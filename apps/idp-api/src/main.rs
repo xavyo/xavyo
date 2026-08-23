@@ -2043,11 +2043,10 @@ impl xavyo_api_social::AuthService for SocialAuthAdapter {
         let typed_user_id = xavyo_core::UserId::from_uuid(user_id);
         let typed_tenant_id = xavyo_core::TenantId::from_uuid(tenant_id);
 
-        // Fetch user email for JWT claims
-        let email = xavyo_db::User::get_email_by_id(&self.pool, user_id)
-            .await
-            .ok()
-            .flatten();
+        // Fail closed: an email lookup error must not mint a JWT without `email`.
+        let email = xavyo_api_social::social_email_from_lookup(
+            xavyo_db::User::get_email_by_id(&self.pool, tenant_id, user_id).await,
+        )?;
 
         // Fail closed: a role-lookup error must not mint a downgraded JWT.
         let roles = xavyo_api_social::social_roles_from_lookup(
@@ -2062,7 +2061,7 @@ impl xavyo_api_social::AuthService for SocialAuthAdapter {
                 typed_user_id,
                 typed_tenant_id,
                 roles,
-                email,
+                Some(email),
                 None,
                 None,
                 None,
@@ -2156,4 +2155,25 @@ async fn shutdown_signal(shutting_down: std::sync::Arc<std::sync::atomic::Atomic
     // The readiness probe will now return 503, telling Kubernetes to stop routing traffic.
     shutting_down.store(true, std::sync::atomic::Ordering::Release);
     info!("Readiness probe set to unhealthy — draining traffic");
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn social_issue_tokens_does_not_fail_open_email() {
+        let src = include_str!("main.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("social_email_from_lookup("),
+            "social JWT mint must fail closed on email lookup"
+        );
+        assert!(
+            production.contains("get_email_by_id(&self.pool, tenant_id, user_id)"),
+            "social JWT email lookup must include tenant_id"
+        );
+        assert!(
+            !production.contains(".ok()\n            .flatten()"),
+            "must not mint a JWT after swallowing email lookup errors"
+        );
+    }
 }

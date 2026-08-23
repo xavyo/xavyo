@@ -451,11 +451,10 @@ impl TokenService {
         )
         .map_err(|_| ApiAuthError::Internal("Failed to fetch user roles".to_string()))?;
 
-        // Fetch user email for JWT claims
-        let email = xavyo_db::User::get_email_by_id(&self.pool, token.user_id)
-            .await
-            .ok()
-            .flatten();
+        // Fail closed: an email lookup error must not mint a JWT without `email`.
+        let email = jwt_email_claim(
+            xavyo_db::User::get_email_by_id(&self.pool, token.tenant_id, token.user_id).await,
+        )?;
 
         // Issue new tokens
         let user_id = UserId::from_uuid(token.user_id);
@@ -476,7 +475,7 @@ impl TokenService {
             user_id,
             tenant_id,
             roles,
-            email,
+            Some(email),
             forwarded_context,
             user_agent,
             ip_address,
@@ -658,6 +657,22 @@ pub fn refresh_account_status(is_active: bool, is_locked: bool) -> Result<(), Ap
     Ok(())
 }
 
+/// Email lookup failures or a missing user must refuse JWT issuance.
+pub fn jwt_email_claim<E: std::fmt::Display>(
+    result: Result<Option<String>, E>,
+) -> Result<String, ApiAuthError> {
+    match result {
+        Ok(Some(email)) => Ok(email),
+        Ok(None) => Err(ApiAuthError::UserNotFound),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to fetch user email for JWT");
+            Err(ApiAuthError::Internal(
+                "Failed to fetch user email".to_string(),
+            ))
+        }
+    }
+}
+
 /// Role lookup failures must refuse token refresh, not mint `["user"]`.
 pub fn refresh_roles<E: std::fmt::Display>(
     result: Result<Vec<String>, E>,
@@ -827,6 +842,30 @@ mod tests {
             production.contains("refresh_account_status"),
             "refresh must refuse locked accounts"
         );
+        assert!(
+            production.contains("jwt_email_claim("),
+            "refresh must fail closed on email lookup"
+        );
+        assert!(
+            !production.contains(".ok()\n            .flatten()"),
+            "must not mint a JWT after swallowing email lookup errors"
+        );
+    }
+
+    #[test]
+    fn jwt_email_claim_does_not_fail_open() {
+        assert_eq!(
+            jwt_email_claim(Ok::<_, &str>(Some("a@b.c".into()))).unwrap(),
+            "a@b.c"
+        );
+        assert!(matches!(
+            jwt_email_claim(Ok::<_, &str>(None)),
+            Err(ApiAuthError::UserNotFound)
+        ));
+        assert!(matches!(
+            jwt_email_claim(Err("db")),
+            Err(ApiAuthError::Internal(ref msg)) if msg == "Failed to fetch user email"
+        ));
     }
 
     #[test]

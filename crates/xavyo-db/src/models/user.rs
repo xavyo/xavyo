@@ -201,17 +201,20 @@ impl User {
             .await
     }
 
-    /// Get a user's email by ID (without tenant filter).
+    /// Get a user's email by ID within a tenant.
     ///
     /// This is a lightweight query used for JWT claims during token refresh.
     pub async fn get_email_by_id(
         pool: &sqlx::PgPool,
+        tenant_id: uuid::Uuid,
         id: uuid::Uuid,
     ) -> Result<Option<String>, sqlx::Error> {
-        let result: Option<(String,)> = sqlx::query_as("SELECT email FROM users WHERE id = $1")
-            .bind(id)
-            .fetch_optional(pool)
-            .await?;
+        let result: Option<(String,)> =
+            sqlx::query_as("SELECT email FROM users WHERE id = $1 AND tenant_id = $2")
+                .bind(id)
+                .bind(tenant_id)
+                .fetch_optional(pool)
+                .await?;
         Ok(result.map(|(email,)| email))
     }
 
@@ -593,6 +596,27 @@ impl User {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn get_email_by_id_scopes_by_tenant() {
+        let src = include_str!("user.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let lookup = production
+            .split("pub async fn get_email_by_id")
+            .nth(1)
+            .expect("get_email_by_id")
+            .split("pub async fn exists_in_tenant")
+            .next()
+            .expect("get_email_by_id body");
+        assert!(
+            lookup.contains("WHERE id = $1 AND tenant_id = $2"),
+            "JWT email lookup must include tenant_id"
+        );
+        assert!(
+            !lookup.contains("WHERE id = $1\""),
+            "must not look up user email by id alone"
+        );
+    }
 
     #[test]
     fn test_user_id_conversion() {

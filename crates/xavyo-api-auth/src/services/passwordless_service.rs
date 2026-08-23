@@ -545,11 +545,9 @@ impl PasswordlessService {
             passwordless_roles(UserRole::get_user_roles(&self.pool, user_id, tenant_id).await)
                 .map_err(|_| ApiAuthError::Internal("Failed to fetch user roles".to_string()))?;
 
-        // Fetch user email for JWT claims
-        let email = User::get_email_by_id(&self.pool, user_id)
-            .await
-            .ok()
-            .flatten();
+        // Fail closed: an email lookup error must not mint a JWT without `email`.
+        let email =
+            super::jwt_email_claim(User::get_email_by_id(&self.pool, tenant_id, user_id).await)?;
 
         let (access_token, refresh_token, expires_in) = self
             .token_service
@@ -557,7 +555,7 @@ impl PasswordlessService {
                 uid,
                 tid,
                 roles,
-                email,
+                Some(email),
                 // Passwordless email link/OTP — single factor (acr "1").
                 Some(AuthContext::passwordless()),
                 user_agent.map(String::from),
@@ -903,6 +901,14 @@ mod tests {
         assert!(
             !production.contains("unwrap_or_else(|_| vec![\"user\""),
             "must not fail-open role lookup to [\"user\"]"
+        );
+        assert!(
+            production.contains("jwt_email_claim("),
+            "passwordless must fail closed on email lookup"
+        );
+        assert!(
+            !production.contains(".ok()\n            .flatten()"),
+            "must not mint a JWT after swallowing email lookup errors"
         );
     }
 }

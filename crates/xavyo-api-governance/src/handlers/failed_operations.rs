@@ -216,15 +216,14 @@ pub async fn process_retries(
     }))
 }
 
-/// Trigger retry processing across all tenants.
+/// Trigger retry processing for the caller's tenant.
 ///
-/// Admin-only endpoint to process all pending retry operations across all tenants.
-/// Returns aggregate statistics about the operations processed.
+/// Admin-only. Does not process other tenants' retry queues.
 #[utoipa::path(
     post,
     path = "/governance/lifecycle/failed-operations/process-all-retries",
     responses(
-        (status = 200, description = "Aggregate retry processing statistics", body = RetryStatsResponse),
+        (status = 200, description = "Retry processing statistics for the caller's tenant", body = RetryStatsResponse),
         (status = 401, description = "Unauthorized"),
         (status = 403, description = "Forbidden - requires admin access"),
         (status = 500, description = "Internal server error")
@@ -236,8 +235,10 @@ pub async fn process_all_retries(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
 ) -> ApiResult<Json<RetryStatsResponse>> {
-    // Verify caller has tenant admin or super admin access
-    let _tenant_id = *claims
+    if !claims.has_role("admin") {
+        return Err(crate::error::ApiGovernanceError::Forbidden);
+    }
+    let tenant_id = *claims
         .tenant_id()
         .ok_or(crate::error::ApiGovernanceError::Unauthorized)?
         .as_uuid();
@@ -248,13 +249,42 @@ pub async fn process_all_retries(
         )
     })?;
 
-    let stats = failed_op_service.process_all_retries(100).await?;
+    let result = failed_op_service.process_retries(tenant_id, 100).await?;
 
     Ok(Json(RetryStatsResponse {
-        tenants_processed: stats.tenants_processed,
-        total_processed: stats.total.processed,
-        total_succeeded: stats.total.succeeded,
-        total_rescheduled: stats.total.rescheduled,
-        total_dead_letter: stats.total.dead_letter,
+        tenants_processed: 1,
+        total_processed: result.processed,
+        total_succeeded: result.succeeded,
+        total_rescheduled: result.rescheduled,
+        total_dead_letter: result.dead_letter,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn process_all_retries_is_admin_and_tenant_scoped() {
+        let src = include_str!("failed_operations.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let handler = production
+            .split("pub async fn process_all_retries")
+            .nth(1)
+            .expect("process_all_retries");
+        assert!(
+            handler.contains("has_role(\"admin\")"),
+            "process-all-retries must require admin"
+        );
+        assert!(
+            handler.contains("process_retries(tenant_id, 100)"),
+            "must process only the caller's tenant"
+        );
+        assert!(
+            !handler.contains("let _tenant_id"),
+            "must not ignore JWT tenant_id"
+        );
+        assert!(
+            !handler.contains("process_all_retries(100)"),
+            "HTTP handler must not process every tenant"
+        );
+    }
 }

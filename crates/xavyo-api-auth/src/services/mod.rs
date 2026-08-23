@@ -80,7 +80,7 @@ pub use ses_email_service::{SesEmailConfig, SesEmailSender};
 pub use session_service::SessionService;
 pub use token_service::{
     account_is_locked, generate_email_verification_token, generate_password_reset_token,
-    generate_secure_token, hash_token, refresh_account_status, refresh_roles,
+    generate_secure_token, hash_token, jwt_email_claim, refresh_account_status, refresh_roles,
     verify_token_hash_constant_time, AuthContext, TokenConfig, TokenService,
     ACCESS_TOKEN_VALIDITY_MINUTES, EMAIL_VERIFICATION_TOKEN_VALIDITY_HOURS,
     PASSWORD_RESET_TOKEN_VALIDITY_HOURS, REFRESH_TOKEN_VALIDITY_DAYS, SECURE_TOKEN_BYTES,
