@@ -410,12 +410,14 @@ impl BulkActionService {
 
         let count: (i64,) = sqlx::query_as(
             r#"
-            SELECT COUNT(*) FROM user_roles
-            WHERE user_id = $1 AND role_name = $2
+            SELECT COUNT(*) FROM user_roles ur
+            JOIN users u ON ur.user_id = u.id AND u.tenant_id = $3
+            WHERE ur.user_id = $1 AND ur.role_name = $2
             "#,
         )
         .bind(user_id)
         .bind(role_name)
+        .bind(tenant_id)
         .fetch_one(&self.pool)
         .await?;
 
@@ -697,5 +699,19 @@ mod tests {
         assert!(attrs.contains(&"department".to_string()));
         assert!(attrs.contains(&"level".to_string()));
         assert!(attrs.contains(&"is_manager".to_string()));
+    }
+
+    #[test]
+    fn user_has_role_joins_users_tenant() {
+        let src = include_str!("bulk_action_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("JOIN users u ON ur.user_id = u.id AND u.tenant_id = $3"),
+            "bulk action role lookup must join users for tenant isolation"
+        );
+        assert!(
+            !production.contains("SELECT COUNT(*) FROM user_roles\n            WHERE user_id = $1 AND role_name = $2"),
+            "must not count user_roles without a tenant-scoped users join"
+        );
     }
 }
