@@ -114,13 +114,8 @@ pub async fn admin_revoke_user_handler(
         revoked_by: admin_id,
     };
 
-    if let Err(e) = RevokedToken::insert(&mut *conn, input).await {
-        tracing::error!(
-            user_id = %request.user_id,
-            error = %e,
-            "Failed to insert revoke-all sentinel"
-        );
-    }
+    let access_tokens_blacklisted =
+        revoke_all_sentinel_write(RevokedToken::insert(&mut *conn, input).await)?;
 
     // Invalidate sentinel in cache
     if let Some(ref cache) = state.revocation_cache {
@@ -141,7 +136,7 @@ pub async fn admin_revoke_user_handler(
     Ok(Json(AdminRevokeUserResponse {
         user_id: request.user_id,
         refresh_tokens_revoked,
-        access_tokens_blacklisted: true,
+        access_tokens_blacklisted,
         revoked_at: Utc::now(),
     }))
 }
@@ -344,4 +339,43 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, OAuthError> {
     claims
         .tid
         .ok_or_else(|| OAuthError::InvalidRequest("Missing tenant_id in JWT claims".to_string()))
+}
+
+/// Admin revoke-all sentinel insert. Persist errors must not report
+/// `access_tokens_blacklisted: true`.
+pub(crate) fn revoke_all_sentinel_write<T, E: std::fmt::Display>(
+    result: Result<T, E>,
+) -> Result<bool, OAuthError> {
+    result.map(|_| true).map_err(|e| {
+        tracing::error!(
+            error = %e,
+            "Failed to insert revoke-all sentinel"
+        );
+        OAuthError::Internal("Failed to persist revoke-all sentinel".to_string())
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn revoke_all_sentinel_write_does_not_skip_on_error() {
+        assert!(revoke_all_sentinel_write(Ok::<(), &str>(())).unwrap());
+        assert!(revoke_all_sentinel_write(Err::<(), _>("db down")).is_err());
+    }
+
+    #[test]
+    fn admin_revoke_user_does_not_swallow_sentinel_insert() {
+        let src = include_str!("admin_sessions.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("revoke_all_sentinel_write("),
+            "admin revoke-user must fail closed on sentinel persist"
+        );
+        assert!(
+            !production.contains("if let Err(e) = RevokedToken::insert"),
+            "must not swallow revoke-all sentinel insert errors"
+        );
+    }
 }
