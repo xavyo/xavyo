@@ -100,6 +100,7 @@ None
 - Never expose API key secrets after creation
 - Never allow cross-tenant access
 - Never delete tenants without proper cleanup
+- Never rate-limit `/tenants/provision` using a spoofable `X-Forwarded-For` (require `TrustXff`)
 
 ## Related Crates
 
