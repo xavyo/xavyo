@@ -15,6 +15,7 @@ use crate::router::OAuthState;
 use axum::{extract::State, http::HeaderMap, Form, Json};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
+use xavyo_api_auth::middleware::sentinel_query_revoked;
 
 /// Database row for a refresh token introspection lookup.
 #[derive(sqlx::FromRow)]
@@ -166,13 +167,16 @@ async fn try_introspect_access_token(
         // after this token was issued, the token should be treated as revoked.
         // Filter by tenant_id to prevent cross-tenant leakage.
         // SECURITY: Acquire dedicated connection for RLS context
-        let sentinel_revoked: bool = if let Ok(mut conn) = state.pool.acquire().await {
-            let _ = sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
-                .bind(tenant_id.to_string())
-                .execute(&mut *conn)
-                .await;
-            sqlx::query_scalar(
-                r"
+        let sentinel_revoked: bool = match state.pool.acquire().await {
+            Ok(mut conn) => {
+                match sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+                    .bind(tenant_id.to_string())
+                    .execute(&mut *conn)
+                    .await
+                {
+                    Ok(_) => sentinel_query_revoked(
+                        sqlx::query_scalar(
+                            r"
                 SELECT EXISTS(
                     SELECT 1 FROM revoked_tokens
                     WHERE jti LIKE 'revoke-all:' || $1 || ':%'
@@ -180,16 +184,17 @@ async fn try_introspect_access_token(
                       AND created_at > to_timestamp($2)
                 )
                 ",
-            )
-            .bind(&claims.sub)
-            .bind(claims.iat as f64)
-            .bind(tenant_id)
-            .fetch_one(&mut *conn)
-            .await
-            .unwrap_or(false)
-        } else {
-            // Fail-closed: treat connection errors as revoked
-            true
+                        )
+                        .bind(&claims.sub)
+                        .bind(claims.iat as f64)
+                        .bind(tenant_id)
+                        .fetch_one(&mut *conn)
+                        .await,
+                    ),
+                    Err(e) => sentinel_query_revoked(Err(e)),
+                }
+            }
+            Err(e) => sentinel_query_revoked(Err(e)),
         };
 
         if sentinel_revoked {
@@ -288,4 +293,21 @@ fn hash_token(token: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(token.as_bytes());
     hex::encode(hasher.finalize())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn introspection_does_not_fail_open_sentinel_query() {
+        let src = include_str!("introspection.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("sentinel_query_revoked("),
+            "introspection sentinel lookups must fail closed"
+        );
+        assert!(
+            !production.contains("unwrap_or(false)"),
+            "must not treat sentinel query errors as not-revoked"
+        );
+    }
 }
