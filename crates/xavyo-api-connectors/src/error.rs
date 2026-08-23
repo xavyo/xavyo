@@ -297,6 +297,7 @@ impl From<crate::services::SyncServiceError> for ConnectorApiError {
             SyncServiceError::InvalidParameter(msg) => ConnectorApiError::bad_request(msg),
             SyncServiceError::Database(e) => ConnectorApiError::Database(e),
             SyncServiceError::Sync(msg) => ConnectorApiError::sync_error(msg),
+            SyncServiceError::NotImplemented(msg) => ConnectorApiError::not_implemented(msg),
         }
     }
 }

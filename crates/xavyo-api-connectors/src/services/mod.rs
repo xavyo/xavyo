@@ -33,7 +33,9 @@ pub use schedule_service::{
     compute_next_run_at, validate_schedule_config, ScheduleError, ScheduleResult, ScheduleService,
 };
 pub use schema_service::{AttributeResponse, ObjectClassResponse, SchemaResponse, SchemaService};
-pub use sync_service::{SyncService, SyncServiceError, SyncServiceResult};
+pub use sync_service::{
+    reject_unimplemented_live_sync, SyncService, SyncServiceError, SyncServiceResult,
+};
 
 // Job tracking service (F044)
 pub use job_service::{JobService, JobServiceError, JobServiceResult};

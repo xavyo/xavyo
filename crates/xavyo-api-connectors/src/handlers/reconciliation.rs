@@ -898,6 +898,11 @@ pub async fn ignore_discrepancy(
     }
     let tenant_id = extract_tenant_id(&claims)?;
     let user_id = Uuid::parse_str(&claims.sub).ok();
+    if user_id.is_none() {
+        return Err(ConnectorApiError::Unauthorized {
+            message: "JWT sub must be a user UUID".to_string(),
+        });
+    }
 
     state
         .reconciliation_service

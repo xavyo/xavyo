@@ -316,8 +316,9 @@ pub use persona_entitlement_service::{
     EntitlementComparison, PersonaContext, PersonaEntitlementResult, PersonaEntitlementService,
 };
 pub use persona_expiration_service::{
-    BatchExpirationResult, ExpiringPersonaSummary, ExpiringPersonasReport, ExtensionResult,
-    PersonaExpirationCheckResult, PersonaExpirationService,
+    reject_unapproved_persona_extension, BatchExpirationResult, ExpiringPersonaSummary,
+    ExpiringPersonasReport, ExtensionResult, PersonaExpirationCheckResult,
+    PersonaExpirationService,
 };
 pub use persona_service::{render_persona_template, PersonaService};
 pub use persona_session_service::{ContextInfo, PersonaClaims, PersonaSessionService};

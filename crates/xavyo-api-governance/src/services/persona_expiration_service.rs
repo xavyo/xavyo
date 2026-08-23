@@ -19,6 +19,16 @@ use xavyo_governance::error::{GovernanceError, Result};
 
 use super::persona_audit_service::PersonaAuditService;
 
+/// Fail closed: a persona that requires approval cannot be extended by a
+/// non-owner until an approval workflow is wired.
+pub fn reject_unapproved_persona_extension(requires_approval: bool, is_owner: bool) -> Result<()> {
+    if requires_approval && !is_owner {
+        Err(GovernanceError::PersonaExtensionRequiresApproval)
+    } else {
+        Ok(())
+    }
+}
+
 /// Default number of days before expiration to send warning (status → expiring).
 const DEFAULT_EXPIRATION_WARNING_DAYS: i64 = 7;
 
@@ -398,18 +408,7 @@ impl PersonaExpirationService {
         // Note: In a full implementation, this would integrate with an approval workflow.
         // For now, we allow the persona owner to self-extend without approval.
         let is_owner = actor_id == persona.physical_user_id;
-
-        if requires_approval && !is_owner {
-            // Non-owner trying to extend a persona that requires approval
-            // In a full implementation, this would create an approval request.
-            // For now, we allow it but flag that approval was needed.
-            info!(
-                persona_id = %persona_id,
-                actor_id = %actor_id,
-                physical_user_id = %persona.physical_user_id,
-                "Extension performed by non-owner for persona requiring approval (admin override)"
-            );
-        }
+        reject_unapproved_persona_extension(requires_approval, is_owner)?;
 
         // Calculate new valid_until
         let current_valid_until = persona.valid_until.unwrap_or_else(Utc::now);
@@ -587,6 +586,22 @@ impl PersonaExpirationService {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn non_owner_cannot_extend_when_approval_required() {
+        let err = reject_unapproved_persona_extension(true, false).expect_err("must fail closed");
+        assert!(matches!(
+            err,
+            GovernanceError::PersonaExtensionRequiresApproval
+        ));
+        assert!(err.is_forbidden());
+    }
+
+    #[test]
+    fn owner_can_self_extend_when_approval_required() {
+        assert!(reject_unapproved_persona_extension(true, true).is_ok());
+        assert!(reject_unapproved_persona_extension(false, false).is_ok());
+    }
 
     #[test]
     fn test_batch_result_default() {

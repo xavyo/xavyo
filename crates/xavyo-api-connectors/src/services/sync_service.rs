@@ -21,6 +21,13 @@ pub enum SyncServiceError {
     NotFound(String),
     #[error("Invalid parameter: {0}")]
     InvalidParameter(String),
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
+}
+
+/// Live inbound sync execution (trigger/retry/link/list changes) is not wired.
+pub fn reject_unimplemented_live_sync() -> SyncServiceError {
+    SyncServiceError::NotImplemented("Live inbound sync execution is not implemented".to_string())
 }
 
 /// Result type for sync service operations.
@@ -187,8 +194,12 @@ impl SyncService {
 
     /// Get sync status for a connector.
     #[instrument(skip(self))]
-    pub async fn get_status(&self, connector_id: Uuid) -> SyncServiceResult<SyncStatus> {
-        let tenant_id = self.get_tenant_for_connector(connector_id).await?;
+    pub async fn get_status(
+        &self,
+        tenant_id: Uuid,
+        connector_id: Uuid,
+    ) -> SyncServiceResult<SyncStatus> {
+        self.ensure_connector(tenant_id, connector_id).await?;
 
         match self.status_manager.get(tenant_id, connector_id).await {
             Ok(Some(status)) => Ok(status),
@@ -208,8 +219,12 @@ impl SyncService {
 
     /// Get sync token for a connector.
     #[instrument(skip(self))]
-    pub async fn get_token(&self, connector_id: Uuid) -> SyncServiceResult<Option<SyncToken>> {
-        let tenant_id = self.get_tenant_for_connector(connector_id).await?;
+    pub async fn get_token(
+        &self,
+        tenant_id: Uuid,
+        connector_id: Uuid,
+    ) -> SyncServiceResult<Option<SyncToken>> {
+        self.ensure_connector(tenant_id, connector_id).await?;
 
         self.token_manager
             .get(tenant_id, connector_id)
@@ -219,8 +234,8 @@ impl SyncService {
 
     /// Reset sync token (triggers full resync).
     #[instrument(skip(self))]
-    pub async fn reset_token(&self, connector_id: Uuid) -> SyncServiceResult<()> {
-        let tenant_id = self.get_tenant_for_connector(connector_id).await?;
+    pub async fn reset_token(&self, tenant_id: Uuid, connector_id: Uuid) -> SyncServiceResult<()> {
+        self.ensure_connector(tenant_id, connector_id).await?;
 
         self.token_manager
             .reset(tenant_id, connector_id)
@@ -232,62 +247,76 @@ impl SyncService {
 
     /// Trigger a sync cycle manually.
     #[instrument(skip(self))]
-    pub async fn trigger_sync(&self, _connector_id: Uuid) -> SyncServiceResult<BatchSummary> {
-        Ok(BatchSummary::default())
+    pub async fn trigger_sync(
+        &self,
+        tenant_id: Uuid,
+        connector_id: Uuid,
+    ) -> SyncServiceResult<BatchSummary> {
+        self.ensure_connector(tenant_id, connector_id).await?;
+        Err(reject_unimplemented_live_sync())
     }
 
     /// List inbound changes for a connector.
     #[instrument(skip(self))]
     pub async fn list_changes(
         &self,
-        _connector_id: Uuid,
+        tenant_id: Uuid,
+        connector_id: Uuid,
         _status: Option<&str>,
         _limit: i64,
         _offset: i64,
     ) -> SyncServiceResult<(Vec<InboundChange>, i64)> {
-        Ok((Vec::new(), 0))
+        self.ensure_connector(tenant_id, connector_id).await?;
+        Err(reject_unimplemented_live_sync())
     }
 
     /// Get a specific inbound change.
     #[instrument(skip(self))]
     pub async fn get_change(
         &self,
-        _connector_id: Uuid,
+        tenant_id: Uuid,
+        connector_id: Uuid,
         _change_id: Uuid,
     ) -> SyncServiceResult<Option<InboundChange>> {
-        Ok(None)
+        self.ensure_connector(tenant_id, connector_id).await?;
+        Err(reject_unimplemented_live_sync())
     }
 
     /// Retry processing a failed change.
     #[instrument(skip(self))]
     pub async fn retry_change(
         &self,
-        _connector_id: Uuid,
+        tenant_id: Uuid,
+        connector_id: Uuid,
         _change_id: Uuid,
     ) -> SyncServiceResult<()> {
-        Ok(())
+        self.ensure_connector(tenant_id, connector_id).await?;
+        Err(reject_unimplemented_live_sync())
     }
 
     /// Manually link a change to a user.
     #[instrument(skip(self))]
     pub async fn link_change(
         &self,
-        _connector_id: Uuid,
+        tenant_id: Uuid,
+        connector_id: Uuid,
         _change_id: Uuid,
         _user_id: Uuid,
     ) -> SyncServiceResult<()> {
-        Ok(())
+        self.ensure_connector(tenant_id, connector_id).await?;
+        Err(reject_unimplemented_live_sync())
     }
 
     /// List sync conflicts for a connector.
     #[instrument(skip(self))]
     pub async fn list_conflicts(
         &self,
+        tenant_id: Uuid,
         connector_id: Uuid,
         _status: Option<&str>,
         limit: i64,
     ) -> SyncServiceResult<(Vec<SyncConflict>, i64)> {
-        let tenant_id = self.get_tenant_for_connector(connector_id).await?;
+        self.ensure_connector(tenant_id, connector_id).await?;
 
         let conflicts = self
             .conflict_detector
@@ -303,13 +332,14 @@ impl SyncService {
     #[instrument(skip(self))]
     pub async fn resolve_conflict(
         &self,
+        tenant_id: Uuid,
         connector_id: Uuid,
         conflict_id: Uuid,
         resolution: &str,
         notes: Option<String>,
         resolved_by: Uuid,
     ) -> SyncServiceResult<()> {
-        let tenant_id = self.get_tenant_for_connector(connector_id).await?;
+        self.ensure_connector(tenant_id, connector_id).await?;
         let strategy = resolution.parse().unwrap_or(ResolutionStrategy::Pending);
 
         self.conflict_detector
@@ -318,23 +348,6 @@ impl SyncService {
             .map_err(|e| SyncServiceError::Sync(e.to_string()))?;
 
         Ok(())
-    }
-
-    /// Get tenant ID for a connector (helper method).
-    async fn get_tenant_for_connector(&self, connector_id: Uuid) -> SyncServiceResult<Uuid> {
-        let row: Option<(Uuid,)> =
-            sqlx::query_as("SELECT tenant_id FROM connector_configurations WHERE id = $1")
-                .bind(connector_id)
-                .fetch_optional(&self.pool)
-                .await
-                .map_err(SyncServiceError::Database)?;
-
-        match row {
-            Some((tenant_id,)) => Ok(tenant_id),
-            None => Err(SyncServiceError::NotFound(format!(
-                "Connector {connector_id} not found"
-            ))),
-        }
     }
 }
 
@@ -361,6 +374,35 @@ mod tests {
         assert_ne!(cfg.tenant_id, Uuid::nil());
         assert_ne!(cfg.connector_id, Uuid::nil());
         assert!(!cfg.enabled);
+    }
+
+    #[test]
+    fn live_sync_stubs_are_not_implemented() {
+        let err = reject_unimplemented_live_sync();
+        assert!(
+            matches!(err, SyncServiceError::NotImplemented(_)),
+            "got {err:?}"
+        );
+        let msg = err.to_string().to_lowercase();
+        assert!(!msg.contains("success"), "{msg}");
+    }
+
+    #[test]
+    fn connector_lookup_is_tenant_scoped() {
+        let src = include_str!("sync_service.rs");
+        let unscoped_helper = format!("{}_{}", "get_tenant", "for_connector");
+        assert!(
+            !src.contains(&unscoped_helper),
+            "connector lookup must not resolve tenant from id alone"
+        );
+        let ensure = format!(
+            "{}({}, {})",
+            "ensure_connector", "tenant_id", "connector_id"
+        );
+        assert!(
+            src.contains(&ensure),
+            "remaining sync ops must ensure the connector belongs to the JWT tenant"
+        );
     }
 
     #[test]
