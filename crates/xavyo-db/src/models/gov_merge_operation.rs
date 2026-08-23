@@ -157,6 +157,27 @@ impl GovMergeOperation {
         .await
     }
 
+    /// Find operations by IDs within a tenant.
+    pub async fn find_by_ids(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        ids: &[Uuid],
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        sqlx::query_as(
+            r"
+            SELECT * FROM gov_merge_operations
+            WHERE tenant_id = $1 AND id = ANY($2)
+            ",
+        )
+        .bind(tenant_id)
+        .bind(ids)
+        .fetch_all(pool)
+        .await
+    }
+
     /// Find pending operations involving an identity (to prevent conflicts).
     pub async fn find_pending_by_identity(
         pool: &sqlx::PgPool,

@@ -127,6 +127,7 @@ let app = Router::new()
 - Never allow campaign decisions without audit trail
 - Never extend a persona that requires approval on behalf of a non-owner until an approval workflow exists
 - Never return a placeholder `access_token` for persona switch or PoA assume/drop (501 until signed JWT re-issuance is wired)
+- Never return `Uuid::nil()` as merge-audit `operator_id` (load it from the merge operation)
 
 ## Related Crates
 

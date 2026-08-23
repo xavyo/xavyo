@@ -7,8 +7,9 @@ use axum::{
 use sqlx::types::Decimal;
 use uuid::Uuid;
 
+use chrono::{DateTime, Utc};
 use xavyo_auth::JwtClaims;
-use xavyo_db::models::{DuplicateCandidateFilter, MergeOperationFilter};
+use xavyo_db::models::{DuplicateCandidateFilter, GovMergeOperation, MergeOperationFilter};
 
 use crate::error::{ApiGovernanceError, ApiResult};
 use crate::models::{
@@ -464,33 +465,25 @@ pub async fn list_merge_audits(
         .list(tenant_id, &filter, limit, offset)
         .await?;
 
-    // Build the summary responses by extracting IDs from snapshots
+    let op_ids: Vec<Uuid> = audits.iter().map(|a| a.operation_id).collect();
+    let operations = GovMergeOperation::find_by_ids(&state.pool, tenant_id, &op_ids)
+        .await
+        .map_err(xavyo_governance::error::GovernanceError::Database)?;
+    let ops_by_id: std::collections::HashMap<Uuid, GovMergeOperation> =
+        operations.into_iter().map(|op| (op.id, op)).collect();
+
     let items: Vec<MergeAuditSummaryResponse> = audits
         .into_iter()
-        .map(|a| {
-            // Extract identity IDs from snapshots
-            let source_identity_id = a
-                .source_snapshot
-                .get("id")
-                .and_then(|v| v.as_str())
-                .and_then(|s| Uuid::parse_str(s).ok())
-                .unwrap_or(Uuid::nil());
-            let target_identity_id = a
-                .target_snapshot
-                .get("id")
-                .and_then(|v| v.as_str())
-                .and_then(|s| Uuid::parse_str(s).ok())
-                .unwrap_or(Uuid::nil());
-
-            MergeAuditSummaryResponse {
-                id: a.id,
-                operation_id: a.operation_id,
-                source_identity_id,
-                target_identity_id,
-                // operator_id will be fetched from the operation if needed
-                operator_id: Uuid::nil(), // Placeholder - see operation for actual operator
-                created_at: a.created_at,
-            }
+        .filter_map(|a| {
+            let op = ops_by_id.get(&a.operation_id)?;
+            merge_audit_summary(
+                a.id,
+                a.operation_id,
+                op.source_identity_id,
+                op.target_identity_id,
+                op.operator_id,
+                a.created_at,
+            )
         })
         .collect();
 
@@ -500,6 +493,29 @@ pub async fn list_merge_audits(
         limit,
         offset,
     }))
+}
+
+/// Build a merge-audit list row. Missing operator or identity IDs are omitted
+/// rather than reported as `Uuid::nil()`.
+pub fn merge_audit_summary(
+    id: Uuid,
+    operation_id: Uuid,
+    source_identity_id: Uuid,
+    target_identity_id: Uuid,
+    operator_id: Uuid,
+    created_at: DateTime<Utc>,
+) -> Option<MergeAuditSummaryResponse> {
+    if source_identity_id.is_nil() || target_identity_id.is_nil() || operator_id.is_nil() {
+        return None;
+    }
+    Some(MergeAuditSummaryResponse {
+        id,
+        operation_id,
+        source_identity_id,
+        target_identity_id,
+        operator_id,
+        created_at,
+    })
 }
 
 /// Get a detailed merge audit record by ID.
@@ -692,4 +708,59 @@ pub struct BatchMergeCandidatePreviewResponse {
     pub source_identity_id: Uuid,
     pub target_identity_id: Uuid,
     pub confidence_score: f64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn merge_audit_summary_rejects_nil_operator() {
+        let source = Uuid::new_v4();
+        let target = Uuid::new_v4();
+        assert!(merge_audit_summary(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            source,
+            target,
+            Uuid::nil(),
+            Utc::now(),
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn merge_audit_summary_keeps_real_operator() {
+        let operator = Uuid::new_v4();
+        let source = Uuid::new_v4();
+        let target = Uuid::new_v4();
+        let row = merge_audit_summary(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            source,
+            target,
+            operator,
+            Utc::now(),
+        )
+        .expect("real ids");
+        assert_eq!(row.operator_id, operator);
+        assert_eq!(row.source_identity_id, source);
+        assert_eq!(row.target_identity_id, target);
+        assert!(!row.operator_id.is_nil());
+    }
+
+    #[test]
+    fn list_merge_audits_does_not_emit_nil_operator() {
+        let src = include_str!("identity_merge.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let needle = format!("operator_id: {}()", "Uuid::nil");
+        assert!(
+            !production.contains(&needle),
+            "audit list must not advertise a nil operator"
+        );
+        assert!(
+            production.contains("merge_audit_summary"),
+            "audit list must map operator from the merge operation"
+        );
+    }
 }
