@@ -1156,9 +1156,9 @@ impl BatchSimulationService {
                 .bind(tenant_id)
                 .fetch_optional(&self.pool)
                 .await
-                .unwrap_or(None);
+                .map_err(GovernanceError::Database)?;
 
-        Ok(name.unwrap_or_else(|| format!("Role {role_id}")))
+        name.ok_or(GovernanceError::GovRoleNotFound(role_id))
     }
 
     /// Get entitlement name by ID.
@@ -1170,31 +1170,31 @@ impl BatchSimulationService {
         .bind(tenant_id)
         .fetch_optional(&self.pool)
         .await
-        .unwrap_or(None);
+        .map_err(GovernanceError::Database)?;
 
-        Ok(name.unwrap_or_else(|| format!("Entitlement {entitlement_id}")))
+        name.ok_or(GovernanceError::EntitlementNotFound(entitlement_id))
     }
 
     /// Get entitlements associated with a role, with names.
     async fn get_role_entitlements_with_names(
         &self,
-        _tenant_id: Uuid,
+        tenant_id: Uuid,
         role_id: Uuid,
     ) -> Result<Vec<(Uuid, String)>> {
-        let entitlements: Vec<(Uuid, String)> = sqlx::query_as(
+        sqlx::query_as(
             r"
             SELECT e.id, e.name
             FROM gov_entitlements e
-            JOIN gov_role_entitlements re ON re.entitlement_id = e.id
-            WHERE re.role_id = $1
+            JOIN gov_role_entitlements re
+              ON re.entitlement_id = e.id AND re.tenant_id = $2
+            WHERE re.role_id = $1 AND e.tenant_id = $2
             ",
         )
         .bind(role_id)
+        .bind(tenant_id)
         .fetch_all(&self.pool)
         .await
-        .unwrap_or_default();
-
-        Ok(entitlements)
+        .map_err(GovernanceError::Database)
     }
 
     /// Check if user has a specific role (resolve role UUID to name via gov_roles).
@@ -1277,20 +1277,65 @@ impl BatchSimulationService {
     }
 
     /// Get entitlements associated with a role.
-    async fn get_role_entitlements(&self, _tenant_id: Uuid, role_id: Uuid) -> Result<Vec<Uuid>> {
-        let entitlements: Vec<Uuid> = sqlx::query_scalar(
+    async fn get_role_entitlements(&self, tenant_id: Uuid, role_id: Uuid) -> Result<Vec<Uuid>> {
+        sqlx::query_scalar(
             r"
             SELECT entitlement_id
             FROM gov_role_entitlements
-            WHERE role_id = $1
+            WHERE role_id = $1 AND tenant_id = $2
             ",
         )
         .bind(role_id)
+        .bind(tenant_id)
         .fetch_all(&self.pool)
         .await
-        .unwrap_or_default();
+        .map_err(GovernanceError::Database)
+    }
 
-        Ok(entitlements)
+    /// Active entitlement IDs assigned to a user in this tenant.
+    async fn active_user_entitlement_ids(
+        &self,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Vec<Uuid>> {
+        sqlx::query_scalar(
+            r"
+            SELECT DISTINCT entitlement_id
+            FROM gov_entitlement_assignments
+            WHERE user_id = $1 AND tenant_id = $2 AND status = 'active'
+            ",
+        )
+        .bind(user_id)
+        .bind(tenant_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(GovernanceError::Database)
+    }
+
+    /// Enabled SoD rule IDs that conflict for an entitlement pair in this tenant.
+    async fn sod_rule_ids_for_pair(
+        &self,
+        tenant_id: Uuid,
+        first: Uuid,
+        second: Uuid,
+    ) -> Result<Vec<Uuid>> {
+        sqlx::query_scalar(
+            r"
+            SELECT id FROM gov_sod_rules
+            WHERE tenant_id = $1
+              AND is_enabled = true
+              AND (
+                (first_entitlement_id = $2 AND second_entitlement_id = $3)
+                OR (first_entitlement_id = $3 AND second_entitlement_id = $2)
+              )
+            ",
+        )
+        .bind(tenant_id)
+        .bind(first)
+        .bind(second)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(GovernanceError::Database)
     }
 
     /// Check for `SoD` violations if a role is added.
@@ -1307,42 +1352,15 @@ impl BatchSimulationService {
             return Ok(vec![]);
         }
 
-        // Get user's current entitlements
-        let current_entitlements: Vec<Uuid> = sqlx::query_scalar(
-            r"
-            SELECT DISTINCT entitlement_id
-            FROM gov_entitlement_assignments
-            WHERE user_id = $1 AND status = 'active'
-            ",
-        )
-        .bind(user_id)
-        .fetch_all(&self.pool)
-        .await
-        .unwrap_or_default();
+        let current_entitlements = self.active_user_entitlement_ids(tenant_id, user_id).await?;
 
-        // Check SoD rules
         let mut violations = Vec::new();
 
         for new_ent in &new_entitlements {
             for current_ent in &current_entitlements {
-                let conflicting_rules: Vec<Uuid> = sqlx::query_scalar(
-                    r"
-                    SELECT id FROM gov_sod_rules
-                    WHERE tenant_id = $1
-                      AND is_enabled = true
-                      AND (
-                        (first_entitlement_id = $2 AND second_entitlement_id = $3)
-                        OR (first_entitlement_id = $3 AND second_entitlement_id = $2)
-                      )
-                    ",
-                )
-                .bind(tenant_id)
-                .bind(new_ent)
-                .bind(current_ent)
-                .fetch_all(&self.pool)
-                .await
-                .unwrap_or_default();
-
+                let conflicting_rules = self
+                    .sod_rule_ids_for_pair(tenant_id, *new_ent, *current_ent)
+                    .await?;
                 violations.extend(conflicting_rules);
             }
         }
@@ -1357,41 +1375,14 @@ impl BatchSimulationService {
         user_id: Uuid,
         entitlement_id: Uuid,
     ) -> Result<Vec<Uuid>> {
-        // Get user's current entitlements
-        let current_entitlements: Vec<Uuid> = sqlx::query_scalar(
-            r"
-            SELECT DISTINCT entitlement_id
-            FROM gov_entitlement_assignments
-            WHERE user_id = $1 AND status = 'active'
-            ",
-        )
-        .bind(user_id)
-        .fetch_all(&self.pool)
-        .await
-        .unwrap_or_default();
+        let current_entitlements = self.active_user_entitlement_ids(tenant_id, user_id).await?;
 
-        // Check SoD rules against all current entitlements
         let mut violations = Vec::new();
 
         for current_ent in &current_entitlements {
-            let conflicting_rules: Vec<Uuid> = sqlx::query_scalar(
-                r"
-                SELECT id FROM gov_sod_rules
-                WHERE tenant_id = $1
-                  AND is_enabled = true
-                  AND (
-                    (first_entitlement_id = $2 AND second_entitlement_id = $3)
-                    OR (first_entitlement_id = $3 AND second_entitlement_id = $2)
-                  )
-                ",
-            )
-            .bind(tenant_id)
-            .bind(entitlement_id)
-            .bind(current_ent)
-            .fetch_all(&self.pool)
-            .await
-            .unwrap_or_default();
-
+            let conflicting_rules = self
+                .sod_rule_ids_for_pair(tenant_id, entitlement_id, *current_ent)
+                .await?;
             violations.extend(conflicting_rules);
         }
 
@@ -1824,6 +1815,85 @@ mod tests {
         assert!(
             !user_has_entitlement.contains("unwrap_or(0)"),
             "user_has_entitlement must not treat query errors as no assignment"
+        );
+    }
+
+    #[test]
+    fn sod_and_name_lookups_are_tenant_scoped_and_fail_closed() {
+        let src = include_str!("batch_simulation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("format!(\"Role {role_id}\")"),
+            "missing roles must not be reported as fake names"
+        );
+        assert!(
+            !production.contains("format!(\"Entitlement {entitlement_id}\")"),
+            "missing entitlements must not be reported as fake names"
+        );
+        assert!(
+            production.contains("GovernanceError::GovRoleNotFound"),
+            "role name lookup must fail when the role is missing"
+        );
+        assert!(
+            production.contains("GovernanceError::EntitlementNotFound"),
+            "entitlement name lookup must fail when the entitlement is missing"
+        );
+
+        let with_names = production
+            .split("async fn get_role_entitlements_with_names")
+            .nth(1)
+            .and_then(|s| s.split("async fn ").next())
+            .expect("get_role_entitlements_with_names");
+        assert!(
+            with_names.contains("re.tenant_id = $2") && with_names.contains("e.tenant_id = $2"),
+            "role entitlement names must be tenant-scoped"
+        );
+        assert!(
+            !with_names.contains("unwrap_or_default"),
+            "role entitlement name lookup must not fail open"
+        );
+
+        let role_ents = production
+            .split("async fn get_role_entitlements(")
+            .nth(1)
+            .and_then(|s| s.split("async fn ").next())
+            .expect("get_role_entitlements");
+        assert!(
+            role_ents.contains("AND tenant_id = $2"),
+            "role entitlements must filter tenant_id"
+        );
+        assert!(
+            !role_ents.contains("unwrap_or_default"),
+            "role entitlement lookup must not fail open"
+        );
+
+        let active = production
+            .split("async fn active_user_entitlement_ids")
+            .nth(1)
+            .and_then(|s| s.split("async fn ").next())
+            .expect("active_user_entitlement_ids");
+        assert!(
+            active.contains("AND tenant_id = $2"),
+            "SoD current entitlements must filter tenant_id"
+        );
+
+        let sod_role = production
+            .split("async fn check_sod_violations_for_role_add")
+            .nth(1)
+            .and_then(|s| s.split("async fn ").next())
+            .expect("check_sod_violations_for_role_add");
+        assert!(
+            !sod_role.contains("unwrap_or_default"),
+            "SoD role-add checks must not fail open"
+        );
+        let sod_ent = production
+            .split("async fn check_sod_violations_for_entitlement_add")
+            .nth(1)
+            .and_then(|s| s.split("async fn ").next())
+            .expect("check_sod_violations_for_entitlement_add");
+        assert!(
+            !sod_ent.contains("unwrap_or_default"),
+            "SoD entitlement-add checks must not fail open"
         );
     }
 }
