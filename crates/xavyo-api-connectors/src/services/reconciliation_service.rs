@@ -10,11 +10,11 @@ use uuid::Uuid;
 
 use xavyo_db::models::{
     ConnectorReconciliationMode, ConnectorReconciliationRun, ConnectorReconciliationRunFilter,
-    ConnectorReconciliationStatus, CreateConnectorReconciliationRun, CreateReconciliationAction,
-    ReconciliationAction, ReconciliationActionFilter, ReconciliationActionResult,
-    ReconciliationActionType, ReconciliationDiscrepancy, ReconciliationDiscrepancyFilter,
-    ReconciliationDiscrepancyType, ReconciliationResolutionStatus, ReconciliationSchedule,
-    ReconciliationScheduleFrequency, UpsertReconciliationSchedule,
+    ConnectorReconciliationStatus, CreateConnectorReconciliationRun, ReconciliationAction,
+    ReconciliationActionFilter, ReconciliationActionResult, ReconciliationActionType,
+    ReconciliationDiscrepancy, ReconciliationDiscrepancyFilter, ReconciliationDiscrepancyType,
+    ReconciliationResolutionStatus, ReconciliationSchedule, ReconciliationScheduleFrequency,
+    UpsertReconciliationSchedule,
 };
 
 use crate::handlers::reconciliation::{
@@ -37,6 +37,16 @@ pub enum ReconciliationServiceError {
     InvalidParameter(String),
     #[error("Conflict: {0}")]
     Conflict(String),
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
+}
+
+/// Connector-side discrepancy remediation is not wired. Callers must not
+/// receive a recorded `success` or a resolved discrepancy.
+pub fn reject_unimplemented_connector_remediation() -> ReconciliationServiceResult<()> {
+    Err(ReconciliationServiceError::NotImplemented(
+        "Connector-side discrepancy remediation is not implemented".to_string(),
+    ))
 }
 
 /// Result type for reconciliation service operations.
@@ -279,55 +289,18 @@ impl ReconciliationService {
                     ReconciliationServiceError::NotFound("Discrepancy not found".to_string())
                 })?;
 
-        // Parse action type
-        let action_type: ReconciliationActionType = action.parse().map_err(|_| {
+        let _action_type: ReconciliationActionType = action.parse().map_err(|_| {
             ReconciliationServiceError::InvalidParameter(format!("Invalid action: {action}"))
         })?;
 
-        let resolved_user_id = user_id.unwrap_or_else(Uuid::nil);
+        let _ = (user_id, dry_run);
 
-        // TODO: In production, this would execute the actual remediation via connector
-        // For now, we record the action and mark the discrepancy as resolved
-
-        let result = if dry_run {
-            ReconciliationActionResult::Success
-        } else {
-            // Would execute actual remediation here
-            ReconciliationActionResult::Success
-        };
-
-        // Record the action
-        let action_record = CreateReconciliationAction::success(
-            discrepancy_id,
-            action_type,
-            resolved_user_id,
-            dry_run,
-        );
-        ReconciliationAction::create(&self.pool, tenant_id, &action_record).await?;
-
-        // Mark discrepancy as resolved (unless dry run)
-        if !dry_run {
-            ReconciliationDiscrepancy::resolve(
-                &self.pool,
-                tenant_id,
-                discrepancy_id,
-                action_type,
-                resolved_user_id,
-            )
-            .await?;
-        }
-
-        tracing::info!(
-            discrepancy_id = %discrepancy_id,
-            action = %action,
-            dry_run = %dry_run,
-            "Discrepancy remediated"
-        );
-
-        Ok(RemediationResponse {
+        // Fail closed: do not record Success or mark the discrepancy resolved
+        // until connector-side remediation actually runs.
+        reject_unimplemented_connector_remediation().map(|()| RemediationResponse {
             discrepancy_id,
             action: action.to_string(),
-            result: result.to_string(),
+            result: "not_implemented".to_string(),
             error_message: None,
             before_state: None,
             after_state: None,
@@ -339,60 +312,18 @@ impl ReconciliationService {
     #[instrument(skip(self))]
     pub async fn bulk_remediate(
         &self,
-        tenant_id: Uuid,
-        user_id: Option<Uuid>,
-        connector_id: Uuid,
-        items: Vec<BulkRemediateItem>,
-        dry_run: bool,
+        _tenant_id: Uuid,
+        _user_id: Option<Uuid>,
+        _connector_id: Uuid,
+        _items: Vec<BulkRemediateItem>,
+        _dry_run: bool,
     ) -> ReconciliationServiceResult<BulkRemediationResponse> {
-        let mut results = Vec::with_capacity(items.len());
-        let mut succeeded = 0;
-        let mut failed = 0;
-
-        for item in items {
-            let result = self
-                .remediate(
-                    tenant_id,
-                    user_id,
-                    connector_id,
-                    item.discrepancy_id,
-                    &item.action,
-                    item.direction.as_deref().unwrap_or("xavyo_to_target"),
-                    item.identity_id,
-                    dry_run,
-                )
-                .await;
-
-            match result {
-                Ok(r) => {
-                    if r.result == "success" {
-                        succeeded += 1;
-                    } else {
-                        failed += 1;
-                    }
-                    results.push(r);
-                }
-                Err(e) => {
-                    failed += 1;
-                    results.push(RemediationResponse {
-                        discrepancy_id: item.discrepancy_id,
-                        action: item.action,
-                        result: "failure".to_string(),
-                        error_message: Some(e.to_string()),
-                        before_state: None,
-                        after_state: None,
-                        dry_run,
-                    });
-                }
-            }
-        }
-
-        Ok(BulkRemediationResponse {
-            results,
+        reject_unimplemented_connector_remediation().map(|()| BulkRemediationResponse {
+            results: Vec::new(),
             summary: BulkRemediationSummary {
-                total: succeeded + failed,
-                succeeded,
-                failed,
+                total: 0,
+                succeeded: 0,
+                failed: 0,
             },
         })
     }
@@ -795,6 +726,37 @@ impl ReconciliationService {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn connector_remediation_is_not_implemented() {
+        let err = reject_unimplemented_connector_remediation().expect_err("must fail closed");
+        assert!(
+            matches!(err, ReconciliationServiceError::NotImplemented(_)),
+            "got {err:?}"
+        );
+        let msg = err.to_string().to_lowercase();
+        assert!(
+            !msg.contains("success"),
+            "error must not look like success: {msg}"
+        );
+    }
+
+    #[test]
+    fn remediate_does_not_record_fake_success_action() {
+        let src = include_str!("reconciliation_service.rs");
+        let fake_success = format!("{}::{}", "CreateReconciliationAction", "success");
+        let resolve_call = format!("{}::{}", "ReconciliationDiscrepancy", "resolve");
+        assert!(
+            !src.contains(&fake_success),
+            "must not record a fake successful reconciliation action"
+        );
+        assert!(
+            !src.contains(&resolve_call),
+            "must not mark a discrepancy resolved without connector execution"
+        );
+    }
+
     #[test]
     fn test_get_default_action() {
         // Test the default action logic directly without creating a pool

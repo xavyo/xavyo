@@ -100,6 +100,10 @@ pub enum ConnectorApiError {
     /// Internal server error.
     #[error("internal error: {0}")]
     Internal(String),
+
+    /// Capability is recognized but not implemented (HTTP 501).
+    #[error("not implemented: {0}")]
+    NotImplemented(String),
 }
 
 impl IntoResponse for ConnectorApiError {
@@ -226,6 +230,9 @@ impl IntoResponse for ConnectorApiError {
                     "An internal error occurred".to_string(),
                 )
             }
+            ConnectorApiError::NotImplemented(msg) => {
+                (StatusCode::NOT_IMPLEMENTED, "not_implemented", msg.clone())
+            }
         };
 
         let body = json!({
@@ -315,5 +322,40 @@ impl ConnectorApiError {
     /// Create a conflict error.
     pub fn conflict(message: impl Into<String>) -> Self {
         ConnectorApiError::Conflict(message.into())
+    }
+
+    /// Create a not-implemented error (HTTP 501).
+    pub fn not_implemented(message: impl Into<String>) -> Self {
+        ConnectorApiError::NotImplemented(message.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::to_bytes;
+    use axum::response::IntoResponse;
+
+    #[tokio::test]
+    async fn not_implemented_is_501_without_success_body() {
+        let response = ConnectorApiError::not_implemented(
+            "Connector-side discrepancy remediation is not implemented",
+        )
+        .into_response();
+        assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+        assert!(
+            !response.status().is_success(),
+            "unimplemented remediation must not be HTTP success"
+        );
+
+        let body = to_bytes(response.into_body(), 1024)
+            .await
+            .expect("response body");
+        let text = String::from_utf8(body.to_vec()).expect("utf8");
+        assert!(text.contains("not_implemented"), "{text}");
+        assert!(
+            !text.contains(r#""result":"success""#),
+            "501 body must not look like a successful remediation: {text}"
+        );
     }
 }

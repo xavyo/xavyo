@@ -26,7 +26,8 @@ pub use operation_service::{
     ResolveConflictRequest, ResolveOperationRequest, TriggerOperationRequest,
 };
 pub use reconciliation_service::{
-    ReconciliationService, ReconciliationServiceError, ReconciliationServiceResult,
+    reject_unimplemented_connector_remediation, ReconciliationService, ReconciliationServiceError,
+    ReconciliationServiceResult,
 };
 pub use schedule_service::{
     compute_next_run_at, validate_schedule_config, ScheduleError, ScheduleResult, ScheduleService,

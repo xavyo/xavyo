@@ -54,6 +54,8 @@ pub fn reconciliation_router() -> Router<ConnectorsState>;
 | POST | `/reconciliation/runs` | Start reconciliation |
 | GET | `/reconciliation/runs` | List runs |
 | GET | `/reconciliation/runs/:id` | Run details |
+| POST | `/connectors/:id/reconciliation/discrepancies/:id/remediate` | 501 until connector-side remediation exists |
+| POST | `/connectors/:id/reconciliation/discrepancies/bulk-remediate` | 501 until connector-side remediation exists |
 | GET | `/provisioning/queue` | Queue stats |
 | GET | `/provisioning/dlq` | Dead letter queue |
 | GET | `/jobs` | List background jobs (F-044) |
@@ -91,6 +93,7 @@ None
 - Never store credentials unencrypted
 - Never skip schema validation for mappings
 - Never ignore reconciliation discrepancies
+- Never mark a discrepancy resolved or record remediation `success` without executing the connector action (501 until wired)
 
 ## Related Crates
 
