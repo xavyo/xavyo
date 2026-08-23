@@ -609,38 +609,30 @@ pub async fn device_authorize_handler(
                                         );
                                     }
                                     Some(c) => {
-                                        // Pending confirmation exists but not confirmed yet
-                                        let csrf_token = generate_csrf_token();
-                                        let cookie =
-                                            create_csrf_cookie(&csrf_token, state.is_production());
-                                        return (
-                                            [(SET_COOKIE, cookie)],
-                                            Html(render_check_email_page(
-                                                &format!(
-                                                    "A confirmation email has been sent. Risk score: {} (medium risk). Please check your inbox and click the link to confirm.",
-                                                    assessment.score
-                                                ),
-                                                Some(&c.device_code_id.to_string()),
-                                                Some(&csrf_token),
-                                            )),
-                                        )
-                                            .into_response();
+                                        return check_email_response(
+                                            &state,
+                                            tenant_id,
+                                            c.device_code_id,
+                                            &format!(
+                                                "A confirmation email has been sent. Risk score: {} (medium risk). Please check your inbox and click the link to confirm.",
+                                                assessment.score
+                                            ),
+                                        );
                                     }
                                     None => {
-                                        // SECURITY (H13): Block approval when email confirmation
-                                        // is required but no confirmation exists yet.
-                                        // Never silently degrade to allowing the approval.
-                                        tracing::warn!(
-                                            tenant_id = %tenant_id,
-                                            user_id = %user_id,
-                                            risk_score = assessment.score,
-                                            "Medium-risk approval blocked: email confirmation required but not yet created"
-                                        );
-                                        return Html(render_result_page(
-                                            false,
-                                            "Additional verification required. Please check your email for a confirmation link.",
-                                        ))
-                                        .into_response();
+                                        return send_and_prompt_confirmation(
+                                            &state,
+                                            confirmation_service.as_ref(),
+                                            tenant_id,
+                                            user_id,
+                                            device_code_info.id,
+                                            approver_ip.clone(),
+                                            &format!(
+                                                "A confirmation email has been sent. Risk score: {} (medium risk). Please check your inbox and click the link to confirm.",
+                                                assessment.score
+                                            ),
+                                        )
+                                        .await;
                                     }
                                 }
                             } else {
@@ -689,36 +681,30 @@ pub async fn device_authorize_handler(
                                         );
                                     }
                                     Some(c) => {
-                                        let csrf_token = generate_csrf_token();
-                                        let cookie =
-                                            create_csrf_cookie(&csrf_token, state.is_production());
-                                        return (
-                                            [(SET_COOKIE, cookie)],
-                                            Html(render_check_email_page(
-                                                &format!(
-                                                    "⚠️ HIGH RISK: This authorization request has a high risk score ({}). An additional confirmation email has been sent. Administrators have been notified.",
-                                                    assessment.score
-                                                ),
-                                                Some(&c.device_code_id.to_string()),
-                                                Some(&csrf_token),
-                                            )),
-                                        )
-                                            .into_response();
+                                        return check_email_response(
+                                            &state,
+                                            tenant_id,
+                                            c.device_code_id,
+                                            &format!(
+                                                "⚠️ HIGH RISK: This authorization request has a high risk score ({}). An additional confirmation email has been sent. Administrators have been notified.",
+                                                assessment.score
+                                            ),
+                                        );
                                     }
                                     None => {
-                                        // SECURITY (H13): Block high-risk approval when no
-                                        // email confirmation exists. Never fall through.
-                                        tracing::warn!(
-                                            tenant_id = %tenant_id,
-                                            user_id = %user_id,
-                                            risk_score = assessment.score,
-                                            "High-risk approval BLOCKED: no email confirmation available"
-                                        );
-                                        return Html(render_result_page(
-                                            false,
-                                            "This authorization request has been flagged as high risk. Additional verification is required. Please check your email.",
-                                        ))
-                                        .into_response();
+                                        return send_and_prompt_confirmation(
+                                            &state,
+                                            confirmation_service.as_ref(),
+                                            tenant_id,
+                                            user_id,
+                                            device_code_info.id,
+                                            approver_ip.clone(),
+                                            &format!(
+                                                "⚠️ HIGH RISK: This authorization request has a high risk score ({}). An additional confirmation email has been sent. Administrators have been notified.",
+                                                assessment.score
+                                            ),
+                                        )
+                                        .await;
                                     }
                                 }
                             } else {
@@ -1340,11 +1326,21 @@ pub struct ConfirmTokenPath {
     pub token: String,
 }
 
+/// Query parameters for GET /device/confirm/{token}.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ConfirmQuery {
+    /// Tenant that owns the confirmation (`tid` in the emailed link).
+    pub tid: Option<Uuid>,
+}
+
 /// Request for POST /device/resend-confirmation.
 #[derive(Debug, Clone, Deserialize, ToSchema)]
 pub struct ResendConfirmationRequest {
     /// The device code ID for which to resend confirmation.
     pub device_code_id: String,
+    /// Tenant that owns the confirmation (hidden field on the check-email form).
+    #[serde(default)]
+    pub tenant_id: Option<String>,
     /// CSRF token for form protection.
     #[serde(default)]
     pub csrf_token: Option<String>,
@@ -1384,12 +1380,17 @@ pub struct ConfirmationStatusResponse {
 pub async fn device_confirm_handler(
     State(state): State<OAuthState>,
     axum::extract::Path(path): axum::extract::Path<ConfirmTokenPath>,
+    Query(query): Query<ConfirmQuery>,
 ) -> Response {
     use crate::services::ConfirmationValidationResult;
 
-    // Extract tenant_id from system tenant (email confirmations work at system level)
-    // In production, we'd need to determine tenant from the confirmation token or URL
-    let tenant_id = state.system_tenant_id;
+    let Some(tenant_id) = query.tid else {
+        return Html(render_confirmation_result_page(
+            false,
+            "This confirmation link is missing tenant information. Request a new email.",
+        ))
+        .into_response();
+    };
 
     let confirmation_service = match &state.device_confirmation_service {
         Some(svc) => svc,
@@ -1509,7 +1510,20 @@ pub async fn device_resend_confirmation_handler(
         }
     }
 
-    let tenant_id = state.system_tenant_id;
+    let tenant_id = match request
+        .tenant_id
+        .as_deref()
+        .and_then(|s| Uuid::parse_str(s).ok())
+    {
+        Some(tid) => tid,
+        None => {
+            return Html(render_confirmation_result_page(
+                false,
+                "Invalid request. Please return to the authorization page and try again.",
+            ))
+            .into_response();
+        }
+    };
 
     let confirmation_service = match &state.device_confirmation_service {
         Some(svc) => svc,
@@ -1522,7 +1536,6 @@ pub async fn device_resend_confirmation_handler(
         }
     };
 
-    // Parse the device_code_id
     let device_code_id = match Uuid::parse_str(&request.device_code_id) {
         Ok(id) => id,
         Err(_) => {
@@ -1534,60 +1547,88 @@ pub async fn device_resend_confirmation_handler(
         }
     };
 
-    // Check for pending confirmation
-    let pending = match confirmation_service
-        .find_pending_confirmation(tenant_id, device_code_id)
+    match confirmation_service
+        .resend_pending(tenant_id, device_code_id, None)
         .await
     {
-        Ok(Some(c)) => c,
-        Ok(None) => {
-            return Html(render_confirmation_result_page(
-                false,
-                "No pending confirmation found. The confirmation may have expired or already been completed.",
-            ))
-            .into_response();
-        }
+        Ok(true) => check_email_response(
+            &state,
+            tenant_id,
+            device_code_id,
+            "A new confirmation email has been sent. Please check your inbox.",
+        ),
+        Ok(false) => Html(render_check_email_page(
+            "Please wait before requesting another email, or the confirmation may have expired.",
+            Some(&device_code_id.to_string()),
+            None,
+            Some(&tenant_id.to_string()),
+        ))
+        .into_response(),
         Err(e) => {
             tracing::error!(
                 tenant_id = %tenant_id,
                 device_code_id = %device_code_id,
                 error = %e,
-                "Failed to find pending confirmation"
+                "Failed to resend device confirmation email"
             );
-            return Html(render_confirmation_result_page(
+            Html(render_confirmation_result_page(
                 false,
-                "An error occurred. Please try again.",
+                "Unable to resend the confirmation email. Please try again.",
             ))
-            .into_response();
+            .into_response()
         }
-    };
-
-    // Check rate limiting
-    if !pending.can_resend() {
-        return Html(render_check_email_page(
-            "Please wait before requesting another email. You can only resend once per minute.",
-            None,
-            None,
-        ))
-        .into_response();
     }
+}
 
-    // For resend, we'd need the user's email. In a full implementation, we'd look this up
-    // from the user_id in the confirmation. For now, we'll return a generic message.
-    // TODO: Look up user email and actually resend
-    tracing::info!(
-        tenant_id = %tenant_id,
-        device_code_id = %device_code_id,
-        confirmation_id = %pending.id,
-        "Confirmation resend requested (not fully implemented)"
-    );
+async fn send_and_prompt_confirmation(
+    state: &OAuthState,
+    confirmation_service: &crate::services::DeviceConfirmationService,
+    tenant_id: Uuid,
+    user_id: Uuid,
+    device_code_id: Uuid,
+    requested_from_ip: Option<String>,
+    message: &str,
+) -> Response {
+    match confirmation_service
+        .create_confirmation_for_user(tenant_id, device_code_id, user_id, requested_from_ip, None)
+        .await
+    {
+        Ok(_) => check_email_response(state, tenant_id, device_code_id, message),
+        Err(e) => {
+            tracing::error!(
+                tenant_id = %tenant_id,
+                user_id = %user_id,
+                device_code_id = %device_code_id,
+                error = %e,
+                "Failed to send device confirmation email"
+            );
+            Html(render_result_page(
+                false,
+                "Unable to send a confirmation email. Please try again or contact your administrator.",
+            ))
+            .into_response()
+        }
+    }
+}
 
-    Html(render_check_email_page(
-        "If the confirmation was successfully resent, you should receive a new email shortly.",
-        Some(&device_code_id.to_string()),
-        None,
-    ))
-    .into_response()
+fn check_email_response(
+    state: &OAuthState,
+    tenant_id: Uuid,
+    device_code_id: Uuid,
+    message: &str,
+) -> Response {
+    let csrf_token = generate_csrf_token();
+    let cookie = create_csrf_cookie(&csrf_token, state.is_production());
+    (
+        [(SET_COOKIE, cookie)],
+        Html(render_check_email_page(
+            message,
+            Some(&device_code_id.to_string()),
+            Some(&csrf_token),
+            Some(&tenant_id.to_string()),
+        )),
+    )
+        .into_response()
 }
 
 /// F117: Render "Check your email" page for device code confirmation.
@@ -1595,15 +1636,18 @@ fn render_check_email_page(
     message: &str,
     device_code_id: Option<&str>,
     csrf_token: Option<&str>,
+    tenant_id: Option<&str>,
 ) -> String {
-    let resend_form = match (device_code_id, csrf_token) {
-        (Some(code_id), Some(csrf)) => format!(
+    let resend_form = match (device_code_id, csrf_token, tenant_id) {
+        (Some(code_id), Some(csrf), Some(tid)) => format!(
             r#"<form method="post" action="/device/resend-confirmation" style="margin-top: 1.5rem;">
                 <input type="hidden" name="device_code_id" value="{}" />
+                <input type="hidden" name="tenant_id" value="{}" />
                 <input type="hidden" name="csrf_token" value="{}" />
                 <button type="submit" class="resend-btn">Resend Confirmation Email</button>
             </form>"#,
             html_escape(code_id),
+            html_escape(tid),
             html_escape(csrf)
         ),
         _ => String::new(),
@@ -2003,5 +2047,54 @@ mod tests {
             unknown_app.is_unknown_app(),
             "Should be unknown when name is None"
         );
+    }
+
+    #[test]
+    fn check_email_resend_form_includes_tenant() {
+        let tid = "11111111-1111-1111-1111-111111111111";
+        let html = render_check_email_page(
+            "Check inbox",
+            Some("22222222-2222-2222-2222-222222222222"),
+            Some("csrf-token"),
+            Some(tid),
+        );
+        assert!(html.contains(r#"name="tenant_id""#), "{html}");
+        assert!(html.contains(tid), "{html}");
+        assert!(html.contains(r#"name="device_code_id""#), "{html}");
+    }
+
+    #[test]
+    fn check_email_resend_form_omitted_without_tenant() {
+        let html = render_check_email_page(
+            "Check inbox",
+            Some("22222222-2222-2222-2222-222222222222"),
+            Some("csrf-token"),
+            None,
+        );
+        assert!(!html.contains("/device/resend-confirmation"), "{html}");
+        assert!(!html.contains(r#"name="tenant_id""#), "{html}");
+    }
+
+    #[test]
+    fn authorize_and_resend_create_or_send_confirmation() {
+        let src = include_str!("device.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("create_confirmation_for_user"),
+            "medium/high-risk must send a confirmation email"
+        );
+        assert!(
+            production.contains("resend_pending"),
+            "resend must actually send"
+        );
+        for needle in [
+            format!("{} fully implemented", "not"),
+            "check your email for a confirmation link".to_string(),
+        ] {
+            assert!(
+                !production.contains(&needle),
+                "must not advertise a sent email that was not sent ({needle})"
+            );
+        }
     }
 }

@@ -213,7 +213,45 @@ impl DeviceCodeConfirmation {
         .await
     }
 
-    /// Increment send count and update `last_sent_at` (for resend).
+    /// Increment send count, store a new token hash, and update `last_sent_at`.
+    ///
+    /// The previous token is invalidated. Callers must email the matching raw token.
+    pub async fn record_resend_with_new_token(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+        new_token_hash: &str,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        let mut conn = pool.acquire().await?;
+
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await?;
+
+        sqlx::query_as::<_, Self>(
+            r"
+            UPDATE device_code_confirmations
+            SET send_count = send_count + 1,
+                last_sent_at = NOW(),
+                confirmation_token_hash = $3
+            WHERE tenant_id = $1
+              AND id = $2
+              AND send_count < $4
+              AND confirmed_at IS NULL
+              AND expires_at > NOW()
+            RETURNING *
+            ",
+        )
+        .bind(tenant_id)
+        .bind(id)
+        .bind(new_token_hash)
+        .bind(MAX_RESEND_COUNT)
+        .fetch_optional(&mut *conn)
+        .await
+    }
+
+    /// Increment send count and update `last_sent_at` without rotating the token.
     pub async fn record_resend(
         pool: &PgPool,
         tenant_id: Uuid,
@@ -221,7 +259,6 @@ impl DeviceCodeConfirmation {
     ) -> Result<Option<Self>, sqlx::Error> {
         let mut conn = pool.acquire().await?;
 
-        // Set tenant context for RLS
         sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
             .bind(tenant_id.to_string())
             .execute(&mut *conn)

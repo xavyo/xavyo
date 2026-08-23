@@ -52,6 +52,28 @@ pub struct DeviceConfirmationService {
     base_url: String,
 }
 
+/// Build the device-confirmation URL that emails must contain.
+///
+/// The device router is nested at `/device`, not `/oauth/device`. An empty
+/// token cannot confirm anything and must not be mailed.
+pub fn confirmation_url(
+    base_url: &str,
+    tenant_id: Uuid,
+    token: &str,
+) -> Result<String, OAuthError> {
+    if token.is_empty() {
+        return Err(OAuthError::Internal(
+            "device confirmation token must not be empty".to_string(),
+        ));
+    }
+    Ok(format!(
+        "{}/device/confirm/{}?tid={}",
+        base_url.trim_end_matches('/'),
+        token,
+        tenant_id
+    ))
+}
+
 impl DeviceConfirmationService {
     /// Create a new device confirmation service.
     pub fn new(pool: PgPool, email_sender: Arc<dyn EmailSender>, base_url: String) -> Self {
@@ -68,6 +90,54 @@ impl DeviceConfirmationService {
         let mut bytes = [0u8; CONFIRMATION_TOKEN_LENGTH];
         OsRng.fill_bytes(&mut bytes);
         URL_SAFE_NO_PAD.encode(bytes)
+    }
+
+    async fn lookup_user_email(
+        &self,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<String, OAuthError> {
+        let mut conn = self.pool.acquire().await.map_err(|e| {
+            OAuthError::Internal(format!("Failed to acquire connection for user email: {e}"))
+        })?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await
+            .map_err(|e| OAuthError::Internal(format!("Failed to set tenant context: {e}")))?;
+
+        let email: Option<(String,)> =
+            sqlx::query_as("SELECT email FROM users WHERE id = $1 AND tenant_id = $2")
+                .bind(user_id)
+                .bind(tenant_id)
+                .fetch_optional(&mut *conn)
+                .await
+                .map_err(|e| OAuthError::Internal(format!("Failed to look up user email: {e}")))?;
+
+        email.map(|(e,)| e).ok_or_else(|| {
+            OAuthError::Internal("User email not found for device confirmation".to_string())
+        })
+    }
+
+    /// Create a confirmation for `user_id` by looking up their tenant-scoped email.
+    pub async fn create_confirmation_for_user(
+        &self,
+        tenant_id: Uuid,
+        device_code_id: Uuid,
+        user_id: Uuid,
+        requested_from_ip: Option<String>,
+        client_name: Option<&str>,
+    ) -> Result<ConfirmationCreated, OAuthError> {
+        let user_email = self.lookup_user_email(tenant_id, user_id).await?;
+        self.create_confirmation(
+            tenant_id,
+            device_code_id,
+            user_id,
+            &user_email,
+            requested_from_ip,
+            client_name,
+        )
+        .await
     }
 
     /// Create a new confirmation and send the email.
@@ -215,14 +285,32 @@ impl DeviceConfirmationService {
             .map_err(|e| OAuthError::Internal(format!("Failed to find pending confirmation: {e}")))
     }
 
-    /// Resend a confirmation email with rate limiting.
+    /// Resend a pending confirmation with a rotated token.
     ///
-    /// # Arguments
-    ///
-    /// * `tenant_id` - The tenant ID
-    /// * `confirmation_id` - The confirmation to resend
-    /// * `user_email` - The user's email address
-    /// * `client_name` - Optional name of the OAuth client
+    /// Looks up the user's email, stores a new token hash, and sends a usable
+    /// confirmation link. Returns `Ok(false)` when rate limited or not found.
+    pub async fn resend_pending(
+        &self,
+        tenant_id: Uuid,
+        device_code_id: Uuid,
+        client_name: Option<&str>,
+    ) -> Result<bool, OAuthError> {
+        let pending = self
+            .find_pending_confirmation(tenant_id, device_code_id)
+            .await?;
+        let Some(pending) = pending else {
+            return Ok(false);
+        };
+        if !pending.can_resend() {
+            return Ok(false);
+        }
+
+        let user_email = self.lookup_user_email(tenant_id, pending.user_id).await?;
+        self.resend_confirmation(tenant_id, pending.id, &user_email, client_name)
+            .await
+    }
+
+    /// Resend a confirmation email with rate limiting and a new raw token.
     ///
     /// # Returns
     ///
@@ -234,44 +322,30 @@ impl DeviceConfirmationService {
         user_email: &str,
         client_name: Option<&str>,
     ) -> Result<bool, OAuthError> {
-        // First, try to record the resend (this checks rate limits in the DB)
-        let confirmation =
-            DeviceCodeConfirmation::record_resend(&self.pool, tenant_id, confirmation_id)
-                .await
-                .map_err(|e| OAuthError::Internal(format!("Failed to record resend: {e}")))?;
+        let new_token = Self::generate_token();
+        let new_hash = DeviceCodeConfirmation::hash_token(&new_token);
+
+        let confirmation = DeviceCodeConfirmation::record_resend_with_new_token(
+            &self.pool,
+            tenant_id,
+            confirmation_id,
+            &new_hash,
+        )
+        .await
+        .map_err(|e| OAuthError::Internal(format!("Failed to record resend: {e}")))?;
 
         match confirmation {
-            None => {
-                // Rate limited or confirmation not found
-                Ok(false)
-            }
+            None => Ok(false),
             Some(c) => {
-                // Generate a new token for the resend
-                let _new_token = Self::generate_token();
-
-                // Note: In a production system, we'd want to update the token hash
-                // in the database. For now, we're just recording the resend
-                // and sending with a regenerated token would require an additional
-                // DB update method. Using the original token hash is acceptable
-                // since we're only rate limiting, not regenerating.
-
-                // Actually, we need to send the original token again or regenerate.
-                // Since we don't store the original token and can't reverse the hash,
-                // the proper implementation would need to generate and store a new token.
-                // For simplicity, we'll require the client to start a new confirmation flow.
-
-                // For now, we'll inform the user that a new confirmation was sent
-                // but actually they need to wait for the cooldown or the original link
                 self.send_confirmation_email(
                     user_email,
-                    "", // We can't resend the original token as it's hashed
+                    &new_token,
                     &c.id,
                     tenant_id,
                     client_name,
                     c.requested_from_ip.as_deref(),
                 )
                 .await?;
-
                 Ok(true)
             }
         }
@@ -287,7 +361,11 @@ impl DeviceConfirmationService {
         client_name: Option<&str>,
         requested_from_ip: Option<&str>,
     ) -> Result<(), OAuthError> {
-        let confirmation_url = format!("{}/oauth/device/confirm/{}", self.base_url, token);
+        let confirmation_url = crate::services::device_confirmation::confirmation_url(
+            &self.base_url,
+            tenant_id,
+            token,
+        )?;
 
         let app_name = client_name.unwrap_or("an application");
         let ip_info = requested_from_ip
@@ -385,5 +463,46 @@ mod tests {
 
         assert!(!created.token.is_empty());
         assert!(created.expires_at <= Utc::now());
+    }
+
+    #[test]
+    fn confirmation_url_rejects_empty_token() {
+        let err = confirmation_url("https://idp.example", Uuid::new_v4(), "")
+            .expect_err("empty token must fail closed");
+        assert!(err.to_string().contains("must not be empty"), "{err}");
+    }
+
+    #[test]
+    fn confirmation_url_is_device_route_with_tenant() {
+        let tenant_id = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+        let url = confirmation_url("https://idp.example/", tenant_id, "abc_token")
+            .expect("non-empty token");
+        assert!(
+            url.contains("/device/confirm/abc_token"),
+            "device router is /device not /oauth/device: {url}"
+        );
+        assert!(
+            !url.contains("/oauth/device/confirm"),
+            "must not advertise a 404 path: {url}"
+        );
+        assert!(
+            url.contains(&format!("tid={tenant_id}")),
+            "email link must carry tenant for RLS: {url}"
+        );
+    }
+
+    #[test]
+    fn resend_does_not_mail_empty_token() {
+        let src = include_str!("device_confirmation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("record_resend_with_new_token"),
+            "resend must persist a new token hash"
+        );
+        let empty_arg = format!("{},", "\"\"");
+        assert!(
+            !production.contains(&empty_arg),
+            "must not pass an empty token to send_confirmation_email"
+        );
     }
 }
