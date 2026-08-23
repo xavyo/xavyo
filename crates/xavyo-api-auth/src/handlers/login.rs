@@ -3,15 +3,17 @@
 //! POST /auth/login - Authenticate user and issue tokens.
 
 use crate::error::ApiAuthError;
+use crate::middleware::ip_filter::check_org_ip_restriction;
+use crate::middleware::jwt_auth::TrustXff;
 use crate::models::{LoginRequest, MfaMethod, MfaRequiredResponse, TokenResponse};
 use crate::services::security_audit::{SecurityAudit, SecurityEventType};
 use crate::services::{
     AlertService, AuditService, AuthContext, AuthService, DevicePolicyService, DeviceService,
-    LockoutService, LoginRiskContext, MfaService, RecordLoginAttemptInput, RiskEnforcementService,
-    SessionService, TokenService, WebAuthnService,
+    IpRestrictionService, LockoutService, LoginRiskContext, MfaService, RecordLoginAttemptInput,
+    RiskEnforcementService, SessionService, TokenService, WebAuthnService,
 };
 use axum::extract::FromRequest;
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::{extract::ConnectInfo, Extension, Json};
 use serde::Serialize;
 use sqlx::PgPool;
@@ -74,6 +76,7 @@ pub async fn login_handler(
     // Extract headers and body from the raw request
     let (parts, body) = raw_request.into_parts();
     let headers = parts.headers.clone();
+    let trust_xff = parts.extensions.get::<TrustXff>().is_some();
     let body_request = axum::http::Request::from_parts(parts, body);
     let Json(request) = Json::<LoginRequest>::from_request(body_request, &())
         .await
@@ -93,9 +96,10 @@ pub async fn login_handler(
         ApiAuthError::Validation(errors.join(", "))
     })?;
 
-    // Extract client info early for audit logging
-    let ip_address: Option<IpAddr> = Some(addr.ip());
-    let ip_str = ip_address.map(|ip| ip.to_string());
+    // Extract client info early for audit logging and IP restriction.
+    // Forwarded headers are used only when TrustXff is present.
+    let ip_str = login_client_ip(&headers, trust_xff, Some(addr.ip()));
+    let ip_address: Option<IpAddr> = ip_str.as_deref().and_then(|s| s.parse().ok());
     let user_agent = headers
         .get(axum::http::header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
@@ -334,6 +338,22 @@ pub async fn login_handler(
         return Err(ApiAuthError::PasswordExpired);
     }
 
+    // Tenant IP restriction (F028). Lookup/missing-IP errors refuse when enabled.
+    let roles = UserRole::get_user_roles(&pool, *user_id.as_uuid(), *tenant_id_val.as_uuid())
+        .await
+        .map_err(|e| {
+            tracing::error!(user_id = %user_id.as_uuid(), error = %e, "Failed to fetch user roles during login");
+            ApiAuthError::Internal("Failed to fetch user roles".to_string())
+        })?;
+    IpRestrictionService::new(pool.clone())
+        .enforce_access(*tenant_id_val.as_uuid(), ip_str.as_deref(), &roles)
+        .await?;
+    if let Some(ref ip) = ip_str {
+        check_org_ip_restriction(&pool, *tenant_id_val.as_uuid(), *user_id.as_uuid(), ip)
+            .await
+            .map_err(ApiAuthError::IpBlocked)?;
+    }
+
     // Reset failed attempts on successful authentication
     lockout_service
         .reset_failed_attempts(*user_id.as_uuid(), *tenant_id_val.as_uuid())
@@ -510,17 +530,6 @@ pub async fn login_handler(
     }
 
     // MFA not enabled - issue full tokens
-    // Fetch user roles from database
-    // L-9: Fail the login if role fetch fails rather than silently issuing
-    // a downgraded token with only ["user"]. An admin whose role query fails
-    // would otherwise get a non-admin JWT — operationally confusing.
-    let roles = UserRole::get_user_roles(&pool, *user_id.as_uuid(), *tenant_id_val.as_uuid())
-        .await
-        .map_err(|e| {
-            tracing::error!(user_id = %user_id.as_uuid(), error = %e, "Failed to fetch user roles during login");
-            ApiAuthError::Internal("Failed to fetch user roles".to_string())
-        })?;
-
     let (access_token, refresh_token, expires_in) = token_service
         .create_tokens(
             user_id,
@@ -589,6 +598,30 @@ pub async fn login_handler(
     }
 
     Ok((StatusCode::OK, Json(LoginResponse::Success(response))))
+}
+
+/// Client IP for login audit and IP restriction. Untrusted forwarded headers are ignored.
+pub(crate) fn login_client_ip(
+    headers: &HeaderMap,
+    trust_xff: bool,
+    peer: Option<IpAddr>,
+) -> Option<String> {
+    if trust_xff {
+        if let Some(xff) = headers
+            .get("x-forwarded-for")
+            .or_else(|| headers.get("x-real-ip"))
+        {
+            if let Ok(value) = xff.to_str() {
+                if let Some(first) = value.split(',').next() {
+                    let ip = first.trim();
+                    if ip.parse::<IpAddr>().is_ok() {
+                        return Some(ip.to_string());
+                    }
+                }
+            }
+        }
+    }
+    peer.map(|ip| ip.to_string())
 }
 
 /// Risk-evaluation failures must refuse login, not skip enforcement.
@@ -784,6 +817,33 @@ mod tests {
         assert!(
             production.contains("login_new_device_for_risk("),
             "missing audit data must not skip new-device risk"
+        );
+        assert!(
+            production.contains("enforce_access("),
+            "login must enforce tenant IP restrictions before issuing tokens"
+        );
+        assert!(
+            production.contains("login_client_ip("),
+            "login must not trust untrusted X-Forwarded-For for IP restriction"
+        );
+        assert!(
+            production.contains("check_org_ip_restriction("),
+            "login must enforce organization IP restriction policies"
+        );
+    }
+
+    #[test]
+    fn untrusted_xff_does_not_override_peer_for_login_ip() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", "10.0.0.1".parse().unwrap());
+        let peer = "203.0.113.10".parse().unwrap();
+        assert_eq!(
+            login_client_ip(&headers, false, Some(peer)).as_deref(),
+            Some("203.0.113.10")
+        );
+        assert_eq!(
+            login_client_ip(&headers, true, Some(peer)).as_deref(),
+            Some("10.0.0.1")
         );
     }
 }

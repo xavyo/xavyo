@@ -55,7 +55,8 @@ pub mod ses_email_service;
 pub use email_service::{EmailConfig, EmailError, EmailSender, MockEmailSender, SmtpEmailSender};
 pub use email_template_service::EmailTemplateService;
 pub use ip_restriction_service::{
-    ip_matches_cidr, validate_cidr, IpRestrictionService, DEFAULT_CACHE_TTL_SECS,
+    ip_matches_cidr, ip_restriction_client_ip, normalized_restriction_ip, validate_cidr,
+    IpRestrictionService, DEFAULT_CACHE_TTL_SECS,
 };
 pub use lockout_service::{LockoutService, LockoutStatus};
 pub use mfa_service::{

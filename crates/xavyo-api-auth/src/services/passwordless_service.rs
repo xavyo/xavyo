@@ -5,6 +5,7 @@
 
 use crate::error::ApiAuthError;
 use crate::services::email_service::EmailSender;
+use crate::services::ip_restriction_service::IpRestrictionService;
 use crate::services::token_service::{
     generate_secure_token, hash_token, verify_token_hash_constant_time, AuthContext, TokenService,
 };
@@ -314,6 +315,7 @@ impl PasswordlessService {
         // lockouts have `locked_until IS NULL`.
         let user_id = db_token.user_id;
         self.check_account_allowed(tenant_id, user_id).await?;
+        self.enforce_ip_access(tenant_id, user_id, ip).await?;
 
         // Mark token as used
         PasswordlessToken::mark_used(&self.pool, tenant_id, db_token.id)
@@ -499,6 +501,7 @@ impl PasswordlessService {
 
         // Code is correct — check account lockout / active status
         self.check_account_allowed(tenant_id, user_id).await?;
+        self.enforce_ip_access(tenant_id, user_id, ip).await?;
 
         // Mark token as used
         PasswordlessToken::mark_used(&self.pool, tenant_id, db_token.id)
@@ -527,6 +530,22 @@ impl PasswordlessService {
 
         // Issue full tokens
         self.issue_tokens(tenant_id, user_id, ip, user_agent).await
+    }
+
+    /// Tenant IP restriction before issuing tokens or an MFA partial token.
+    async fn enforce_ip_access(
+        &self,
+        tenant_id: Uuid,
+        user_id: Uuid,
+        ip: Option<IpAddr>,
+    ) -> Result<(), ApiAuthError> {
+        let roles =
+            passwordless_roles(UserRole::get_user_roles(&self.pool, user_id, tenant_id).await)
+                .map_err(|_| ApiAuthError::Internal("Failed to fetch user roles".to_string()))?;
+        let ip_str = ip.map(|ip| ip.to_string());
+        IpRestrictionService::new(self.pool.clone())
+            .enforce_access(tenant_id, ip_str.as_deref(), &roles)
+            .await
     }
 
     /// Issue access + refresh tokens for a user.
@@ -909,6 +928,10 @@ mod tests {
         assert!(
             !production.contains(".ok()\n            .flatten()"),
             "must not mint a JWT after swallowing email lookup errors"
+        );
+        assert!(
+            production.contains("enforce_ip_access("),
+            "passwordless verify must enforce tenant IP restrictions"
         );
     }
 }

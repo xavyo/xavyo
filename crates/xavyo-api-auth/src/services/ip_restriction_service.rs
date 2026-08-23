@@ -353,6 +353,28 @@ impl IpRestrictionService {
     // IP Validation & Filtering
     // ========================================================================
 
+    /// Enforce tenant IP restriction at token issue / login.
+    ///
+    /// When enforcement is disabled, missing IPs are allowed. When enabled,
+    /// unknown/unparseable IPs and lookup errors refuse (fail closed).
+    pub async fn enforce_access(
+        &self,
+        tenant_id: Uuid,
+        ip_address: Option<&str>,
+        user_roles: &[String],
+    ) -> Result<(), ApiAuthError> {
+        let (settings, _) = self.get_cached_data(tenant_id).await?;
+        let ip = match ip_restriction_client_ip(settings.enforcement_mode, ip_address)? {
+            None => return Ok(()),
+            Some(ip) => ip,
+        };
+        let is_super_admin = user_roles
+            .iter()
+            .any(|r| r == "super_admin" || r == "superadmin");
+        self.check_ip_access(tenant_id, ip, user_roles, is_super_admin)
+            .await
+    }
+
     /// Check if an IP address is allowed access for a tenant.
     ///
     /// Returns Ok(()) if access is allowed, Err(IpBlocked) if blocked.
@@ -606,6 +628,31 @@ impl IpRestrictionService {
     }
 }
 
+/// Normalize a client IP for restriction checks.
+///
+/// Empty and `"unknown"` are treated as missing so they cannot share a
+/// restriction bucket or skip enforcement.
+pub fn normalized_restriction_ip(ip: Option<&str>) -> Option<&str> {
+    ip.map(str::trim)
+        .filter(|s| !s.is_empty() && !s.eq_ignore_ascii_case("unknown"))
+}
+
+/// Decide whether a missing client IP may proceed.
+///
+/// Disabled enforcement allows missing IPs. Enabled modes must refuse.
+pub fn ip_restriction_client_ip(
+    mode: IpEnforcementMode,
+    ip: Option<&str>,
+) -> Result<Option<&str>, ApiAuthError> {
+    match (mode, normalized_restriction_ip(ip)) {
+        (IpEnforcementMode::Disabled, _) => Ok(None),
+        (_, Some(ip)) => Ok(Some(ip)),
+        (_, None) => Err(ApiAuthError::IpBlocked(
+            "Cannot determine client IP for IP restriction".to_string(),
+        )),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -649,6 +696,29 @@ mod tests {
         assert!(ip_matches_cidr(&ip1, "2001:db8::/32"));
         assert!(!ip_matches_cidr(&ip2, "2001:db8::/32"));
         assert!(ip_matches_cidr(&ip1, "::/0")); // Match all
+    }
+
+    #[test]
+    fn missing_client_ip_does_not_skip_enabled_restriction() {
+        assert!(ip_restriction_client_ip(IpEnforcementMode::Disabled, None)
+            .unwrap()
+            .is_none());
+        assert_eq!(
+            ip_restriction_client_ip(IpEnforcementMode::Whitelist, Some("203.0.113.10")).unwrap(),
+            Some("203.0.113.10")
+        );
+        assert!(matches!(
+            ip_restriction_client_ip(IpEnforcementMode::Whitelist, None),
+            Err(ApiAuthError::IpBlocked(_))
+        ));
+        assert!(matches!(
+            ip_restriction_client_ip(IpEnforcementMode::Blacklist, Some("unknown")),
+            Err(ApiAuthError::IpBlocked(_))
+        ));
+        assert!(matches!(
+            ip_restriction_client_ip(IpEnforcementMode::Whitelist, Some("  ")),
+            Err(ApiAuthError::IpBlocked(_))
+        ));
     }
 
     #[test]
