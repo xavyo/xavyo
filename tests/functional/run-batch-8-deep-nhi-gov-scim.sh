@@ -884,10 +884,10 @@ if [[ -n "$GOV_CERT_ID" && "$GOV_CERT_ID" != "null" ]]; then
   parse_response "$RAW"
   if [[ "$CODE" == "200" || "$CODE" == "204" ]]; then
     pass "TC-GOV-CERT-005" "$CODE, campaign launched"
-  elif [[ "$CODE" == "400" || "$CODE" == "412" || "$CODE" == "422" ]]; then
-    pass "TC-GOV-CERT-005" "$CODE, launch attempted (may need assignments/scope)"
+  elif [[ "$CODE" == "409" || "$CODE" == "412" ]]; then
+    fail "TC-GOV-CERT-005" "$CODE is not launch success (empty scope/no items/not draft); do not record PASS"
   else
-    fail "TC-GOV-CERT-005" "Expected 200/204/400/412, got $CODE"
+    fail "TC-GOV-CERT-005" "Expected 200/204, got $CODE"
   fi
 else
   skip "TC-GOV-CERT-005" "No campaign ID"

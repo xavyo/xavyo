@@ -21,7 +21,10 @@ use sqlx::PgPool;
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use xavyo_auth::dpop::DPOP_PROOF_MAX_AGE_SECS;
-use xavyo_auth::{cert_binding_satisfied, decode_token, extract_kid, verify_resource_proof};
+use xavyo_auth::{
+    cert_binding_satisfied, decode_token_with_config, extract_kid, forwarded_cert_thumbprint,
+    verify_resource_proof, ValidationConfig,
+};
 use xavyo_core::{TenantId, UserId};
 use xavyo_db::models::{DpopProofJti, RevokedToken};
 
@@ -126,11 +129,20 @@ pub async fn jwt_auth_middleware(
         default_public_key
     };
 
-    // Decode and validate JWT
-    let claims = decode_token(token, resolved_key.as_bytes()).map_err(|e| {
-        tracing::warn!("JWT validation failed: {}", e);
-        (StatusCode::UNAUTHORIZED, "Invalid or expired token").into_response()
-    })?;
+    // Decode and validate JWT (iss/aud must match tokens minted by TokenConfig)
+    let expected = request
+        .extensions()
+        .get::<JwtExpectedAudience>()
+        .cloned()
+        .unwrap_or_default();
+    let validation = ValidationConfig::default()
+        .issuer(expected.issuer.clone())
+        .audience(vec![expected.audience.clone()]);
+    let claims =
+        decode_token_with_config(token, resolved_key.as_bytes(), &validation).map_err(|e| {
+            tracing::warn!("JWT validation failed: {}", e);
+            (StatusCode::UNAUTHORIZED, "Invalid or expired token").into_response()
+        })?;
 
     // H-2: Reject tokens with empty JTI — all valid tokens must have a JTI for
     // revocation tracking. An empty JTI would bypass both the per-token and
@@ -253,10 +265,16 @@ pub async fn jwt_auth_middleware(
     // network, same model as `X-Tenant-ID`). Fail-closed: a cert-bound token
     // presented without a matching thumbprint is rejected.
     if let Some(expected_x5t) = claims.cert_thumbprint() {
-        let presented = request
-            .headers()
-            .get("x-client-cert-thumbprint")
-            .and_then(|v| v.to_str().ok());
+        let presented = forwarded_cert_thumbprint(
+            request
+                .headers()
+                .get("x-ssl-client-verify")
+                .and_then(|v| v.to_str().ok()),
+            request
+                .headers()
+                .get("x-client-cert-thumbprint")
+                .and_then(|v| v.to_str().ok()),
+        );
         if !cert_binding_satisfied(expected_x5t, presented) {
             tracing::warn!(
                 target: "security",
@@ -398,6 +416,20 @@ pub async fn jwt_auth_middleware(
     })?;
     let tenant_id = TenantId::from_uuid(tenant_uuid);
 
+    // Reject X-Tenant-ID that disagrees with the token's tid (API keys already compare).
+    let header_tid = request
+        .headers()
+        .get("X-Tenant-ID")
+        .and_then(|v| v.to_str().ok());
+    if let Err(reason) = tenant_header_agrees(header_tid, tenant_uuid) {
+        tracing::warn!(
+            jwt_tid = %tenant_uuid,
+            header = ?header_tid,
+            "Rejected request: {reason}"
+        );
+        return Err((StatusCode::UNAUTHORIZED, "Tenant mismatch").into_response());
+    }
+
     // Extract user ID from sub claim
     // For client_credentials tokens, sub is the client_id (not a UUID)
     // In that case, we mark it as a service account token
@@ -490,6 +522,41 @@ pub async fn jwt_auth_middleware(
 #[derive(Clone, Copy, Debug)]
 pub struct TrustXff;
 
+/// Issuer/audience expected by `jwt_auth_middleware`. Defaults match `TokenConfig`.
+#[derive(Clone, Debug)]
+pub struct JwtExpectedAudience {
+    /// Expected `iss` claim.
+    pub issuer: String,
+    /// Expected `aud` claim.
+    pub audience: String,
+}
+
+impl Default for JwtExpectedAudience {
+    fn default() -> Self {
+        Self {
+            issuer: "xavyo".to_string(),
+            audience: "xavyo".to_string(),
+        }
+    }
+}
+
+/// Compare an optional `X-Tenant-ID` header to the JWT `tid`.
+///
+/// Missing header is allowed (JWT is the source of truth). A present header
+/// must parse as the same UUID.
+pub fn tenant_header_agrees(header: Option<&str>, jwt_tid: uuid::Uuid) -> Result<(), &'static str> {
+    let Some(raw) = header.map(str::trim).filter(|s| !s.is_empty()) else {
+        return Ok(());
+    };
+    let parsed = raw
+        .parse::<uuid::Uuid>()
+        .map_err(|_| "X-Tenant-ID is not a valid UUID")?;
+    if parsed != jwt_tid {
+        return Err("X-Tenant-ID does not match JWT tid");
+    }
+    Ok(())
+}
+
 /// Wrapper for JWT public key to allow putting it in extensions.
 #[derive(Clone)]
 pub struct JwtPublicKey(pub String);
@@ -554,5 +621,20 @@ mod tests {
         let empty_token = "";
         assert!(empty_token.is_empty());
         // In middleware, empty tokens are rejected before JWT decode
+    }
+
+    #[test]
+    fn tenant_header_agrees_when_absent_or_matching() {
+        let tid = uuid::Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+        assert!(tenant_header_agrees(None, tid).is_ok());
+        assert!(tenant_header_agrees(Some(""), tid).is_ok());
+        assert!(tenant_header_agrees(Some("11111111-1111-1111-1111-111111111111"), tid).is_ok());
+    }
+
+    #[test]
+    fn tenant_header_rejected_when_mismatched_or_invalid() {
+        let tid = uuid::Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+        assert!(tenant_header_agrees(Some("22222222-2222-2222-2222-222222222222"), tid).is_err());
+        assert!(tenant_header_agrees(Some("not-a-uuid"), tid).is_err());
     }
 }

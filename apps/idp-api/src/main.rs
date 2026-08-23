@@ -7,6 +7,7 @@ mod bootstrap;
 mod config;
 #[cfg(feature = "kafka")]
 mod consumers;
+mod governance_auth;
 mod health;
 mod logging;
 mod metrics;
@@ -47,11 +48,11 @@ use xavyo_api_connectors::{
     OperationService, OperationState, ReconciliationService, ReconciliationState,
     ScimTargetService, ScimTargetState, SyncService, SyncState,
 };
-use xavyo_api_governance::governance_router;
 use xavyo_api_governance::services::{
     AccessRequestService, CertificationCampaignService, EscalationPolicyService, EscalationService,
 };
 use xavyo_api_governance::EscalationJob;
+use xavyo_api_governance::{governance_router, governance_self_service_router};
 use xavyo_api_import::{import_admin_router, import_public_router, ImportState};
 use xavyo_api_nhi::{a2a_router, discovery_router, mcp_router};
 use xavyo_api_nhi::{nhi_router, NhiState};
@@ -777,6 +778,7 @@ async fn main() {
         transmitter: ssf_transmitter.clone(),
     };
     let ssf_routes = ssf_router(ssf_state.clone())
+        .layer(axum::middleware::from_fn(admin_guard))
         .layer(axum::middleware::from_fn(jwt_auth_middleware))
         .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
         .layer(TenantLayer::with_config(
@@ -1019,17 +1021,19 @@ async fn main() {
 
     // Governance routes (F033 - IGA Entitlement Management)
     // F113: Support both API key and JWT authentication for programmatic access
-    let governance_routes = governance_router(pool.clone(), ssf_emitter.clone())
-        .layer(axum::middleware::from_fn(admin_guard))
-        .layer(axum::middleware::from_fn(jwt_auth_middleware))
-        .layer(axum::middleware::from_fn(api_key_auth_middleware))
-        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
-        .layer(axum::Extension(pool.clone()))
-        .layer(TenantLayer::with_config(
-            xavyo_tenant::TenantConfig::builder()
-                .require_tenant(true)
-                .build(),
-        ));
+    // Self-service (my-approvals, own access-requests) is JWT-only so non-admin
+    // reviewers are not 403'd by admin_guard.
+    let governance_self_service_routes = crate::governance_auth::apply_governance_auth_layers(
+        governance_self_service_router(pool.clone(), ssf_emitter.clone()),
+        config.jwt_public_key.clone(),
+        pool.clone(),
+    );
+    let governance_routes = crate::governance_auth::apply_governance_auth_layers(
+        governance_router(pool.clone(), ssf_emitter.clone())
+            .layer(axum::middleware::from_fn(admin_guard)),
+        config.jwt_public_key.clone(),
+        pool.clone(),
+    );
 
     // Authorization engine routes (F083 - Fine-Grained Authorization)
     // F113: Support both API key and JWT authentication for programmatic access
@@ -1438,8 +1442,13 @@ async fn main() {
                         .build(),
                 )),
         )
-        // Governance routes (F033 - IGA Entitlement Management)
-        .nest("/governance", governance_routes)
+        // Governance: self-service (JWT) merged with admin workflows (JWT + admin_guard)
+        .nest(
+            "/governance",
+            Router::new()
+                .merge(governance_self_service_routes)
+                .merge(governance_routes),
+        )
         // Connector routes (F045 - Connector Framework)
         .nest("/connectors", connector_routes)
         // Provisioning operation routes (F160 - Job Tracking)

@@ -187,9 +187,14 @@ async fn handle_authorization_code_grant(
     // mTLS (RFC 8705): the client cert thumbprint the gateway verified +
     // forwarded (trusted header). Used both for client authentication
     // (self_signed_tls_client_auth) and to certificate-bind the issued token.
-    let cert_thumbprint = headers
-        .get("x-client-cert-thumbprint")
-        .and_then(|v| v.to_str().ok());
+    let cert_thumbprint = xavyo_auth::forwarded_cert_thumbprint(
+        headers
+            .get("x-ssl-client-verify")
+            .and_then(|v| v.to_str().ok()),
+        headers
+            .get("x-client-cert-thumbprint")
+            .and_then(|v| v.to_str().ok()),
+    );
 
     // Client authentication. `private_key_jwt` (RFC 7523) takes precedence when
     // a `client_assertion` is present — the FAPI 2.0 strong-auth method.
@@ -402,9 +407,14 @@ async fn handle_client_credentials_grant(
     // Extract tenant_id from X-Tenant-ID header
     let tenant_id = extract_tenant_id_from_headers(headers)?;
 
-    let cert_thumbprint = headers
-        .get("x-client-cert-thumbprint")
-        .and_then(|v| v.to_str().ok());
+    let cert_thumbprint = xavyo_auth::forwarded_cert_thumbprint(
+        headers
+            .get("x-ssl-client-verify")
+            .and_then(|v| v.to_str().ok()),
+        headers
+            .get("x-client-cert-thumbprint")
+            .and_then(|v| v.to_str().ok()),
+    );
 
     // Authenticate the client via one of (RFC 6749 / 7523 / 8705):
     // private_key_jwt (client_assertion), mTLS (registered cert), or client_secret.
@@ -676,9 +686,14 @@ async fn handle_refresh_token_grant(
     // refresh request (RFC 9449 / RFC 8705) — sender-constraint carries forward.
     let dpop_jkt =
         extract_dpop_binding(state, headers, state.dpop_nonce_required() || client_fapi)?;
-    let cert_thumbprint = headers
-        .get("x-client-cert-thumbprint")
-        .and_then(|v| v.to_str().ok());
+    let cert_thumbprint = xavyo_auth::forwarded_cert_thumbprint(
+        headers
+            .get("x-ssl-client-verify")
+            .and_then(|v| v.to_str().ok()),
+        headers
+            .get("x-client-cert-thumbprint")
+            .and_then(|v| v.to_str().ok()),
+    );
 
     // Issue new access token
     let token_response = state
@@ -1013,9 +1028,14 @@ async fn handle_token_exchange_grant(
         headers,
         state.dpop_nonce_required() || client.fapi_profile,
     )?;
-    let cert_thumbprint = headers
-        .get("x-client-cert-thumbprint")
-        .and_then(|v| v.to_str().ok());
+    let cert_thumbprint = xavyo_auth::forwarded_cert_thumbprint(
+        headers
+            .get("x-ssl-client-verify")
+            .and_then(|v| v.to_str().ok()),
+        headers
+            .get("x-client-cert-thumbprint")
+            .and_then(|v| v.to_str().ok()),
+    );
 
     let token_response = state
         .token_service

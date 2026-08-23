@@ -8951,6 +8951,7 @@ dependencies = [
  "utoipa",
  "uuid",
  "wiremock",
+ "xavyo-auth",
  "xavyo-core",
  "xavyo-db",
  "xavyo-ssf",

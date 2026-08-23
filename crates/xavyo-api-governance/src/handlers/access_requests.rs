@@ -18,6 +18,16 @@ use crate::models::{
 use crate::router::GovernanceState;
 use xavyo_webhooks::{EventPublisher, WebhookEvent};
 
+/// Tenant + requester taken from the JWT (self-service; no admin role required).
+pub fn requester_from_claims(claims: &JwtClaims) -> Result<(Uuid, Uuid), ApiGovernanceError> {
+    let tenant_id = *claims
+        .tenant_id()
+        .ok_or(ApiGovernanceError::Unauthorized)?
+        .as_uuid();
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
+    Ok((tenant_id, user_id))
+}
+
 /// List the current user's access requests.
 #[utoipa::path(
     get,
@@ -36,12 +46,7 @@ pub async fn list_my_requests(
     Extension(claims): Extension<JwtClaims>,
     Query(query): Query<ListAccessRequestsQuery>,
 ) -> ApiResult<Json<AccessRequestListResponse>> {
-    let tenant_id = *claims
-        .tenant_id()
-        .ok_or(ApiGovernanceError::Unauthorized)?
-        .as_uuid();
-
-    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
+    let (tenant_id, user_id) = requester_from_claims(&claims)?;
 
     let limit = query.limit.unwrap_or(50).min(100);
     let offset = query.offset.unwrap_or(0).max(0);
@@ -117,12 +122,7 @@ pub async fn create_request(
 ) -> ApiResult<(StatusCode, Json<AccessRequestCreatedResponse>)> {
     request.validate()?;
 
-    let tenant_id = *claims
-        .tenant_id()
-        .ok_or(ApiGovernanceError::Unauthorized)?
-        .as_uuid();
-
-    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
+    let (tenant_id, user_id) = requester_from_claims(&claims)?;
 
     let created = state
         .access_request_service
@@ -192,12 +192,7 @@ pub async fn cancel_request(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<AccessRequestResponse>> {
-    let tenant_id = *claims
-        .tenant_id()
-        .ok_or(ApiGovernanceError::Unauthorized)?
-        .as_uuid();
-
-    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
+    let (tenant_id, user_id) = requester_from_claims(&claims)?;
 
     let request = state
         .access_request_service
@@ -205,4 +200,36 @@ pub async fn cancel_request(
         .await?;
 
     Ok(Json(request.into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::requester_from_claims;
+    use xavyo_auth::JwtClaims;
+    use xavyo_core::TenantId;
+
+    #[test]
+    fn non_admin_jwt_is_enough_to_identify_requester() {
+        let user_id = uuid::Uuid::new_v4();
+        let tenant = TenantId::new();
+        let claims = JwtClaims::builder()
+            .subject(user_id.to_string())
+            .tenant_id(tenant)
+            .roles(vec!["user"])
+            .expires_in_secs(3600)
+            .build();
+        let (tid, uid) = requester_from_claims(&claims).expect("user JWT must work without admin");
+        assert_eq!(tid, *tenant.as_uuid());
+        assert_eq!(uid, user_id);
+    }
+
+    #[test]
+    fn missing_tenant_is_unauthorized() {
+        let claims = JwtClaims::builder()
+            .subject(uuid::Uuid::new_v4().to_string())
+            .roles(vec!["user"])
+            .expires_in_secs(3600)
+            .build();
+        assert!(requester_from_claims(&claims).is_err());
+    }
 }

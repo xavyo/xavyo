@@ -70,7 +70,9 @@ pub use jwt::{
     decode_token, decode_token_with_algorithm, decode_token_with_config, encode_token,
     encode_token_with_kid, extract_kid, ValidationConfig,
 };
-pub use mtls::{cert_binding_satisfied, compute_x5t_s256, x5t_s256_from_pem};
+pub use mtls::{
+    cert_binding_satisfied, compute_x5t_s256, forwarded_cert_thumbprint, x5t_s256_from_pem,
+};
 pub use password::{hash_password, verify_password, PasswordHasher};
 pub use rar::{parse_authorization_details, AuthorizationDetail, RarError};
 pub use step_up::{check_step_up, step_up_challenge_header, StepUpOutcome, StepUpRequirement};

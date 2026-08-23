@@ -38,12 +38,7 @@ pub async fn list_pending_approvals(
     Extension(claims): Extension<JwtClaims>,
     Query(query): Query<ListPendingApprovalsQuery>,
 ) -> ApiResult<Json<PendingApprovalListResponse>> {
-    let tenant_id = *claims
-        .tenant_id()
-        .ok_or(ApiGovernanceError::Unauthorized)?
-        .as_uuid();
-
-    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
+    let (tenant_id, user_id) = crate::handlers::access_requests::requester_from_claims(&claims)?;
 
     let limit = query.limit.unwrap_or(50).min(100);
     let offset = query.offset.unwrap_or(0).max(0);

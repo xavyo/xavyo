@@ -27,7 +27,7 @@ const CACHE_TTL_SECONDS: u64 = 30;
 #[derive(Clone)]
 pub struct RevocationCache {
     cache: Cache<String, bool>,
-    pool: Arc<PgPool>,
+    pool: Option<Arc<PgPool>>,
 }
 
 impl RevocationCache {
@@ -41,8 +41,22 @@ impl RevocationCache {
 
         Self {
             cache,
-            pool: Arc::new(pool),
+            pool: Some(Arc::new(pool)),
         }
+    }
+
+    /// In-memory cache: unknown JTIs are treated as not revoked (no DB).
+    ///
+    /// Used by JWT-middleware unit tests that cannot reach Postgres. Production
+    /// always uses [`Self::new`].
+    #[must_use]
+    pub fn new_in_memory() -> Self {
+        let cache = Cache::builder()
+            .max_capacity(MAX_CACHE_ENTRIES)
+            .time_to_live(Duration::from_secs(CACHE_TTL_SECONDS))
+            .build();
+
+        Self { cache, pool: None }
     }
 
     /// Check if a JTI has been revoked.
@@ -55,8 +69,12 @@ impl RevocationCache {
             return Ok(revoked);
         }
 
+        let Some(pool) = self.pool.as_ref() else {
+            return Ok(false);
+        };
+
         // Cache miss — query DB
-        let revoked = RevokedToken::is_revoked(&*self.pool, jti).await?;
+        let revoked = RevokedToken::is_revoked(pool.as_ref(), jti).await?;
 
         // Cache the result
         self.cache.insert(jti.to_string(), revoked).await;

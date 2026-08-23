@@ -17,6 +17,15 @@ use crate::models::{
 };
 use crate::router::GovernanceState;
 
+/// Admin-only campaign writes (launch/cancel/create).
+pub fn require_campaign_admin(claims: &JwtClaims) -> Result<(), ApiGovernanceError> {
+    if claims.has_role("admin") {
+        Ok(())
+    } else {
+        Err(ApiGovernanceError::Forbidden)
+    }
+}
+
 /// List certification campaigns.
 #[utoipa::path(
     get,
@@ -260,9 +269,7 @@ pub async fn launch_campaign(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<CampaignWithProgressResponse>> {
-    if !claims.has_role("admin") {
-        return Err(ApiGovernanceError::Forbidden);
-    }
+    require_campaign_admin(&claims)?;
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -306,9 +313,7 @@ pub async fn cancel_campaign(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<CampaignResponse>> {
-    if !claims.has_role("admin") {
-        return Err(ApiGovernanceError::Forbidden);
-    }
+    require_campaign_admin(&claims)?;
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -354,4 +359,32 @@ pub async fn get_campaign_progress(
         .await?;
 
     Ok(Json(progress.into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::require_campaign_admin;
+    use crate::error::ApiGovernanceError;
+    use xavyo_auth::JwtClaims;
+
+    #[test]
+    fn non_admin_cannot_launch_campaign() {
+        let user = JwtClaims::builder()
+            .subject("11111111-1111-1111-1111-111111111111")
+            .roles(vec!["user"])
+            .expires_in_secs(3600)
+            .build();
+        let err = require_campaign_admin(&user).unwrap_err();
+        assert!(matches!(err, ApiGovernanceError::Forbidden));
+    }
+
+    #[test]
+    fn admin_can_launch_campaign() {
+        let admin = JwtClaims::builder()
+            .subject("22222222-2222-2222-2222-222222222222")
+            .roles(vec!["admin"])
+            .expires_in_secs(3600)
+            .build();
+        assert!(require_campaign_admin(&admin).is_ok());
+    }
 }
