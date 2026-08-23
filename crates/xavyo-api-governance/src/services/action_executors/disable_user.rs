@@ -53,24 +53,17 @@ impl DisableUserExecutor {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Terminate all active sessions for the user.
+    /// Terminate sessions and refresh tokens for the user.
     async fn terminate_sessions(
         pool: &PgPool,
         tenant_id: Uuid,
         user_id: Uuid,
     ) -> Result<i32, sqlx::Error> {
-        let result = sqlx::query(
-            r#"
-            UPDATE sessions SET revoked_at = NOW()
-            WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()
-            "#,
+        let count = crate::services::revoke_auth::revoke_user_sessions_and_refresh_tokens(
+            pool, tenant_id, user_id,
         )
-        .bind(user_id)
-        .bind(tenant_id)
-        .execute(pool)
         .await?;
-
-        Ok(result.rows_affected() as i32)
+        Ok(count as i32)
     }
 }
 
@@ -177,6 +170,10 @@ mod tests {
         assert!(
             !production.contains("unwrap_or(0)"),
             "must not treat session terminate errors as zero sessions"
+        );
+        assert!(
+            production.contains("revoke_user_sessions_and_refresh_tokens("),
+            "disable must revoke refresh tokens, not only sessions"
         );
     }
 

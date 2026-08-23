@@ -122,6 +122,7 @@ pub mod fuzzy_matching_service;
 pub mod identity_correlation_rule_service;
 pub mod identity_merge_service;
 pub mod merge_audit_service;
+pub mod revoke_auth;
 
 // Persona Management services (F063)
 pub mod persona_archetype_service;

@@ -1062,30 +1062,21 @@ impl IdentityMergeService {
     // =========================================================================
 
     async fn invalidate_sessions(&self, tenant_id: Uuid, user_id: Uuid) -> Result<()> {
-        // Invalidate all sessions for the archived identity
-        // This ensures the user cannot access the system with the old identity
-        let result = sqlx::query(
-            r"
-            UPDATE sessions
-            SET revoked_at = NOW()
-            WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL
-            ",
+        // Archive must kill sessions *and* refresh tokens. Swallowing the
+        // session UPDATE left the source identity able to mint new access tokens.
+        let count = crate::services::revoke_auth::revoke_user_sessions_and_refresh_tokens(
+            &self.pool, tenant_id, user_id,
         )
-        .bind(user_id)
-        .bind(tenant_id)
-        .execute(&self.pool)
-        .await;
+        .await
+        .map_err(GovernanceError::Database)?;
 
-        // Session table may not exist in all setups - don't fail if it doesn't
-        if let Ok(res) = result {
-            if res.rows_affected() > 0 {
-                tracing::info!(
-                    tenant_id = %tenant_id,
-                    user_id = %user_id,
-                    count = res.rows_affected(),
-                    "Invalidated sessions for archived identity"
-                );
-            }
+        if count > 0 {
+            tracing::info!(
+                tenant_id = %tenant_id,
+                user_id = %user_id,
+                count = count,
+                "Invalidated sessions and refresh tokens for archived identity"
+            );
         }
 
         Ok(())
@@ -1131,32 +1122,20 @@ impl IdentityMergeService {
         .bind(tenant_id)
         .bind(target_id)
         .execute(executor)
-        .await;
+        .await
+        .map_err(GovernanceError::Database)?;
 
-        // Table may not exist - don't fail
-        match result {
-            Ok(res) => {
-                let count = res.rows_affected() as usize;
-                if count > 0 {
-                    tracing::info!(
-                        tenant_id = %tenant_id,
-                        source_id = %source_id,
-                        target_id = %target_id,
-                        count = count,
-                        "Transferred group memberships during merge"
-                    );
-                }
-                Ok(count)
-            }
-            Err(e) => {
-                // If table doesn't exist, log and continue
-                tracing::debug!(
-                    error = %e,
-                    "Group membership transfer skipped (table may not exist)"
-                );
-                Ok(0)
-            }
+        let count = result.rows_affected() as usize;
+        if count > 0 {
+            tracing::info!(
+                tenant_id = %tenant_id,
+                source_id = %source_id,
+                target_id = %target_id,
+                count = count,
+                "Transferred group memberships during merge"
+            );
         }
+        Ok(count)
     }
 
     /// Cancel or reassign pending access requests involving the source identity.
@@ -1229,42 +1208,38 @@ impl IdentityMergeService {
         let mut total_transferred = 0;
 
         // Transfer application ownership
-        let app_result: std::result::Result<sqlx::postgres::PgQueryResult, sqlx::Error> =
-            sqlx::query(
-                r"
+        let app_result = sqlx::query(
+            r"
             UPDATE gov_applications
             SET owner_id = $3, updated_at = NOW()
             WHERE owner_id = $1 AND tenant_id = $2
             ",
-            )
-            .bind(source_id)
-            .bind(tenant_id)
-            .bind(target_id)
-            .execute(&mut **tx)
-            .await;
+        )
+        .bind(source_id)
+        .bind(tenant_id)
+        .bind(target_id)
+        .execute(&mut **tx)
+        .await
+        .map_err(GovernanceError::Database)?;
 
-        if let Ok(res) = app_result {
-            total_transferred += res.rows_affected() as usize;
-        }
+        total_transferred += app_result.rows_affected() as usize;
 
         // Transfer entitlement ownership
-        let ent_result: std::result::Result<sqlx::postgres::PgQueryResult, sqlx::Error> =
-            sqlx::query(
-                r"
+        let ent_result = sqlx::query(
+            r"
             UPDATE gov_entitlements
             SET owner_id = $3, updated_at = NOW()
             WHERE owner_id = $1 AND tenant_id = $2
             ",
-            )
-            .bind(source_id)
-            .bind(tenant_id)
-            .bind(target_id)
-            .execute(&mut **tx)
-            .await;
+        )
+        .bind(source_id)
+        .bind(tenant_id)
+        .bind(target_id)
+        .execute(&mut **tx)
+        .await
+        .map_err(GovernanceError::Database)?;
 
-        if let Ok(res) = ent_result {
-            total_transferred += res.rows_affected() as usize;
-        }
+        total_transferred += ent_result.rows_affected() as usize;
 
         if total_transferred > 0 {
             tracing::info!(
@@ -1513,6 +1488,28 @@ mod tests {
         assert_eq!(
             result.external_references_preserved["social_identities"][0]["provider"],
             "google"
+        );
+    }
+
+    #[test]
+    fn merge_does_not_swallow_session_or_side_effect_writes() {
+        let src = include_str!("identity_merge_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("revoke_user_sessions_and_refresh_tokens("),
+            "merge must revoke sessions and refresh tokens fail-closed"
+        );
+        assert!(
+            !production.contains("Session table may not exist"),
+            "must not swallow session revoke after archive"
+        );
+        assert!(
+            !production.contains("Group membership transfer skipped"),
+            "must not swallow group membership transfer"
+        );
+        assert!(
+            !production.contains("if let Ok(res) = app_result"),
+            "must not swallow ownership transfer"
         );
     }
 }

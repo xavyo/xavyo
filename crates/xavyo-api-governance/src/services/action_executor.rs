@@ -213,6 +213,14 @@ impl ActionExecutor {
         .await
         .map_err(GovernanceError::Database)?;
 
+        crate::services::revoke_auth::revoke_user_sessions_and_refresh_tokens(
+            self.pool.as_ref(),
+            context.tenant_id,
+            context.object_id,
+        )
+        .await
+        .map_err(GovernanceError::Database)?;
+
         Ok(())
     }
 
@@ -237,20 +245,16 @@ impl ActionExecutor {
         Ok(())
     }
 
-    /// T032: Revoke all active sessions for the user.
+    /// T032: Revoke all active sessions and refresh tokens for the user.
     async fn execute_revoke_sessions(
         &self,
         context: &ActionExecutionContext,
     ) -> Result<(), GovernanceError> {
-        sqlx::query(
-            r"
-            DELETE FROM sessions
-            WHERE user_id = $1 AND tenant_id = $2
-            ",
+        crate::services::revoke_auth::revoke_user_sessions_and_refresh_tokens(
+            self.pool.as_ref(),
+            context.tenant_id,
+            context.object_id,
         )
-        .bind(context.object_id)
-        .bind(context.tenant_id)
-        .execute(self.pool.as_ref())
         .await
         .map_err(GovernanceError::Database)?;
 
@@ -731,5 +735,19 @@ mod tests {
 
         let scope = config.get("scope").and_then(|v| v.as_str());
         assert_eq!(scope, Some("high_risk_entitlements"));
+    }
+
+    #[test]
+    fn disable_and_revoke_sessions_revoke_refresh_tokens() {
+        let src = include_str!("action_executor.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("revoke_user_sessions_and_refresh_tokens("),
+            "lifecycle disable/revoke-sessions must revoke refresh tokens"
+        );
+        assert!(
+            !production.contains("DELETE FROM sessions"),
+            "must not delete sessions without revoking refresh tokens"
+        );
     }
 }
