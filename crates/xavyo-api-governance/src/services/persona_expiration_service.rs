@@ -19,6 +19,18 @@ use xavyo_governance::error::{GovernanceError, Result};
 
 use super::persona_audit_service::PersonaAuditService;
 
+/// Whether a status update actually changed the row.
+///
+/// Callers must not treat a DB error as "no update" and continue.
+pub(crate) fn persona_status_applied(updated: bool) -> bool {
+    updated
+}
+
+/// Email notification is not implemented; never report it as sent.
+pub(crate) fn expiration_notification_sent() -> bool {
+    false
+}
+
 /// Fail closed: a persona that requires approval cannot be extended by a
 /// non-owner until an approval workflow is wired.
 pub fn reject_unapproved_persona_extension(requires_approval: bool, is_owner: bool) -> Result<()> {
@@ -207,18 +219,18 @@ impl PersonaExpirationService {
         let mut results = Vec::new();
         for persona in personas {
             if persona.status == PersonaStatus::Active {
-                // Transition to expiring
-                if let Ok(Some(_updated)) = GovPersona::update_status(
+                let updated = GovPersona::update_status(
                     &self.pool,
                     tenant_id,
                     persona.id,
                     PersonaStatus::Expiring,
                 )
                 .await
-                {
+                .map_err(GovernanceError::Database)?;
+                if persona_status_applied(updated.is_some()) {
                     let days_remaining = persona.valid_until.map(|v| (v - now).num_days());
 
-                    // Log audit event
+                    // Log audit event. Email is not sent yet; do not claim it was.
                     let _ = self
                         .log_expiration_warning(tenant_id, persona.id, days_remaining.unwrap_or(0))
                         .await;
@@ -229,7 +241,7 @@ impl PersonaExpirationService {
                         new_status: PersonaStatus::Expiring,
                         valid_until: persona.valid_until,
                         days_until_expiration: days_remaining,
-                        notification_sent: true,
+                        notification_sent: expiration_notification_sent(),
                         sessions_invalidated: 0,
                     });
 
@@ -267,20 +279,20 @@ impl PersonaExpirationService {
             {
                 let previous_status = persona.status;
 
-                // Transition to expired
-                if let Ok(Some(_updated)) = GovPersona::update_status(
+                let updated = GovPersona::update_status(
                     &self.pool,
                     tenant_id,
                     persona.id,
                     PersonaStatus::Expired,
                 )
                 .await
-                {
-                    // T071: Invalidate sessions for this persona
+                .map_err(GovernanceError::Database)?;
+                if persona_status_applied(updated.is_some()) {
+                    // T071: Invalidate sessions for this persona. Errors must
+                    // not report expiration as complete while sessions remain.
                     let sessions_invalidated = self
                         .invalidate_persona_sessions(tenant_id, persona.id)
-                        .await
-                        .unwrap_or(0);
+                        .await?;
 
                     // Log audit event
                     let _ = self
@@ -294,7 +306,7 @@ impl PersonaExpirationService {
                         new_status: PersonaStatus::Expired,
                         valid_until: persona.valid_until,
                         days_until_expiration: Some(0),
-                        notification_sent: true,
+                        notification_sent: expiration_notification_sent(),
                         sessions_invalidated,
                     });
 
@@ -624,5 +636,38 @@ mod tests {
         assert_eq!(result.extension_days, 30);
         assert!(!result.required_approval);
         assert_eq!(result.extension_count, 3);
+    }
+
+    #[test]
+    fn persona_status_applied_is_the_update_outcome() {
+        assert!(persona_status_applied(true));
+        assert!(!persona_status_applied(false));
+    }
+
+    #[test]
+    fn expiration_does_not_claim_unsent_notification() {
+        assert!(!expiration_notification_sent());
+        let src = include_str!("persona_expiration_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("persona_status_applied("),
+            "status update errors must fail the job"
+        );
+        assert!(
+            !production.contains("if let Ok(Some(_updated))"),
+            "must not swallow persona status updates"
+        );
+        let idx = production
+            .find("invalidate_persona_sessions")
+            .expect("session invalidation");
+        let window = &production[idx..(idx + 180).min(production.len())];
+        assert!(
+            !window.contains("unwrap_or"),
+            "must not skip session invalidation on error: {window}"
+        );
+        assert!(
+            production.contains("expiration_notification_sent()"),
+            "must not claim a notification that was not sent"
+        );
     }
 }
