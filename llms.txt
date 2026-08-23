@@ -59,9 +59,9 @@ The `docs-site/` contains a full Docusaurus documentation site:
 
 ### Connectors (4 crates)
 - [xavyo-connector-ldap](crates/xavyo-connector-ldap/CRATE.md): 🟢 LDAP/AD
-- [xavyo-connector-entra](crates/xavyo-connector-entra/CRATE.md): 🟢 Microsoft Entra
-- [xavyo-connector-rest](crates/xavyo-connector-rest/CRATE.md): 🔴 REST APIs
-- [xavyo-connector-database](crates/xavyo-connector-database/CRATE.md): 🔴 Databases
+- [xavyo-connector-entra](crates/xavyo-connector-entra/CRATE.md): 🟢 Microsoft Entra (crate/API; no UI form)
+- [xavyo-connector-rest](crates/xavyo-connector-rest/CRATE.md): 🟢 REST APIs (crate/API; not a production UI path)
+- [xavyo-connector-database](crates/xavyo-connector-database/CRATE.md): 🟡 Databases (crate/API; not a production UI path)
 
 ### API (14 crates)
 - [xavyo-api-auth](crates/xavyo-api-auth/CRATE.md): 🟢 Auth endpoints
