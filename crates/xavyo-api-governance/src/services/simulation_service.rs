@@ -180,19 +180,7 @@ impl SimulationService {
             GovernanceError::Validation("Entitlement ID required for add entitlement".to_string())
         })?;
 
-        // Get users who are members of this group/role
-        let affected_users: Vec<Uuid> = sqlx::query_scalar(
-            r"
-            SELECT DISTINCT user_id
-            FROM group_memberships
-            WHERE tenant_id = $1 AND group_id = $2
-            ",
-        )
-        .bind(tenant_id)
-        .bind(role_id)
-        .fetch_all(&self.pool)
-        .await
-        .unwrap_or_default();
+        let affected_users = self.group_member_user_ids(tenant_id, role_id).await?;
 
         // All affected users would gain the new entitlement
         let access_gained = serde_json::json!(affected_users
@@ -226,12 +214,12 @@ impl SimulationService {
             )
         })?;
 
-        // Get users who have this entitlement through the role
         let affected_users: Vec<Uuid> = sqlx::query_scalar(
             r"
             SELECT DISTINCT ug.user_id
             FROM group_memberships ug
             INNER JOIN gov_entitlement_assignments ea ON ea.target_id = ug.group_id
+                AND ea.tenant_id = $1
                 AND ea.target_type = 'group'
                 AND ea.entitlement_id = $3
                 AND ea.status = 'active'
@@ -243,7 +231,7 @@ impl SimulationService {
         .bind(ent_id)
         .fetch_all(&self.pool)
         .await
-        .unwrap_or_default();
+        .map_err(GovernanceError::Database)?;
 
         let access_gained = serde_json::json!([]);
         let access_lost = serde_json::json!(affected_users
@@ -297,33 +285,8 @@ impl SimulationService {
             GovernanceError::Validation("Role ID required for remove role".to_string())
         })?;
 
-        // Get all users in this role
-        let affected_users: Vec<Uuid> = sqlx::query_scalar(
-            r"
-            SELECT DISTINCT user_id
-            FROM group_memberships
-            WHERE tenant_id = $1 AND group_id = $2
-            ",
-        )
-        .bind(tenant_id)
-        .bind(role_id)
-        .fetch_all(&self.pool)
-        .await
-        .unwrap_or_default();
-
-        // Get all entitlements assigned to this role
-        let entitlement_ids: Vec<Uuid> = sqlx::query_scalar(
-            r"
-            SELECT DISTINCT entitlement_id
-            FROM gov_entitlement_assignments
-            WHERE tenant_id = $1 AND target_type = 'group' AND target_id = $2 AND status = 'active'
-            ",
-        )
-        .bind(tenant_id)
-        .bind(role_id)
-        .fetch_all(&self.pool)
-        .await
-        .unwrap_or_default();
+        let affected_users = self.group_member_user_ids(tenant_id, role_id).await?;
+        let entitlement_ids = self.group_entitlement_ids(tenant_id, role_id).await?;
 
         let access_gained = serde_json::json!([]);
         let access_lost = serde_json::json!(affected_users
@@ -352,19 +315,7 @@ impl SimulationService {
             GovernanceError::Validation("Role ID required for modify role".to_string())
         })?;
 
-        // Get all users in this role
-        let affected_users: Vec<Uuid> = sqlx::query_scalar(
-            r"
-            SELECT DISTINCT user_id
-            FROM group_memberships
-            WHERE tenant_id = $1 AND group_id = $2
-            ",
-        )
-        .bind(tenant_id)
-        .bind(role_id)
-        .fetch_all(&self.pool)
-        .await
-        .unwrap_or_default();
+        let affected_users = self.group_member_user_ids(tenant_id, role_id).await?;
 
         // Build access gained/lost from changes
         // For modify_role scenario, entitlement_ids represents entitlements to add
@@ -388,6 +339,36 @@ impl SimulationService {
             serde_json::json!(gained),
             serde_json::json!(lost),
         ))
+    }
+
+    async fn group_member_user_ids(&self, tenant_id: Uuid, group_id: Uuid) -> Result<Vec<Uuid>> {
+        sqlx::query_scalar(
+            r"
+            SELECT DISTINCT user_id
+            FROM group_memberships
+            WHERE tenant_id = $1 AND group_id = $2
+            ",
+        )
+        .bind(tenant_id)
+        .bind(group_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(GovernanceError::Database)
+    }
+
+    async fn group_entitlement_ids(&self, tenant_id: Uuid, group_id: Uuid) -> Result<Vec<Uuid>> {
+        sqlx::query_scalar(
+            r"
+            SELECT DISTINCT entitlement_id
+            FROM gov_entitlement_assignments
+            WHERE tenant_id = $1 AND target_type = 'group' AND target_id = $2 AND status = 'active'
+            ",
+        )
+        .bind(tenant_id)
+        .bind(group_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(GovernanceError::Database)
     }
 
     /// Apply a simulation (commit the changes).
@@ -839,5 +820,39 @@ mod tests {
         let changes = SimulationChanges::default();
 
         assert!(validate_changes(&ScenarioType::AddRole, &changes, None).is_err());
+    }
+
+    #[test]
+    fn impact_queries_do_not_fail_open() {
+        let src = include_str!("simulation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("group_member_user_ids("),
+            "role membership impact must use a fail-closed helper"
+        );
+        assert!(
+            production.contains("group_entitlement_ids("),
+            "role entitlement impact must use a fail-closed helper"
+        );
+        assert!(
+            production.contains("ea.tenant_id = $1"),
+            "entitlement-remove impact must join assignments on tenant"
+        );
+        for fn_name in [
+            "calculate_add_entitlement_impact",
+            "calculate_remove_entitlement_impact",
+            "calculate_remove_role_impact",
+            "calculate_modify_role_impact",
+        ] {
+            let body = production
+                .split(&format!("async fn {fn_name}"))
+                .nth(1)
+                .and_then(|s| s.split("async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                !body.contains("unwrap_or_default()"),
+                "{fn_name} must not treat query errors as empty impact"
+            );
+        }
     }
 }

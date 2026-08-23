@@ -189,7 +189,7 @@ impl MetricsService {
         .bind(role_id)
         .fetch_one(&self.pool)
         .await
-        .unwrap_or(0);
+        .map_err(GovernanceError::Database)?;
 
         // For active users, count users who have logged in recently
         // Fall back to users with recent group membership activity
@@ -206,7 +206,7 @@ impl MetricsService {
         .bind(role_id)
         .fetch_one(&self.pool)
         .await
-        .unwrap_or(0);
+        .map_err(GovernanceError::Database)?;
 
         // Get entitlements assigned to this role (via group assignment)
         // Note: role_id is treated as a group_id, and entitlements are assigned to groups
@@ -221,7 +221,7 @@ impl MetricsService {
         .bind(role_id)
         .fetch_all(&self.pool)
         .await
-        .unwrap_or_default();
+        .map_err(GovernanceError::Database)?;
 
         // Calculate entitlement usage
         let mut entitlement_usage = Vec::with_capacity(entitlement_ids.len());
@@ -238,7 +238,7 @@ impl MetricsService {
             .bind(ent_id)
             .fetch_one(&self.pool)
             .await
-            .unwrap_or(0);
+            .map_err(GovernanceError::Database)?;
 
             let usage_rate = if user_count > 0 {
                 used_by as f64 / user_count as f64
@@ -343,6 +343,25 @@ mod tests {
         assert_eq!(
             MetricsService::calculate_trend(0.7, None),
             MetricsTrendDirection::Stable
+        );
+    }
+
+    #[test]
+    fn calculate_metrics_does_not_fail_open() {
+        let src = include_str!("metrics_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let calc = production
+            .split("async fn calculate_for_role")
+            .nth(1)
+            .and_then(|s| s.split("async fn ").next())
+            .expect("calculate_for_role");
+        assert!(
+            !calc.contains("unwrap_or(0)") && !calc.contains("unwrap_or_default()"),
+            "role metrics must not treat query errors as zero usage"
+        );
+        assert!(
+            calc.contains("map_err(GovernanceError::Database)"),
+            "role metrics query errors must fail closed"
         );
     }
 }
