@@ -15,7 +15,7 @@ pub use device_code::{
     DeviceTokenExchangeResult,
 };
 pub use device_confirmation::{
-    ConfirmationCreated, ConfirmationValidationResult, DeviceConfirmationService,
+    confirmation_url, ConfirmationCreated, ConfirmationValidationResult, DeviceConfirmationService,
 };
 pub use device_risk::{
     AdminNotifier, DeviceRiskService, LogOnlyAdminNotifier, RiskAction, RiskAssessment,
