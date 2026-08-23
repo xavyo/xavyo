@@ -14,6 +14,22 @@ use uuid::Uuid;
 use xavyo_auth::verify_password;
 use xavyo_db::{set_tenant_context, EmailChangeRequest, RevokeReason, User};
 
+/// Session service required to complete an email change.
+///
+/// Completing without a session service (or ignoring revoke errors) left
+/// old sessions valid after the address changed.
+fn email_change_session_revoker(
+    session_service: Option<&Arc<SessionService>>,
+) -> Result<&SessionService, ApiAuthError> {
+    session_service
+        .map(std::convert::AsRef::as_ref)
+        .ok_or_else(|| {
+            ApiAuthError::Internal(
+                "session service is required to complete email change".to_string(),
+            )
+        })
+}
+
 /// Token validity in hours for email change requests.
 pub const EMAIL_CHANGE_TOKEN_VALIDITY_HOURS: i64 = 24;
 
@@ -259,19 +275,11 @@ impl EmailChangeService {
             .await
             .map_err(ApiAuthError::Database)?;
 
-        // H5: Revoke all sessions after email change to force re-authentication
-        if let Some(ref session_service) = self.session_service {
-            if let Err(e) = session_service
-                .revoke_all_user_sessions(user_id, tenant_id, RevokeReason::Security)
-                .await
-            {
-                warn!(
-                    user_id = %user_id,
-                    error = %e,
-                    "Failed to revoke sessions after email change"
-                );
-            }
-        }
+        // H5: Revoke all sessions after email change to force re-authentication.
+        // Missing wiring or revoke errors used to still return success.
+        email_change_session_revoker(self.session_service.as_ref())?
+            .revoke_all_user_sessions(user_id, tenant_id, RevokeReason::Security)
+            .await?;
 
         info!(
             user_id = %user_id,
@@ -315,5 +323,28 @@ impl EmailChangeService {
 
 #[cfg(test)]
 mod tests {
-    // Integration tests will be in the tests/ directory
+    use super::*;
+
+    #[test]
+    fn email_change_session_revoker_requires_service() {
+        assert!(email_change_session_revoker(None).is_err());
+    }
+
+    #[test]
+    fn email_change_does_not_swallow_session_revoke() {
+        let src = include_str!("email_change_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("email_change_session_revoker("),
+            "email change must require a session service"
+        );
+        assert!(
+            !production.contains("Failed to revoke sessions after email change"),
+            "session revoke errors must not be logged-and-ignored"
+        );
+        assert!(
+            !production.contains("if let Some(ref session_service) = self.session_service"),
+            "must not skip session revoke when the service is missing"
+        );
+    }
 }

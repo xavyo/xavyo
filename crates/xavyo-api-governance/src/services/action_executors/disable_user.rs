@@ -106,9 +106,15 @@ impl ActionExecutor for DisableUserExecutor {
         match Self::disable_user(pool, tenant_id, target_user_id).await {
             Ok(true) => {
                 // Also terminate sessions
-                let sessions_terminated = Self::terminate_sessions(pool, tenant_id, target_user_id)
-                    .await
-                    .unwrap_or(0);
+                let sessions_terminated =
+                    match Self::terminate_sessions(pool, tenant_id, target_user_id).await {
+                        Ok(n) => n,
+                        Err(e) => {
+                            return ExecutionResult::failure(format!(
+                                "Failed to terminate sessions after disable: {e}"
+                            ));
+                        }
+                    };
 
                 ExecutionResult::success(
                     serde_json::json!({"is_active": true}),
@@ -157,5 +163,19 @@ mod tests {
     fn test_executor_action_type() {
         let executor = DisableUserExecutor::new();
         assert_eq!(executor.action_type(), "disable");
+    }
+
+    #[test]
+    fn disable_user_does_not_swallow_session_terminate() {
+        let src = include_str!("disable_user.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("Failed to terminate sessions after disable: {e}"),
+            "session terminate errors must fail the action"
+        );
+        assert!(
+            !production.contains("unwrap_or(0)"),
+            "must not treat session terminate errors as zero sessions"
+        );
     }
 }
