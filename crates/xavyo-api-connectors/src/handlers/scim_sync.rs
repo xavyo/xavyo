@@ -59,19 +59,49 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid> {
         })
 }
 
+/// Outbound SCIM target full-sync and reconciliation are not wired.
+///
+/// Callers must not receive HTTP 202 with `status: running` and no worker.
+pub fn reject_unimplemented_scim_target_sync() -> ConnectorApiError {
+    ConnectorApiError::not_implemented(
+        "SCIM target sync/reconciliation execution is not implemented",
+    )
+}
+
+async fn require_active_target(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    target_id: Uuid,
+) -> Result<ScimTarget> {
+    let target = ScimTarget::get_by_id(pool, tenant_id, target_id)
+        .await?
+        .ok_or_else(|| ConnectorApiError::NotFound {
+            resource: "scim_target".to_string(),
+            id: target_id.to_string(),
+        })?;
+
+    if target.status != "active" {
+        return Err(ConnectorApiError::Conflict(format!(
+            "SCIM target is not active (status: {})",
+            target.status,
+        )));
+    }
+    Ok(target)
+}
+
 /// POST /admin/scim-targets/:id/sync — Trigger a full sync.
 ///
-/// Returns 202 Accepted with `sync_run_id`, or 409 if a sync is already running.
+/// Returns 501 until a worker actually performs the outbound sync.
 #[utoipa::path(
     post,
     path = "/admin/scim-targets/{target_id}/sync",
     tag = "SCIM Target Sync",
     params(("target_id" = Uuid, Path, description = "SCIM target ID")),
     responses(
-        (status = 202, description = "Full sync initiated", body = TriggerSyncResponse),
+        (status = 501, description = "Outbound full sync is not implemented"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Target not found"),
-        (status = 409, description = "Sync already in progress")
+        (status = 409, description = "Target is not active")
     ),
     security(("bearerAuth" = []))
 )]
@@ -85,64 +115,23 @@ pub async fn trigger_sync(
     }
     let tenant_id = extract_tenant_id(&claims)?;
     let pool = state.scim_target_service.pool();
-    let triggered_by = Uuid::parse_str(&claims.sub).ok();
-
-    // Verify target exists and is active.
-    let target = ScimTarget::get_by_id(pool, tenant_id, target_id)
-        .await?
-        .ok_or_else(|| ConnectorApiError::NotFound {
-            resource: "scim_target".to_string(),
-            id: target_id.to_string(),
-        })?;
-
-    if target.status != "active" {
-        return Err(ConnectorApiError::Conflict(format!(
-            "SCIM target is not active (status: {})",
-            target.status,
-        )));
-    }
-
-    // Atomically create a sync run only if no active run exists.
-    let run = ScimSyncRun::create_if_no_active_run(
-        pool,
-        xavyo_db::models::CreateScimSyncRun {
-            tenant_id,
-            target_id,
-            run_type: "full_sync".to_string(),
-            triggered_by,
-            total_resources: 0,
-        },
-    )
-    .await?
-    .ok_or_else(|| {
-        ConnectorApiError::Conflict("A sync is already running for this target".to_string())
-    })?;
-
-    // TODO: Dispatch actual sync work to background task using SyncEngine.
-
-    Ok((
-        StatusCode::ACCEPTED,
-        Json(TriggerSyncResponse {
-            sync_run_id: run.id,
-            status: "running".to_string(),
-            message: "Full sync initiated".to_string(),
-        }),
-    ))
+    require_active_target(pool, tenant_id, target_id).await?;
+    Err(reject_unimplemented_scim_target_sync())
 }
 
 /// POST /admin/scim-targets/:id/reconcile — Trigger a reconciliation.
 ///
-/// Returns 202 Accepted with `sync_run_id`, or 409 if a sync is already running.
+/// Returns 501 until a worker actually performs the outbound reconciliation.
 #[utoipa::path(
     post,
     path = "/admin/scim-targets/{target_id}/reconcile",
     tag = "SCIM Target Sync",
     params(("target_id" = Uuid, Path, description = "SCIM target ID")),
     responses(
-        (status = 202, description = "Reconciliation initiated", body = TriggerSyncResponse),
+        (status = 501, description = "Outbound reconciliation is not implemented"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Target not found"),
-        (status = 409, description = "Sync already in progress")
+        (status = 409, description = "Target is not active")
     ),
     security(("bearerAuth" = []))
 )]
@@ -156,49 +145,8 @@ pub async fn trigger_reconciliation(
     }
     let tenant_id = extract_tenant_id(&claims)?;
     let pool = state.scim_target_service.pool();
-    let triggered_by = Uuid::parse_str(&claims.sub).ok();
-
-    // Verify target exists and is active.
-    let target = ScimTarget::get_by_id(pool, tenant_id, target_id)
-        .await?
-        .ok_or_else(|| ConnectorApiError::NotFound {
-            resource: "scim_target".to_string(),
-            id: target_id.to_string(),
-        })?;
-
-    if target.status != "active" {
-        return Err(ConnectorApiError::Conflict(format!(
-            "SCIM target is not active (status: {})",
-            target.status,
-        )));
-    }
-
-    // Atomically create a reconciliation run only if no active run exists.
-    let run = ScimSyncRun::create_if_no_active_run(
-        pool,
-        xavyo_db::models::CreateScimSyncRun {
-            tenant_id,
-            target_id,
-            run_type: "reconciliation".to_string(),
-            triggered_by,
-            total_resources: 0,
-        },
-    )
-    .await?
-    .ok_or_else(|| {
-        ConnectorApiError::Conflict(
-            "A sync/reconciliation is already running for this target".to_string(),
-        )
-    })?;
-
-    Ok((
-        StatusCode::ACCEPTED,
-        Json(TriggerSyncResponse {
-            sync_run_id: run.id,
-            status: "running".to_string(),
-            message: "Reconciliation initiated".to_string(),
-        }),
-    ))
+    require_active_target(pool, tenant_id, target_id).await?;
+    Err(reject_unimplemented_scim_target_sync())
 }
 
 /// GET /admin/scim-targets/:id/sync-runs — List sync runs for a target.
@@ -310,4 +258,62 @@ pub async fn get_sync_run(
     }
 
     Ok(Json(run))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::to_bytes;
+    use axum::response::IntoResponse;
+
+    #[tokio::test]
+    async fn scim_target_sync_is_501_without_running_body() {
+        let response = reject_unimplemented_scim_target_sync().into_response();
+        assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+        assert!(
+            !response.status().is_success(),
+            "unimplemented SCIM target sync must not be HTTP success"
+        );
+
+        let body = to_bytes(response.into_body(), 1024)
+            .await
+            .expect("response body");
+        let text = String::from_utf8(body.to_vec()).expect("utf8");
+        assert!(text.contains("not_implemented"), "{text}");
+        for needle in [
+            r#""status":"running""#,
+            "Full sync initiated",
+            "Reconciliation initiated",
+            "sync_run_id",
+        ] {
+            assert!(
+                !text.contains(needle),
+                "501 body must not look like a started sync ({needle}): {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn trigger_handlers_do_not_persist_fake_running_runs() {
+        let src = include_str!("scim_sync.rs");
+        let production = src
+            .split("mod tests")
+            .next()
+            .expect("production source before tests");
+        assert!(
+            production.contains("reject_unimplemented_scim_target_sync"),
+            "trigger handlers must fail closed"
+        );
+        for needle in [
+            format!("{}_{}", "create_if_no", "active_run"),
+            format!("{} sync initiated", "Full"),
+            format!("{} initiated", "Reconciliation"),
+            format!("status: \"{}\"", "running"),
+        ] {
+            assert!(
+                !production.contains(&needle),
+                "SCIM target trigger handlers must not fake a running sync ({needle})"
+            );
+        }
+    }
 }

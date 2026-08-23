@@ -56,6 +56,8 @@ pub fn reconciliation_router() -> Router<ConnectorsState>;
 | GET | `/reconciliation/runs/:id` | Run details |
 | POST | `/connectors/:id/reconciliation/discrepancies/:id/remediate` | 501 until connector-side remediation exists |
 | POST | `/connectors/:id/reconciliation/discrepancies/bulk-remediate` | 501 until connector-side remediation exists |
+| POST | `/admin/scim-targets/:id/sync` | 501 until outbound full sync is wired |
+| POST | `/admin/scim-targets/:id/reconcile` | 501 until outbound reconciliation is wired |
 | GET | `/provisioning/queue` | Queue stats |
 | GET | `/provisioning/dlq` | Dead letter queue |
 | GET | `/jobs` | List background jobs (F-044) |
@@ -98,6 +100,7 @@ None
 - Never look up a connector by id without `tenant_id` from the JWT
 - Never return HTTP 200 for trigger/retry/link/list inbound sync until execution is wired (501)
 - Never persist `Uuid::nil()` as `resolved_by` when ignoring a discrepancy
+- Never return HTTP 202 `running`/`initiated` for SCIM target sync/reconcile until a worker is dispatched (501)
 
 ## Related Crates
 
