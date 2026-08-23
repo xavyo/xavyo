@@ -16,8 +16,8 @@
 //!
 //! ## Rate Limiting
 //!
-//! The provisioning endpoint is rate limited to 10 requests per IP per hour to
-//! prevent abuse.
+//! The provisioning endpoint is rate limited to 100 requests per IP per hour to
+//! prevent abuse. Unknown client IPs are refused (fail closed).
 
 pub mod error;
 pub mod handlers;
