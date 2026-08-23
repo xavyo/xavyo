@@ -190,12 +190,17 @@ impl Session {
     }
 
     /// Find a session by ID.
-    pub async fn find_by_id<'e, E>(executor: E, id: Uuid) -> Result<Option<Self>, sqlx::Error>
+    pub async fn find_by_id<'e, E>(
+        executor: E,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<Option<Self>, sqlx::Error>
     where
         E: PgExecutor<'e>,
     {
-        sqlx::query_as("SELECT * FROM sessions WHERE id = $1")
+        sqlx::query_as("SELECT * FROM sessions WHERE id = $1 AND tenant_id = $2")
             .bind(id)
+            .bind(tenant_id)
             .fetch_optional(executor)
             .await
     }
@@ -203,13 +208,15 @@ impl Session {
     /// Find a session by refresh token ID.
     pub async fn find_by_refresh_token<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         refresh_token_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error>
     where
         E: PgExecutor<'e>,
     {
-        sqlx::query_as("SELECT * FROM sessions WHERE refresh_token_id = $1")
+        sqlx::query_as("SELECT * FROM sessions WHERE refresh_token_id = $1 AND tenant_id = $2")
             .bind(refresh_token_id)
+            .bind(tenant_id)
             .fetch_optional(executor)
             .await
     }
@@ -217,6 +224,7 @@ impl Session {
     /// Find all active sessions for a user.
     pub async fn find_active_by_user<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         user_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error>
     where
@@ -225,27 +233,33 @@ impl Session {
         sqlx::query_as(
             r"
             SELECT * FROM sessions
-            WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()
+            WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()
             ORDER BY last_activity_at DESC
             ",
         )
         .bind(user_id)
+        .bind(tenant_id)
         .fetch_all(executor)
         .await
     }
 
     /// Count active sessions for a user.
-    pub async fn count_active_by_user<'e, E>(executor: E, user_id: Uuid) -> Result<i64, sqlx::Error>
+    pub async fn count_active_by_user<'e, E>(
+        executor: E,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<i64, sqlx::Error>
     where
         E: PgExecutor<'e>,
     {
         let result: (i64,) = sqlx::query_as(
             r"
             SELECT COUNT(*) FROM sessions
-            WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()
+            WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()
             ",
         )
         .bind(user_id)
+        .bind(tenant_id)
         .fetch_one(executor)
         .await?;
         Ok(result.0)
@@ -254,6 +268,7 @@ impl Session {
     /// Revoke a session.
     pub async fn revoke<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         id: Uuid,
         reason: RevokeReason,
     ) -> Result<bool, sqlx::Error>
@@ -264,11 +279,12 @@ impl Session {
             r"
             UPDATE sessions
             SET revoked_at = NOW(), revoked_reason = $2
-            WHERE id = $1 AND revoked_at IS NULL
+            WHERE id = $1 AND tenant_id = $3 AND revoked_at IS NULL
             ",
         )
         .bind(id)
         .bind(reason.to_string())
+        .bind(tenant_id)
         .execute(executor)
         .await?;
         Ok(result.rows_affected() > 0)
@@ -277,6 +293,7 @@ impl Session {
     /// Revoke all sessions for a user except the specified one.
     pub async fn revoke_all_except<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         user_id: Uuid,
         except_session_id: Uuid,
         reason: RevokeReason,
@@ -288,12 +305,13 @@ impl Session {
             r"
             UPDATE sessions
             SET revoked_at = NOW(), revoked_reason = $3
-            WHERE user_id = $1 AND id != $2 AND revoked_at IS NULL
+            WHERE user_id = $1 AND tenant_id = $4 AND id != $2 AND revoked_at IS NULL
             ",
         )
         .bind(user_id)
         .bind(except_session_id)
         .bind(reason.to_string())
+        .bind(tenant_id)
         .execute(executor)
         .await?;
         Ok(result.rows_affected())
@@ -302,6 +320,7 @@ impl Session {
     /// Revoke all sessions for a user.
     pub async fn revoke_all_for_user<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         user_id: Uuid,
         reason: RevokeReason,
     ) -> Result<u64, sqlx::Error>
@@ -312,11 +331,12 @@ impl Session {
             r"
             UPDATE sessions
             SET revoked_at = NOW(), revoked_reason = $2
-            WHERE user_id = $1 AND revoked_at IS NULL
+            WHERE user_id = $1 AND tenant_id = $3 AND revoked_at IS NULL
             ",
         )
         .bind(user_id)
         .bind(reason.to_string())
+        .bind(tenant_id)
         .execute(executor)
         .await?;
         Ok(result.rows_affected())
@@ -325,6 +345,7 @@ impl Session {
     /// Find the oldest active session for a user.
     pub async fn find_oldest_active<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         user_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error>
     where
@@ -333,18 +354,23 @@ impl Session {
         sqlx::query_as(
             r"
             SELECT * FROM sessions
-            WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()
+            WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()
             ORDER BY created_at ASC
             LIMIT 1
             ",
         )
         .bind(user_id)
+        .bind(tenant_id)
         .fetch_optional(executor)
         .await
     }
 
     /// Update last activity timestamp.
-    pub async fn update_activity<'e, E>(executor: E, id: Uuid) -> Result<bool, sqlx::Error>
+    pub async fn update_activity<'e, E>(
+        executor: E,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<bool, sqlx::Error>
     where
         E: PgExecutor<'e>,
     {
@@ -352,10 +378,11 @@ impl Session {
             r"
             UPDATE sessions
             SET last_activity_at = NOW()
-            WHERE id = $1 AND revoked_at IS NULL
+            WHERE id = $1 AND tenant_id = $2 AND revoked_at IS NULL
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .execute(executor)
         .await?;
         Ok(result.rows_affected() > 0)
@@ -423,6 +450,28 @@ mod tests {
 
         // Idle timeout disabled
         assert!(!session.is_idle(0));
+    }
+
+    #[test]
+    fn session_queries_filter_by_tenant_id() {
+        let src = include_str!("session.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $2"),
+            "find_by_id must filter tenant_id"
+        );
+        assert!(
+            production.contains("WHERE refresh_token_id = $1 AND tenant_id = $2"),
+            "find_by_refresh_token must filter tenant_id"
+        );
+        assert!(
+            production.contains("user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL"),
+            "user-scoped session queries must filter tenant_id"
+        );
+        assert!(
+            !production.contains("WHERE id = $1 AND revoked_at IS NULL\n"),
+            "revoke/update must not skip tenant_id"
+        );
     }
 
     #[test]
