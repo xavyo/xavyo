@@ -23,6 +23,7 @@ pub mod mfa_service;
 pub mod password_policy_service;
 pub mod passwordless_service;
 pub mod profile_service;
+pub mod revoke_auth;
 pub mod risk_enforcement_service;
 pub mod session_service;
 pub mod token_service;

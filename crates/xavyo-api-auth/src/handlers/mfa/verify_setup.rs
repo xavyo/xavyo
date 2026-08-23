@@ -55,21 +55,19 @@ pub async fn verify_totp_setup(
         )
         .await?;
 
-    // Revoke all sessions — MFA enrollment is a security-sensitive change
-    let revoked = sqlx::query(
-        "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'security' \
-         WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()",
+    // Revoke sessions and refresh tokens — MFA enrollment is a security-sensitive change
+    let revoked = crate::services::revoke_auth::revoke_user_sessions_and_refresh_tokens(
+        &state.pool,
+        *tenant_id.as_uuid(),
+        *user_id.as_uuid(),
     )
-    .bind(user_id.as_uuid())
-    .bind(tenant_id.as_uuid())
-    .execute(&state.pool)
     .await
     .map_err(ApiAuthError::Database)?;
 
     info!(
         user_id = %user_id.as_uuid(),
-        sessions_revoked = revoked.rows_affected(),
-        "TOTP setup completed, MFA enabled, sessions revoked"
+        tokens_revoked = revoked,
+        "TOTP setup completed, MFA enabled, sessions and refresh tokens revoked"
     );
 
     // F085: Publish auth.mfa.enrolled webhook event
@@ -94,4 +92,21 @@ pub async fn verify_totp_setup(
             message: "MFA has been enabled. Store your recovery codes safely - they will not be shown again.".to_string(),
         }),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn totp_verify_setup_revokes_sessions_and_refresh_tokens() {
+        let src = include_str!("verify_setup.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("revoke_user_sessions_and_refresh_tokens("),
+            "TOTP setup must revoke sessions and refresh tokens"
+        );
+        assert!(
+            !production.contains("UPDATE sessions SET"),
+            "must not revoke sessions without refresh tokens"
+        );
+    }
 }

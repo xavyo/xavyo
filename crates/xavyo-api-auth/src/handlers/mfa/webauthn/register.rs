@@ -146,14 +146,12 @@ pub async fn finish_webauthn_registration(
         )
         .await?;
 
-    // Revoke all sessions — MFA enrollment is a security-sensitive change
-    let revoked = sqlx::query(
-        "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'security' \
-         WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()",
+    // Revoke sessions and refresh tokens — MFA enrollment is a security-sensitive change
+    let revoked = crate::services::revoke_auth::revoke_user_sessions_and_refresh_tokens(
+        &state.pool,
+        *tenant_id.as_uuid(),
+        *user_id.as_uuid(),
     )
-    .bind(user_id.as_uuid())
-    .bind(tenant_id.as_uuid())
-    .execute(&state.pool)
     .await
     .map_err(ApiAuthError::Database)?;
 
@@ -161,8 +159,8 @@ pub async fn finish_webauthn_registration(
         user_id = %user_id.as_uuid(),
         credential_id = %credential.id,
         credential_name = %credential.name,
-        sessions_revoked = revoked.rows_affected(),
-        "WebAuthn credential registered, sessions revoked"
+        tokens_revoked = revoked,
+        "WebAuthn credential registered, sessions and refresh tokens revoked"
     );
 
     // F085: Publish auth.mfa.enrolled webhook event
@@ -205,5 +203,19 @@ mod tests {
         let json = r#"{"name": "My YubiKey"}"#;
         let request: StartRegistrationRequest = serde_json::from_str(json).unwrap();
         assert_eq!(request.name, Some("My YubiKey".to_string()));
+    }
+
+    #[test]
+    fn webauthn_register_revokes_sessions_and_refresh_tokens() {
+        let src = include_str!("register.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("revoke_user_sessions_and_refresh_tokens("),
+            "WebAuthn register must revoke sessions and refresh tokens"
+        );
+        assert!(
+            !production.contains("UPDATE sessions SET"),
+            "must not revoke sessions without refresh tokens"
+        );
     }
 }

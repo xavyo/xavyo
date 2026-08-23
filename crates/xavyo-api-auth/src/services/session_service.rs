@@ -451,7 +451,7 @@ impl SessionService {
             .await
             .map_err(ApiAuthError::DatabaseInternal)?;
 
-        let result = sqlx::query(
+        let refresh = sqlx::query(
             "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL",
         )
         .bind(user_id)
@@ -460,7 +460,17 @@ impl SessionService {
         .await
         .map_err(ApiAuthError::Database)?;
 
-        let count = result.rows_affected();
+        let oauth = sqlx::query(
+            "UPDATE oauth_refresh_tokens SET revoked = TRUE, revoked_at = now() \
+             WHERE user_id = $1 AND tenant_id = $2 AND revoked = FALSE",
+        )
+        .bind(user_id)
+        .bind(tenant_id)
+        .execute(&mut *conn)
+        .await
+        .map_err(ApiAuthError::Database)?;
+
+        let count = refresh.rows_affected() + oauth.rows_affected();
 
         info!(
             user_id = %user_id,
@@ -526,6 +536,16 @@ mod tests {
         assert!(
             !production.contains("fall back to tenant policy"),
             "must not skip org session policy on lookup error"
+        );
+    }
+
+    #[test]
+    fn refresh_token_revoke_covers_oauth_refresh_tokens() {
+        let src = include_str!("session_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("UPDATE oauth_refresh_tokens"),
+            "refresh-token revoke must also revoke OAuth refresh tokens"
         );
     }
 }
