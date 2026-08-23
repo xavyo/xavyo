@@ -150,20 +150,21 @@ impl BulkActionJob {
                         error = %e,
                         "Failed to process bulk action"
                     );
-                    // Mark the action as failed
-                    if let Err(mark_err) = GovBulkAction::mark_failed(
+                    GovBulkAction::mark_failed(
                         &self.pool,
+                        action.tenant_id,
                         action.id,
                         serde_json::json!({"error": e.to_string()}),
                     )
                     .await
-                    {
+                    .map_err(|mark_err| {
                         error!(
                             action_id = %action.id,
                             error = %mark_err,
                             "Failed to mark bulk action as failed"
                         );
-                    }
+                        BulkActionJobError::Database(mark_err.to_string())
+                    })?;
                 }
             }
         }
@@ -287,7 +288,8 @@ impl BulkActionJob {
 
             // Update checkpoint (progress)
             let new_processed = offset + self.batch_size;
-            self.update_checkpoint(action.id, &stats).await?;
+            self.update_checkpoint(action.tenant_id, action.id, &stats)
+                .await?;
 
             offset = new_processed;
         }
@@ -295,11 +297,11 @@ impl BulkActionJob {
         // Mark as completed or failed based on results
         let results_json = serde_json::json!(batch_results);
         if stats.failures > 0 && stats.successes == 0 && stats.skipped == 0 {
-            GovBulkAction::mark_failed(&self.pool, action.id, results_json)
+            GovBulkAction::mark_failed(&self.pool, action.tenant_id, action.id, results_json)
                 .await
                 .map_err(|e| BulkActionJobError::Database(e.to_string()))?;
         } else {
-            GovBulkAction::mark_completed(&self.pool, action.id, results_json)
+            GovBulkAction::mark_completed(&self.pool, action.tenant_id, action.id, results_json)
                 .await
                 .map_err(|e| BulkActionJobError::Database(e.to_string()))?;
         }
@@ -432,11 +434,13 @@ impl BulkActionJob {
     /// Update checkpoint (progress) for resume capability.
     async fn update_checkpoint(
         &self,
+        tenant_id: Uuid,
         action_id: Uuid,
         stats: &BulkActionJobStats,
     ) -> Result<(), BulkActionJobError> {
         GovBulkAction::update_progress(
             &self.pool,
+            tenant_id,
             action_id,
             stats.users_processed as i32,
             stats.successes as i32,
@@ -610,6 +614,34 @@ mod tests {
         assert!(
             !lookup.contains("FROM gov_bulk_actions WHERE id = $1"),
             "must not look up bulk actions by id alone"
+        );
+    }
+
+    #[test]
+    fn status_mutations_pass_tenant_id() {
+        let src = include_str!("bulk_action_job.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production
+                .contains("GovBulkAction::mark_failed(&self.pool, action.tenant_id, action.id"),
+            "mark_failed must pass tenant_id"
+        );
+        assert!(
+            production
+                .contains("GovBulkAction::mark_completed(&self.pool, action.tenant_id, action.id"),
+            "mark_completed must pass tenant_id"
+        );
+        assert!(
+            production.contains("update_checkpoint(action.tenant_id, action.id, &stats)"),
+            "progress checkpoint must pass tenant_id"
+        );
+        assert!(
+            !production.contains("if let Err(mark_err) = GovBulkAction::mark_failed"),
+            "must not swallow bulk action failure persistence"
+        );
+        assert!(
+            !production.contains("GovBulkAction::mark_failed(\n                        &self.pool,\n                        action.id,"),
+            "must not mark bulk actions failed by id alone"
         );
     }
 }

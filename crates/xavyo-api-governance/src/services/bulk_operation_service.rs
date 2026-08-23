@@ -195,7 +195,7 @@ impl BulkOperationService {
 
         // If pending, mark as running
         if operation.status == BulkOperationStatus::Pending {
-            GovBulkStateOperation::mark_running(&self.pool, operation_id).await?;
+            GovBulkStateOperation::mark_running(&self.pool, tenant_id, operation_id).await?;
         }
 
         // Determine object type from transition config
@@ -257,6 +257,7 @@ impl BulkOperationService {
             if processed % 10 == 0 || processed == operation.total_count {
                 GovBulkStateOperation::update_progress(
                     &self.pool,
+                    tenant_id,
                     operation_id,
                     processed,
                     success_count,
@@ -271,10 +272,17 @@ impl BulkOperationService {
 
         if failure_count > 0 && success_count == 0 {
             // All failed
-            GovBulkStateOperation::mark_failed(&self.pool, operation_id, results_json).await?;
+            GovBulkStateOperation::mark_failed(&self.pool, tenant_id, operation_id, results_json)
+                .await?;
         } else {
             // Some or all succeeded
-            GovBulkStateOperation::mark_completed(&self.pool, operation_id, results_json).await?;
+            GovBulkStateOperation::mark_completed(
+                &self.pool,
+                tenant_id,
+                operation_id,
+                results_json,
+            )
+            .await?;
         }
 
         Ok(())
@@ -355,4 +363,45 @@ pub struct ProcessingStats {
     pub operations_completed: usize,
     pub operations_failed: usize,
     pub errors: Vec<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn status_mutations_pass_tenant_id() {
+        let src = include_str!("bulk_operation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains(
+                "GovBulkStateOperation::mark_running(&self.pool, tenant_id, operation_id)"
+            ),
+            "mark_running must pass tenant_id"
+        );
+        assert!(
+            production.contains(
+                "&self.pool,\n                    tenant_id,\n                    operation_id,"
+            ),
+            "update_progress must pass tenant_id"
+        );
+        assert!(
+            production.contains("GovBulkStateOperation::mark_failed(&self.pool, tenant_id, operation_id, results_json)"),
+            "mark_failed must pass tenant_id"
+        );
+        assert!(
+            production.contains(
+                "GovBulkStateOperation::mark_completed(\n                &self.pool,\n                tenant_id,\n                operation_id,\n                results_json,"
+            ),
+            "mark_completed must pass tenant_id"
+        );
+        assert!(
+            !production.contains("GovBulkStateOperation::mark_running(&self.pool, operation_id)"),
+            "must not mark operations running by id alone"
+        );
+        assert!(
+            !production.contains(
+                "GovBulkStateOperation::mark_failed(&self.pool, operation_id, results_json)"
+            ),
+            "must not mark operations failed by id alone"
+        );
+    }
 }

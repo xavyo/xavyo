@@ -449,6 +449,7 @@ impl GovBulkAction {
     /// Update progress counters.
     pub async fn update_progress(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         id: Uuid,
         processed_count: i32,
         success_count: i32,
@@ -458,11 +459,12 @@ impl GovBulkAction {
         let result = sqlx::query(
             r"
             UPDATE gov_bulk_actions
-            SET processed_count = $2, success_count = $3, failure_count = $4, skipped_count = $5
-            WHERE id = $1 AND status = 'running'
+            SET processed_count = $3, success_count = $4, failure_count = $5, skipped_count = $6
+            WHERE id = $1 AND tenant_id = $2 AND status = 'running'
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .bind(processed_count)
         .bind(success_count)
         .bind(failure_count)
@@ -476,17 +478,19 @@ impl GovBulkAction {
     /// Mark action as completed.
     pub async fn mark_completed(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         id: Uuid,
         results: JsonValue,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r"
             UPDATE gov_bulk_actions
-            SET status = 'completed', results = $2, completed_at = NOW()
-            WHERE id = $1 AND status = 'running'
+            SET status = 'completed', results = $3, completed_at = NOW()
+            WHERE id = $1 AND tenant_id = $2 AND status = 'running'
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .bind(&results)
         .execute(pool)
         .await?;
@@ -497,17 +501,19 @@ impl GovBulkAction {
     /// Mark action as failed.
     pub async fn mark_failed(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         id: Uuid,
         results: JsonValue,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r"
             UPDATE gov_bulk_actions
-            SET status = 'failed', results = $2, completed_at = NOW()
-            WHERE id = $1 AND status IN ('pending', 'running')
+            SET status = 'failed', results = $3, completed_at = NOW()
+            WHERE id = $1 AND tenant_id = $2 AND status IN ('pending', 'running')
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .bind(&results)
         .execute(pool)
         .await?;
@@ -602,6 +608,36 @@ impl GovBulkAction {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn progress_and_status_mutations_scope_by_tenant() {
+        let src = include_str!("gov_bulk_action.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for (fn_name, old_where) in [
+            ("fn update_progress", "WHERE id = $1 AND status = 'running'"),
+            ("fn mark_completed", "WHERE id = $1 AND status = 'running'"),
+            (
+                "fn mark_failed",
+                "WHERE id = $1 AND status IN ('pending', 'running')",
+            ),
+        ] {
+            let body = production
+                .split(fn_name)
+                .nth(1)
+                .unwrap_or_else(|| panic!("{fn_name} missing"))
+                .split("pub async fn")
+                .next()
+                .unwrap_or_else(|| panic!("{fn_name} body"));
+            assert!(
+                body.contains("AND tenant_id = $2"),
+                "{fn_name} must include tenant_id"
+            );
+            assert!(
+                !body.contains(old_where),
+                "{fn_name} must not mutate bulk actions by id alone"
+            );
+        }
+    }
 
     #[test]
     fn test_bulk_action_type_display() {
