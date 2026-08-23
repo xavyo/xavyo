@@ -352,7 +352,13 @@ impl ApprovalService {
             .await?
             .ok_or(GovernanceError::NotAuthorizedApprover)?;
 
-        // Record the decision within the transaction
+        // Release FOR UPDATE before pool writes. Model helpers take `&PgPool`, so
+        // inserting on a second connection while this transaction holds the
+        // request row deadlocks (FK wait). Uniqueness on (request_id, step_order)
+        // still serializes concurrent approvers.
+        tx.commit().await.map_err(GovernanceError::Database)?;
+
+        // Record the decision
         // Uses unique constraint on (request_id, step_order) to prevent concurrent approval conflicts (F053)
         let decision_input = CreateGovApprovalDecision {
             tenant_id,
@@ -403,10 +409,6 @@ impl ApprovalService {
         .await?;
 
         if is_final {
-            // Commit decision transaction before provisioning
-            // (provisioning goes through AssignmentService with its own SoD checks)
-            tx.commit().await.map_err(GovernanceError::Database)?;
-
             // All approvals complete - provision the entitlement
             let assignment = self
                 .provision_entitlement(tenant_id, &request, approver_id)
@@ -424,9 +426,6 @@ impl ApprovalService {
             let updated_request = GovAccessRequest::advance_step(&self.pool, tenant_id, request_id)
                 .await?
                 .ok_or(GovernanceError::AccessRequestNotFound(request_id))?;
-
-            // Commit the transaction (releases FOR UPDATE lock)
-            tx.commit().await.map_err(GovernanceError::Database)?;
 
             // F054/T082: Set deadline for new step based on escalation configuration
             if let Some(workflow_id) = updated_request.workflow_id {
@@ -511,7 +510,9 @@ impl ApprovalService {
             .await?
             .ok_or(GovernanceError::NotAuthorizedApprover)?;
 
-        // Record the decision within the transaction
+        tx.commit().await.map_err(GovernanceError::Database)?;
+
+        // Record the decision
         // Uses unique constraint on (request_id, step_order) to prevent concurrent approval conflicts (F053)
         let decision_input = CreateGovApprovalDecision {
             tenant_id,
@@ -562,9 +563,6 @@ impl ApprovalService {
         )
         .await?
         .ok_or(GovernanceError::RequestNotPending)?;
-
-        // Commit the transaction (releases FOR UPDATE lock)
-        tx.commit().await.map_err(GovernanceError::Database)?;
 
         Ok(ApprovalResult {
             new_status: GovRequestStatus::Rejected,
