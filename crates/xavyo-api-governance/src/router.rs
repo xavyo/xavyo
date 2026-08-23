@@ -698,13 +698,84 @@ impl GovernanceState {
     }
 }
 
-/// Create the governance API router.
-///
-/// All routes are prefixed with `/governance` and require authentication.
-pub fn governance_router(pool: PgPool, caep_emitter: Arc<dyn xavyo_ssf::CaepEmitter>) -> Router {
-    let state = GovernanceState::new(pool)
+fn governance_state(
+    pool: PgPool,
+    caep_emitter: Arc<dyn xavyo_ssf::CaepEmitter>,
+) -> GovernanceState {
+    GovernanceState::new(pool)
         .expect("Failed to initialize GovernanceState (check XAVYO_SIEM_ENCRYPTION_KEY)")
-        .with_caep_emitter(caep_emitter);
+        .with_caep_emitter(caep_emitter)
+}
+
+/// Self-service IGA routes (JWT only — no admin role).
+///
+/// Covers a user's own access requests, approvals, certifications, and
+/// catalog/cart so non-admin reviewers are not 403'd.
+pub fn governance_self_service_router(
+    pool: PgPool,
+    caep_emitter: Arc<dyn xavyo_ssf::CaepEmitter>,
+) -> Router {
+    let state = governance_state(pool, caep_emitter);
+    Router::new()
+        .route("/access-requests", get(access_requests::list_my_requests))
+        .route("/access-requests", post(access_requests::create_request))
+        .route("/access-requests/:id", get(access_requests::get_request))
+        .route(
+            "/access-requests/:id/cancel",
+            post(access_requests::cancel_request),
+        )
+        .route("/my-approvals", get(approvals::list_pending_approvals))
+        .route(
+            "/access-requests/:id/approve",
+            post(approvals::approve_request),
+        )
+        .route(
+            "/access-requests/:id/reject",
+            post(approvals::reject_request),
+        )
+        .route(
+            "/certification-items/:id",
+            get(certification_items::get_item),
+        )
+        .route(
+            "/certification-items/:id/decide",
+            post(certification_items::decide_item),
+        )
+        .route(
+            "/my-certifications",
+            get(certification_items::get_my_certifications),
+        )
+        .route(
+            "/my-certifications/summary",
+            get(certification_items::get_my_certifications_summary),
+        )
+        .route("/catalog/categories", get(catalog::list_catalog_categories))
+        .route(
+            "/catalog/categories/:id",
+            get(catalog::get_catalog_category),
+        )
+        .route("/catalog/items", get(catalog::list_catalog_items))
+        .route("/catalog/items/:id", get(catalog::get_catalog_item))
+        .route(
+            "/catalog/cart",
+            get(catalog::get_cart).delete(catalog::clear_cart),
+        )
+        .route("/catalog/cart/items", post(catalog::add_to_cart))
+        .route(
+            "/catalog/cart/items/:item_id",
+            put(catalog::update_cart_item).delete(catalog::remove_from_cart),
+        )
+        .route("/catalog/cart/validate", post(catalog::validate_cart))
+        .route("/catalog/cart/submit", post(catalog::submit_cart))
+        .with_state(state)
+}
+
+/// Create the governance API router (admin workflows).
+///
+/// Mount behind JWT + `admin_guard`. Self-service routes live on
+/// [`governance_self_service_router`].
+pub fn governance_router(pool: PgPool, caep_emitter: Arc<dyn xavyo_ssf::CaepEmitter>) -> Router {
+    let state = governance_state(pool, caep_emitter);
 
     Router::new()
         // Applications
@@ -796,24 +867,6 @@ pub fn governance_router(pool: PgPool, caep_emitter: Arc<dyn xavyo_ssf::CaepEmit
         .route(
             "/sod-exemptions/:id/revoke",
             post(sod_exemptions::revoke_exemption),
-        )
-        // Access Requests (F035)
-        .route("/access-requests", get(access_requests::list_my_requests))
-        .route("/access-requests", post(access_requests::create_request))
-        .route("/access-requests/:id", get(access_requests::get_request))
-        .route(
-            "/access-requests/:id/cancel",
-            post(access_requests::cancel_request),
-        )
-        // Approvals (F035)
-        .route("/my-approvals", get(approvals::list_pending_approvals))
-        .route(
-            "/access-requests/:id/approve",
-            post(approvals::approve_request),
-        )
-        .route(
-            "/access-requests/:id/reject",
-            post(approvals::reject_request),
         )
         // Approval Workflows (F035)
         .route(
@@ -914,27 +967,9 @@ pub fn governance_router(pool: PgPool, caep_emitter: Arc<dyn xavyo_ssf::CaepEmit
             "/certification-campaigns/:campaign_id/items",
             get(certification_items::list_campaign_items),
         )
-        // Certification Items (F036)
-        .route(
-            "/certification-items/:id",
-            get(certification_items::get_item),
-        )
-        .route(
-            "/certification-items/:id/decide",
-            post(certification_items::decide_item),
-        )
         .route(
             "/certification-items/:id/reassign",
             post(certification_items::reassign_item),
-        )
-        // My Certifications (F036)
-        .route(
-            "/my-certifications",
-            get(certification_items::get_my_certifications),
-        )
-        .route(
-            "/my-certifications/summary",
-            get(certification_items::get_my_certifications_summary),
         )
         // Birthright Policies (F037)
         .route(
@@ -2894,15 +2929,6 @@ pub fn governance_router(pool: PgPool, caep_emitter: Arc<dyn xavyo_ssf::CaepEmit
             "/users/:user_id/archetype",
             delete(archetypes::remove_user_archetype),
         )
-        // Self-Service Request Catalog routes (F-062)
-        // Browse routes (US1)
-        .route("/catalog/categories", get(catalog::list_catalog_categories))
-        .route(
-            "/catalog/categories/:id",
-            get(catalog::get_catalog_category),
-        )
-        .route("/catalog/items", get(catalog::list_catalog_items))
-        .route("/catalog/items/:id", get(catalog::get_catalog_item))
         // Admin catalog routes (US5)
         .route(
             "/admin/catalog/categories",
@@ -2941,19 +2967,6 @@ pub fn governance_router(pool: PgPool, caep_emitter: Arc<dyn xavyo_ssf::CaepEmit
             "/admin/catalog/items/:id/disable",
             post(catalog::disable_catalog_item),
         )
-        // Cart routes (US2)
-        .route(
-            "/catalog/cart",
-            get(catalog::get_cart).delete(catalog::clear_cart),
-        )
-        .route("/catalog/cart/items", post(catalog::add_to_cart))
-        .route(
-            "/catalog/cart/items/:item_id",
-            put(catalog::update_cart_item).delete(catalog::remove_from_cart),
-        )
-        // Cart validation & submission routes (US3)
-        .route("/catalog/cart/validate", post(catalog::validate_cart))
-        .route("/catalog/cart/submit", post(catalog::submit_cart))
         // Role Constructions (F-063)
         .route(
             "/roles/:role_id/constructions",

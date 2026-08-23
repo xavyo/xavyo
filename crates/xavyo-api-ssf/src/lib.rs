@@ -30,7 +30,7 @@ pub mod transmitter;
 
 pub use emitter::SsfStreamEmitter;
 pub use error::SsfApiError;
-pub use handlers::SsfState;
+pub use handlers::{authorize_ssf_admin, SsfState};
 pub use poll::ssf_poll_router;
 pub use router::{ssf_router, ssf_well_known_router};
 pub use transmitter::{DeliveryError, SsfTransmitter};

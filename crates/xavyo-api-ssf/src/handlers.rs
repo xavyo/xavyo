@@ -12,6 +12,7 @@ use axum::{
 };
 use sqlx::pool::PoolConnection;
 use sqlx::Postgres;
+use xavyo_auth::JwtClaims;
 use xavyo_core::TenantId;
 use xavyo_db::models::{CreateSsfStream, SsfPollToken, SsfStream, SsfSubject};
 use xavyo_ssf::{CaepEvent, SubjectId, CREDENTIAL_CHANGE_URI, SESSION_REVOKED_URI};
@@ -50,6 +51,15 @@ pub(crate) async fn tenant_conn(
     Ok(conn)
 }
 
+/// Stream management requires an admin (or super_admin) JWT.
+pub fn authorize_ssf_admin(claims: &JwtClaims) -> Result<(), SsfApiError> {
+    if claims.has_role("admin") || claims.has_role("super_admin") {
+        Ok(())
+    } else {
+        Err(SsfApiError::Forbidden)
+    }
+}
+
 /// `GET /.well-known/ssf-configuration` — transmitter configuration (SSF §7).
 pub async fn ssf_configuration(State(state): State<SsfState>) -> Json<SsfConfigurationMetadata> {
     Json(SsfConfigurationMetadata::new(&state.issuer))
@@ -59,8 +69,10 @@ pub async fn ssf_configuration(State(state): State<SsfState>) -> Json<SsfConfigu
 pub async fn create_stream(
     State(state): State<SsfState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Json(req): Json<CreateStreamRequest>,
 ) -> Result<(StatusCode, Json<StreamResponse>), SsfApiError> {
+    authorize_ssf_admin(&claims)?;
     req.validate()?;
     let tenant = *tenant_id.as_uuid();
     let is_poll = req.is_poll();
@@ -116,8 +128,10 @@ pub async fn create_stream(
 pub async fn verify_stream(
     State(state): State<SsfState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Json(req): Json<VerifyRequest>,
 ) -> Result<StatusCode, SsfApiError> {
+    authorize_ssf_admin(&claims)?;
     let tenant = *tenant_id.as_uuid();
     let stream = {
         let mut conn = tenant_conn(&state.pool, tenant).await?;
@@ -141,7 +155,9 @@ pub async fn verify_stream(
 pub async fn list_streams(
     State(state): State<SsfState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
 ) -> Result<Json<Vec<StreamResponse>>, SsfApiError> {
+    authorize_ssf_admin(&claims)?;
     let tenant = *tenant_id.as_uuid();
     let mut conn = tenant_conn(&state.pool, tenant).await?;
     let streams = SsfStream::list_by_tenant(&mut *conn, tenant).await?;
@@ -157,8 +173,10 @@ pub async fn list_streams(
 pub async fn get_stream(
     State(state): State<SsfState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Query(q): Query<StreamIdQuery>,
 ) -> Result<Json<StreamResponse>, SsfApiError> {
+    authorize_ssf_admin(&claims)?;
     let tenant = *tenant_id.as_uuid();
     let mut conn = tenant_conn(&state.pool, tenant).await?;
     let stream = SsfStream::get(&mut *conn, tenant, q.stream_id)
@@ -171,8 +189,10 @@ pub async fn get_stream(
 pub async fn delete_stream(
     State(state): State<SsfState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Query(q): Query<StreamIdQuery>,
 ) -> Result<StatusCode, SsfApiError> {
+    authorize_ssf_admin(&claims)?;
     let tenant = *tenant_id.as_uuid();
     let mut conn = tenant_conn(&state.pool, tenant).await?;
     let deleted = SsfStream::delete(&mut *conn, tenant, q.stream_id).await?;
@@ -187,8 +207,10 @@ pub async fn delete_stream(
 pub async fn get_status(
     State(state): State<SsfState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Query(q): Query<StreamIdQuery>,
 ) -> Result<Json<StatusResponse>, SsfApiError> {
+    authorize_ssf_admin(&claims)?;
     let tenant = *tenant_id.as_uuid();
     let mut conn = tenant_conn(&state.pool, tenant).await?;
     let stream = SsfStream::get(&mut *conn, tenant, q.stream_id)
@@ -204,8 +226,10 @@ pub async fn get_status(
 pub async fn update_status(
     State(state): State<SsfState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Json(req): Json<UpdateStatusRequest>,
 ) -> Result<Json<StatusResponse>, SsfApiError> {
+    authorize_ssf_admin(&claims)?;
     req.validate()?;
     let tenant = *tenant_id.as_uuid();
     let mut conn = tenant_conn(&state.pool, tenant).await?;
@@ -222,8 +246,10 @@ pub async fn update_status(
 pub async fn add_subject(
     State(state): State<SsfState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Json(req): Json<SubjectRequest>,
 ) -> Result<StatusCode, SsfApiError> {
+    authorize_ssf_admin(&claims)?;
     let tenant = *tenant_id.as_uuid();
     let mut conn = tenant_conn(&state.pool, tenant).await?;
     // Ensure the stream exists in this tenant before attaching a subject.
@@ -238,10 +264,45 @@ pub async fn add_subject(
 pub async fn remove_subject(
     State(state): State<SsfState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Json(req): Json<SubjectRequest>,
 ) -> Result<StatusCode, SsfApiError> {
+    authorize_ssf_admin(&claims)?;
     let tenant = *tenant_id.as_uuid();
     let mut conn = tenant_conn(&state.pool, tenant).await?;
     SsfSubject::remove(&mut *conn, tenant, req.stream_id, &req.subject).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn non_admin_cannot_manage_ssf_streams() {
+        let user = JwtClaims::builder()
+            .subject("user-1")
+            .roles(vec!["user"])
+            .expires_in_secs(3600)
+            .build();
+        let err = authorize_ssf_admin(&user).unwrap_err();
+        assert!(matches!(err, SsfApiError::Forbidden));
+    }
+
+    #[test]
+    fn admin_and_super_admin_can_manage_ssf_streams() {
+        let admin = JwtClaims::builder()
+            .subject("admin-1")
+            .roles(vec!["admin"])
+            .expires_in_secs(3600)
+            .build();
+        assert!(authorize_ssf_admin(&admin).is_ok());
+
+        let super_admin = JwtClaims::builder()
+            .subject("root")
+            .roles(vec!["super_admin"])
+            .expires_in_secs(3600)
+            .build();
+        assert!(authorize_ssf_admin(&super_admin).is_ok());
+    }
 }

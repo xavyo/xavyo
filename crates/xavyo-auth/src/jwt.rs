@@ -455,6 +455,32 @@ pwIDAQAB
     }
 
     #[test]
+    fn decode_token_with_config_rejects_wrong_issuer_or_audience() {
+        let claims = JwtClaims::builder()
+            .subject("user-123")
+            .issuer("xavyo")
+            .audience(vec!["xavyo"])
+            .expires_in_secs(3600)
+            .build();
+        let token = encode_token(&claims, TEST_PRIVATE_KEY).unwrap();
+
+        let ok = ValidationConfig::default()
+            .issuer("xavyo")
+            .audience(vec!["xavyo".to_string()]);
+        assert!(decode_token_with_config(&token, TEST_PUBLIC_KEY, &ok).is_ok());
+
+        let bad_iss = ValidationConfig::default()
+            .issuer("other")
+            .audience(vec!["xavyo".to_string()]);
+        assert!(decode_token_with_config(&token, TEST_PUBLIC_KEY, &bad_iss).is_err());
+
+        let bad_aud = ValidationConfig::default()
+            .issuer("xavyo")
+            .audience(vec!["other".to_string()]);
+        assert!(decode_token_with_config(&token, TEST_PUBLIC_KEY, &bad_aud).is_err());
+    }
+
+    #[test]
     fn test_decode_token_with_leeway() {
         // Token that expired 30 seconds ago
         let claims = JwtClaims::builder()

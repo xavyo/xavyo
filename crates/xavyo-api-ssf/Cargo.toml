@@ -12,6 +12,7 @@ repository = "https://github.com/xavyo/xavyo"
 xavyo-core = { path = "../xavyo-core" }
 xavyo-db = { path = "../xavyo-db" }
 xavyo-ssf = { path = "../xavyo-ssf" }
+xavyo-auth = { path = "../xavyo-auth" }
 
 # Web framework
 axum = { workspace = true }

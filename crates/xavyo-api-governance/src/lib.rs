@@ -34,4 +34,4 @@ pub use jobs::{
     EscalationStats, FailedOperationRetryJob, GracePeriodExpirationJob, MicroCertExpirationJob,
     MicroCertExpirationJobError, MicroCertExpirationStats, ScheduledTransitionJob,
 };
-pub use router::governance_router;
+pub use router::{governance_router, governance_self_service_router};

@@ -24,6 +24,10 @@ pub enum SsfApiError {
     #[error("invalid or missing poll credentials")]
     Unauthorized,
 
+    /// Authenticated but not an admin.
+    #[error("admin role required")]
+    Forbidden,
+
     /// A database error (sanitized in the response).
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
@@ -39,6 +43,7 @@ impl SsfApiError {
             Self::InvalidRequest(_) => StatusCode::BAD_REQUEST,
             Self::StreamNotFound => StatusCode::NOT_FOUND,
             Self::Unauthorized => StatusCode::UNAUTHORIZED,
+            Self::Forbidden => StatusCode::FORBIDDEN,
             Self::Database(_) | Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }

@@ -51,6 +51,20 @@ pub fn cert_binding_satisfied(token_x5t_s256: &str, presented_x5t_s256: Option<&
     presented_x5t_s256 == Some(token_x5t_s256)
 }
 
+/// Accept a forwarded client-cert thumbprint only when the TLS terminator
+/// also asserted verification (`X-SSL-Client-Verify: SUCCESS`). A lone
+/// `X-Client-Cert-Thumbprint` from an untrusted client is ignored.
+#[must_use]
+pub fn forwarded_cert_thumbprint<'a>(
+    ssl_client_verify: Option<&'a str>,
+    thumbprint: Option<&'a str>,
+) -> Option<&'a str> {
+    match ssl_client_verify {
+        Some(v) if v.eq_ignore_ascii_case("SUCCESS") => thumbprint,
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -113,5 +127,18 @@ NGdmso7Y1SHNIjM37dHlwgVBOboONKzg7liB
         assert!(!cert_binding_satisfied(EXPECTED_X5T, None));
         // Mismatched thumbprint is rejected.
         assert!(!cert_binding_satisfied(EXPECTED_X5T, Some("different")));
+    }
+
+    #[test]
+    fn lone_client_thumbprint_header_is_ignored() {
+        assert_eq!(forwarded_cert_thumbprint(None, Some(EXPECTED_X5T)), None);
+        assert_eq!(
+            forwarded_cert_thumbprint(Some("SUCCESS"), Some(EXPECTED_X5T)),
+            Some(EXPECTED_X5T)
+        );
+        assert_eq!(
+            forwarded_cert_thumbprint(Some("NONE"), Some(EXPECTED_X5T)),
+            None
+        );
     }
 }

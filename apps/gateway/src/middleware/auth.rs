@@ -105,7 +105,7 @@ where
                 }
             };
 
-            // Validate JWT token
+            // Validate JWT token (signature + iss/aud)
             match validate_jwt(token, &config) {
                 Ok(claims) => {
                     // Add claims as extension
@@ -119,159 +119,29 @@ where
 }
 
 /// Validate JWT token and extract claims.
-fn validate_jwt(token: &str, _config: &GatewayConfig) -> Result<AuthClaims, String> {
-    // For now, do basic JWT structure validation
-    // In production, this would use xavyo-auth for full validation
-    let parts: Vec<&str> = token.split('.').collect();
-    if parts.len() != 3 {
-        return Err("Invalid JWT format".to_string());
-    }
+fn validate_jwt(token: &str, config: &GatewayConfig) -> Result<AuthClaims, String> {
+    let pem = std::fs::read(&config.auth.public_key_path)
+        .map_err(|e| format!("Failed to read JWT public key: {e}"))?;
+    validate_jwt_with_pem(token, &pem, &config.auth.issuer, &config.auth.audience)
+}
 
-    // Decode payload (middle part)
-    let payload = parts[1];
-    let decoded = base64_decode_url_safe(payload).map_err(|()| "Invalid JWT payload encoding")?;
-
-    let payload_str = String::from_utf8(decoded).map_err(|_| "Invalid JWT payload encoding")?;
-
-    // Parse JSON payload
-    let payload: serde_json::Value =
-        serde_json::from_str(&payload_str).map_err(|_| "Invalid JWT payload JSON")?;
-
-    // Extract claims
-    let sub = payload
-        .get("sub")
-        .and_then(|v| v.as_str())
-        .ok_or("Missing 'sub' claim")?
-        .to_string();
-
-    let tenant_id = payload
-        .get("tid")
-        .and_then(|v| v.as_str())
-        .map(std::string::ToString::to_string);
-
-    let roles = payload
-        .get("roles")
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str())
-                .map(std::string::ToString::to_string)
-                .collect()
-        })
-        .unwrap_or_default();
-
+/// Signature-checking JWT validation used by the gateway and unit tests.
+pub fn validate_jwt_with_pem(
+    token: &str,
+    public_key_pem: &[u8],
+    issuer: &str,
+    audience: &str,
+) -> Result<AuthClaims, String> {
+    let validation = xavyo_auth::ValidationConfig::default()
+        .issuer(issuer.to_string())
+        .audience(vec![audience.to_string()]);
+    let claims = xavyo_auth::decode_token_with_config(token, public_key_pem, &validation)
+        .map_err(|e| format!("Invalid JWT: {e}"))?;
     Ok(AuthClaims {
-        sub,
-        tenant_id,
-        roles,
+        sub: claims.sub,
+        tenant_id: claims.tid.map(|u| u.to_string()),
+        roles: claims.roles,
     })
-}
-
-/// Base64 URL-safe decoding for JWT.
-fn base64_decode_url_safe(input: &str) -> Result<Vec<u8>, ()> {
-    // Add padding if needed
-    let padded = match input.len() % 4 {
-        2 => format!("{input}=="),
-        3 => format!("{input}="),
-        _ => input.to_string(),
-    };
-
-    // Replace URL-safe characters
-    let standard = padded.replace('-', "+").replace('_', "/");
-
-    // Decode
-    use std::io::Read;
-    let mut decoder = base64_decoder(&standard);
-    let mut output = Vec::new();
-    decoder.read_to_end(&mut output).map_err(|_| ())?;
-    Ok(output)
-}
-
-fn base64_decoder(input: &str) -> impl std::io::Read + '_ {
-    struct Base64Reader<'a> {
-        input: &'a [u8],
-        pos: usize,
-        buffer: [u8; 3],
-        buffer_pos: usize,
-        buffer_len: usize,
-    }
-
-    impl std::io::Read for Base64Reader<'_> {
-        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-            const DECODE_TABLE: [i8; 128] = [
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                -1, 62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1, -1, -1, -1, -1,
-                -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-                21, 22, 23, 24, 25, -1, -1, -1, -1, -1, -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
-                36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, -1, -1, -1, -1, -1,
-            ];
-
-            let mut written = 0;
-            while written < buf.len() {
-                // Use buffered bytes first
-                while self.buffer_pos < self.buffer_len && written < buf.len() {
-                    buf[written] = self.buffer[self.buffer_pos];
-                    self.buffer_pos += 1;
-                    written += 1;
-                }
-
-                if written >= buf.len() {
-                    break;
-                }
-
-                // Decode next 4 bytes
-                if self.pos >= self.input.len() {
-                    break;
-                }
-
-                let mut chunk = [0u8; 4];
-                let mut chunk_len = 0;
-                let mut padding = 0;
-
-                while chunk_len < 4 && self.pos < self.input.len() {
-                    let byte = self.input[self.pos];
-                    self.pos += 1;
-
-                    if byte == b'=' {
-                        padding += 1;
-                        chunk[chunk_len] = 0;
-                        chunk_len += 1;
-                    } else if byte < 128 && DECODE_TABLE[byte as usize] >= 0 {
-                        chunk[chunk_len] = DECODE_TABLE[byte as usize] as u8;
-                        chunk_len += 1;
-                    }
-                }
-
-                if chunk_len == 0 {
-                    break;
-                }
-
-                // Decode the chunk
-                let decoded_len = 3 - padding;
-                self.buffer[0] = (chunk[0] << 2) | (chunk[1] >> 4);
-                if decoded_len > 1 {
-                    self.buffer[1] = (chunk[1] << 4) | (chunk[2] >> 2);
-                }
-                if decoded_len > 2 {
-                    self.buffer[2] = (chunk[2] << 6) | chunk[3];
-                }
-
-                self.buffer_pos = 0;
-                self.buffer_len = decoded_len;
-            }
-
-            Ok(written)
-        }
-    }
-
-    Base64Reader {
-        input: input.as_bytes(),
-        pos: 0,
-        buffer: [0; 3],
-        buffer_pos: 0,
-        buffer_len: 0,
-    }
 }
 
 /// Create an unauthorized response.
@@ -295,72 +165,80 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use xavyo_auth::{encode_token, JwtClaims};
+    use xavyo_core::TenantId;
+
+    const TEST_PRIVATE_KEY: &[u8] = br#"-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC46zZuOStUrVWL
+q5KtkAaPL9hNCULR4zPhgskdUOB1c+bxRiOicEHKTBsqb4LSnizIb3fIEN5XuUL5
+TzOBKT3hAc/gKKU71VKE5EMcbfuLLVxTqj08K2j7PzCChzzydZGjAWfisndASeQP
+IJ1HM3Lh3VhXar3uwxbpT2Kqx59C7SDpCTHsZwvLVMupyEiL+18rFI7vDvlnHxuo
+G5dkGZhyZrLfKx1A3eX49UibiJz8Km4UtbReZ5O+VSndHYmhLFXJKHd9pOr7Xxyy
+mTucGJbmZOmSjb3bgaIhYyH+CtpoxTtqCfUi2kHCZdC1cGF93UnqLmNIq7nc0Ybh
+JJc++72NAgMBAAECggEAA4ZeSP8Xe5t7PjiUyPCuI1QY5i0HREt1rXaKAWBNiwec
+zxwUaVAE/Qdy3B34iy2/MknnqV1i856hL3HqTCu+VXfsn7v+nFOeaVCVk+jnytkg
+QasE1E0KiQGFGfPcfk2t60LHWWun+MZ/zacEQHtzVOlcefwbpz26RdPA0HsSJtso
+cqgiF274eoWfzOqWvGxmbPwvToVVb+PPRw8r1+EcQ95vaWM24O83/lfVNmUgonzD
+S7qqRq3g51enCHBuoqE2a9tIx3UGut/MP5MECxdgw+bfcOAZ1z7hzai5difHF/vr
+amWytmlPdJJIvYeKU7H4YISmYQUQ8JB9fGCMMeX1+QKBgQD1iyJy4RFDBL3Izl5b
+p2vyu1GkUiJw7dz8F1MTrz25uRnMdyqvkV6X9u8uw7BzQ7D9ecTPrJrHlvaLeISP
+RR/4EfjY9wC5VrEpwrrKYaf12DGqhVyTpwktrVgUkUmOXSTi8256DkOwuR3QgIhD
+Cbkvq6iwHEhIxLzv8iApVsDt+QKBgQDAyyjvzWJnsew+iFcXqwAPRXkv1bXGrFYE
+iub3K5HqGe6G2JS89dEvqqjmne9qZshG9M7FyHapX8NdKE5e6a5mADLr4thpMqJY
+gKTi1gs4vlq55ziz5LW3gYLbPkp+P8bKBzVa/M/457oudHpPR4+EwVwsP4I9YCAO
+EoNqYiCBNQKBgQCCc1Lv+Yb0NhamEo2q3/3HzaEITeKiYJzhCXtHn/iJLT/5ku4I
+rJC256gXDjw2YKYtZH4dXzQ0CY4edv7mJvFfGB0/F6s4zEf/Scd3Mf7L6/onAAc5
+IqsLq2Z6Nt3/Vpj8QhxVmDJ6Nz8RwNej1gyeuPI77iqxDmTajaZsj/yb8QKBgQCR
+K2kTyI9EjZDaNUd/Jt/Qn/t0rXNGuhW7LexkSYaBxCz7lLHK5z4wqkyr+liAwgwk
+gcoA28WeG+G7j9ITXdpYK+YsAI/8BoiAI74EoC+q9orSWO01aA38s6SY+fqVvegt
+z+e5L4xaXAKxYDuI3tWOnRqOpvOmy27XqdESlfjr0QKBgDpS1FtG9JN1Bg01GoOp
+Hzl/YpRraobBYDOtv70uNx9QyKAeFmvhDkwmgbOA1efFMgcPG7bdvL5ld7/N6d7D
+RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
+6iYwOxn6PHzksnM+GSuHzWGz
+-----END PRIVATE KEY-----"#;
+
+    const TEST_PUBLIC_KEY: &[u8] = br#"-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuOs2bjkrVK1Vi6uSrZAG
+jy/YTQlC0eMz4YLJHVDgdXPm8UYjonBBykwbKm+C0p4syG93yBDeV7lC+U8zgSk9
+4QHP4CilO9VShORDHG37iy1cU6o9PCto+z8wgoc88nWRowFn4rJ3QEnkDyCdRzNy
+4d1YV2q97sMW6U9iqsefQu0g6Qkx7GcLy1TLqchIi/tfKxSO7w75Zx8bqBuXZBmY
+cmay3ysdQN3l+PVIm4ic/CpuFLW0XmeTvlUp3R2JoSxVySh3faTq+18cspk7nBiW
+5mTpko2924GiIWMh/graaMU7agn1ItpBwmXQtXBhfd1J6i5jSKu53NGG4SSXPvu9
+jQIDAQAB
+-----END PUBLIC KEY-----"#;
 
     #[test]
     fn test_validate_jwt_invalid_format() {
-        let config = create_test_config();
-        let result = validate_jwt("not-a-jwt", &config);
+        let result = validate_jwt_with_pem("not-a-jwt", TEST_PUBLIC_KEY, "xavyo", "xavyo");
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_validate_jwt_valid_structure() {
-        let config = create_test_config();
-        // Create a minimal valid JWT structure (header.payload.signature)
-        // Payload: {"sub": "user123", "tid": "tenant456", "roles": ["admin"]}
-        let payload = r#"{"sub":"user123","tid":"tenant456","roles":["admin"]}"#;
-        let encoded_payload = base64_encode_url_safe(payload.as_bytes());
-        let token = format!("eyJhbGciOiJIUzI1NiJ9.{}.signature", encoded_payload);
-
-        let result = validate_jwt(&token, &config);
-        assert!(result.is_ok());
-
-        let claims = result.unwrap();
-        assert_eq!(claims.sub, "user123");
-        assert_eq!(claims.tenant_id, Some("tenant456".to_string()));
-        assert_eq!(claims.roles, vec!["admin"]);
+    fn dummy_signature_segment_is_rejected() {
+        let token = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyMTIzIn0.signature";
+        let result = validate_jwt_with_pem(token, TEST_PUBLIC_KEY, "xavyo", "xavyo");
+        assert!(result.is_err());
     }
 
-    fn create_test_config() -> GatewayConfig {
-        let yaml = r#"
-server:
-  port: 8080
-backends: []
-rate_limits:
-  enabled: true
-auth:
-  public_key_path: ./jwt.pem
-  issuer: https://example.com
-  audience: test
-"#;
-        GatewayConfig::from_yaml(yaml).unwrap()
-    }
-
-    fn base64_encode_url_safe(input: &[u8]) -> String {
-        const ENCODE_TABLE: &[u8; 64] =
-            b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-
-        let mut output = String::new();
-        let mut i = 0;
-
-        while i < input.len() {
-            let b0 = input[i];
-            let b1 = input.get(i + 1).copied().unwrap_or(0);
-            let b2 = input.get(i + 2).copied().unwrap_or(0);
-
-            output.push(ENCODE_TABLE[(b0 >> 2) as usize] as char);
-            output.push(ENCODE_TABLE[((b0 & 0x03) << 4 | b1 >> 4) as usize] as char);
-
-            if i + 1 < input.len() {
-                output.push(ENCODE_TABLE[((b1 & 0x0f) << 2 | b2 >> 6) as usize] as char);
-            }
-            if i + 2 < input.len() {
-                output.push(ENCODE_TABLE[(b2 & 0x3f) as usize] as char);
-            }
-
-            i += 3;
-        }
-
-        output
+    #[test]
+    fn signed_token_with_matching_iss_aud_is_accepted() {
+        let tenant = TenantId::new();
+        let claims = JwtClaims::builder()
+            .subject("user123")
+            .issuer("https://example.com")
+            .audience(vec!["test"])
+            .tenant_id(tenant)
+            .roles(vec!["admin"])
+            .expires_in_secs(3600)
+            .build();
+        let token = encode_token(&claims, TEST_PRIVATE_KEY).unwrap();
+        let result =
+            validate_jwt_with_pem(&token, TEST_PUBLIC_KEY, "https://example.com", "test").unwrap();
+        assert_eq!(result.sub, "user123");
+        assert_eq!(result.roles, vec!["admin"]);
+        assert_eq!(
+            result.tenant_id.as_deref(),
+            Some(tenant.as_uuid().to_string().as_str())
+        );
     }
 }
