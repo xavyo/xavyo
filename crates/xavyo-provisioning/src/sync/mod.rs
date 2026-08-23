@@ -82,7 +82,7 @@ pub use change::{
     InboundChange, InboundChangeBuilder, InboundCorrelationCandidate, InboundCorrelationResult,
 };
 pub use config::ConflictResolution;
-pub use config::{SyncConfig, SyncMode};
+pub use config::{SyncConfig, SyncConfigService, SyncMode};
 pub use conflict::{SyncConflict, SyncConflictDetector};
 pub use correlator::{
     DatabaseInboundCorrelator, InboundCorrelationConfig, InboundCorrelationRule, InboundCorrelator,
