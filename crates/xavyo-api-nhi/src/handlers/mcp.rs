@@ -103,6 +103,7 @@ pub async fn list_tools(
         (status = 403, description = "Agent not authorized"),
         (status = 404, description = "Tool not found"),
         (status = 429, description = "Rate limit exceeded"),
+        (status = 501, description = "Remote tool execution is not implemented"),
     ),
     tag = "MCP Tools"
 ))]

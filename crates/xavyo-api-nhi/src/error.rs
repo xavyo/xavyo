@@ -49,6 +49,10 @@ pub enum NhiApiError {
     #[error("Bad gateway: {0}")]
     BadGateway(String),
 
+    /// Capability is not implemented (HTTP 501).
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
+
     /// Internal server error.
     #[error("Internal error")]
     Internal(String),
@@ -85,6 +89,9 @@ impl IntoResponse for NhiApiError {
                 tracing::warn!("Bad gateway: {}", msg);
                 (StatusCode::BAD_GATEWAY, "bad_gateway", msg.clone())
             }
+            Self::NotImplemented(msg) => {
+                (StatusCode::NOT_IMPLEMENTED, "not_implemented", msg.clone())
+            }
             Self::Internal(msg) => {
                 tracing::error!("Internal error: {}", msg);
                 (
@@ -118,5 +125,31 @@ pub type ApiResult<T> = Result<T, NhiApiError>;
 impl From<validator::ValidationErrors> for NhiApiError {
     fn from(err: validator::ValidationErrors) -> Self {
         Self::ValidationError(err.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::to_bytes;
+    use axum::response::IntoResponse;
+
+    #[tokio::test]
+    async fn not_implemented_into_response_is_501() {
+        let err = NhiApiError::NotImplemented("MCP tool execution is not implemented".to_string());
+        let response = err.into_response();
+        assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+
+        let body = to_bytes(response.into_body(), 1024).await.expect("body");
+        let text = String::from_utf8(body.to_vec()).expect("utf8");
+        assert!(
+            !text.contains(r#""status":"simulated""#),
+            "501 body must not look like a successful simulated invocation: {text}"
+        );
+        assert!(
+            !text.contains(r#""status": "simulated""#),
+            "501 body must not look like a successful simulated invocation: {text}"
+        );
+        assert!(text.contains("not_implemented"), "{text}");
     }
 }
