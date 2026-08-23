@@ -61,6 +61,14 @@ pub fn compute_role_intersection(
     }
 }
 
+/// Role lookup failures must refuse PoA assumption, not default to `["user"]`.
+pub fn poa_roles(result: std::result::Result<Vec<String>, sqlx::Error>) -> Result<Vec<String>> {
+    result.map_err(|e| {
+        tracing::error!(error = %e, "Failed to fetch roles for PoA assumption");
+        GovernanceError::from(e)
+    })
+}
+
 use crate::models::power_of_attorney::{GrantPoaRequest, PoaDirection, PoaScopeRequest};
 
 /// Service for Power of Attorney operations.
@@ -542,12 +550,11 @@ impl PoaService {
 
         // SECURITY: Fetch roles for both donor and attorney, then compute intersection.
         // The attorney must NEVER gain roles they don't already possess through PoA assumption.
-        let donor_roles = UserRole::get_user_roles(&self.pool, poa.donor_id, tenant_id)
-            .await
-            .unwrap_or_else(|_| vec!["user".to_string()]);
-        let attorney_roles = UserRole::get_user_roles(&self.pool, attorney_id, tenant_id)
-            .await
-            .unwrap_or_else(|_| vec!["user".to_string()]);
+        // Lookup errors must refuse assumption, not default to ["user"].
+        let donor_roles =
+            poa_roles(UserRole::get_user_roles(&self.pool, poa.donor_id, tenant_id).await)?;
+        let attorney_roles =
+            poa_roles(UserRole::get_user_roles(&self.pool, attorney_id, tenant_id).await)?;
 
         let intersection = compute_role_intersection(&donor_roles, &attorney_roles);
 
@@ -799,5 +806,29 @@ mod tests {
     fn test_poa_service_creation() {
         // This is a placeholder test - actual tests require database
         // The unit tests are in power_of_attorney_tests.rs
+    }
+
+    #[test]
+    fn poa_roles_does_not_default_to_user() {
+        assert_eq!(
+            poa_roles(Ok(vec!["admin".into()])).unwrap(),
+            vec!["admin".to_string()]
+        );
+        let err = poa_roles(Err(sqlx::Error::Protocol("db".into())));
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn poa_assume_does_not_fail_open_roles() {
+        let src = include_str!("poa_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("poa_roles("),
+            "PoA assumption must fail closed on role lookup"
+        );
+        assert!(
+            !production.contains("unwrap_or_else(|_| vec![\"user\""),
+            "must not default PoA roles to [\"user\"]"
+        );
     }
 }

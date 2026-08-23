@@ -436,11 +436,11 @@ impl TokenService {
             }
         }
 
-        // Check if user is still active (include tenant_id for defense-in-depth)
-        let user_active = self.is_user_active(token.user_id, token.tenant_id).await?;
-        if !user_active {
-            return Err(ApiAuthError::AccountInactive);
-        }
+        // Check if user is still active and not locked (include tenant_id).
+        let (is_active, locked_at, locked_until) = self
+            .user_account_status(token.user_id, token.tenant_id)
+            .await?;
+        refresh_account_status(is_active, account_is_locked(locked_at, locked_until))?;
 
         // Revoke the old refresh token (token rotation)
         self.revoke_token_by_hash(&token.token_hash).await?;
@@ -529,21 +529,32 @@ impl TokenService {
         Ok(result.rows_affected())
     }
 
-    /// Check if a user is active (includes `tenant_id` for defense-in-depth).
-    async fn is_user_active(
+    /// Load active/lockout columns (includes `tenant_id` for defense-in-depth).
+    async fn user_account_status(
         &self,
         user_id: uuid::Uuid,
         tenant_id: uuid::Uuid,
-    ) -> Result<bool, ApiAuthError> {
-        let query = "SELECT is_active FROM users WHERE id = $1 AND tenant_id = $2";
+    ) -> Result<
+        (
+            bool,
+            Option<chrono::DateTime<chrono::Utc>>,
+            Option<chrono::DateTime<chrono::Utc>>,
+        ),
+        ApiAuthError,
+    > {
+        let row: Option<(
+            bool,
+            Option<chrono::DateTime<chrono::Utc>>,
+            Option<chrono::DateTime<chrono::Utc>>,
+        )> = sqlx::query_as(
+            "SELECT is_active, locked_at, locked_until FROM users WHERE id = $1 AND tenant_id = $2",
+        )
+        .bind(user_id)
+        .bind(tenant_id)
+        .fetch_optional(&self.pool)
+        .await?;
 
-        let active: Option<bool> = sqlx::query_scalar(query)
-            .bind(user_id)
-            .bind(tenant_id)
-            .fetch_optional(&self.pool)
-            .await?;
-
-        Ok(active.unwrap_or(false))
+        Ok(row.unwrap_or((false, None, None)))
     }
 
     /// Get access token validity in seconds.
@@ -620,6 +631,31 @@ pub fn generate_email_verification_token() -> (String, String) {
     let token = generate_secure_token();
     let hash = hash_token(&token);
     (token, hash)
+}
+
+/// Same lockout rule as [`xavyo_db::models::User::is_locked`].
+pub fn account_is_locked(
+    locked_at: Option<chrono::DateTime<chrono::Utc>>,
+    locked_until: Option<chrono::DateTime<chrono::Utc>>,
+) -> bool {
+    if locked_at.is_none() {
+        return false;
+    }
+    match locked_until {
+        None => true,
+        Some(until) => chrono::Utc::now() < until,
+    }
+}
+
+/// Inactive or locked accounts must not rotate refresh tokens.
+pub fn refresh_account_status(is_active: bool, is_locked: bool) -> Result<(), ApiAuthError> {
+    if !is_active {
+        return Err(ApiAuthError::AccountInactive);
+    }
+    if is_locked {
+        return Err(ApiAuthError::AccountLocked);
+    }
+    Ok(())
 }
 
 /// Role lookup failures must refuse token refresh, not mint `["user"]`.
@@ -787,5 +823,41 @@ mod tests {
             !production.contains("unwrap_or_else(|_| vec![\"user\""),
             "must not fail-open role lookup to [\"user\"]"
         );
+        assert!(
+            production.contains("refresh_account_status"),
+            "refresh must refuse locked accounts"
+        );
+    }
+
+    #[test]
+    fn refresh_account_status_allows_active_unlocked() {
+        assert!(refresh_account_status(true, false).is_ok());
+    }
+
+    #[test]
+    fn refresh_account_status_refuses_inactive_and_locked() {
+        assert!(matches!(
+            refresh_account_status(false, false),
+            Err(ApiAuthError::AccountInactive)
+        ));
+        assert!(matches!(
+            refresh_account_status(true, true),
+            Err(ApiAuthError::AccountLocked)
+        ));
+    }
+
+    #[test]
+    fn account_is_locked_honors_permanent_lockout() {
+        let now = chrono::Utc::now();
+        assert!(!account_is_locked(None, None));
+        assert!(account_is_locked(Some(now), None));
+        assert!(account_is_locked(
+            Some(now),
+            Some(now + chrono::Duration::hours(1))
+        ));
+        assert!(!account_is_locked(
+            Some(now),
+            Some(now - chrono::Duration::hours(1))
+        ));
     }
 }

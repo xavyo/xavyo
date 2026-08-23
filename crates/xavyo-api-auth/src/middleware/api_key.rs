@@ -485,17 +485,11 @@ pub async fn api_key_auth_middleware(
     // Many handlers extract tenant_id/user_id from JwtClaims extension
     // This allows API key authentication to work with existing handlers
 
-    // F202-US1: Load user's actual roles instead of hardcoded ["api_key"]
-    let roles = UserRole::get_user_roles(&pool, api_key.user_id, api_key.tenant_id)
-        .await
-        .unwrap_or_else(|e| {
-            tracing::warn!(
-                user_id = %api_key.user_id,
-                error = %e,
-                "Failed to load roles for API key user, falling back to [\"api_key\"]"
-            );
-            vec!["api_key".to_string()]
-        });
+    // F202-US1: Load user's actual roles. Lookup errors must not mint a
+    // synthetic ["api_key"] role set.
+    let roles =
+        api_key_roles(UserRole::get_user_roles(&pool, api_key.user_id, api_key.tenant_id).await)
+            .map_err(axum::response::IntoResponse::into_response)?;
 
     let now = Utc::now().timestamp();
     let synthetic_claims = JwtClaims {
@@ -617,6 +611,19 @@ pub async fn api_key_auth_middleware(
     }
 
     Ok(next.run(request).await)
+}
+
+/// Role lookup failures must refuse API-key auth, not mint `["api_key"]`.
+pub fn api_key_roles<E: std::fmt::Display>(
+    result: Result<Vec<String>, E>,
+) -> Result<Vec<String>, ApiKeyError> {
+    match result {
+        Ok(roles) => Ok(roles),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to load roles for API key user");
+            Err(ApiKeyError::InternalError)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -863,5 +870,31 @@ mod tests {
         assert!(is_path_prefix_match("/nhi/agents/456", "/nhi/agents"));
         assert!(!is_path_prefix_match("/nhi/agents-proxy", "/nhi/agents"));
         assert!(!is_path_prefix_match("/use", "/users"));
+    }
+
+    #[test]
+    fn api_key_roles_does_not_fallback_to_api_key() {
+        assert_eq!(
+            api_key_roles(Ok::<Vec<String>, &str>(vec!["admin".into()])).unwrap(),
+            vec!["admin".to_string()]
+        );
+        assert!(matches!(
+            api_key_roles(Err("db")),
+            Err(ApiKeyError::InternalError)
+        ));
+    }
+
+    #[test]
+    fn api_key_auth_does_not_fail_open_roles() {
+        let src = include_str!("api_key.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("api_key_roles("),
+            "API key auth must fail closed on role lookup"
+        );
+        assert!(
+            !production.contains("falling back to [\"api_key\"]"),
+            "must not mint a synthetic api_key role on lookup error"
+        );
     }
 }

@@ -7,7 +7,7 @@ pub mod permission_guard;
 pub mod rate_limit;
 pub mod session_activity;
 
-pub use api_key::{api_key_auth_middleware, ApiKeyContext, ApiKeyError};
+pub use api_key::{api_key_auth_middleware, api_key_roles, ApiKeyContext, ApiKeyError};
 pub use ip_filter::{check_org_ip_restriction, extract_client_ip, ip_filter_middleware};
 pub use jwt_auth::{
     jwt_auth_middleware, sentinel_query_revoked, tenant_header_agrees, AllowPartialToken,
