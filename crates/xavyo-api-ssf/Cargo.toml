@@ -49,4 +49,5 @@ hex = "0.4"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
+tower = { workspace = true, features = ["util"] }
 wiremock = "0.6"
