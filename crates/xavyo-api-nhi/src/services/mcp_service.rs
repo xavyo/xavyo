@@ -152,13 +152,24 @@ pub fn validate_parameters(
     Ok(())
 }
 
+/// Remote MCP tool execution result after permission and schema checks.
+///
+/// Real remote tool execution is not implemented. This always returns
+/// [`NhiApiError::NotImplemented`] so callers cannot mistake an HTTP-success
+/// placeholder for a real run.
+pub fn mcp_tool_execution_result(_tool_name: &str) -> Result<serde_json::Value, NhiApiError> {
+    Err(NhiApiError::NotImplemented(
+        "MCP tool execution is not implemented".to_string(),
+    ))
+}
+
 /// Invoke a tool by name on behalf of an agent.
 ///
-/// This is a placeholder implementation that:
 /// 1. Resolves the tool by name
-/// 2. Verifies the agent has permission to use it
-/// 3. Validates parameters against the tool's input schema
-/// 4. Returns a simulated result (real execution will be added later)
+/// 2. Verifies the tool is active
+/// 3. Verifies the agent has permission to use it
+/// 4. Validates parameters against the tool's input schema
+/// 5. Fail-closed: remote execution is not implemented ([`mcp_tool_execution_result`])
 pub async fn invoke_tool(
     pool: &PgPool,
     tenant_id: Uuid,
@@ -192,26 +203,19 @@ pub async fn invoke_tool(
     validate_parameters(&tool.input_schema, &parameters)
         .map_err(|e| NhiApiError::BadRequest(e.message))?;
 
-    let call_id = Uuid::new_v4();
-    let elapsed = start.elapsed();
-
     debug!(
-        call_id = %call_id,
         tool_name = %tool_name,
         agent_nhi_id = %agent_nhi_id,
-        latency_ms = elapsed.as_secs_f64() * 1000.0,
         conversation_id = context.as_ref().and_then(|c| c.conversation_id.as_deref()),
-        "Tool invocation (simulated)"
+        "MCP tool execution is not implemented"
     );
 
-    // 5. Return simulated result (placeholder)
+    // 5. Fail closed — remote execution is not implemented.
+    let result = mcp_tool_execution_result(tool_name)?;
+    let elapsed = start.elapsed();
     Ok(McpCallResponse {
-        call_id,
-        result: serde_json::json!({
-            "status": "simulated",
-            "tool": tool_name,
-            "message": "Tool execution is not yet implemented; this is a placeholder result."
-        }),
+        call_id: Uuid::new_v4(),
+        result,
         latency_ms: elapsed.as_secs_f64() * 1000.0,
     })
 }
@@ -299,5 +303,60 @@ mod tests {
         let schema = serde_json::json!({});
         let params = serde_json::json!({ "anything": "goes" });
         assert!(validate_parameters(&schema, &params).is_ok());
+    }
+
+    #[test]
+    fn mcp_tool_execution_result_is_not_implemented() {
+        let err = mcp_tool_execution_result("send_email").unwrap_err();
+        assert!(
+            matches!(err, NhiApiError::NotImplemented(_)),
+            "expected NotImplemented, got {err:?}"
+        );
+        let msg = err.to_string();
+        assert!(
+            !msg.contains(r#""status":"simulated""#),
+            "execution result must not claim simulated success: {msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn mcp_tool_execution_not_implemented_into_response_is_501() {
+        use axum::body::to_bytes;
+        use axum::response::IntoResponse;
+
+        let err = mcp_tool_execution_result("send_email").unwrap_err();
+        let response = err.into_response();
+        assert_eq!(response.status(), axum::http::StatusCode::NOT_IMPLEMENTED);
+
+        let body = to_bytes(response.into_body(), 1024).await.expect("body");
+        let text = String::from_utf8(body.to_vec()).expect("utf8");
+        assert!(
+            !text.contains(r#""status":"simulated""#),
+            "501 body must not contain simulated success: {text}"
+        );
+        assert!(
+            !text.contains(r#""status": "simulated""#),
+            "501 body must not contain simulated success: {text}"
+        );
+    }
+
+    #[test]
+    fn invoke_tool_calls_mcp_tool_execution_result() {
+        let src = include_str!("mcp_service.rs");
+        let invoke_fn = src
+            .split("pub async fn invoke_tool")
+            .nth(1)
+            .expect("invoke_tool")
+            .split("pub async fn check_permission")
+            .next()
+            .expect("invoke_tool body");
+        assert!(
+            invoke_fn.contains("mcp_tool_execution_result(tool_name)"),
+            "invoke_tool must call mcp_tool_execution_result"
+        );
+        assert!(
+            !invoke_fn.contains(r#""status": "simulated""#),
+            "invoke_tool must not return a simulated success payload"
+        );
     }
 }

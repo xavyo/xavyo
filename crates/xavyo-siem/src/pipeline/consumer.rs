@@ -1,13 +1,10 @@
-//! Kafka event consumer for SIEM export pipeline.
+//! Fan-out consumer for SIEM export pipelines.
 //!
-//! Consumes events from the Kafka event bus and fans out to destination pipelines.
-//!
-//! This module provides the `SiemEventConsumer` which manages a set of
-//! `ExportPipeline` instances (one per active destination) and dispatches
-//! incoming `SiemEvent`s to all matching pipelines concurrently.
-//!
-//! The actual Kafka consumption is wired up in `idp-api` since this crate
-//! does not depend on `xavyo-events`. This module provides the fan-out logic.
+//! `SiemEventConsumer` dispatches `SiemEvent`s to one `ExportPipeline` per
+//! destination. It does **not** consume Kafka itself: this crate does not
+//! depend on `xavyo-events`. The default `idp-api` process does not start
+//! this consumer; live/real-time SIEM export is not active. Batch export via
+//! the governance API is the supported path.
 
 use std::collections::HashMap;
 use std::sync::Arc;

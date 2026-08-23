@@ -7,11 +7,13 @@ mod bootstrap;
 mod config;
 #[cfg(feature = "kafka")]
 mod consumers;
+mod email_policy;
 mod health;
 mod logging;
 mod metrics;
 mod middleware;
 mod openapi;
+mod siem;
 mod state;
 mod telemetry;
 
@@ -300,48 +302,92 @@ async fn main() {
     // F202-US3: Per-API-key rate limiter (shared across all routes with API key auth)
     let api_key_rate_limiter = Arc::new(ApiKeyRateLimiter::new());
 
-    // Email sender auto-detection: SES > SMTP > Mock
-    let email_sender: Arc<dyn xavyo_api_auth::EmailSender> = {
-        let mut sender: Option<Arc<dyn xavyo_api_auth::EmailSender>> = None;
-
-        // Priority 1: AWS SES (if EMAIL_SES_REGION is set and feature enabled)
+    // Email sender: SES > SMTP > Mock (development only). Production fail-closed.
+    let has_ses = {
         #[cfg(feature = "aws-ses")]
-        if sender.is_none() && std::env::var("EMAIL_SES_REGION").is_ok() {
-            match xavyo_api_auth::SesEmailConfig::from_env() {
-                Ok(ses_config) => {
-                    let region = ses_config.region.clone();
-                    sender = Some(Arc::new(
-                        xavyo_api_auth::SesEmailSender::new(ses_config).await,
-                    ));
-                    info!(region = %region, "AWS SES email sender configured");
-                }
-                Err(e) => {
-                    tracing::error!(error = %e, "SES configuration error — falling through to SMTP");
+        {
+            std::env::var("EMAIL_SES_REGION").is_ok()
+        }
+        #[cfg(not(feature = "aws-ses"))]
+        {
+            false
+        }
+    };
+    let has_smtp = EmailConfig::from_env().is_ok();
+    let sender_kind = match email_policy::select_email_sender_kind(
+        config.app_env.is_production(),
+        has_ses,
+        has_smtp,
+    ) {
+        Ok(kind) => kind,
+        Err(e) => {
+            eprintln!("FATAL: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    let email_sender: Arc<dyn xavyo_api_auth::EmailSender> = match sender_kind {
+        email_policy::EmailSenderKind::Ses => {
+            #[cfg(feature = "aws-ses")]
+            {
+                match xavyo_api_auth::SesEmailConfig::from_env() {
+                    Ok(ses_config) => {
+                        let region = ses_config.region.clone();
+                        let sender =
+                            Arc::new(xavyo_api_auth::SesEmailSender::new(ses_config).await);
+                        info!(region = %region, "AWS SES email sender configured");
+                        sender
+                    }
+                    Err(e) => {
+                        if config.app_env.is_production() {
+                            eprintln!("FATAL: SES configuration error: {e}");
+                            std::process::exit(1);
+                        }
+                        tracing::error!(
+                            error = %e,
+                            "SES configuration error — using mock email sender"
+                        );
+                        Arc::new(MockEmailSender::new())
+                    }
                 }
             }
+            #[cfg(not(feature = "aws-ses"))]
+            {
+                eprintln!(
+                    "FATAL: SES selected but this binary was not compiled with the aws-ses feature"
+                );
+                std::process::exit(1);
+            }
         }
-
-        // Priority 2: SMTP (if EMAIL_SMTP_HOST is set)
-        if sender.is_none() {
-            if let Ok(email_config) = EmailConfig::from_env() {
+        email_policy::EmailSenderKind::Smtp => match EmailConfig::from_env() {
+            Ok(email_config) => {
                 info!(
                     smtp_host = %email_config.smtp_host,
                     from_address = %email_config.from_address,
                     "SMTP email sender configured"
                 );
-                sender = Some(Arc::new(SmtpEmailSender::new(email_config)));
+                Arc::new(SmtpEmailSender::new(email_config))
             }
-        }
-
-        // Priority 3: Mock (fallback)
-        sender.unwrap_or_else(|| {
+            Err(e) => {
+                if config.app_env.is_production() {
+                    eprintln!("FATAL: SMTP configuration error: {e}");
+                    std::process::exit(1);
+                }
+                tracing::error!(
+                    error = %e,
+                    "SMTP configuration error — using mock email sender"
+                );
+                Arc::new(MockEmailSender::new())
+            }
+        },
+        email_policy::EmailSenderKind::Mock => {
             tracing::warn!(
                 target: "security",
                 "No email provider configured — using mock email sender. \
                  Set EMAIL_SES_REGION for AWS SES, or EMAIL_SMTP_HOST for SMTP."
             );
             Arc::new(MockEmailSender::new())
-        })
+        }
     };
 
     // Create MFA service for TOTP authentication
@@ -1566,16 +1612,24 @@ async fn main() {
         info!("Webhook delivery worker started");
     }
 
-    // TODO(F078): Start SIEM event consumer for real-time audit log export.
-    // When Kafka is enabled, this spawns a SiemEventConsumer that fans out
-    // identity events to all configured SIEM destinations per tenant.
-    // Requires: XAVYO_SIEM_ENCRYPTION_KEY env var for auth_config decryption.
-    // #[cfg(feature = "kafka")]
-    // if let Some(_kafka_config) = config.kafka.as_ref() {
-    //     use xavyo_siem::pipeline::consumer::SiemEventConsumer;
-    //     // Load active destinations from DB and build consumer
-    //     tracing::info!("SIEM event consumer initialization pending");
-    // }
+    // Real-time SIEM Kafka export is not started here. `SiemEventConsumer`
+    // (xavyo-siem) is fan-out only and is not wired; this crate does not
+    // depend on xavyo-siem. Batch export via /governance/siem is available.
+    {
+        let kafka_configured = config.kafka.is_some();
+        let live = siem::siem_live_export_available(kafka_configured);
+        let started = siem::siem_realtime_consumer_started();
+        if started && live {
+            info!("SIEM real-time export consumer started");
+        } else {
+            info!(
+                kafka_configured,
+                live_export_available = live,
+                consumer_started = started,
+                "Real-time SIEM Kafka export is not active; batch export via /governance/siem is available"
+            );
+        }
+    }
 
     // Spawn background cleanup task for expired revoked tokens (F069-S4)
     {
