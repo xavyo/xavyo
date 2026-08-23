@@ -128,18 +128,10 @@ pub async fn end_session_handler(
         }
     }
 
-    // Step 1: Validate id_token_hint if provided.
+    // Step 1: Validate id_token_hint if provided. A present hint that fails
+    // validation is an invalid request — do not 200 as if logout succeeded.
     let identity = if let Some(ref id_token_hint) = params.id_token_hint {
-        match validate_id_token_hint(&state, id_token_hint) {
-            Ok(id) => Some(id),
-            Err(e) => {
-                tracing::warn!(
-                    error = %e,
-                    "id_token_hint validation failed, proceeding without identity"
-                );
-                None
-            }
-        }
+        Some(validate_id_token_hint(&state, id_token_hint)?)
     } else {
         None
     };
@@ -180,30 +172,12 @@ pub async fn end_session_handler(
 
     // Step 4: Revoke user sessions and refresh tokens if user is identified.
     if let Some(ref id) = identity {
-        // Use the tenant_id from the id_token_hint if available, otherwise
-        // fall back to the tenant_id from the request extension.
-        let session_tenant = id.tenant_id.unwrap_or(tenant_uuid);
-        if let Err(e) = revoke_user_sessions(&state, session_tenant, id.user_id).await {
-            tracing::error!(
-                user_id = %id.user_id,
-                tenant_id = %session_tenant,
-                error = %e,
-                "Failed to revoke user sessions during logout"
-            );
-        }
-        // Also revoke all OAuth2 refresh tokens for this user
-        if let Err(e) = state
+        let session_tenant = logout_session_tenant(id.tenant_id, tenant_uuid)?;
+        revoke_user_sessions(&state, session_tenant, id.user_id).await?;
+        state
             .token_service
             .revoke_user_tokens(session_tenant, id.user_id)
-            .await
-        {
-            tracing::error!(
-                user_id = %id.user_id,
-                tenant_id = %session_tenant,
-                error = %e,
-                "Failed to revoke refresh tokens during logout"
-            );
-        }
+            .await?;
     }
 
     // Step 5: Build response.
@@ -240,6 +214,23 @@ pub async fn end_session_handler(
             }),
         )
             .into_response())
+    }
+}
+
+/// Tenant used for session and refresh-token revocation during logout.
+///
+/// Missing `tid` used to fall back to `X-Tenant-ID`, so a hint without tenant
+/// could revoke sessions in another tenant. Mismatch is also rejected.
+fn logout_session_tenant(
+    token_tid: Option<Uuid>,
+    request_tenant: Uuid,
+) -> Result<Uuid, OAuthError> {
+    if super::client_auth::token_tid_matches_tenant(token_tid, request_tenant) {
+        Ok(request_tenant)
+    } else {
+        Err(OAuthError::InvalidRequest(
+            "id_token_hint tenant does not match request".to_string(),
+        ))
     }
 }
 
@@ -472,5 +463,40 @@ mod tests {
         };
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("\"message\":\"Logged out successfully\""));
+    }
+
+    #[test]
+    fn logout_session_tenant_requires_matching_tid() {
+        let tenant = Uuid::from_u128(1);
+        let other = Uuid::from_u128(2);
+        assert_eq!(logout_session_tenant(Some(tenant), tenant).unwrap(), tenant);
+        assert!(logout_session_tenant(Some(other), tenant).is_err());
+        assert!(logout_session_tenant(None, tenant).is_err());
+    }
+
+    #[test]
+    fn logout_does_not_swallow_hint_or_revoke_errors() {
+        let src = include_str!("logout.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("logout_session_tenant("),
+            "logout must require tid on id_token_hint"
+        );
+        assert!(
+            !production.contains("proceeding without identity"),
+            "invalid id_token_hint must not proceed as success"
+        );
+        assert!(
+            !production.contains("unwrap_or(tenant_uuid)"),
+            "must not fall back to header tenant when tid is missing"
+        );
+        assert!(
+            !production.contains("Failed to revoke user sessions during logout"),
+            "session revoke errors must not be logged-and-ignored"
+        );
+        assert!(
+            !production.contains("Failed to revoke refresh tokens during logout"),
+            "refresh revoke errors must not be logged-and-ignored"
+        );
     }
 }

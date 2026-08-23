@@ -416,6 +416,37 @@ fn extract_client_ip(request: &axum::http::Request<Body>) -> String {
     "unknown".to_string()
 }
 
+/// Rate-limit key from `extract_client_ip`.
+///
+/// Empty and `"unknown"` used to share one bucket across unidentified clients.
+/// Login, token, and registration limits must refuse when the client IP cannot
+/// be determined — same fail-closed rule as tenant provisioning.
+fn rate_limit_ip_key(ip: &str) -> Option<&str> {
+    let ip = ip.trim();
+    if ip.is_empty() || ip.eq_ignore_ascii_case("unknown") {
+        None
+    } else {
+        Some(ip)
+    }
+}
+
+/// 400 when a rate-limited endpoint cannot identify the client.
+fn unknown_client_ip_response() -> Response {
+    let mut response = Response::new(Body::from(
+        serde_json::json!({
+            "error": "invalid_request",
+            "error_description": "Cannot determine client IP for rate limiting."
+        })
+        .to_string(),
+    ));
+    *response.status_mut() = axum::http::StatusCode::BAD_REQUEST;
+    response.headers_mut().insert(
+        axum::http::header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+    );
+    response
+}
+
 /// Axum middleware that sets `TrustXff` in request extensions when the direct
 /// connection IP matches a trusted proxy CIDR.
 ///
@@ -458,7 +489,15 @@ pub async fn login_rate_limit_middleware(
         None => return next.run(request).await,
     };
 
-    let ip = extract_client_ip(&request);
+    let Some(ip) = rate_limit_ip_key(&extract_client_ip(&request)).map(str::to_owned) else {
+        tracing::warn!(
+            target: "security",
+            event_type = "rate_limit_unknown_ip",
+            endpoint = "login",
+            "Cannot determine client IP for rate limiting, refusing request"
+        );
+        return unknown_client_ip_response();
+    };
 
     // Check IP-based rate limit
     if limiters.login_ip.check_key(&ip).is_err() {
@@ -491,7 +530,15 @@ pub async fn token_rate_limit_middleware(
 
     // For the token endpoint, the client_id is in the POST body or Basic auth header.
     // We rate-limit by IP as a fallback since we can't easily read the body here.
-    let ip = extract_client_ip(&request);
+    let Some(ip) = rate_limit_ip_key(&extract_client_ip(&request)).map(str::to_owned) else {
+        tracing::warn!(
+            target: "security",
+            event_type = "rate_limit_unknown_ip",
+            endpoint = "token",
+            "Cannot determine client IP for rate limiting, refusing request"
+        );
+        return unknown_client_ip_response();
+    };
 
     if limiters.token_client.check_key(&ip).is_err() {
         tracing::warn!(
@@ -521,7 +568,15 @@ pub async fn registration_rate_limit_middleware(
         None => return next.run(request).await,
     };
 
-    let ip = extract_client_ip(&request);
+    let Some(ip) = rate_limit_ip_key(&extract_client_ip(&request)).map(str::to_owned) else {
+        tracing::warn!(
+            target: "security",
+            event_type = "rate_limit_unknown_ip",
+            endpoint = "registration",
+            "Cannot determine client IP for rate limiting, refusing request"
+        );
+        return unknown_client_ip_response();
+    };
 
     if limiters.registration_ip.check_key(&ip).is_err() {
         tracing::warn!(
@@ -1274,5 +1329,71 @@ mod tests {
         let result = super::extract_idempotency_key(&headers);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().map(|k| k.len()), Some(256));
+    }
+
+    #[test]
+    fn rate_limit_ip_key_refuses_unknown() {
+        assert_eq!(
+            super::rate_limit_ip_key("203.0.113.10"),
+            Some("203.0.113.10")
+        );
+        assert_eq!(super::rate_limit_ip_key(" 10.0.0.1 "), Some("10.0.0.1"));
+        assert_eq!(super::rate_limit_ip_key("2001:db8::1"), Some("2001:db8::1"));
+        assert_eq!(super::rate_limit_ip_key("unknown"), None);
+        assert_eq!(super::rate_limit_ip_key("UNKNOWN"), None);
+        assert_eq!(super::rate_limit_ip_key(""), None);
+        assert_eq!(super::rate_limit_ip_key("   "), None);
+    }
+
+    #[test]
+    fn unknown_client_ip_is_bad_request() {
+        let response = super::unknown_client_ip_response();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            response
+                .headers()
+                .get(axum::http::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok()),
+            Some("application/json")
+        );
+    }
+
+    #[test]
+    fn login_token_registration_refuse_unknown_ip() {
+        let src = include_str!("middleware.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("rate_limit_ip_key("),
+            "rate-limited endpoints must refuse unidentified clients"
+        );
+        let login = production
+            .split("pub async fn login_rate_limit_middleware")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("login middleware");
+        let token = production
+            .split("pub async fn token_rate_limit_middleware")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("token middleware");
+        let registration = production
+            .split("pub async fn registration_rate_limit_middleware")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("registration middleware");
+        for (name, body) in [
+            ("login", login),
+            ("token", token),
+            ("registration", registration),
+        ] {
+            assert!(
+                body.contains("rate_limit_ip_key("),
+                "{name} must refuse unknown client IP"
+            );
+            assert!(
+                body.contains("unknown_client_ip_response()"),
+                "{name} must return 400 when client IP is unknown"
+            );
+        }
     }
 }
