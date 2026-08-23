@@ -79,17 +79,17 @@ impl SessionService {
 
         // Enforce max concurrent sessions
         if policy.max_concurrent_sessions > 0 {
-            let active_count = Session::count_active_by_user(&mut *tx, user_id)
+            let active_count = Session::count_active_by_user(&mut *tx, tenant_id, user_id)
                 .await
                 .map_err(ApiAuthError::Database)?;
 
             if active_count >= i64::from(policy.max_concurrent_sessions) {
                 // Revoke oldest session
-                if let Some(oldest) = Session::find_oldest_active(&mut *tx, user_id)
+                if let Some(oldest) = Session::find_oldest_active(&mut *tx, tenant_id, user_id)
                     .await
                     .map_err(ApiAuthError::Database)?
                 {
-                    Session::revoke(&mut *tx, oldest.id, RevokeReason::MaxSessions)
+                    Session::revoke(&mut *tx, tenant_id, oldest.id, RevokeReason::MaxSessions)
                         .await
                         .map_err(ApiAuthError::Database)?;
 
@@ -150,7 +150,7 @@ impl SessionService {
             .await
             .map_err(ApiAuthError::DatabaseInternal)?;
 
-        let sessions = Session::find_active_by_user(&mut *conn, user_id)
+        let sessions = Session::find_active_by_user(&mut *conn, tenant_id, user_id)
             .await
             .map_err(ApiAuthError::Database)?;
 
@@ -178,7 +178,7 @@ impl SessionService {
             .await
             .map_err(ApiAuthError::DatabaseInternal)?;
 
-        Session::find_by_id(&mut *conn, session_id)
+        Session::find_by_id(&mut *conn, tenant_id, session_id)
             .await
             .map_err(ApiAuthError::Database)
     }
@@ -194,7 +194,7 @@ impl SessionService {
             .await
             .map_err(ApiAuthError::DatabaseInternal)?;
 
-        Session::find_by_refresh_token(&mut *conn, refresh_token_id)
+        Session::find_by_refresh_token(&mut *conn, tenant_id, refresh_token_id)
             .await
             .map_err(ApiAuthError::Database)
     }
@@ -211,7 +211,7 @@ impl SessionService {
             .await
             .map_err(ApiAuthError::DatabaseInternal)?;
 
-        let result = Session::revoke(&mut *conn, session_id, reason)
+        let result = Session::revoke(&mut *conn, tenant_id, session_id, reason)
             .await
             .map_err(ApiAuthError::Database)?;
 
@@ -236,6 +236,7 @@ impl SessionService {
 
         let count = Session::revoke_all_except(
             &mut *conn,
+            tenant_id,
             user_id,
             current_session_id,
             RevokeReason::UserLogout,
@@ -281,7 +282,7 @@ impl SessionService {
             .await
             .map_err(ApiAuthError::DatabaseInternal)?;
 
-        Session::update_activity(&mut *conn, session_id)
+        Session::update_activity(&mut *conn, tenant_id, session_id)
             .await
             .map_err(ApiAuthError::Database)?;
 
@@ -493,7 +494,7 @@ impl SessionService {
             .await
             .map_err(ApiAuthError::DatabaseInternal)?;
 
-        let count = Session::revoke_all_for_user(&mut *conn, user_id, reason)
+        let count = Session::revoke_all_for_user(&mut *conn, tenant_id, user_id, reason)
             .await
             .map_err(ApiAuthError::Database)?;
 
@@ -546,6 +547,24 @@ mod tests {
         assert!(
             production.contains("UPDATE oauth_refresh_tokens"),
             "refresh-token revoke must also revoke OAuth refresh tokens"
+        );
+    }
+
+    #[test]
+    fn session_ops_pass_tenant_id_to_db() {
+        let src = include_str!("session_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("find_by_id(&mut *conn, tenant_id, session_id)"),
+            "get_session must pass tenant_id"
+        );
+        assert!(
+            production.contains("count_active_by_user(&mut *tx, tenant_id, user_id)"),
+            "create_session must count sessions by tenant"
+        );
+        assert!(
+            production.contains("revoke_all_for_user(&mut *conn, tenant_id, user_id, reason)"),
+            "revoke_all_user_sessions must pass tenant_id"
         );
     }
 }

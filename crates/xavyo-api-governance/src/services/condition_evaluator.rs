@@ -363,12 +363,12 @@ impl ConditionEvaluator {
     /// Returns true if the user has no active sessions.
     async fn evaluate_no_active_sessions(
         &self,
-        _tenant_id: Uuid,
+        tenant_id: Uuid,
         object_id: Uuid,
         condition: &TransitionCondition,
     ) -> Result<TransitionConditionResult> {
         // Count active sessions for the user
-        let session_count = Session::count_active_by_user(&self.pool, object_id).await?;
+        let session_count = Session::count_active_by_user(&self.pool, tenant_id, object_id).await?;
 
         let satisfied = session_count == 0;
         let reason = if satisfied {
@@ -537,6 +537,20 @@ mod tests {
         assert_eq!(
             condition.description,
             Some("User's last day has passed".to_string())
+        );
+    }
+
+    #[test]
+    fn no_active_sessions_counts_within_tenant() {
+        let src = include_str!("condition_evaluator.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("count_active_by_user(&self.pool, tenant_id, object_id)"),
+            "no_active_sessions must count sessions for the tenant"
+        );
+        assert!(
+            !production.contains("_tenant_id"),
+            "must not ignore tenant_id when counting sessions"
         );
     }
 }
