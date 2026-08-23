@@ -216,14 +216,8 @@ impl PasswordPolicyService {
     /// Should be called after `validate_password` passes. If the policy has
     /// `check_breached_passwords` enabled, queries the HIBP k-anonymity API.
     ///
-    /// **Fail mode** is controlled by the `HIBP_FAIL_CLOSED` env var:
-    /// - unset / "false" / "0": fail-open (legacy behaviour). On HIBP error,
-    ///   allow the password through and emit a security warning. Operators
-    ///   are expected to monitor the `hibp_fail_open` counter and alert.
-    /// - "true" / "1": fail-closed. On HIBP error, reject the password as if
-    ///   it were breached. Use this for high-assurance tenants where an
-    ///   attacker disrupting egress to api.pwnedpasswords.com would otherwise
-    ///   silently disable the breach check.
+    /// HIBP errors fail closed so an attacker cannot disable the breach check
+    /// by disrupting egress. `HIBP_FAIL_OPEN=true` restores the legacy allow.
     pub async fn check_breached(
         password: &str,
         policy: &TenantPasswordPolicy,
@@ -238,36 +232,7 @@ impl PasswordPolicyService {
                 Err(PasswordPolicyError::Breached)
             }
             Ok(false) => Ok(()),
-            Err(()) => {
-                let fail_closed = std::env::var("HIBP_FAIL_CLOSED")
-                    .map(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
-                    .unwrap_or(false);
-
-                if fail_closed {
-                    // SECURITY: fail-closed — treat HIBP unavailability as if the
-                    // password were breached. Prevents an attacker who can disrupt
-                    // egress to api.pwnedpasswords.com from silently disabling the
-                    // breach check.
-                    warn!(
-                        target: "security",
-                        event_type = "hibp_fail_closed",
-                        outcome = "rejected",
-                        "HIBP check failed; rejecting password (HIBP_FAIL_CLOSED=true)"
-                    );
-                    Err(PasswordPolicyError::Breached)
-                } else {
-                    // Fail-open is observable: every occurrence emits a counter
-                    // event so operators can alert on a sustained outage and
-                    // flip HIBP_FAIL_CLOSED if needed.
-                    warn!(
-                        target: "security",
-                        event_type = "hibp_fail_open",
-                        outcome = "allowed",
-                        "HIBP check failed; allowing password through (set HIBP_FAIL_CLOSED=true to harden)"
-                    );
-                    Ok(())
-                }
-            }
+            Err(()) => hibp_on_unavailable(hibp_fail_open_from_env()),
         }
     }
 
@@ -687,6 +652,40 @@ impl PasswordPolicyService {
     }
 }
 
+/// Whether HIBP unavailability should allow the password through.
+///
+/// Default is fail-closed. `HIBP_FAIL_OPEN=true` is the legacy opt-in.
+pub fn hibp_fail_open_from_env() -> bool {
+    std::env::var("HIBP_FAIL_OPEN")
+        .map(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false)
+}
+
+/// Fail-closed mapping for HIBP API errors.
+///
+/// When `fail_open` is false (the default), a tenant that enabled
+/// `check_breached_passwords` must not accept a password if the check
+/// cannot run.
+pub fn hibp_on_unavailable(fail_open: bool) -> Result<(), PasswordPolicyError> {
+    if fail_open {
+        warn!(
+            target: "security",
+            event_type = "hibp_fail_open",
+            outcome = "allowed",
+            "HIBP check failed; allowing password (HIBP_FAIL_OPEN=true)"
+        );
+        Ok(())
+    } else {
+        warn!(
+            target: "security",
+            event_type = "hibp_fail_closed",
+            outcome = "rejected",
+            "HIBP check failed; rejecting password"
+        );
+        Err(PasswordPolicyError::Breached)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -842,5 +841,26 @@ mod tests {
         let msg = result.error_message();
         assert!(msg.contains("at least 12 characters"));
         assert!(msg.contains("uppercase"));
+    }
+
+    #[test]
+    fn hibp_on_unavailable_fails_closed_by_default() {
+        let err = hibp_on_unavailable(false).expect_err("must reject");
+        assert!(matches!(err, PasswordPolicyError::Breached));
+        assert!(hibp_on_unavailable(true).is_ok());
+    }
+
+    #[test]
+    fn check_breached_does_not_fail_open_on_hibp_error() {
+        let src = include_str!("password_policy_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("hibp_on_unavailable("),
+            "HIBP errors must fail closed"
+        );
+        assert!(
+            !production.contains("HIBP_FAIL_CLOSED"),
+            "must not default fail-open via HIBP_FAIL_CLOSED"
+        );
     }
 }
