@@ -220,8 +220,7 @@ pub async fn reset_password_handler(
     // H4: Revoke all active sessions on password reset (same as password change)
     let sessions_revoked = session_service
         .revoke_all_user_sessions(user_id, *tenant_id.as_uuid(), RevokeReason::PasswordChange)
-        .await
-        .unwrap_or(0) as i64;
+        .await?;
 
     // Update password timestamps (uses its own pool connection)
     password_policy_service
@@ -247,5 +246,19 @@ mod tests {
     fn test_reset_password_response_default() {
         let response = ResetPasswordResponse::default();
         assert!(response.message.contains("reset successfully"));
+    }
+
+    #[test]
+    fn reset_password_does_not_swallow_session_revoke() {
+        let src = include_str!("reset_password.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(0)"),
+            "password reset must fail if sessions cannot be revoked"
+        );
+        assert!(
+            production.contains("revoke_all_user_sessions"),
+            "password reset must revoke sessions"
+        );
     }
 }

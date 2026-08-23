@@ -18,17 +18,19 @@ impl AssignRoleExecutor {
     }
 
     /// Get role name from gov_roles by role_id and tenant_id.
-    async fn get_role_name(pool: &PgPool, tenant_id: Uuid, role_id: Uuid) -> Option<String> {
+    async fn get_role_name(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        role_id: Uuid,
+    ) -> Result<Option<String>, sqlx::Error> {
         let result: Option<(String,)> =
             sqlx::query_as("SELECT name FROM gov_roles WHERE id = $1 AND tenant_id = $2")
                 .bind(role_id)
                 .bind(tenant_id)
                 .fetch_optional(pool)
-                .await
-                .ok()
-                .flatten();
+                .await?;
 
-        result.map(|(name,)| name)
+        Ok(result.map(|(name,)| name))
     }
 
     /// Check if the user already has the specified role.
@@ -133,8 +135,9 @@ impl ActionExecutor for AssignRoleExecutor {
 
         // Resolve role_id to role_name via gov_roles
         let role_name = match Self::get_role_name(pool, ctx.tenant_id, role_id).await {
-            Some(name) => name,
-            None => return ExecutionResult::failure("Role not found for the given tenant"),
+            Ok(Some(name)) => name,
+            Ok(None) => return ExecutionResult::failure("Role not found for the given tenant"),
+            Err(e) => return ExecutionResult::failure(format!("Failed to look up role: {e}")),
         };
 
         // Check if user already has the role
@@ -196,8 +199,8 @@ impl ActionExecutor for AssignRoleExecutor {
         };
 
         let role_name = match Self::get_role_name(pool, ctx.tenant_id, role_id).await {
-            Some(name) => name,
-            None => return (false, None, None),
+            Ok(Some(name)) => name,
+            Ok(None) | Err(_) => return (false, None, None),
         };
 
         match Self::user_has_role(pool, ctx.tenant_id, target_user_id, &role_name).await {
@@ -255,6 +258,20 @@ mod tests {
         assert!(
             !production.contains("VALUES ($1, $2, NOW())"),
             "must not insert user_roles without a tenant-scoped users SELECT"
+        );
+    }
+
+    #[test]
+    fn get_role_name_does_not_swallow_lookup_errors() {
+        let src = include_str!("assign_role.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains(".ok()\n                .flatten()"),
+            "role lookup errors must not be treated as not found"
+        );
+        assert!(
+            production.contains("Failed to look up role: {e}"),
+            "execute must fail closed when gov_roles cannot be queried"
         );
     }
 }

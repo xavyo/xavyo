@@ -157,33 +157,22 @@ impl RoleAssignmentService {
                     entitlement_assignment_ids.push(assignment.id);
                 }
                 Err(e) => {
-                    tracing::warn!(
+                    tracing::error!(
                         tenant_id = %tenant_id,
                         user_id = %user_id,
                         entitlement_id = %entitlement_id,
                         error = %e,
                         "Failed to assign entitlement during role assignment"
                     );
-                    // Continue with other entitlements
+                    return Err(e);
                 }
             }
         }
 
-        // Trigger constructions for the role assignment
         let provisioning_operation_ids = self
             .inducement_trigger_service
             .trigger_constructions_for_assignment(tenant_id, user_id, role_id, Some(assigned_by))
-            .await
-            .unwrap_or_else(|e| {
-                tracing::error!(
-                    tenant_id = %tenant_id,
-                    user_id = %user_id,
-                    role_id = %role_id,
-                    error = %e,
-                    "Failed to trigger constructions for role assignment"
-                );
-                Vec::new()
-            });
+            .await?;
 
         tracing::info!(
             tenant_id = %tenant_id,
@@ -280,34 +269,24 @@ impl RoleAssignmentService {
                             entitlement_assignments_revoked.push(assignment.id);
                         }
                         Err(e) => {
-                            tracing::warn!(
+                            tracing::error!(
                                 tenant_id = %tenant_id,
                                 user_id = %user_id,
                                 entitlement_id = %entitlement_id,
                                 error = %e,
                                 "Failed to revoke entitlement during role revocation"
                             );
+                            return Err(e);
                         }
                     }
                 }
             }
         }
 
-        // Trigger deprovisioning for the role revocation
         let deprovisioning_operation_ids = self
             .inducement_trigger_service
             .trigger_deprovisioning_for_revocation(tenant_id, user_id, role_id, revoked_by)
-            .await
-            .unwrap_or_else(|e| {
-                tracing::error!(
-                    tenant_id = %tenant_id,
-                    user_id = %user_id,
-                    role_id = %role_id,
-                    error = %e,
-                    "Failed to trigger deprovisioning for role revocation"
-                );
-                Vec::new()
-            });
+            .await?;
 
         tracing::info!(
             tenant_id = %tenant_id,
@@ -462,5 +441,37 @@ mod tests {
 
         assert!(!result.entitlement_assignments_revoked.is_empty());
         assert!(result.deprovisioning_operation_ids.is_empty());
+    }
+
+    #[test]
+    fn assign_and_revoke_do_not_swallow_side_effects() {
+        let src = include_str!("role_assignment_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let assign = production
+            .split("pub async fn assign_role")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("assign_role");
+        assert!(
+            assign.contains("return Err(e)"),
+            "entitlement assign errors must fail the role assignment"
+        );
+        assert!(
+            !assign.contains("unwrap_or_else"),
+            "construction trigger errors must fail the role assignment"
+        );
+        let revoke = production
+            .split("pub async fn revoke_role")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("revoke_role");
+        assert!(
+            revoke.contains("return Err(e)"),
+            "entitlement revoke errors must fail the role revocation"
+        );
+        assert!(
+            !revoke.contains("unwrap_or_else"),
+            "deprovisioning trigger errors must fail the role revocation"
+        );
     }
 }
