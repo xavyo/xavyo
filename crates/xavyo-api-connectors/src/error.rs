@@ -289,6 +289,18 @@ impl From<crate::services::JobServiceError> for ConnectorApiError {
     }
 }
 
+impl From<crate::services::SyncServiceError> for ConnectorApiError {
+    fn from(err: crate::services::SyncServiceError) -> Self {
+        use crate::services::SyncServiceError;
+        match err {
+            SyncServiceError::NotFound(msg) => ConnectorApiError::not_found(msg),
+            SyncServiceError::InvalidParameter(msg) => ConnectorApiError::bad_request(msg),
+            SyncServiceError::Database(e) => ConnectorApiError::Database(e),
+            SyncServiceError::Sync(msg) => ConnectorApiError::sync_error(msg),
+        }
+    }
+}
+
 /// Result type for connector API operations.
 pub type Result<T> = std::result::Result<T, ConnectorApiError>;
 

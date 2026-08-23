@@ -163,13 +163,13 @@ pub async fn get_sync_config(
     Extension(claims): Extension<JwtClaims>,
     Path(connector_id): Path<Uuid>,
 ) -> Result<Json<SyncConfigResponse>, ApiError> {
-    let _tenant_id = extract_tenant_id(&claims)?;
+    let tenant_id = extract_tenant_id(&claims)?;
 
     let config = state
         .sync_service
-        .get_config(connector_id)
+        .get_config(tenant_id, connector_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(ApiError::from)?;
 
     Ok(Json(SyncConfigResponse {
         connector_id: config.connector_id,
@@ -207,11 +207,12 @@ pub async fn update_sync_config(
     if !claims.has_role("admin") {
         return Err(ConnectorApiError::Forbidden);
     }
-    let _tenant_id = extract_tenant_id(&claims)?;
+    let tenant_id = extract_tenant_id(&claims)?;
 
     let config = state
         .sync_service
         .update_config(
+            tenant_id,
             connector_id,
             request.enabled,
             request.sync_mode,
@@ -221,7 +222,7 @@ pub async fn update_sync_config(
             request.conflict_resolution,
         )
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(ApiError::from)?;
 
     Ok(Json(SyncConfigResponse {
         connector_id: config.connector_id,
@@ -257,13 +258,13 @@ pub async fn enable_sync(
     if !claims.has_role("admin") {
         return Err(ConnectorApiError::Forbidden);
     }
-    let _tenant_id = extract_tenant_id(&claims)?;
+    let tenant_id = extract_tenant_id(&claims)?;
 
     state
         .sync_service
-        .enable(connector_id)
+        .enable(tenant_id, connector_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(ApiError::from)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -291,13 +292,13 @@ pub async fn disable_sync(
     if !claims.has_role("admin") {
         return Err(ConnectorApiError::Forbidden);
     }
-    let _tenant_id = extract_tenant_id(&claims)?;
+    let tenant_id = extract_tenant_id(&claims)?;
 
     state
         .sync_service
-        .disable(connector_id)
+        .disable(tenant_id, connector_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(ApiError::from)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -736,13 +737,13 @@ pub async fn get_all_sync_status(
     State(state): State<SyncState>,
     Extension(claims): Extension<JwtClaims>,
 ) -> Result<Json<Vec<SyncStatusResponse>>, ApiError> {
-    let _tenant_id = extract_tenant_id(&claims)?;
+    let tenant_id = extract_tenant_id(&claims)?;
 
     let statuses = state
         .sync_service
-        .get_all_status()
+        .get_all_status(tenant_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(ApiError::from)?;
 
     let responses = statuses
         .into_iter()

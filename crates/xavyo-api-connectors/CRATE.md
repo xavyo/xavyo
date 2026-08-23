@@ -94,6 +94,7 @@ None
 - Never skip schema validation for mappings
 - Never ignore reconciliation discrepancies
 - Never mark a discrepancy resolved or record remediation `success` without executing the connector action (501 until wired)
+- Never return HTTP success for sync config enable/disable/update without persisting to `gov_sync_configurations`
 
 ## Related Crates
 

@@ -5,8 +5,9 @@ use tracing::instrument;
 use uuid::Uuid;
 
 use xavyo_provisioning::sync::{
-    BatchSummary, ConflictResolution, InboundChange, ResolutionStrategy, SyncConfig, SyncConflict,
-    SyncConflictDetector, SyncMode, SyncStatus, SyncStatusManager, SyncToken, SyncTokenManager,
+    BatchSummary, ConflictResolution, InboundChange, ResolutionStrategy, SyncConfig,
+    SyncConfigService, SyncConflict, SyncConflictDetector, SyncError, SyncMode, SyncStatus,
+    SyncStatusManager, SyncToken, SyncTokenManager,
 };
 
 /// Error type for sync service operations.
@@ -28,9 +29,28 @@ pub type SyncServiceResult<T> = Result<T, SyncServiceError>;
 /// Service for managing live synchronization.
 pub struct SyncService {
     pool: PgPool,
+    config_service: SyncConfigService,
     status_manager: SyncStatusManager,
     token_manager: SyncTokenManager,
     conflict_detector: SyncConflictDetector,
+}
+
+fn map_sync_error(err: SyncError) -> SyncServiceError {
+    match err {
+        SyncError::Configuration { message } => SyncServiceError::InvalidParameter(message),
+        SyncError::NotFound { entity, id } => SyncServiceError::NotFound(format!("{entity} {id}")),
+        SyncError::Database(e) => SyncServiceError::Database(e),
+        other => SyncServiceError::Sync(other.to_string()),
+    }
+}
+
+/// In-memory defaults for a tenant-scoped connector. Never uses `Uuid::nil()`.
+pub(crate) fn default_config_for(tenant_id: Uuid, connector_id: Uuid) -> SyncConfig {
+    SyncConfig {
+        tenant_id,
+        connector_id,
+        ..SyncConfig::default()
+    }
 }
 
 impl SyncService {
@@ -38,6 +58,7 @@ impl SyncService {
     #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
+            config_service: SyncConfigService::new(pool.clone()),
             status_manager: SyncStatusManager::new(pool.clone()),
             token_manager: SyncTokenManager::new(pool.clone()),
             conflict_detector: SyncConflictDetector::new(pool.clone()),
@@ -45,21 +66,56 @@ impl SyncService {
         }
     }
 
-    /// Get sync configuration for a connector.
-    #[instrument(skip(self))]
-    pub async fn get_config(&self, connector_id: Uuid) -> SyncServiceResult<SyncConfig> {
-        let config = SyncConfig {
-            connector_id,
-            ..Default::default()
-        };
-        Ok(config)
+    async fn ensure_connector(&self, tenant_id: Uuid, connector_id: Uuid) -> SyncServiceResult<()> {
+        let found: Option<(Uuid,)> = sqlx::query_as(
+            "SELECT id FROM connector_configurations WHERE id = $1 AND tenant_id = $2",
+        )
+        .bind(connector_id)
+        .bind(tenant_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        match found {
+            Some(_) => Ok(()),
+            None => Err(SyncServiceError::NotFound(format!(
+                "Connector {connector_id} not found"
+            ))),
+        }
     }
 
-    /// Update sync configuration.
+    async fn load_or_default(
+        &self,
+        tenant_id: Uuid,
+        connector_id: Uuid,
+    ) -> SyncServiceResult<SyncConfig> {
+        self.ensure_connector(tenant_id, connector_id).await?;
+        match self
+            .config_service
+            .get(tenant_id, connector_id)
+            .await
+            .map_err(map_sync_error)?
+        {
+            Some(cfg) => Ok(cfg),
+            None => Ok(default_config_for(tenant_id, connector_id)),
+        }
+    }
+
+    /// Get sync configuration for a connector (persisted, or tenant-scoped defaults).
+    #[instrument(skip(self))]
+    pub async fn get_config(
+        &self,
+        tenant_id: Uuid,
+        connector_id: Uuid,
+    ) -> SyncServiceResult<SyncConfig> {
+        self.load_or_default(tenant_id, connector_id).await
+    }
+
+    /// Update and persist sync configuration.
     #[instrument(skip(self))]
     #[allow(clippy::too_many_arguments)]
     pub async fn update_config(
         &self,
+        tenant_id: Uuid,
         connector_id: Uuid,
         enabled: Option<bool>,
         mode: Option<String>,
@@ -68,7 +124,7 @@ impl SyncService {
         rate_limit_per_minute: Option<i32>,
         conflict_resolution: Option<String>,
     ) -> SyncServiceResult<SyncConfig> {
-        let mut config = self.get_config(connector_id).await?;
+        let mut config = self.load_or_default(tenant_id, connector_id).await?;
 
         if let Some(e) = enabled {
             config.enabled = e;
@@ -89,22 +145,43 @@ impl SyncService {
             config.conflict_resolution = c.parse().unwrap_or(ConflictResolution::Manual);
         }
 
-        Ok(config)
+        self.config_service
+            .upsert(&config)
+            .await
+            .map_err(map_sync_error)
     }
 
-    /// Enable sync for a connector.
+    /// Enable sync for a connector (persisted).
     #[instrument(skip(self))]
-    pub async fn enable(&self, connector_id: Uuid) -> SyncServiceResult<()> {
-        self.update_config(connector_id, Some(true), None, None, None, None, None)
-            .await?;
+    pub async fn enable(&self, tenant_id: Uuid, connector_id: Uuid) -> SyncServiceResult<()> {
+        self.update_config(
+            tenant_id,
+            connector_id,
+            Some(true),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await?;
         Ok(())
     }
 
-    /// Disable sync for a connector.
+    /// Disable sync for a connector (persisted).
     #[instrument(skip(self))]
-    pub async fn disable(&self, connector_id: Uuid) -> SyncServiceResult<()> {
-        self.update_config(connector_id, Some(false), None, None, None, None, None)
-            .await?;
+    pub async fn disable(&self, tenant_id: Uuid, connector_id: Uuid) -> SyncServiceResult<()> {
+        self.update_config(
+            tenant_id,
+            connector_id,
+            Some(false),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await?;
         Ok(())
     }
 
@@ -120,10 +197,13 @@ impl SyncService {
         }
     }
 
-    /// Get sync status for all connectors.
+    /// Get sync status for all connectors in a tenant.
     #[instrument(skip(self))]
-    pub async fn get_all_status(&self) -> SyncServiceResult<Vec<SyncStatus>> {
-        Ok(Vec::new())
+    pub async fn get_all_status(&self, tenant_id: Uuid) -> SyncServiceResult<Vec<SyncStatus>> {
+        self.status_manager
+            .list_by_tenant(tenant_id)
+            .await
+            .map_err(map_sync_error)
     }
 
     /// Get sync token for a connector.
@@ -269,5 +349,32 @@ mod tests {
 
         let err = SyncServiceError::InvalidParameter("invalid".to_string());
         assert_eq!(err.to_string(), "Invalid parameter: invalid");
+    }
+
+    #[test]
+    fn default_config_is_tenant_scoped() {
+        let tenant_id = Uuid::new_v4();
+        let connector_id = Uuid::new_v4();
+        let cfg = default_config_for(tenant_id, connector_id);
+        assert_eq!(cfg.tenant_id, tenant_id);
+        assert_eq!(cfg.connector_id, connector_id);
+        assert_ne!(cfg.tenant_id, Uuid::nil());
+        assert_ne!(cfg.connector_id, Uuid::nil());
+        assert!(!cfg.enabled);
+    }
+
+    #[test]
+    fn config_mutations_go_through_upsert() {
+        let src = include_str!("sync_service.rs");
+        let persist_call = format!(".{}({})", "upsert", "&config");
+        let list_call = format!("{}({})", "list_by_tenant", "tenant_id");
+        assert!(
+            src.contains(&persist_call),
+            "update/enable/disable must persist via config service upsert"
+        );
+        assert!(
+            src.contains(&list_call),
+            "get_all_status must list tenant statuses, not return an empty vec"
+        );
     }
 }
