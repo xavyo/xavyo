@@ -538,20 +538,23 @@ impl RiskEnforcementService {
             0
         };
 
-        // Upsert the calculated score
-        let _ = GovRiskScore::upsert(
-            &self.pool,
-            tenant_id,
-            UpsertGovRiskScore {
-                user_id,
-                total_score,
-                static_score: 0,
-                dynamic_score: total_score,
-                factor_breakdown: serde_json::Value::Array(breakdown.clone()),
-                peer_comparison: None,
-            },
-        )
-        .await;
+        // Upsert the calculated score. Persist errors must fail closed so
+        // callers do not treat an unstored score as recorded.
+        risk_score_upsert(
+            GovRiskScore::upsert(
+                &self.pool,
+                tenant_id,
+                UpsertGovRiskScore {
+                    user_id,
+                    total_score,
+                    static_score: 0,
+                    dynamic_score: total_score,
+                    factor_breakdown: serde_json::Value::Array(breakdown.clone()),
+                    peer_comparison: None,
+                },
+            )
+            .await,
+        )?;
 
         Ok((total_score, serde_json::Value::Array(breakdown)))
     }
@@ -667,6 +670,13 @@ fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 
 /// Login must refuse when risk evaluation fails.
 ///
+/// Persist errors for the calculated score must fail closed.
+pub(crate) fn risk_score_upsert<T>(
+    result: Result<T, sqlx::Error>,
+) -> Result<T, RiskEnforcementError> {
+    result.map_err(|e| RiskEnforcementError::DatabaseError(e.to_string()))
+}
+
 /// Tenant `fail_open` used to return [`EnforcementDecision::skip()`], which let
 /// a scoring outage disable MFA/block. Login maps this error to HTTP 503.
 pub fn risk_eval_on_error(
@@ -698,6 +708,12 @@ pub enum RiskEnforcementError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn risk_score_upsert_does_not_skip_on_error() {
+        assert!(risk_score_upsert(Ok::<(), sqlx::Error>(())).is_ok());
+        assert!(risk_score_upsert(Err::<(), _>(sqlx::Error::Protocol("db".into()))).is_err());
+    }
 
     #[test]
     fn risk_eval_on_error_never_skips() {
@@ -744,6 +760,14 @@ mod tests {
         assert!(
             calc.contains("map_err(|e| RiskEnforcementError::DatabaseError"),
             "event sum errors must fail closed"
+        );
+        assert!(
+            calc.contains("risk_score_upsert("),
+            "score persist errors must fail closed"
+        );
+        assert!(
+            !calc.contains("let _ = GovRiskScore::upsert"),
+            "must not swallow risk score upsert"
         );
         assert!(
             !calc.contains("unwrap_or(0.0)"),

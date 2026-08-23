@@ -733,6 +733,20 @@ async fn delete_mfa_session(
     Ok(())
 }
 
+/// MFA session delete after TOTP success must not be swallowed.
+pub fn device_mfa_session_delete<E: std::fmt::Display>(result: Result<(), E>) -> Result<(), E> {
+    match result {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                "MFA session delete failed, refusing device login"
+            );
+            Err(e)
+        }
+    }
+}
+
 /// Render login page HTML (for displaying errors).
 fn render_login_page(
     user_code: &str,
@@ -971,8 +985,18 @@ pub async fn device_mfa_handler(
         return render_mfa_error_with_csrf(&user_code, &request.mfa_session_id, error_msg);
     }
 
-    // Delete MFA session
-    let _ = delete_mfa_session(&state.pool, request.mfa_session_id, tenant_id).await;
+    // Delete MFA session before issuing a login session. Swallowing this left
+    // the MFA session reusable after a successful TOTP.
+    if let Err(e) = device_mfa_session_delete(
+        delete_mfa_session(&state.pool, request.mfa_session_id, tenant_id).await,
+    ) {
+        warn!(error = %e, "Failed to delete MFA session");
+        return render_mfa_error_with_csrf(
+            &user_code,
+            &request.mfa_session_id,
+            "An error occurred. Please try again.",
+        );
+    }
 
     // Extract client info for session (peer IP unless TrustXff)
     let ip_str = device_client_ip(&headers, connect_info.as_ref(), trust_xff.is_some());
@@ -1423,6 +1447,26 @@ mod tests {
     fn device_lockout_record_does_not_skip_on_error() {
         assert!(device_lockout_record(Ok::<u8, &str>(1)).is_ok());
         assert!(device_lockout_record(Err::<u8, _>("db down")).is_err());
+    }
+
+    #[test]
+    fn device_mfa_session_delete_does_not_skip_on_error() {
+        assert!(device_mfa_session_delete(Ok::<(), &str>(())).is_ok());
+        assert!(device_mfa_session_delete(Err::<(), _>("db down")).is_err());
+    }
+
+    #[test]
+    fn device_mfa_does_not_swallow_session_delete() {
+        let src = include_str!("device_login.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("device_mfa_session_delete("),
+            "MFA session delete must fail closed"
+        );
+        assert!(
+            !production.contains("let _ = delete_mfa_session("),
+            "must not swallow MFA session delete after TOTP success"
+        );
     }
 
     #[test]
