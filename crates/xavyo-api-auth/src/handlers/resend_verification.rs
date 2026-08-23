@@ -151,9 +151,10 @@ async fn process_resend_verification(
 
     // Invalidate any existing unused tokens for this user
     sqlx::query(
-        "UPDATE email_verification_tokens SET verified_at = NOW() WHERE user_id = $1 AND verified_at IS NULL"
+        "UPDATE email_verification_tokens SET verified_at = NOW() WHERE user_id = $1 AND tenant_id = $2 AND verified_at IS NULL"
     )
     .bind(user_id)
+    .bind(tenant_id.as_uuid())
     .execute(&mut *tx)
     .await?;
 
@@ -197,5 +198,19 @@ mod tests {
     fn test_resend_verification_response_default() {
         let response = ResendVerificationResponse::default();
         assert!(response.message.contains("If an unverified account exists"));
+    }
+
+    #[test]
+    fn resend_verification_invalidates_tokens_by_tenant() {
+        let src = include_str!("resend_verification.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("WHERE user_id = $1 AND tenant_id = $2 AND verified_at IS NULL"),
+            "invalidating unused verification tokens must filter tenant_id"
+        );
+        assert!(
+            !production.contains("WHERE user_id = $1 AND verified_at IS NULL"),
+            "must not invalidate verification tokens by user_id alone"
+        );
     }
 }
