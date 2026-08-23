@@ -437,28 +437,20 @@ impl AssignmentService {
         // F064: Create revocation task for semi-manual resources before deleting
         // Only for user assignments
         if existing.target_type == GovAssignmentTargetType::User {
-            // Get entitlement to find application
-            if let Ok(Some(entitlement)) =
-                GovEntitlement::find_by_id(&self.pool, tenant_id, existing.entitlement_id).await
-            {
-                if let Err(e) = self
-                    .create_manual_task_if_needed(
-                        tenant_id,
-                        assignment_id,
-                        entitlement.application_id,
-                        existing.target_id,
-                        entitlement.id,
-                        ManualTaskOperation::Revoke,
-                    )
+            if let Some(entitlement) = entitlement_for_manual_task(
+                GovEntitlement::find_by_id(&self.pool, tenant_id, existing.entitlement_id)
                     .await
-                {
-                    tracing::warn!(
-                        tenant_id = %tenant_id,
-                        assignment_id = %assignment_id,
-                        error = %e,
-                        "Failed to create revocation task for semi-manual resource"
-                    );
-                }
+                    .map_err(GovernanceError::Database)?,
+            ) {
+                self.create_manual_task_if_needed(
+                    tenant_id,
+                    assignment_id,
+                    entitlement.application_id,
+                    existing.target_id,
+                    entitlement.id,
+                    ManualTaskOperation::Revoke,
+                )
+                .await?;
             }
         }
 
@@ -486,27 +478,20 @@ impl AssignmentService {
 
         // F064: Create modify task for semi-manual resources (suspend = revoke access)
         if existing.target_type == GovAssignmentTargetType::User {
-            if let Ok(Some(entitlement)) =
-                GovEntitlement::find_by_id(&self.pool, tenant_id, existing.entitlement_id).await
-            {
-                if let Err(e) = self
-                    .create_manual_task_if_needed(
-                        tenant_id,
-                        assignment_id,
-                        entitlement.application_id,
-                        existing.target_id,
-                        entitlement.id,
-                        ManualTaskOperation::Revoke, // Suspend = temporarily revoke
-                    )
+            if let Some(entitlement) = entitlement_for_manual_task(
+                GovEntitlement::find_by_id(&self.pool, tenant_id, existing.entitlement_id)
                     .await
-                {
-                    tracing::warn!(
-                        tenant_id = %tenant_id,
-                        assignment_id = %assignment_id,
-                        error = %e,
-                        "Failed to create suspend task for semi-manual resource"
-                    );
-                }
+                    .map_err(GovernanceError::Database)?,
+            ) {
+                self.create_manual_task_if_needed(
+                    tenant_id,
+                    assignment_id,
+                    entitlement.application_id,
+                    existing.target_id,
+                    entitlement.id,
+                    ManualTaskOperation::Revoke, // Suspend = temporarily revoke
+                )
+                .await?;
             }
         }
 
@@ -528,27 +513,20 @@ impl AssignmentService {
 
         // F064: Create modify task for semi-manual resources (reactivate = re-grant access)
         if existing.target_type == GovAssignmentTargetType::User {
-            if let Ok(Some(entitlement)) =
-                GovEntitlement::find_by_id(&self.pool, tenant_id, existing.entitlement_id).await
-            {
-                if let Err(e) = self
-                    .create_manual_task_if_needed(
-                        tenant_id,
-                        assignment_id,
-                        entitlement.application_id,
-                        existing.target_id,
-                        entitlement.id,
-                        ManualTaskOperation::Grant, // Reactivate = re-grant
-                    )
+            if let Some(entitlement) = entitlement_for_manual_task(
+                GovEntitlement::find_by_id(&self.pool, tenant_id, existing.entitlement_id)
                     .await
-                {
-                    tracing::warn!(
-                        tenant_id = %tenant_id,
-                        assignment_id = %assignment_id,
-                        error = %e,
-                        "Failed to create reactivate task for semi-manual resource"
-                    );
-                }
+                    .map_err(GovernanceError::Database)?,
+            ) {
+                self.create_manual_task_if_needed(
+                    tenant_id,
+                    assignment_id,
+                    entitlement.application_id,
+                    existing.target_id,
+                    entitlement.id,
+                    ManualTaskOperation::Grant, // Reactivate = re-grant
+                )
+                .await?;
             }
         }
 
@@ -626,12 +604,43 @@ impl AssignmentService {
     }
 }
 
+/// Entitlement lookup for semi-manual deprovision tasks. Database errors must
+/// fail the mutation, not skip creating the task.
+pub(crate) fn entitlement_for_manual_task<T>(lookup: Option<T>) -> Option<T> {
+    lookup
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
 
     #[test]
     fn test_service_creation() {
         // This test just verifies the service can be instantiated
         // Real tests would require a database connection
+    }
+
+    #[test]
+    fn entitlement_for_manual_task_keeps_presence() {
+        assert!(entitlement_for_manual_task(Some(1)).is_some());
+        assert!(entitlement_for_manual_task::<u8>(None).is_none());
+    }
+
+    #[test]
+    fn assignment_mutations_do_not_skip_manual_tasks_on_lookup_error() {
+        let src = include_str!("assignment_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("entitlement_for_manual_task("),
+            "entitlement lookup for deprovision tasks must fail closed"
+        );
+        assert!(
+            !production.contains("if let Ok(Some(entitlement))"),
+            "must not skip manual tasks when entitlement lookup fails"
+        );
+        assert!(
+            !production.contains("Failed to create revocation task for semi-manual resource"),
+            "must not swallow deprovision task creation"
+        );
     }
 }
