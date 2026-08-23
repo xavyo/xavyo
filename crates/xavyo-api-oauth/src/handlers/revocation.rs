@@ -139,10 +139,9 @@ async fn try_revoke_access_token(state: &OAuthState, tenant_id: Uuid, token: &st
         return false; // No JTI to blacklist
     }
 
-    // Extract user_id from subject.
-    // For NHI tokens, the subject may be a non-UUID identifier (e.g., NHI name).
-    // Use a nil UUID for revocation record so the JTI blacklist still works.
-    let user_id = claims.sub.parse::<Uuid>().unwrap_or(Uuid::nil());
+    // Extract user_id from subject. NHI tokens may use a non-UUID subject;
+    // derive a stable UUID so we never persist Uuid::nil() as the actor.
+    let user_id = revocation_user_id(&claims.sub);
 
     // SECURITY: Acquire dedicated connection for RLS to prevent pool race condition
     let mut conn = match state.pool.acquire().await {
@@ -229,8 +228,9 @@ async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &s
         return false;
     }
 
-    // Look up the refresh token by hash using the same connection
-    let row: Option<(Uuid, Uuid, bool)> = sqlx::query_as(
+    // Look up the refresh token by hash using the same connection.
+    // Lookup errors are not "unknown token" — do not pretend revoke succeeded.
+    let row: Option<(Uuid, Uuid, bool)> = match sqlx::query_as(
         r"
         SELECT id, user_id, revoked
         FROM oauth_refresh_tokens
@@ -241,8 +241,17 @@ async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &s
     .bind(tenant_id)
     .fetch_optional(&mut *conn)
     .await
-    .ok()
-    .flatten();
+    {
+        Ok(row) => row,
+        Err(e) => {
+            tracing::error!(
+                target: "token_lifecycle",
+                error = %e,
+                "Failed to look up refresh token for revocation"
+            );
+            return false;
+        }
+    };
 
     let (token_id, user_id, already_revoked) = match row {
         Some(r) => r,
@@ -254,7 +263,7 @@ async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &s
     }
 
     // Mark refresh token as revoked using the same connection
-    let _ = sqlx::query(
+    match sqlx::query(
         r"
         UPDATE oauth_refresh_tokens
         SET revoked = TRUE, revoked_at = now()
@@ -264,7 +273,27 @@ async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &s
     .bind(token_id)
     .bind(tenant_id)
     .execute(&mut *conn)
-    .await;
+    .await
+    {
+        Ok(result) if result.rows_affected() > 0 => {}
+        Ok(_) => {
+            tracing::error!(
+                target: "token_lifecycle",
+                token_id = %token_id,
+                "Refresh token revoke update affected 0 rows"
+            );
+            return false;
+        }
+        Err(e) => {
+            tracing::error!(
+                target: "token_lifecycle",
+                token_id = %token_id,
+                error = %e,
+                "Failed to mark refresh token revoked"
+            );
+            return false;
+        }
+    }
 
     // Cascade: revoke all user's access tokens using sentinel pattern
     cascade_revoke_user_access_tokens(state, tenant_id, user_id).await;
@@ -337,6 +366,21 @@ async fn cascade_revoke_user_access_tokens(state: &OAuthState, tenant_id: Uuid, 
     }
 }
 
+/// Map a JWT `sub` to a UUID for the revocation record.
+///
+/// Human users have UUID subjects. NHI tokens may use a name; hash it so we
+/// never persist `Uuid::nil()` as the actor.
+fn revocation_user_id(sub: &str) -> Uuid {
+    Uuid::parse_str(sub).unwrap_or_else(|_| {
+        let mut hasher = Sha256::new();
+        hasher.update(sub.as_bytes());
+        let digest = hasher.finalize();
+        let mut bytes = [0u8; 16];
+        bytes.copy_from_slice(&digest[..16]);
+        Uuid::from_bytes(bytes)
+    })
+}
+
 /// Hash a token value using SHA-256 (same algorithm as `TokenService`).
 fn hash_token(token: &str) -> String {
     let mut hasher = Sha256::new();
@@ -391,5 +435,31 @@ mod tests {
             !production.contains("if let Some(token_tid) = claims.tid"),
             "must not skip tenant match when tid is absent"
         );
+        assert!(
+            production.contains("revocation_user_id("),
+            "revocation must not use Uuid::nil() as the actor"
+        );
+        assert!(
+            !production.contains("unwrap_or(Uuid::nil())"),
+            "must not persist a nil UUID as the revoked-token user"
+        );
+        assert!(
+            !production.contains(".ok()\n    .flatten()"),
+            "refresh-token lookup errors must not look like an unknown token"
+        );
+        assert!(
+            !production.contains("let _ = sqlx::query("),
+            "must not swallow refresh-token revoke updates"
+        );
+    }
+
+    #[test]
+    fn revocation_user_id_is_stable_and_not_nil() {
+        let human = Uuid::new_v4();
+        assert_eq!(revocation_user_id(&human.to_string()), human);
+        let nhi = revocation_user_id("agent-alpha");
+        assert_ne!(nhi, Uuid::nil());
+        assert_eq!(nhi, revocation_user_id("agent-alpha"));
+        assert_ne!(nhi, revocation_user_id("agent-beta"));
     }
 }

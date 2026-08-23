@@ -102,8 +102,12 @@ impl LifecycleEventService {
     }
 
     /// List actions for an event.
-    pub async fn get_event_actions(&self, event_id: Uuid) -> Result<Vec<GovLifecycleAction>> {
-        GovLifecycleAction::list_by_event(&self.pool, event_id)
+    pub async fn get_event_actions(
+        &self,
+        tenant_id: Uuid,
+        event_id: Uuid,
+    ) -> Result<Vec<GovLifecycleAction>> {
+        GovLifecycleAction::list_by_event(&self.pool, tenant_id, event_id)
             .await
             .map_err(GovernanceError::Database)
     }
@@ -774,5 +778,29 @@ impl LifecycleEventService {
         GovAccessSnapshot::create(&self.pool, tenant_id, input)
             .await
             .map_err(GovernanceError::Database)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn get_event_actions_passes_tenant_id() {
+        let src = include_str!("lifecycle_event_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let lookup = production
+            .split("pub async fn get_event_actions")
+            .nth(1)
+            .expect("get_event_actions")
+            .split("pub async fn list_actions")
+            .next()
+            .expect("get_event_actions body");
+        assert!(
+            lookup.contains("list_by_event(&self.pool, tenant_id, event_id)"),
+            "get_event_actions must pass tenant_id"
+        );
+        assert!(
+            !lookup.contains("list_by_event(&self.pool, event_id)"),
+            "must not list lifecycle actions by event_id alone"
+        );
     }
 }
