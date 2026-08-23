@@ -82,21 +82,19 @@ pub async fn disable_mfa(
         )
         .await?;
 
-    // Revoke all sessions — MFA removal is a security-sensitive change
-    let revoked = sqlx::query(
-        "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'security' \
-         WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()",
+    // Revoke sessions and refresh tokens — MFA removal is a security-sensitive change
+    let revoked = crate::services::revoke_auth::revoke_user_sessions_and_refresh_tokens(
+        &state.pool,
+        *tenant_id.as_uuid(),
+        *user_id.as_uuid(),
     )
-    .bind(user_id.as_uuid())
-    .bind(tenant_id.as_uuid())
-    .execute(&state.pool)
     .await
     .map_err(ApiAuthError::Database)?;
 
     info!(
         user_id = %user_id.as_uuid(),
-        sessions_revoked = revoked.rows_affected(),
-        "Revoked sessions after MFA disable"
+        tokens_revoked = revoked,
+        "Revoked sessions and refresh tokens after MFA disable"
     );
 
     // Generate MFA disabled alert (F025)
@@ -116,4 +114,21 @@ pub async fn disable_mfa(
             message: "MFA has been disabled.".to_string(),
         }),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn mfa_disable_revokes_sessions_and_refresh_tokens() {
+        let src = include_str!("disable.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("revoke_user_sessions_and_refresh_tokens("),
+            "MFA disable must revoke sessions and refresh tokens"
+        );
+        assert!(
+            !production.contains("UPDATE sessions SET"),
+            "must not revoke sessions without refresh tokens"
+        );
+    }
 }

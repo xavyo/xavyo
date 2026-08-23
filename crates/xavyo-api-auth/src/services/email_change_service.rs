@@ -275,11 +275,13 @@ impl EmailChangeService {
             .await
             .map_err(ApiAuthError::Database)?;
 
-        // H5: Revoke all sessions after email change to force re-authentication.
-        // Missing wiring or revoke errors used to still return success.
-        email_change_session_revoker(self.session_service.as_ref())?
-            .revoke_all_user_sessions(user_id, tenant_id, RevokeReason::Security)
-            .await?;
+        // H5: Revoke sessions and refresh tokens after email change to force
+        // re-authentication. Session-only revoke left opaque refresh tokens valid.
+        let session_service = email_change_session_revoker(self.session_service.as_ref())?;
+        tokio::try_join!(
+            session_service.revoke_all_user_sessions(user_id, tenant_id, RevokeReason::Security),
+            session_service.revoke_all_user_refresh_tokens(user_id, tenant_id),
+        )?;
 
         info!(
             user_id = %user_id,
@@ -337,6 +339,10 @@ mod tests {
         assert!(
             production.contains("email_change_session_revoker("),
             "email change must require a session service"
+        );
+        assert!(
+            production.contains("revoke_all_user_refresh_tokens"),
+            "email change must revoke refresh tokens, not only sessions"
         );
         assert!(
             !production.contains("Failed to revoke sessions after email change"),

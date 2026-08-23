@@ -121,6 +121,15 @@ pub async fn admin_reset_password(
     .execute(&mut *tx)
     .await?;
 
+    sqlx::query(
+        "UPDATE oauth_refresh_tokens SET revoked = TRUE, revoked_at = now() \
+         WHERE user_id = $1 AND tenant_id = $2 AND revoked = FALSE",
+    )
+    .bind(user_id)
+    .bind(*tenant_id.as_uuid())
+    .execute(&mut *tx)
+    .await?;
+
     tx.commit().await?;
 
     // Revoke all active sessions
@@ -159,6 +168,10 @@ mod tests {
         assert!(
             production.contains("revoke_all_user_sessions"),
             "admin password reset must revoke sessions"
+        );
+        assert!(
+            production.contains("UPDATE oauth_refresh_tokens"),
+            "admin password reset must revoke OAuth refresh tokens"
         );
     }
 }

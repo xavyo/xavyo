@@ -543,15 +543,11 @@ impl DelegatedAdminService {
         // Invalidate user's permission cache
         self.invalidate_user_permission_cache(tenant_id, user_id);
 
-        // Revoke user's active sessions so new permissions take effect immediately
+        // Revoke sessions and refresh tokens so new permissions take effect immediately
         session_revoke_result(
-            sqlx::query(
-                "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'security' \
-             WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()",
+            crate::services::revoke_auth::revoke_user_sessions_and_refresh_tokens(
+                &self.pool, tenant_id, user_id,
             )
-            .bind(user_id)
-            .bind(tenant_id)
-            .execute(&self.pool)
             .await,
         )
         .map_err(ApiAuthError::Database)?;
@@ -723,15 +719,13 @@ impl DelegatedAdminService {
         // Invalidate user's permission cache
         self.invalidate_user_permission_cache(tenant_id, assignment.user_id);
 
-        // Revoke user's active sessions so permission removal takes effect immediately
+        // Revoke sessions and refresh tokens so permission removal takes effect immediately
         session_revoke_result(
-            sqlx::query(
-                "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'security' \
-             WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()",
+            crate::services::revoke_auth::revoke_user_sessions_and_refresh_tokens(
+                &self.pool,
+                tenant_id,
+                assignment.user_id,
             )
-            .bind(assignment.user_id)
-            .bind(tenant_id)
-            .execute(&self.pool)
             .await,
         )
         .map_err(ApiAuthError::Database)?;
@@ -1086,6 +1080,14 @@ mod tests {
         assert!(
             production.contains("session_revoke_result("),
             "session revoke after permission change must fail closed"
+        );
+        assert!(
+            production.contains("revoke_user_sessions_and_refresh_tokens("),
+            "permission change must revoke sessions and refresh tokens"
+        );
+        assert!(
+            !production.contains("UPDATE sessions SET"),
+            "must not revoke sessions without refresh tokens"
         );
         assert!(
             !production.contains("let _ = sqlx::query("),
