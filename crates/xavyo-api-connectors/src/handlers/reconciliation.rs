@@ -786,7 +786,7 @@ pub async fn get_discrepancy(
     ),
     request_body = RemediateRequest,
     responses(
-        (status = 200, description = "Remediation result", body = RemediationResponse),
+        (status = 501, description = "Connector-side remediation is not implemented"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Discrepancy not found")
     ),
@@ -832,7 +832,7 @@ pub async fn remediate_discrepancy(
     ),
     request_body = BulkRemediateRequest,
     responses(
-        (status = 200, description = "Bulk remediation results", body = BulkRemediationResponse),
+        (status = 501, description = "Connector-side remediation is not implemented"),
         (status = 400, description = "Invalid request (e.g., too many items)"),
         (status = 401, description = "Unauthorized")
     ),
@@ -1333,6 +1333,7 @@ fn map_reconciliation_error(err: ReconciliationServiceError) -> ApiError {
             ApiError::internal("Database error")
         }
         ReconciliationServiceError::Reconciliation(msg) => ApiError::internal(msg),
+        ReconciliationServiceError::NotImplemented(msg) => ApiError::not_implemented(msg),
     }
 }
 
