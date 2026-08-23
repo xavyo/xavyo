@@ -498,7 +498,9 @@ impl UserService {
         let password_policy =
             TenantPasswordPolicy::get_or_default(&self.pool, *tenant_id.as_uuid())
                 .await
-                .unwrap_or_else(|_| TenantPasswordPolicy::default_for_tenant(*tenant_id.as_uuid()));
+                .map_err(|e| {
+                    ApiUsersError::Internal(format!("Failed to load password policy: {e}"))
+                })?;
         validation_errors.extend(validate_password_against_policy(
             &request.password,
             &password_policy,
@@ -618,7 +620,7 @@ impl UserService {
         .bind(tenant_id.as_uuid())
         .fetch_all(&self.pool)
         .await
-        .unwrap_or_else(|_| request.roles.clone());
+        .map_err(|e| ApiUsersError::Internal(format!("Failed to load assigned roles: {e}")))?;
 
         Ok(user_to_response(&user, stored_roles, None))
     }
@@ -1421,5 +1423,19 @@ mod tests {
             "Active".to_string()
         );
         assert!(!response.lifecycle_state.as_ref().unwrap().is_terminal);
+    }
+
+    #[test]
+    fn create_user_does_not_skip_password_policy_or_roles_on_error() {
+        let src = include_str!("user_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("default_for_tenant(*tenant_id.as_uuid())"),
+            "must not skip password policy when the lookup fails"
+        );
+        assert!(
+            !production.contains("unwrap_or_else(|_| request.roles.clone())"),
+            "must not report unstored roles as assigned"
+        );
     }
 }

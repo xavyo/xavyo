@@ -15,6 +15,7 @@ use xavyo_db::{
     TenantMfaPolicy, TenantPasswordPolicy, TenantSessionPolicy,
 };
 
+use crate::error::ApiAuthError;
 use crate::models::{
     IpRestrictionPolicyConfig, MfaPolicyConfig, PasswordPolicyConfig, PolicyConflictWarning,
     PolicyValidationResult, SessionPolicyConfig,
@@ -37,6 +38,25 @@ pub enum OrgPolicyError {
 
     #[error("Validation error: {0}")]
     Validation(String),
+}
+
+/// Treat missing org/policy as absent; other errors refuse the request.
+///
+/// Skipping enforcement when the lookup fails would fail-open a stricter
+/// org MFA/password/session/IP policy.
+pub fn org_policy_or_absent<T>(
+    result: Result<T, OrgPolicyError>,
+) -> Result<Option<T>, ApiAuthError> {
+    match result {
+        Ok(value) => Ok(Some(value)),
+        Err(OrgPolicyError::OrgNotFound(_) | OrgPolicyError::PolicyNotFound) => Ok(None),
+        Err(e) => {
+            tracing::error!(error = %e, "Organization policy lookup failed");
+            Err(ApiAuthError::Internal(
+                "Failed to resolve organization security policy".to_string(),
+            ))
+        }
+    }
 }
 
 /// Service for managing organization-level security policies.
@@ -604,5 +624,30 @@ mod tests {
         assert_eq!(OrgPolicyType::Mfa.as_str(), "mfa");
         assert_eq!(OrgPolicyType::Session.as_str(), "session");
         assert_eq!(OrgPolicyType::IpRestriction.as_str(), "ip_restriction");
+    }
+
+    #[test]
+    fn org_policy_or_absent_ok_and_missing() {
+        assert!(org_policy_or_absent(Ok::<(), OrgPolicyError>(()))
+            .unwrap()
+            .is_some());
+        assert!(
+            org_policy_or_absent::<()>(Err(OrgPolicyError::PolicyNotFound))
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            org_policy_or_absent::<()>(Err(OrgPolicyError::OrgNotFound(Uuid::new_v4())))
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn org_policy_or_absent_does_not_fail_open_on_db() {
+        let err = org_policy_or_absent::<()>(Err(OrgPolicyError::Database(sqlx::Error::Protocol(
+            "db".into(),
+        ))));
+        assert!(matches!(err, Err(ApiAuthError::Internal(_))));
     }
 }

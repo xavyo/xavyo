@@ -367,11 +367,12 @@ impl SessionService {
         let tenant_policy = self.get_tenant_policy(tenant_id).await?;
         let org_service = OrgPolicyService::new(Arc::new(self.pool.clone()));
 
-        match org_service
-            .get_effective_policy_for_user(tenant_id, user_id, OrgPolicyType::Session)
-            .await
-        {
-            Ok((config, sources)) => {
+        match crate::services::org_policy_or_absent(
+            org_service
+                .get_effective_policy_for_user(tenant_id, user_id, OrgPolicyType::Session)
+                .await,
+        )? {
+            Some((config, sources)) => {
                 // Check if we got an actual org policy (not just tenant default)
                 let has_org_policy = sources.iter().any(|s| {
                     !matches!(
@@ -415,10 +416,7 @@ impl SessionService {
                     Ok(tenant_policy)
                 }
             }
-            Err(_) => {
-                // If org policy resolution fails, fall back to tenant policy
-                Ok(tenant_policy)
-            }
+            None => Ok(tenant_policy),
         }
     }
 
@@ -515,5 +513,19 @@ mod tests {
         // Basic test that service can be conceptually created
         // Full tests require database setup
         assert_eq!(ACTIVITY_UPDATE_THROTTLE_SECONDS, 60);
+    }
+
+    #[test]
+    fn effective_session_policy_does_not_fail_open_on_org_error() {
+        let src = include_str!("session_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("org_policy_or_absent"),
+            "org session policy lookup errors must refuse"
+        );
+        assert!(
+            !production.contains("fall back to tenant policy"),
+            "must not skip org session policy on lookup error"
+        );
     }
 }

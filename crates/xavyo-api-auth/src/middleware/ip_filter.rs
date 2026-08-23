@@ -152,7 +152,9 @@ pub async fn check_org_ip_restriction(
 ) -> Result<(), String> {
     let ip: IpAddr = match ip_address.parse() {
         Ok(ip) => ip,
-        Err(_) => return Ok(()), // Can't parse IP, skip org check
+        Err(_) => {
+            return Err("Cannot determine client IP for organization IP restriction".to_string())
+        }
     };
 
     let org_service = OrgPolicyService::new(Arc::new(pool.clone()));
@@ -165,8 +167,10 @@ pub async fn check_org_ip_restriction(
         )
         .await;
 
-    match result {
-        Ok((config, sources)) => {
+    match crate::services::org_policy_or_absent(result) {
+        Err(e) => Err(e.to_string()),
+        Ok(None) => Ok(()),
+        Ok(Some((config, sources))) => {
             // Only enforce if we got an actual org policy (not tenant default)
             let has_org_policy = sources.iter().any(|s| {
                 !matches!(
@@ -179,8 +183,8 @@ pub async fn check_org_ip_restriction(
                 return Ok(());
             }
 
-            let ip_config: IpRestrictionPolicyConfig =
-                serde_json::from_value(config).unwrap_or_default();
+            let ip_config: IpRestrictionPolicyConfig = serde_json::from_value(config)
+                .map_err(|e| format!("Invalid org IP restriction config: {e}"))?;
 
             if !ip_config.has_restrictions() {
                 return Ok(());
@@ -214,10 +218,6 @@ pub async fn check_org_ip_restriction(
                     }
                 }
             }
-        }
-        Err(_) => {
-            // If org policy resolution fails, allow (fail-open)
-            Ok(())
         }
     }
 }
@@ -316,5 +316,23 @@ mod tests {
     fn untrusted_xff_without_peer_is_none() {
         let req = make_request_with_xff("10.0.0.1");
         assert_eq!(extract_client_ip(&req), None);
+    }
+
+    #[test]
+    fn org_ip_restriction_does_not_fail_open() {
+        let src = include_str!("ip_filter.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("org_policy_or_absent"),
+            "org IP lookup errors must refuse"
+        );
+        assert!(
+            !production.contains("allow (fail-open)"),
+            "must not skip org IP restrictions on lookup error"
+        );
+        assert!(
+            production.contains("Cannot determine client IP for organization IP restriction"),
+            "unparseable IP must not skip org IP restriction"
+        );
     }
 }
