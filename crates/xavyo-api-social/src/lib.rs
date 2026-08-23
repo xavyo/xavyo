@@ -31,6 +31,7 @@ pub mod router;
 pub mod services;
 
 pub use error::{ProviderType, SocialError, SocialResult};
+pub use handlers::{social_login_allowed, social_roles_from_lookup};
 pub use router::{
     admin_social_router, authenticated_social_router, public_social_router, social_router,
     AuthService, SocialConfig, SocialState,

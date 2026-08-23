@@ -229,6 +229,8 @@ pub async fn callback(
                 tracing::error!(user_id = %user.id, error = %e, "Failed to fetch user roles");
                 FederationError::Internal("Failed to fetch user roles".to_string())
             })?;
+    federation_login_allowed(user.is_active, user.is_locked())?;
+
     let xavyo_tokens = state
         .token_issuer
         .issue_tokens(user.id, token_result.session.tenant_id, roles, None)
@@ -342,4 +344,53 @@ pub async fn logout(
     );
 
     Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+/// Inactive or locked accounts must not receive JWTs from federation login.
+pub fn federation_login_allowed(is_active: bool, is_locked: bool) -> Result<(), FederationError> {
+    if !is_active {
+        tracing::warn!("Rejected federation login for deactivated user");
+        return Err(FederationError::AccountInactive);
+    }
+    if is_locked {
+        tracing::warn!("Rejected federation login for locked user");
+        return Err(FederationError::AccountLocked);
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn federation_login_allows_active_unlocked() {
+        assert!(federation_login_allowed(true, false).is_ok());
+    }
+
+    #[test]
+    fn federation_login_refuses_inactive() {
+        assert!(matches!(
+            federation_login_allowed(false, false),
+            Err(FederationError::AccountInactive)
+        ));
+    }
+
+    #[test]
+    fn federation_login_refuses_locked() {
+        assert!(matches!(
+            federation_login_allowed(true, true),
+            Err(FederationError::AccountLocked)
+        ));
+    }
+
+    #[test]
+    fn federation_callback_checks_lockout_before_tokens() {
+        let src = include_str!("federation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("federation_login_allowed(user.is_active, user.is_locked())"),
+            "federation login must refuse locked/inactive accounts"
+        );
+    }
 }

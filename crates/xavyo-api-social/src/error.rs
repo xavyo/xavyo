@@ -118,6 +118,12 @@ pub enum SocialError {
 
     #[error("Internal error: {message}")]
     InternalError { message: String },
+
+    #[error("Account is not active")]
+    AccountInactive,
+
+    #[error("Account is locked")]
+    AccountLocked,
 }
 
 /// Error response structure for API responses.
@@ -155,6 +161,8 @@ impl SocialError {
             SocialError::IdTokenVerificationFailed { .. } => "id_token_verification_failed",
             SocialError::JwksFetchFailed { .. } => "jwks_fetch_failed",
             SocialError::InternalError { .. } => "internal_error",
+            SocialError::AccountInactive => "account_inactive",
+            SocialError::AccountLocked => "account_locked",
         }
     }
 
@@ -183,6 +191,8 @@ impl SocialError {
             SocialError::IdTokenVerificationFailed { .. } => StatusCode::BAD_REQUEST,
             SocialError::JwksFetchFailed { .. } => StatusCode::BAD_GATEWAY,
             SocialError::InternalError { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            SocialError::AccountInactive => StatusCode::FORBIDDEN,
+            SocialError::AccountLocked => StatusCode::UNAUTHORIZED,
         }
     }
 }

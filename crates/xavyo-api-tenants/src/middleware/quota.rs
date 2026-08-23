@@ -49,6 +49,7 @@ pub struct QuotaDetails {
 /// - If tenant has no limit configured: passes through
 /// - If quota not exceeded: passes through
 /// - If quota exceeded: returns 429 Too Many Requests with quota details
+/// - If quota lookup fails: returns 503 (fail closed)
 ///
 /// ## Example
 ///
@@ -102,8 +103,7 @@ pub async fn api_quota_middleware(
                 error = %e,
                 "Failed to check API call quota"
             );
-            // On error, fail open to avoid blocking legitimate requests
-            next.run(request).await
+            quota_check_unavailable_response()
         }
     }
 }
@@ -149,7 +149,7 @@ pub async fn agent_quota_middleware(
                 error = %e,
                 "Failed to check agent quota"
             );
-            next.run(request).await
+            quota_check_unavailable_response()
         }
     }
 }
@@ -181,10 +181,20 @@ pub async fn check_mau_quota(pool: &PgPool, tenant_id: Uuid) -> Result<(), Respo
                 error = %e,
                 "Failed to check MAU quota"
             );
-            // Fail open on error
-            Ok(())
+            Err(quota_check_unavailable_response())
         }
     }
+}
+
+/// Create a 503 when quota cannot be evaluated.
+///
+/// Skipping the check would fail open and let a tenant exceed its plan.
+fn quota_check_unavailable_response() -> Response {
+    let body = serde_json::json!({
+        "error": "quota_check_unavailable",
+        "message": "Unable to verify plan quota. Please try again later."
+    });
+    (StatusCode::SERVICE_UNAVAILABLE, Json(body)).into_response()
 }
 
 /// Create a 429 Too Many Requests response for quota exceeded.
@@ -292,5 +302,29 @@ mod tests {
         assert!(json.contains("\"error\":\"quota_exceeded\""));
         assert!(json.contains("Monthly API call limit exceeded"));
         assert!(json.contains("\"details\""));
+    }
+
+    #[test]
+    fn quota_check_unavailable_is_service_unavailable() {
+        let response = quota_check_unavailable_response();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[test]
+    fn quota_middleware_does_not_fail_open_on_error() {
+        let src = include_str!("quota.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("quota_check_unavailable_response"),
+            "quota lookup errors must refuse the request"
+        );
+        assert!(
+            !production.contains("fail open to avoid blocking"),
+            "must not skip quota enforcement on database error"
+        );
+        assert!(
+            !production.contains("Fail open on error"),
+            "MAU quota lookup errors must refuse login"
+        );
     }
 }

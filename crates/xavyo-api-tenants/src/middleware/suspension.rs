@@ -74,6 +74,7 @@ enum TenantStatus {
 /// - If tenant is active: passes through
 /// - If tenant is suspended: returns 403 Forbidden with suspension message
 /// - If tenant is deleted: returns 403 Forbidden with deletion message
+/// - If status lookup fails: returns 503 (fail closed)
 ///
 /// ## Example
 ///
@@ -141,10 +142,7 @@ pub async fn suspension_check_middleware(
                 error = %e,
                 "Failed to check tenant access status"
             );
-            // On error, fail open to avoid blocking legitimate requests
-            // This is a trade-off: prefer availability over strict enforcement
-            // The access check is a secondary control, not a primary one
-            next.run(request).await
+            tenant_status_unavailable_response(&request_uri)
         }
     }
 }
@@ -224,6 +222,26 @@ fn deleted_response(request_uri: &Uri) -> Response {
         .into_response()
 }
 
+/// Create a 503 when tenant access status cannot be determined.
+///
+/// Skipping the check would fail open and let a suspended or deleted tenant
+/// continue using the API.
+fn tenant_status_unavailable_response(request_uri: &Uri) -> Response {
+    let body = ProblemDetails {
+        problem_type: format!("{PROBLEM_TYPE_BASE}/tenant-status-unavailable"),
+        title: "Tenant Status Unavailable".to_string(),
+        status: 503,
+        detail: "Unable to verify organization access status. Please try again later.".to_string(),
+        instance: Some(request_uri.path().to_string()),
+    };
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        [(header::CONTENT_TYPE, "application/problem+json")],
+        Json(body),
+    )
+        .into_response()
+}
+
 /// Create a 404 Not Found response for unknown tenants using RFC 7807 Problem Details.
 fn not_found_response(request_uri: &Uri) -> Response {
     let body = ProblemDetails {
@@ -272,6 +290,33 @@ mod tests {
         assert_eq!(TenantStatus::Active, TenantStatus::Active);
         assert_ne!(TenantStatus::Suspended, TenantStatus::Deleted);
         assert_ne!(TenantStatus::Active, TenantStatus::NotFound);
+    }
+
+    #[test]
+    fn tenant_status_unavailable_is_service_unavailable() {
+        let response = tenant_status_unavailable_response(&test_uri());
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            response
+                .headers()
+                .get(header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok()),
+            Some("application/problem+json")
+        );
+    }
+
+    #[test]
+    fn suspension_check_does_not_fail_open_on_error() {
+        let src = include_str!("suspension.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("tenant_status_unavailable_response"),
+            "tenant status lookup errors must refuse the request"
+        );
+        assert!(
+            !production.contains("fail open to avoid blocking"),
+            "must not skip suspension/deletion checks on database error"
+        );
     }
 
     #[test]

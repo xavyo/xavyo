@@ -120,6 +120,12 @@ pub enum FederationError {
     #[error("User not found: {0}")]
     UserNotFound(Uuid),
 
+    #[error("Account is not active")]
+    AccountInactive,
+
+    #[error("Account is locked")]
+    AccountLocked,
+
     #[error("Failed to issue tokens: {0}")]
     TokenIssueFailed(String),
 
@@ -213,6 +219,16 @@ impl IntoResponse for FederationError {
 
             // 403 Forbidden
             FederationError::Forbidden(msg) => (StatusCode::FORBIDDEN, "forbidden", msg.clone()),
+            FederationError::AccountInactive => (
+                StatusCode::FORBIDDEN,
+                "account_inactive",
+                "Account is not active".to_string(),
+            ),
+            FederationError::AccountLocked => (
+                StatusCode::UNAUTHORIZED,
+                "account_locked",
+                "Account is locked".to_string(),
+            ),
             FederationError::IdpDisabled(_id) => {
                 // R9: Don't leak IdP UUID to unauthenticated callers
                 tracing::debug!(idp_id = %_id, "IdP is disabled");
