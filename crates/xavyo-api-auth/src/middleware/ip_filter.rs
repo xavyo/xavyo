@@ -64,6 +64,43 @@ pub fn extract_client_ip(req: &Request<Body>) -> Option<String> {
     None
 }
 
+/// Unknown client IP must refuse, not skip IP restriction.
+pub fn refuse_unknown_client_ip() -> (StatusCode, Json<ProblemDetails>) {
+    (
+        StatusCode::FORBIDDEN,
+        Json(
+            ProblemDetails::new("ip-blocked", "IP Blocked", StatusCode::FORBIDDEN)
+                .with_detail("Cannot determine client IP for IP restriction"),
+        ),
+    )
+}
+
+/// IP restriction lookup errors must refuse, not skip enforcement.
+pub fn refuse_ip_restriction_error(
+    err: &crate::error::ApiAuthError,
+) -> (StatusCode, Json<ProblemDetails>) {
+    match err {
+        crate::error::ApiAuthError::IpBlocked(reason) => (
+            StatusCode::FORBIDDEN,
+            Json(
+                ProblemDetails::new("ip-blocked", "IP Blocked", StatusCode::FORBIDDEN)
+                    .with_detail(reason.clone()),
+            ),
+        ),
+        _ => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(
+                ProblemDetails::new(
+                    "ip-restriction-unavailable",
+                    "IP Restriction Unavailable",
+                    StatusCode::SERVICE_UNAVAILABLE,
+                )
+                .with_detail("Unable to verify IP restrictions"),
+            ),
+        ),
+    }
+}
+
 /// IP filter middleware.
 ///
 /// Checks if the request's IP address is allowed based on tenant IP restriction settings.
@@ -79,9 +116,8 @@ pub async fn ip_filter_middleware(
     let ip_address = if let Some(ip) = extract_client_ip(&req) {
         ip
     } else {
-        // If we can't determine the IP, log and continue (fail-open for IP detection)
-        warn!("Could not determine client IP, skipping IP filter");
-        return next.run(req).await;
+        warn!("Could not determine client IP, refusing request");
+        return refuse_unknown_client_ip().into_response();
     };
 
     // Get user info from claims
@@ -110,31 +146,23 @@ pub async fn ip_filter_middleware(
             // IP is allowed, continue to next handler
             next.run(req).await
         }
-        Err(crate::error::ApiAuthError::IpBlocked(reason)) => {
-            // IP is blocked
-            warn!(
-                tenant_id = %tenant_uuid,
-                ip = %ip_address,
-                reason = %reason,
-                "IP address blocked"
-            );
-
-            let problem = ProblemDetails::new("ip-blocked", "IP Blocked", StatusCode::FORBIDDEN)
-                .with_detail(reason);
-
-            (StatusCode::FORBIDDEN, Json(problem)).into_response()
-        }
         Err(err) => {
-            // Other error (e.g., database error)
-            warn!(
-                tenant_id = %tenant_uuid,
-                ip = %ip_address,
-                error = %err,
-                "Error checking IP access"
-            );
-
-            // Fail-open on errors to avoid blocking all traffic on DB issues
-            next.run(req).await
+            if let crate::error::ApiAuthError::IpBlocked(ref reason) = err {
+                warn!(
+                    tenant_id = %tenant_uuid,
+                    ip = %ip_address,
+                    reason = %reason,
+                    "IP address blocked"
+                );
+            } else {
+                warn!(
+                    tenant_id = %tenant_uuid,
+                    ip = %ip_address,
+                    error = %err,
+                    "Error checking IP access, refusing request"
+                );
+            }
+            refuse_ip_restriction_error(&err).into_response()
         }
     }
 }
@@ -333,6 +361,38 @@ mod tests {
         assert!(
             production.contains("Cannot determine client IP for organization IP restriction"),
             "unparseable IP must not skip org IP restriction"
+        );
+    }
+
+    #[test]
+    fn tenant_ip_filter_does_not_fail_open() {
+        assert_eq!(refuse_unknown_client_ip().0, StatusCode::FORBIDDEN);
+        assert_eq!(
+            refuse_ip_restriction_error(&crate::error::ApiAuthError::IpBlocked("blocked".into())).0,
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            refuse_ip_restriction_error(&crate::error::ApiAuthError::Internal("db".into())).0,
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+
+        let src = include_str!("ip_filter.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("refuse_unknown_client_ip("),
+            "unknown client IP must refuse"
+        );
+        assert!(
+            production.contains("refuse_ip_restriction_error("),
+            "IP restriction lookup errors must refuse"
+        );
+        assert!(
+            !production.contains("skipping IP filter"),
+            "must not skip IP filter when the client IP is unknown"
+        );
+        assert!(
+            !production.contains("Fail-open on errors"),
+            "must not skip IP restriction on lookup error"
         );
     }
 }

@@ -4,7 +4,8 @@
 //!
 //! Per RFC 7009:
 //! - Client authentication is required (Basic Auth or body params)
-//! - Always returns 200 OK regardless of whether the token existed
+//! - Returns 200 OK when the token is revoked or was unknown/invalid
+//! - Persist failures return 500 — they are not "unknown token"
 //! - Accepts form-encoded body with `token` and optional `token_type_hint`
 
 use crate::error::OAuthError;
@@ -23,15 +24,16 @@ use xavyo_db::models::{CreateRevokedToken, RevokedToken};
 
 /// Handle RFC 7009 token revocation.
 ///
-/// Always returns 200 OK per RFC 7009 Section 2.1 — never leak information
-/// about token validity to unauthenticated clients.
+/// Returns 200 OK per RFC 7009 Section 2.2 when the token is revoked or unknown.
+/// Persist failures are 500 — they must not look like a successful revoke.
 #[utoipa::path(
     post,
     path = "/oauth/revoke",
     request_body = RevocationRequest,
     responses(
-        (status = 200, description = "Token revoked (always 200 per RFC 7009)"),
+        (status = 200, description = "Token revoked or unknown (RFC 7009)"),
         (status = 401, description = "Invalid client credentials"),
+        (status = 500, description = "Revocation could not be persisted"),
     ),
     tag = "OAuth2"
 )]
@@ -69,74 +71,90 @@ pub async fn revoke_token_handler(
         e
     })?;
 
-    // Step 2: Attempt to revoke the token
-    // Per RFC 7009: always return 200 OK even if token is invalid/unknown
+    // Step 2: Attempt to revoke the token.
+    // RFC 7009 §2.2: 200 for success or unknown/invalid tokens.
+    // Persist failures are not unknown tokens — those must not look revoked.
     let token = &request.token;
     let hint = request.token_type_hint.as_deref();
 
-    let result = match hint {
-        Some("access_token") => {
-            // Try access token first, then refresh token
-            try_revoke_access_token(&state, tenant_id, token).await
-                || try_revoke_refresh_token(&state, tenant_id, token).await
-        }
+    let attempt = match hint {
         Some("refresh_token") => {
-            // Try refresh token first, then access token
-            try_revoke_refresh_token(&state, tenant_id, token).await
-                || try_revoke_access_token(&state, tenant_id, token).await
+            let first = try_revoke_refresh_token(&state, tenant_id, token).await;
+            if first == RevokeAttempt::Unknown {
+                try_revoke_access_token(&state, tenant_id, token).await
+            } else {
+                first
+            }
         }
         _ => {
-            // No hint: try access token first (JWT decode is fast), then refresh token
-            try_revoke_access_token(&state, tenant_id, token).await
-                || try_revoke_refresh_token(&state, tenant_id, token).await
+            let first = try_revoke_access_token(&state, tenant_id, token).await;
+            if first == RevokeAttempt::Unknown {
+                try_revoke_refresh_token(&state, tenant_id, token).await
+            } else {
+                first
+            }
         }
     };
 
-    if result {
-        tracing::info!(
-            target: "token_lifecycle",
-            event_type = "token_revoked",
-            client_id = %client_id,
-            tenant_id = %tenant_id,
-            token_type_hint = ?hint,
-            "Token revoked via RFC 7009"
-        );
-    } else {
-        tracing::debug!(
-            target: "token_lifecycle",
-            event_type = "revocation_no_match",
-            client_id = %client_id,
-            "Token not recognized (returning 200 per RFC 7009)"
-        );
+    match attempt {
+        RevokeAttempt::Revoked => {
+            tracing::info!(
+                target: "token_lifecycle",
+                event_type = "token_revoked",
+                client_id = %client_id,
+                tenant_id = %tenant_id,
+                token_type_hint = ?hint,
+                "Token revoked via RFC 7009"
+            );
+        }
+        RevokeAttempt::Unknown => {
+            tracing::debug!(
+                target: "token_lifecycle",
+                event_type = "revocation_no_match",
+                client_id = %client_id,
+                "Token not recognized (returning 200 per RFC 7009)"
+            );
+        }
+        RevokeAttempt::Failed => {
+            tracing::error!(
+                target: "token_lifecycle",
+                event_type = "revocation_persist_failed",
+                client_id = %client_id,
+                "Token revocation was not persisted"
+            );
+        }
     }
 
-    // Always 200 OK per RFC 7009
-    Ok(StatusCode::OK)
+    rfc7009_revoke_status(attempt)
 }
 
 /// Try to revoke a token as an access token (JWT).
 ///
 /// Decodes the JWT to extract the JTI, verifies tenant match,
 /// then adds the JTI to the blacklist.
-/// Returns true if the token was a valid JWT and was revoked.
-async fn try_revoke_access_token(state: &OAuthState, tenant_id: Uuid, token: &str) -> bool {
+/// Unknown/invalid tokens are `Unknown`; persist errors are `Failed`.
+async fn try_revoke_access_token(
+    state: &OAuthState,
+    tenant_id: Uuid,
+    token: &str,
+) -> RevokeAttempt {
     // Try to decode the JWT (don't validate expiry — we want to revoke expired tokens too)
     let config = xavyo_auth::ValidationConfig::default().skip_exp_validation();
 
     let claims = match xavyo_auth::decode_token_with_config(token, &state.public_key, &config) {
         Ok(claims) => claims,
-        Err(_) => return false, // Not a valid JWT signed by us
+        Err(_) => return RevokeAttempt::Unknown, // Not a valid JWT signed by us
     };
 
     // Verify the token belongs to the requesting client's tenant.
     // Missing tid is unknown — do not revoke into another tenant.
     if !super::client_auth::token_tid_matches_tenant(claims.tid, tenant_id) {
-        return false;
+        return RevokeAttempt::Unknown;
     }
 
     let jti = &claims.jti;
     if jti.is_empty() {
-        return false; // No JTI to blacklist
+        return RevokeAttempt::Unknown; // No JTI to blacklist
     }
 
     // Extract user_id from subject. NHI tokens may use a non-UUID subject;
@@ -153,7 +171,7 @@ async fn try_revoke_access_token(state: &OAuthState, tenant_id: Uuid, token: &st
                 error = %e,
                 "Failed to acquire connection for revocation insert"
             );
-            return false;
+            return RevokeAttempt::Failed;
         }
     };
 
@@ -169,7 +187,7 @@ async fn try_revoke_access_token(state: &OAuthState, tenant_id: Uuid, token: &st
             jti = %jti,
             "Failed to set tenant context for revocation insert"
         );
-        return false;
+        return RevokeAttempt::Failed;
     }
 
     // Insert JTI into revoked_tokens table using the same connection
@@ -183,39 +201,41 @@ async fn try_revoke_access_token(state: &OAuthState, tenant_id: Uuid, token: &st
         revoked_by: None,
     };
 
-    let inserted = match RevokedToken::insert(&mut *conn, input).await {
-        Ok(_) => true,
-        Err(e) => {
-            tracing::error!(
-                target: "token_lifecycle",
-                jti = %jti,
-                error = %e,
-                "Failed to insert revoked token record — revocation not persisted"
-            );
-            false
-        }
-    };
+    let attempt = persist_revocation_insert(RevokedToken::insert(&mut *conn, input).await);
 
     // Invalidate in cache so subsequent requests are rejected immediately
-    if let Some(ref cache) = state.revocation_cache {
-        cache.invalidate(jti).await;
+    if attempt == RevokeAttempt::Revoked {
+        if let Some(ref cache) = state.revocation_cache {
+            cache.invalidate(jti).await;
+        }
     }
 
-    inserted
+    attempt
 }
 
 /// Try to revoke a token as a refresh token (opaque).
 ///
 /// Hashes the token and looks it up in `oauth_refresh_tokens`.
 /// If found, marks it as revoked and cascades to blacklist access tokens.
-/// Returns true if the token was found and revoked.
-async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &str) -> bool {
+/// Unknown tokens are `Unknown`; persist errors are `Failed`.
+async fn try_revoke_refresh_token(
+    state: &OAuthState,
+    tenant_id: Uuid,
+    token: &str,
+) -> RevokeAttempt {
     let token_hash = hash_token(token);
 
     // SECURITY: Acquire dedicated connection for RLS to prevent pool race condition
     let mut conn = match state.pool.acquire().await {
         Ok(c) => c,
-        Err(_) => return false,
+        Err(e) => {
+            tracing::error!(
+                target: "token_lifecycle",
+                error = %e,
+                "Failed to acquire connection for refresh-token revocation"
+            );
+            return RevokeAttempt::Failed;
+        }
     };
 
     // Set tenant context for RLS on this connection
@@ -225,7 +245,11 @@ async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &s
         .await
         .is_err()
     {
-        return false;
+        tracing::error!(
+            target: "token_lifecycle",
+            "Failed to set tenant context for refresh-token revocation"
+        );
+        return RevokeAttempt::Failed;
     }
 
     // Look up the refresh token by hash using the same connection.
@@ -249,17 +273,17 @@ async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &s
                 error = %e,
                 "Failed to look up refresh token for revocation"
             );
-            return false;
+            return RevokeAttempt::Failed;
         }
     };
 
     let (token_id, user_id, already_revoked) = match row {
         Some(r) => r,
-        None => return false, // Not a known refresh token
+        None => return RevokeAttempt::Unknown, // Not a known refresh token
     };
 
     if already_revoked {
-        return true; // Already revoked, nothing to do
+        return RevokeAttempt::Revoked; // Already revoked, nothing to do
     }
 
     // Mark refresh token as revoked using the same connection
@@ -282,7 +306,7 @@ async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &s
                 token_id = %token_id,
                 "Refresh token revoke update affected 0 rows"
             );
-            return false;
+            return RevokeAttempt::Failed;
         }
         Err(e) => {
             tracing::error!(
@@ -291,14 +315,12 @@ async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &s
                 error = %e,
                 "Failed to mark refresh token revoked"
             );
-            return false;
+            return RevokeAttempt::Failed;
         }
     }
 
     // Cascade: revoke all user's access tokens using sentinel pattern
-    cascade_revoke_user_access_tokens(state, tenant_id, user_id).await;
-
-    true
+    cascade_revoke_user_access_tokens(state, tenant_id, user_id).await
 }
 
 /// Cascade revocation: blacklist all access tokens for a user.
@@ -306,7 +328,11 @@ async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &s
 /// Inserts a `revoke-all:{user_id}:{timestamp}` sentinel into `revoked_tokens`.
 /// The JWT auth middleware checks for these sentinels and rejects any token
 /// issued before the sentinel timestamp.
-async fn cascade_revoke_user_access_tokens(state: &OAuthState, tenant_id: Uuid, user_id: Uuid) {
+async fn cascade_revoke_user_access_tokens(
+    state: &OAuthState,
+    tenant_id: Uuid,
+    user_id: Uuid,
+) -> RevokeAttempt {
     let sentinel_jti = format!("revoke-all:{}:{}", user_id, Utc::now().timestamp());
 
     // SECURITY: Acquire dedicated connection for RLS to prevent pool race condition.
@@ -321,7 +347,7 @@ async fn cascade_revoke_user_access_tokens(state: &OAuthState, tenant_id: Uuid, 
                 error = %e,
                 "Failed to acquire connection for cascade revocation"
             );
-            return;
+            return RevokeAttempt::Failed;
         }
     };
 
@@ -337,7 +363,7 @@ async fn cascade_revoke_user_access_tokens(state: &OAuthState, tenant_id: Uuid, 
             user_id = %user_id,
             "Failed to set tenant context for cascade revocation"
         );
-        return;
+        return RevokeAttempt::Failed;
     }
 
     let input = CreateRevokedToken {
@@ -351,19 +377,16 @@ async fn cascade_revoke_user_access_tokens(state: &OAuthState, tenant_id: Uuid, 
     };
 
     // Use the same connection for the insert so RLS context applies
-    if let Err(e) = RevokedToken::insert(&mut *conn, input).await {
-        tracing::error!(
-            target: "token_lifecycle",
-            user_id = %user_id,
-            error = %e,
-            "Failed to insert cascade revocation sentinel"
-        );
+    let attempt = persist_revocation_insert(RevokedToken::insert(&mut *conn, input).await);
+
+    // Invalidate sentinel in cache only after a successful persist
+    if attempt == RevokeAttempt::Revoked {
+        if let Some(ref cache) = state.revocation_cache {
+            cache.invalidate(&sentinel_jti).await;
+        }
     }
 
-    // Invalidate sentinel in cache
-    if let Some(ref cache) = state.revocation_cache {
-        cache.invalidate(&sentinel_jti).await;
-    }
+    attempt
 }
 
 /// Map a JWT `sub` to a UUID for the revocation record.
@@ -379,6 +402,44 @@ fn revocation_user_id(sub: &str) -> Uuid {
         bytes.copy_from_slice(&digest[..16]);
         Uuid::from_bytes(bytes)
     })
+}
+
+/// Outcome of a revocation attempt.
+///
+/// RFC 7009 §2.2 returns 200 for success *or* unknown/invalid tokens.
+/// Persist and lookup errors are not unknown tokens.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RevokeAttempt {
+    Revoked,
+    Unknown,
+    Failed,
+}
+
+/// RFC 7009 status. Persist failures must not look like a successful revoke.
+pub(crate) fn rfc7009_revoke_status(attempt: RevokeAttempt) -> Result<StatusCode, OAuthError> {
+    match attempt {
+        RevokeAttempt::Revoked | RevokeAttempt::Unknown => Ok(StatusCode::OK),
+        RevokeAttempt::Failed => Err(OAuthError::Internal(
+            "Failed to persist token revocation".to_string(),
+        )),
+    }
+}
+
+/// Map a revoked-token insert to a revoke attempt. Insert errors are `Failed`.
+pub(crate) fn persist_revocation_insert<T, E: std::fmt::Display>(
+    result: Result<T, E>,
+) -> RevokeAttempt {
+    match result {
+        Ok(_) => RevokeAttempt::Revoked,
+        Err(e) => {
+            tracing::error!(
+                target: "token_lifecycle",
+                error = %e,
+                "Failed to persist revoked token record"
+            );
+            RevokeAttempt::Failed
+        }
+    }
 }
 
 /// Hash a token value using SHA-256 (same algorithm as `TokenService`).
@@ -450,6 +511,40 @@ mod tests {
         assert!(
             !production.contains("let _ = sqlx::query("),
             "must not swallow refresh-token revoke updates"
+        );
+        assert!(
+            production.contains("rfc7009_revoke_status("),
+            "RFC 7009 persist failures must not return 200"
+        );
+        assert!(
+            production.contains("persist_revocation_insert("),
+            "revoked-token inserts must fail closed"
+        );
+        assert!(
+            !production
+                .contains("cascade_revoke_user_access_tokens(state, tenant_id, user_id).await;"),
+            "must not swallow cascade sentinel persist after refresh-token revoke"
+        );
+    }
+
+    #[test]
+    fn rfc7009_persist_failure_is_not_success() {
+        assert_eq!(
+            rfc7009_revoke_status(RevokeAttempt::Revoked).unwrap(),
+            StatusCode::OK
+        );
+        assert_eq!(
+            rfc7009_revoke_status(RevokeAttempt::Unknown).unwrap(),
+            StatusCode::OK
+        );
+        assert!(rfc7009_revoke_status(RevokeAttempt::Failed).is_err());
+        assert_eq!(
+            persist_revocation_insert(Ok::<(), &str>(())),
+            RevokeAttempt::Revoked
+        );
+        assert_eq!(
+            persist_revocation_insert(Err::<(), _>("db down")),
+            RevokeAttempt::Failed
         );
     }
 

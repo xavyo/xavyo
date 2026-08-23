@@ -294,20 +294,22 @@ pub async fn revoke_user_tokens_handler(
         cache.invalidate(&all_jti_clone).await;
     }
 
-    // Also revoke all refresh tokens for the user
-    let refresh_revoked = sqlx::query(
-        r"
+    // Also revoke all refresh tokens for the user. Update errors must not
+    // look like "sign out everywhere" succeeded with zero refresh tokens.
+    let refresh_revoked = refresh_tokens_revoked(
+        sqlx::query(
+            r"
         UPDATE refresh_tokens
         SET revoked_at = NOW()
         WHERE tenant_id = $1 AND user_id = $2 AND revoked_at IS NULL
         ",
-    )
-    .bind(tenant_id)
-    .bind(body.user_id)
-    .execute(&pool)
-    .await
-    .map(|r| r.rows_affected() as i64)
-    .unwrap_or(0);
+        )
+        .bind(tenant_id)
+        .bind(body.user_id)
+        .execute(&pool)
+        .await
+        .map(|r| r.rows_affected()),
+    )?;
 
     let tokens_revoked = refresh_revoked + 1; // +1 for the access token marker
 
@@ -328,4 +330,49 @@ pub fn revocation_router() -> axum::Router {
     axum::Router::new()
         .route("/revoke", post(revoke_token_handler))
         .route("/revoke-user", post(revoke_user_tokens_handler))
+}
+
+/// Refresh-token revoke after sign-out-everywhere. Update errors used to
+/// return 200 with only the access-token sentinel counted as revoked.
+pub(crate) fn refresh_tokens_revoked<E: std::fmt::Display>(
+    result: Result<u64, E>,
+) -> Result<i64, (StatusCode, Json<RevocationErrorResponse>)> {
+    result.map(|n| n as i64).map_err(|e| {
+        tracing::error!("Failed to revoke refresh tokens: {}", e);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(RevocationErrorResponse {
+                error: "internal_error".to_string(),
+                message: "Failed to revoke tokens".to_string(),
+            }),
+        )
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn refresh_tokens_revoked_does_not_skip_on_error() {
+        assert_eq!(refresh_tokens_revoked(Ok::<u64, &str>(3)).unwrap(), 3);
+        assert_eq!(refresh_tokens_revoked(Ok::<u64, &str>(0)).unwrap(), 0);
+        let err = refresh_tokens_revoked(Err::<u64, _>("db down")).unwrap_err();
+        assert_eq!(err.0, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(err.1 .0.error, "internal_error");
+    }
+
+    #[test]
+    fn revoke_user_does_not_swallow_refresh_token_update() {
+        let src = include_str!("revocation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("refresh_tokens_revoked("),
+            "sign-out-everywhere must fail closed on refresh-token revoke"
+        );
+        assert!(
+            !production.contains("unwrap_or(0)"),
+            "must not report success when refresh-token revoke fails"
+        );
+    }
 }
