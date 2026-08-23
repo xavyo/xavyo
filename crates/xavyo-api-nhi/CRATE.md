@@ -52,6 +52,7 @@ pub fn discovery_router(state: NhiState) -> Router; // Agent discovery (/.well-k
 | GET | `/nhi/service-accounts` | List service accounts |
 | GET | `/mcp/tools` | List permitted MCP tools for calling agent |
 | POST | `/mcp/tools/:name/call` | Invoke an MCP tool (501 — remote execution is not implemented) |
+| POST | `/nhi/tool-permissions/check` | Allow/deny/requires_approval; unregistered tools are `deny` |
 | POST | `/a2a/tasks` | Create A2A task (with NHI-to-NHI permission check) |
 | GET | `/a2a/tasks` | List A2A tasks |
 | GET | `/a2a/tasks/:id` | Get A2A task |
@@ -131,6 +132,7 @@ The crate implements comprehensive risk scoring for NHIs:
 - Never create NHIs without owners
 - Never skip risk scoring
 - Never ignore risk scoring policies
+- Never `allow` `POST /tool-permissions/check` for a tool that is not registered (deny, fail closed)
 
 ## Related Crates
 
