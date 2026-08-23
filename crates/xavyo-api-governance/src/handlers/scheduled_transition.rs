@@ -20,7 +20,7 @@ use crate::{
 use xavyo_auth::JwtClaims;
 
 /// Default batch size for processing due transitions.
-const DEFAULT_BATCH_SIZE: i64 = 100;
+const DEFAULT_BATCH_SIZE: i32 = 100;
 
 /// List scheduled transitions.
 ///
@@ -143,15 +143,39 @@ pub async fn trigger_due_transitions(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
 ) -> ApiResult<StatusCode> {
-    // Just verify the caller is authenticated
-    let _tenant_id = claims
+    let tenant_id = *claims
         .tenant_id()
-        .ok_or(crate::error::ApiGovernanceError::Unauthorized)?;
+        .ok_or(crate::error::ApiGovernanceError::Unauthorized)?
+        .as_uuid();
 
-    // Process due transitions across all tenants with default batch size
     state
         .scheduled_transition_service
-        .process_due_transitions(DEFAULT_BATCH_SIZE)
+        .process_due_transitions_for_tenant(tenant_id, DEFAULT_BATCH_SIZE)
         .await?;
     Ok(StatusCode::OK)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn trigger_due_is_tenant_scoped() {
+        let src = include_str!("scheduled_transition.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let trigger = production
+            .split("pub async fn trigger_due_transitions")
+            .nth(1)
+            .expect("trigger_due_transitions");
+        assert!(
+            trigger.contains("process_due_transitions_for_tenant(tenant_id,"),
+            "trigger-due must process only the caller's tenant"
+        );
+        assert!(
+            !trigger.contains("let _tenant_id"),
+            "must not ignore JWT tenant_id"
+        );
+        assert!(
+            !trigger.contains("process_due_transitions(DEFAULT_BATCH_SIZE)"),
+            "must not execute scheduled transitions across all tenants"
+        );
+    }
 }
