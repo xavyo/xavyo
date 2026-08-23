@@ -185,11 +185,9 @@ impl ProfileService {
     ) -> Result<MfaStatusResponse, ApiAuthError> {
         let mfa_status = mfa_service.get_status(user_id, tenant_id).await?;
 
-        // Check WebAuthn status (T070)
+        // Check WebAuthn status (T070). Lookup errors must not report disabled.
         let webauthn_enabled = if let Some(ws) = webauthn_service {
-            ws.has_webauthn_enabled(user_id, tenant_id)
-                .await
-                .unwrap_or(false)
+            ws.has_webauthn_enabled(user_id, tenant_id).await?
         } else {
             false
         };
@@ -219,5 +217,17 @@ impl ProfileService {
 
 #[cfg(test)]
 mod tests {
-    // Integration tests will be in the tests/ directory
+    #[test]
+    fn mfa_status_does_not_fail_open_webauthn() {
+        let src = include_str!("profile_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let idx = production
+            .find("has_webauthn_enabled")
+            .expect("WebAuthn enrollment check");
+        let window = &production[idx..(idx + 180).min(production.len())];
+        assert!(
+            !window.contains("unwrap_or(false)"),
+            "must not report WebAuthn disabled when the lookup fails"
+        );
+    }
 }
