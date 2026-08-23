@@ -57,11 +57,10 @@ pub async fn get_user_mfa_status(
         .get_status(user_id, *tenant_id.as_uuid())
         .await?;
 
-    // Check WebAuthn status (T070)
+    // Check WebAuthn status (T070). Lookup errors must not report disabled.
     let webauthn_enabled = webauthn_service
         .has_webauthn_enabled(user_id, *tenant_id.as_uuid())
-        .await
-        .unwrap_or(false);
+        .await?;
 
     // Build available methods list (T069)
     let mut available_methods = Vec::new();
@@ -86,4 +85,21 @@ pub async fn get_user_mfa_status(
             last_used_at: status.last_used_at,
         }),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn admin_mfa_status_does_not_fail_open_webauthn() {
+        let src = include_str!("user_mfa_status.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let idx = production
+            .find("has_webauthn_enabled")
+            .expect("WebAuthn enrollment check");
+        let window = &production[idx..(idx + 180).min(production.len())];
+        assert!(
+            !window.contains("unwrap_or(false)"),
+            "must not report WebAuthn disabled when the lookup fails"
+        );
+    }
 }

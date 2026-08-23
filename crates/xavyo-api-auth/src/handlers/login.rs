@@ -449,11 +449,12 @@ pub async fn login_handler(
         .has_mfa_enabled(*user_id.as_uuid(), *tenant_id_val.as_uuid())
         .await?;
 
-    // Check WebAuthn MFA (F032)
-    let webauthn_enabled = webauthn_service
-        .has_webauthn_enabled(*user_id.as_uuid(), *tenant_id_val.as_uuid())
-        .await
-        .unwrap_or(false);
+    // Check WebAuthn MFA (F032). Lookup errors must not skip MFA.
+    let webauthn_enabled = webauthn_enrollment(
+        webauthn_service
+            .has_webauthn_enabled(*user_id.as_uuid(), *tenant_id_val.as_uuid())
+            .await,
+    )?;
 
     let mfa_enabled = totp_enabled || webauthn_enabled;
 
@@ -605,6 +606,17 @@ pub fn login_risk_eval_error(err: crate::services::RiskEnforcementError) -> ApiA
     ApiAuthError::RiskServiceUnavailable
 }
 
+/// Fail-closed WebAuthn enrollment. Lookup errors must not skip MFA.
+pub fn webauthn_enrollment(result: Result<bool, ApiAuthError>) -> Result<bool, ApiAuthError> {
+    match result {
+        Ok(enabled) => Ok(enabled),
+        Err(err) => {
+            tracing::warn!(error = %err, "WebAuthn enrollment check failed, refusing login");
+            Err(err)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -643,6 +655,39 @@ mod tests {
         assert!(
             !production.contains("EnforcementDecision::skip()"),
             "must not treat risk-eval errors as a skipped decision"
+        );
+    }
+
+    #[test]
+    fn webauthn_enrollment_propagates_status() {
+        assert!(webauthn_enrollment(Ok(true)).unwrap());
+        assert!(!webauthn_enrollment(Ok(false)).unwrap());
+    }
+
+    #[test]
+    fn webauthn_enrollment_does_not_fail_open() {
+        let err = webauthn_enrollment(Err(ApiAuthError::Internal("db".into())));
+        assert!(
+            matches!(err, Err(ApiAuthError::Internal(ref msg)) if msg == "db"),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn login_handler_does_not_skip_webauthn_on_error() {
+        let src = include_str!("login.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("webauthn_enrollment("),
+            "login must fail closed on WebAuthn enrollment errors"
+        );
+        let idx = production
+            .find("has_webauthn_enabled")
+            .expect("WebAuthn enrollment check");
+        let window = &production[idx..(idx + 220).min(production.len())];
+        assert!(
+            !window.contains("unwrap_or(false)"),
+            "must not fail-open WebAuthn enrollment"
         );
     }
 }

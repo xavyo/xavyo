@@ -506,11 +506,24 @@ pub async fn device_login_handler(
         );
     }
 
-    // Check if MFA is required
-    let mfa_enabled = mfa_service
-        .has_mfa_enabled(tenant_id, user.id)
-        .await
-        .unwrap_or(false);
+    // Check if MFA is required. `has_mfa_enabled` takes (user_id, tenant_id);
+    // swapping those args looks up the tenant UUID as a user and skips TOTP.
+    let (mfa_user_id, mfa_tenant_id) = totp_enrollment_ids(user.id, tenant_id);
+    let mfa_enabled = match device_totp_required(
+        mfa_service
+            .has_mfa_enabled(mfa_user_id, mfa_tenant_id)
+            .await,
+    ) {
+        Ok(enabled) => enabled,
+        Err(_) => {
+            return render_login_error_with_csrf(
+                &request.user_code,
+                &client_id,
+                &scopes,
+                "An error occurred. Please try again.",
+            );
+        }
+    };
 
     if mfa_enabled {
         // Store MFA session in database for later verification
@@ -1138,6 +1151,26 @@ pub async fn get_user_from_session(
     Some((session.user_id, session.tenant_id))
 }
 
+/// `(user_id, tenant_id)` for `MfaService::has_mfa_enabled`.
+///
+/// Device login previously passed these swapped. RLS then looked up the
+/// tenant UUID as a user, found no TOTP secret, and skipped MFA.
+pub fn totp_enrollment_ids(user_id: Uuid, tenant_id: Uuid) -> (Uuid, Uuid) {
+    (user_id, tenant_id)
+}
+
+/// Fail-closed TOTP enrollment for device login.
+/// Lookup errors must refuse the login, not skip MFA.
+pub fn device_totp_required<E: std::fmt::Display>(enrollment: Result<bool, E>) -> Result<bool, E> {
+    match enrollment {
+        Ok(enabled) => Ok(enabled),
+        Err(e) => {
+            tracing::warn!(error = %e, "MFA enrollment check failed, refusing device login");
+            Err(e)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1206,6 +1239,43 @@ mod tests {
         assert!(
             !production.contains("\"X-Forwarded-For\""),
             "must not read X-Forwarded-For without TrustXff"
+        );
+    }
+
+    #[test]
+    fn totp_enrollment_ids_are_user_then_tenant() {
+        let user = Uuid::from_u128(1);
+        let tenant = Uuid::from_u128(2);
+        assert_eq!(totp_enrollment_ids(user, tenant), (user, tenant));
+        assert_ne!(totp_enrollment_ids(user, tenant), (tenant, user));
+    }
+
+    #[test]
+    fn device_totp_required_does_not_skip_on_error() {
+        assert_eq!(device_totp_required(Ok::<bool, &str>(true)), Ok(true));
+        assert_eq!(device_totp_required(Ok::<bool, &str>(false)), Ok(false));
+        assert_eq!(device_totp_required(Err("db down")), Err("db down"));
+    }
+
+    #[test]
+    fn device_login_does_not_fail_open_mfa_enrollment() {
+        let src = include_str!("device_login.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("totp_enrollment_ids(user.id, tenant_id)"),
+            "MFA check must pass user_id then tenant_id"
+        );
+        assert!(
+            !production.contains("has_mfa_enabled(tenant_id, user.id)"),
+            "must not swap MFA enrollment arguments"
+        );
+        assert!(
+            production.contains("device_totp_required"),
+            "MFA enrollment errors must fail closed"
+        );
+        assert!(
+            !production.contains("unwrap_or(false)"),
+            "must not fail-open MFA enrollment"
         );
     }
 }
