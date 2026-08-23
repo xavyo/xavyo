@@ -236,7 +236,7 @@ impl SodViolationService {
                     &self.pool,
                     tenant_id,
                     violation.id,
-                    Uuid::nil(), // System remediation
+                    super::license_reclamation_service::system_actor_id(),
                     Some("Auto-remediated: entitlement assignment revoked".to_string()),
                 )
                 .await
@@ -331,5 +331,19 @@ mod tests {
         assert_eq!(result.violations_found, 3);
         assert_eq!(result.violations_created, 2);
         assert_eq!(result.existing_violations, 1);
+    }
+
+    #[test]
+    fn auto_remediate_does_not_use_nil_actor() {
+        let src = include_str!("sod_violation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("system_actor_id()"),
+            "system remediation must record a real actor"
+        );
+        assert!(
+            !production.contains("Uuid::nil()"),
+            "must not persist Uuid::nil as remediated_by"
+        );
     }
 }

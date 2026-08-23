@@ -274,7 +274,7 @@ impl LicenseExpirationService {
                         RecordPoolEventParams {
                             pool_id: pool_record.id,
                             action: LicenseAuditAction::PoolExpired,
-                            actor_id: Uuid::nil(), // System actor
+                            actor_id: super::license_reclamation_service::system_actor_id(),
                             details: Some(serde_json::json!({
                                 "pool_name": pool_record.name,
                                 "expiration_date": pool_record.expiration_date,
@@ -378,7 +378,7 @@ impl LicenseExpirationService {
                             RecordPoolEventParams {
                                 pool_id,
                                 action: LicenseAuditAction::LicenseExpired,
-                                actor_id: Uuid::nil(), // System actor
+                                actor_id: super::license_reclamation_service::system_actor_id(),
                                 details: Some(serde_json::json!({
                                     "policy": "revoke_all",
                                     "assignments_revoked": assignments_revoked,
@@ -985,5 +985,19 @@ mod tests {
         assert_eq!(deserialized.pool_id, pool_id);
         assert_eq!(deserialized.pool_name, "Roundtrip Pool");
         assert_eq!(deserialized.days_until_expiration, 7);
+    }
+
+    #[test]
+    fn expiration_audit_does_not_use_nil_actor() {
+        let src = include_str!("license_expiration_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("system_actor_id()"),
+            "automated expiration must record a real system actor"
+        );
+        assert!(
+            !production.contains("Uuid::nil()"),
+            "must not persist Uuid::nil as actor_id"
+        );
     }
 }

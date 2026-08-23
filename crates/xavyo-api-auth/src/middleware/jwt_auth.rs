@@ -420,16 +420,15 @@ pub async fn jwt_auth_middleware(
     // Extract user ID from sub claim
     // For client_credentials tokens, sub is the client_id (not a UUID)
     // In that case, we mark it as a service account token
-    let (user_uuid, is_service_account) = if let Ok(uuid) = claims.sub.parse::<uuid::Uuid>() {
-        (uuid, false)
-    } else {
-        // This is likely a client_credentials token where sub is the client_id
-        // Use a nil UUID for service accounts - handlers should check ServiceAccountMarker
-        tracing::debug!(
-            client_id = %claims.sub,
-            "Client credentials token detected, using service account mode"
-        );
-        (uuid::Uuid::nil(), true)
+    let (user_uuid, is_service_account) = match service_account_user_id(&claims.sub) {
+        (id, true) => {
+            tracing::debug!(
+                client_id = %claims.sub,
+                "Client credentials token detected, using service account mode"
+            );
+            (id, true)
+        }
+        (id, false) => (id, false),
     };
     let user_id = UserId::from_uuid(user_uuid);
 
@@ -499,6 +498,29 @@ pub async fn jwt_auth_middleware(
     request.extensions_mut().insert(user_agent); // User agent for audit
 
     Ok(next.run(request).await)
+}
+
+/// Map JWT `sub` to a user UUID.
+///
+/// Human users have UUID subjects. Client-credentials tokens use a client_id;
+/// hash it so we never insert `Uuid::nil()` as `UserId`.
+pub(crate) fn service_account_user_id(sub: &str) -> (uuid::Uuid, bool) {
+    if let Ok(id) = uuid::Uuid::parse_str(sub) {
+        (id, false)
+    } else {
+        (hash_sub_to_uuid(sub), true)
+    }
+}
+
+fn hash_sub_to_uuid(sub: &str) -> uuid::Uuid {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(b"xavyo:service-account:");
+    hasher.update(sub.as_bytes());
+    let digest = hasher.finalize();
+    let mut bytes = [0u8; 16];
+    bytes.copy_from_slice(&digest[..16]);
+    uuid::Uuid::from_bytes(bytes)
 }
 
 /// Marker extension indicating that X-Forwarded-For should be trusted for this request.
@@ -678,6 +700,34 @@ mod tests {
         assert!(
             !production.contains("unwrap_or(false)"),
             "must not treat sentinel query errors as not-revoked"
+        );
+    }
+
+    #[test]
+    fn service_account_user_id_is_not_nil() {
+        let user = uuid::Uuid::new_v4();
+        let (id, service) = service_account_user_id(&user.to_string());
+        assert_eq!(id, user);
+        assert!(!service);
+
+        let (nhi, service) = service_account_user_id("nhi:tool-42");
+        assert!(service);
+        assert!(!nhi.is_nil());
+        assert_eq!(service_account_user_id("nhi:tool-42").0, nhi);
+        assert_ne!(service_account_user_id("other-client").0, nhi);
+    }
+
+    #[test]
+    fn jwt_auth_does_not_use_nil_user_id_for_service_accounts() {
+        let src = include_str!("jwt_auth.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("service_account_user_id("),
+            "non-UUID sub must map to a stable non-nil user id"
+        );
+        assert!(
+            !production.contains("Uuid::nil(), true"),
+            "must not use Uuid::nil as the service-account user id"
         );
     }
 

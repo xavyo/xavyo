@@ -59,13 +59,12 @@ pub struct ReclamationExecutionResult {
 // Pure Business Logic Functions (no I/O, fully testable)
 // ============================================================================
 
-/// The system actor UUID used for automated reclamation (all zeros).
+/// Well-known UUID for automated system actions in audit rows.
 ///
-/// When reclamation is triggered automatically (e.g., by a lifecycle event),
-/// this nil UUID is used as the `actor_id` in audit logs to distinguish
-/// system-initiated actions from human-initiated ones.
+/// Must never be `Uuid::nil()`: nil is indistinguishable from a missing actor
+/// and is forbidden as `actor_id` / `remediated_by`.
 pub(crate) fn system_actor_id() -> Uuid {
-    Uuid::nil()
+    Uuid::from_u128(0x78a1_0c4e_5b92_4d31_9f6a_2c8d_e047_b1f5)
 }
 
 /// Validate that trigger-specific fields are present for the given trigger type.
@@ -1128,16 +1127,10 @@ mod tests {
     // ========================================================================
 
     #[test]
-    fn test_system_actor_id_is_nil() {
+    fn test_system_actor_id_is_not_nil() {
         let id = system_actor_id();
-        assert_eq!(id, Uuid::nil());
-        assert!(id.is_nil());
-    }
-
-    #[test]
-    fn test_system_actor_id_is_all_zeros() {
-        let id = system_actor_id();
-        assert_eq!(id.to_string(), "00000000-0000-0000-0000-000000000000");
+        assert_ne!(id, Uuid::nil());
+        assert!(!id.is_nil());
     }
 
     #[test]
@@ -1221,7 +1214,7 @@ mod tests {
         assert!(exec_result.errors.is_empty());
 
         // 5. Verify system actor is used.
-        assert!(system_actor_id().is_nil());
+        assert!(!system_actor_id().is_nil());
     }
 
     #[test]
