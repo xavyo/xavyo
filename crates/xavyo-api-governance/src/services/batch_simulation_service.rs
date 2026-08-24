@@ -331,6 +331,7 @@ impl BatchSimulationService {
                 // Read results from the pool (not the tx) since they are read-only;
                 // all writes go through the transaction.
                 &self.pool,
+                tenant_id,
                 simulation_id,
                 &no_filter,
                 page_size,
@@ -763,15 +764,20 @@ impl BatchSimulationService {
 
         let results = GovBatchSimulationResult::list_by_simulation(
             &self.pool,
+            tenant_id,
             simulation_id,
             &filter,
             limit,
             offset,
         )
         .await?;
-        let total =
-            GovBatchSimulationResult::count_by_simulation(&self.pool, simulation_id, &filter)
-                .await?;
+        let total = GovBatchSimulationResult::count_by_simulation(
+            &self.pool,
+            tenant_id,
+            simulation_id,
+            &filter,
+        )
+        .await?;
 
         Ok((results, total))
     }
@@ -779,7 +785,8 @@ impl BatchSimulationService {
     /// Delete a simulation (only draft or cancelled).
     pub async fn delete(&self, tenant_id: Uuid, simulation_id: Uuid) -> Result<bool> {
         // Also delete results
-        GovBatchSimulationResult::delete_by_simulation(&self.pool, simulation_id).await?;
+        GovBatchSimulationResult::delete_by_simulation(&self.pool, tenant_id, simulation_id)
+            .await?;
 
         let deleted = GovBatchSimulation::delete(&self.pool, tenant_id, simulation_id).await?;
 
@@ -1815,6 +1822,31 @@ mod tests {
         assert!(
             !user_has_entitlement.contains("unwrap_or(0)"),
             "user_has_entitlement must not treat query errors as no assignment"
+        );
+    }
+
+    #[test]
+    fn result_queries_pass_tenant_id() {
+        let src = include_str!("batch_simulation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("list_by_simulation(")
+                && production
+                    .contains("&self.pool,\n            tenant_id,\n            simulation_id,"),
+            "batch result list must pass tenant_id"
+        );
+        assert!(
+            production
+                .contains("count_by_simulation(\n            &self.pool,\n            tenant_id,"),
+            "batch result count must pass tenant_id"
+        );
+        assert!(
+            production.contains("delete_by_simulation(&self.pool, tenant_id, simulation_id)"),
+            "batch result delete must pass tenant_id"
+        );
+        assert!(
+            !production.contains("&self.pool,\n            simulation_id,\n            &filter,"),
+            "must not list batch results by simulation_id alone"
         );
     }
 

@@ -178,6 +178,7 @@ impl GovPolicySimulationResult {
     /// List results for a simulation with filtering and pagination.
     pub async fn list_by_simulation(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         simulation_id: Uuid,
         filter: &PolicySimulationResultFilter,
         limit: i64,
@@ -185,32 +186,35 @@ impl GovPolicySimulationResult {
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
             r"
-            SELECT * FROM gov_policy_simulation_results
-            WHERE simulation_id = $1
+            SELECT r.* FROM gov_policy_simulation_results r
+            INNER JOIN gov_policy_simulations s ON s.id = r.simulation_id
+            WHERE r.simulation_id = $1 AND s.tenant_id = $2
             ",
         );
-        let mut param_count = 1;
+        let mut param_count = 2;
 
         if filter.impact_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND impact_type = ${param_count}"));
+            query.push_str(&format!(" AND r.impact_type = ${param_count}"));
         }
         if filter.severity.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND severity = ${param_count}"));
+            query.push_str(&format!(" AND r.severity = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${param_count}"));
+            query.push_str(&format!(" AND r.user_id = ${param_count}"));
         }
 
         query.push_str(&format!(
-            " ORDER BY created_at ASC LIMIT ${} OFFSET ${}",
+            " ORDER BY r.created_at ASC LIMIT ${} OFFSET ${}",
             param_count + 1,
             param_count + 2
         ));
 
-        let mut q = sqlx::query_as::<_, GovPolicySimulationResult>(&query).bind(simulation_id);
+        let mut q = sqlx::query_as::<_, GovPolicySimulationResult>(&query)
+            .bind(simulation_id)
+            .bind(tenant_id);
 
         if let Some(impact_type) = filter.impact_type {
             q = q.bind(impact_type);
@@ -228,31 +232,35 @@ impl GovPolicySimulationResult {
     /// Count results for a simulation with filtering.
     pub async fn count_by_simulation(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         simulation_id: Uuid,
         filter: &PolicySimulationResultFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
             r"
-            SELECT COUNT(*) FROM gov_policy_simulation_results
-            WHERE simulation_id = $1
+            SELECT COUNT(*) FROM gov_policy_simulation_results r
+            INNER JOIN gov_policy_simulations s ON s.id = r.simulation_id
+            WHERE r.simulation_id = $1 AND s.tenant_id = $2
             ",
         );
-        let mut param_count = 1;
+        let mut param_count = 2;
 
         if filter.impact_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND impact_type = ${param_count}"));
+            query.push_str(&format!(" AND r.impact_type = ${param_count}"));
         }
         if filter.severity.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND severity = ${param_count}"));
+            query.push_str(&format!(" AND r.severity = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${param_count}"));
+            query.push_str(&format!(" AND r.user_id = ${param_count}"));
         }
 
-        let mut q = sqlx::query_scalar::<_, i64>(&query).bind(simulation_id);
+        let mut q = sqlx::query_scalar::<_, i64>(&query)
+            .bind(simulation_id)
+            .bind(tenant_id);
 
         if let Some(impact_type) = filter.impact_type {
             q = q.bind(impact_type);
@@ -267,18 +275,21 @@ impl GovPolicySimulationResult {
         q.fetch_one(pool).await
     }
 
-    /// Delete all results for a simulation.
+    /// Delete all results for a simulation within a tenant.
     pub async fn delete_by_simulation(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         simulation_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
             r"
-            DELETE FROM gov_policy_simulation_results
-            WHERE simulation_id = $1
+            DELETE FROM gov_policy_simulation_results r
+            USING gov_policy_simulations s
+            WHERE r.simulation_id = s.id AND r.simulation_id = $1 AND s.tenant_id = $2
             ",
         )
         .bind(simulation_id)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
 
@@ -322,6 +333,26 @@ mod tests {
         assert!(json.contains("Payment Approval Conflict"));
         assert!(json.contains("Create Payment"));
         assert!(json.contains("Finance Role"));
+    }
+
+    #[test]
+    fn policy_result_queries_join_parent_tenant() {
+        let src = include_str!("gov_policy_simulation_result.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("INNER JOIN gov_policy_simulations s ON s.id = r.simulation_id"),
+            "policy result lookups must join parent simulations"
+        );
+        assert!(
+            production.contains("AND s.tenant_id = $2"),
+            "policy result lookups must filter parent tenant_id"
+        );
+        assert!(
+            !production.contains(
+                "FROM gov_policy_simulation_results\n            WHERE simulation_id = $1"
+            ),
+            "must not query policy results by simulation_id alone"
+        );
     }
 
     #[test]

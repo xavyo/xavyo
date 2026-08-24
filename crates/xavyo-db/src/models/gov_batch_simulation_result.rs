@@ -147,6 +147,7 @@ impl GovBatchSimulationResult {
     /// List results for a simulation with filtering and pagination.
     pub async fn list_by_simulation(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         simulation_id: Uuid,
         filter: &BatchSimulationResultFilter,
         limit: i64,
@@ -154,29 +155,32 @@ impl GovBatchSimulationResult {
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
             r"
-            SELECT * FROM gov_batch_simulation_results
-            WHERE simulation_id = $1
+            SELECT r.* FROM gov_batch_simulation_results r
+            INNER JOIN gov_batch_simulations s ON s.id = r.simulation_id
+            WHERE r.simulation_id = $1 AND s.tenant_id = $2
             ",
         );
-        let mut param_count = 1;
+        let mut param_count = 2;
 
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${param_count}"));
+            query.push_str(&format!(" AND r.user_id = ${param_count}"));
         }
         if filter.has_warnings == Some(true) {
-            query.push_str(" AND warnings != '[]'::jsonb");
+            query.push_str(" AND r.warnings != '[]'::jsonb");
         } else if filter.has_warnings == Some(false) {
-            query.push_str(" AND warnings = '[]'::jsonb");
+            query.push_str(" AND r.warnings = '[]'::jsonb");
         }
 
         query.push_str(&format!(
-            " ORDER BY created_at ASC LIMIT ${} OFFSET ${}",
+            " ORDER BY r.created_at ASC LIMIT ${} OFFSET ${}",
             param_count + 1,
             param_count + 2
         ));
 
-        let mut q = sqlx::query_as::<_, GovBatchSimulationResult>(&query).bind(simulation_id);
+        let mut q = sqlx::query_as::<_, GovBatchSimulationResult>(&query)
+            .bind(simulation_id)
+            .bind(tenant_id);
 
         if let Some(user_id) = filter.user_id {
             q = q.bind(user_id);
@@ -188,28 +192,32 @@ impl GovBatchSimulationResult {
     /// Count results for a simulation with filtering.
     pub async fn count_by_simulation(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         simulation_id: Uuid,
         filter: &BatchSimulationResultFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
             r"
-            SELECT COUNT(*) FROM gov_batch_simulation_results
-            WHERE simulation_id = $1
+            SELECT COUNT(*) FROM gov_batch_simulation_results r
+            INNER JOIN gov_batch_simulations s ON s.id = r.simulation_id
+            WHERE r.simulation_id = $1 AND s.tenant_id = $2
             ",
         );
-        let mut param_count = 1;
+        let mut param_count = 2;
 
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${param_count}"));
+            query.push_str(&format!(" AND r.user_id = ${param_count}"));
         }
         if filter.has_warnings == Some(true) {
-            query.push_str(" AND warnings != '[]'::jsonb");
+            query.push_str(" AND r.warnings != '[]'::jsonb");
         } else if filter.has_warnings == Some(false) {
-            query.push_str(" AND warnings = '[]'::jsonb");
+            query.push_str(" AND r.warnings = '[]'::jsonb");
         }
 
-        let mut q = sqlx::query_scalar::<_, i64>(&query).bind(simulation_id);
+        let mut q = sqlx::query_scalar::<_, i64>(&query)
+            .bind(simulation_id)
+            .bind(tenant_id);
 
         if let Some(user_id) = filter.user_id {
             q = q.bind(user_id);
@@ -218,18 +226,21 @@ impl GovBatchSimulationResult {
         q.fetch_one(pool).await
     }
 
-    /// Delete all results for a simulation.
+    /// Delete all results for a simulation within a tenant.
     pub async fn delete_by_simulation(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         simulation_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
             r"
-            DELETE FROM gov_batch_simulation_results
-            WHERE simulation_id = $1
+            DELETE FROM gov_batch_simulation_results r
+            USING gov_batch_simulations s
+            WHERE r.simulation_id = s.id AND r.simulation_id = $1 AND s.tenant_id = $2
             ",
         )
         .bind(simulation_id)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
 
@@ -291,6 +302,26 @@ mod tests {
         let filter = BatchSimulationResultFilter::default();
         assert!(filter.user_id.is_none());
         assert!(filter.has_warnings.is_none());
+    }
+
+    #[test]
+    fn batch_result_queries_join_parent_tenant() {
+        let src = include_str!("gov_batch_simulation_result.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("INNER JOIN gov_batch_simulations s ON s.id = r.simulation_id"),
+            "batch result lookups must join parent simulations"
+        );
+        assert!(
+            production.contains("AND s.tenant_id = $2"),
+            "batch result lookups must filter parent tenant_id"
+        );
+        assert!(
+            !production.contains(
+                "FROM gov_batch_simulation_results\n            WHERE simulation_id = $1"
+            ),
+            "must not query batch results by simulation_id alone"
+        );
     }
 
     #[test]
