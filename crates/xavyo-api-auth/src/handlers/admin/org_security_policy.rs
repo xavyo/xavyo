@@ -438,7 +438,10 @@ pub async fn upsert_org_policy(
             org_id,
             policy_type,
             request.config.clone(),
-            request.is_active.unwrap_or(true),
+            request
+                .is_active
+                .or_else(|| existing.as_ref().map(|p| p.is_active))
+                .unwrap_or(true),
             Some(user_id),
         )
         .await
@@ -738,6 +741,20 @@ mod tests {
             "allowed_methods": ["invalid_method"]
         });
         assert!(validate_policy_config(&OrgPolicyType::Mfa, &invalid).is_err());
+    }
+
+    #[test]
+    fn upsert_does_not_reenable_policy_when_is_active_omitted() {
+        let src = include_str!("org_security_policy.rs");
+        assert!(
+            src.contains("existing.as_ref().map(|p| p.is_active)"),
+            "omitted is_active must keep the existing policy flag"
+        );
+        let production = src.split("mod tests").next().expect("production");
+        assert!(
+            !production.contains("request.is_active.unwrap_or(true)"),
+            "must not fail-open is_active to true on update"
+        );
     }
 
     #[test]

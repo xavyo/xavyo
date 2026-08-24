@@ -160,7 +160,7 @@ impl TenantMfaConfig {
                 grace_period_days,
                 remember_device_days
             )
-            VALUES ($1, $2, $3, $4, $5)
+            VALUES ($1, COALESCE($2, false), COALESCE($3, $6), COALESCE($4, 0), COALESCE($5, 30))
             ON CONFLICT (tenant_id) DO UPDATE SET
                 required = COALESCE($2, tenant_mfa_policies.required),
                 methods_allowed = COALESCE($3, tenant_mfa_policies.methods_allowed),
@@ -171,16 +171,11 @@ impl TenantMfaConfig {
             ",
         )
         .bind(tenant_id)
-        .bind(data.required.unwrap_or(DEFAULT_MFA_REQUIRED))
-        .bind(data.methods_allowed.unwrap_or(default_methods))
-        .bind(
-            data.grace_period_days
-                .unwrap_or(DEFAULT_MFA_GRACE_PERIOD_DAYS),
-        )
-        .bind(
-            data.remember_device_days
-                .unwrap_or(DEFAULT_MFA_REMEMBER_DEVICE_DAYS),
-        )
+        .bind(data.required)
+        .bind(data.methods_allowed)
+        .bind(data.grace_period_days)
+        .bind(data.remember_device_days)
+        .bind(default_methods)
         .fetch_one(executor)
         .await
     }
@@ -209,6 +204,26 @@ mod tests {
         assert_eq!(config.methods_allowed, vec!["totp", "webauthn"]);
         assert_eq!(config.grace_period_days, 0);
         assert_eq!(config.remember_device_days, 30);
+    }
+
+    #[test]
+    fn upsert_does_not_fail_open_omitted_required() {
+        let src = include_str!("tenant_mfa_config.rs");
+        let upsert = src
+            .split("pub async fn upsert")
+            .nth(1)
+            .expect("upsert")
+            .split("/// Delete MFA configuration")
+            .next()
+            .expect("upsert body");
+        assert!(
+            !upsert.contains("unwrap_or("),
+            "omitted MFA required flag must not be replaced with default before bind"
+        );
+        assert!(
+            upsert.contains("COALESCE($2, tenant_mfa_policies.required)"),
+            "update must preserve omitted required"
+        );
     }
 
     #[test]

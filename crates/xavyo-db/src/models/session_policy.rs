@@ -134,7 +134,16 @@ impl TenantSessionPolicy {
                 track_device_info,
                 remember_me_ttl_days
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            VALUES (
+                $1,
+                COALESCE($2, 15),
+                COALESCE($3, 7),
+                COALESCE($4, 30),
+                COALESCE($5, 24),
+                COALESCE($6, 0),
+                COALESCE($7, true),
+                COALESCE($8, 30)
+            )
             ON CONFLICT (tenant_id) DO UPDATE SET
                 access_token_ttl_minutes = COALESCE($2, tenant_session_policies.access_token_ttl_minutes),
                 refresh_token_ttl_days = COALESCE($3, tenant_session_policies.refresh_token_ttl_days),
@@ -148,13 +157,13 @@ impl TenantSessionPolicy {
             ",
         )
         .bind(tenant_id)
-        .bind(data.access_token_ttl_minutes.unwrap_or(DEFAULT_ACCESS_TOKEN_TTL_MINUTES))
-        .bind(data.refresh_token_ttl_days.unwrap_or(DEFAULT_REFRESH_TOKEN_TTL_DAYS))
-        .bind(data.idle_timeout_minutes.unwrap_or(DEFAULT_IDLE_TIMEOUT_MINUTES))
-        .bind(data.absolute_timeout_hours.unwrap_or(DEFAULT_ABSOLUTE_TIMEOUT_HOURS))
-        .bind(data.max_concurrent_sessions.unwrap_or(DEFAULT_MAX_CONCURRENT_SESSIONS))
-        .bind(data.track_device_info.unwrap_or(true))
-        .bind(data.remember_me_ttl_days.unwrap_or(DEFAULT_REMEMBER_ME_TTL_DAYS))
+        .bind(data.access_token_ttl_minutes)
+        .bind(data.refresh_token_ttl_days)
+        .bind(data.idle_timeout_minutes)
+        .bind(data.absolute_timeout_hours)
+        .bind(data.max_concurrent_sessions)
+        .bind(data.track_device_info)
+        .bind(data.remember_me_ttl_days)
         .fetch_one(executor)
         .await
     }
@@ -219,6 +228,26 @@ mod tests {
         assert_eq!(policy.idle_timeout_minutes, 30);
         assert_eq!(policy.max_concurrent_sessions, 0);
         assert!(policy.track_device_info);
+    }
+
+    #[test]
+    fn upsert_does_not_reset_timeouts_when_fields_omitted() {
+        let src = include_str!("session_policy.rs");
+        let upsert = src
+            .split("pub async fn upsert")
+            .nth(1)
+            .expect("upsert")
+            .split("/// Delete a session policy")
+            .next()
+            .expect("upsert body");
+        assert!(
+            !upsert.contains("unwrap_or("),
+            "omitted session timeouts must not be replaced with defaults before bind"
+        );
+        assert!(
+            upsert.contains("COALESCE($2, tenant_session_policies.access_token_ttl_minutes)"),
+            "update must preserve omitted access_token_ttl_minutes"
+        );
     }
 
     #[test]
