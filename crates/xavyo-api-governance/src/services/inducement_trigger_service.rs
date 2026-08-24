@@ -431,6 +431,7 @@ impl InducementTriggerService {
             SELECT DISTINCT r.id
             FROM gov_roles r
             JOIN gov_entitlement_assignments gea ON gea.entitlement_id = r.id
+                AND gea.tenant_id = r.tenant_id
             WHERE gea.tenant_id = $1
                 AND gea.target_type = 'user'
                 AND gea.target_id = $2
@@ -460,5 +461,19 @@ mod tests {
         let key = format!("{}:user:default", connector_id);
         assert!(key.contains("user"));
         assert!(key.contains("default"));
+    }
+
+    #[test]
+    fn user_role_lookups_join_assignments_on_tenant_id() {
+        let src = include_str!("inducement_trigger_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("AND gea.tenant_id = r.tenant_id"),
+            "user role lookups must join assignments on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN gov_entitlement_assignments gea ON gea.entitlement_id = r.id\n            WHERE gea.tenant_id = $1"),
+            "must not join assignments by entitlement id alone"
+        );
     }
 }
