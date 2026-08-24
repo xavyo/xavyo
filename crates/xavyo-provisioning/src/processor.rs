@@ -382,17 +382,27 @@ impl DefaultOperationProcessor {
                             "Connector offline, transitioning operation to awaiting_system"
                         );
                         self.queue
-                            .transition_to_awaiting_system(operation.id)
+                            .transition_to_awaiting_system(
+                                operation.tenant_id,
+                                operation.connector_id,
+                            )
                             .await?;
                         continue;
                     }
                     Err(e) => {
-                        // Health check error, log and continue with execution (fail-open)
+                        // Health lookup errors must not execute against an unknown connector.
                         warn!(
                             operation_id = %operation.id,
                             error = %e,
-                            "Health check failed, proceeding with execution"
+                            "Health check failed, transitioning operation to awaiting_system"
                         );
+                        self.queue
+                            .transition_to_awaiting_system(
+                                operation.tenant_id,
+                                operation.connector_id,
+                            )
+                            .await?;
+                        continue;
                     }
                 }
             }
@@ -460,7 +470,10 @@ impl DefaultOperationProcessor {
                             if went_offline {
                                 // Connector went offline, transition to awaiting_system
                                 self.queue
-                                    .transition_to_awaiting_system(operation.id)
+                                    .transition_to_awaiting_system(
+                                        operation.tenant_id,
+                                        operation.connector_id,
+                                    )
                                     .await?;
                                 continue;
                             }
@@ -1165,6 +1178,20 @@ mod tests {
         assert!(
             !production.contains("fail(operation.id,"),
             "must not fail operations by id alone"
+        );
+        assert!(
+            production.contains(
+                "transition_to_awaiting_system(\n                                operation.tenant_id,\n                                operation.connector_id,"
+            ),
+            "offline transition must pass tenant_id and connector_id"
+        );
+        assert!(
+            !production.contains("transition_to_awaiting_system(operation.id)"),
+            "must not treat operation id as connector id"
+        );
+        assert!(
+            !production.contains("proceeding with execution"),
+            "health check errors must not fail-open into execution"
         );
     }
 

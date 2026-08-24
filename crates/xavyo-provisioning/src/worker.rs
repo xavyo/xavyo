@@ -173,7 +173,7 @@ impl<P: OperationProcessor + Send + Sync + 'static> ProvisioningWorker<P> {
 
     /// Release stale operations that are stuck in processing.
     async fn release_stale_operations(&self) {
-        match self.queue.release_stale_operations().await {
+        match self.queue.release_stale_operations(None).await {
             Ok(count) if count > 0 => {
                 warn!(count = count, "Released stale operations");
             }
