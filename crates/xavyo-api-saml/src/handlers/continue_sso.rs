@@ -201,19 +201,12 @@ async fn continue_sso_inner(
     )?;
 
     // SAML Response built successfully — now consume the session to prevent replay.
-    if let Err(e) = state
-        .session_store
-        .consume_by_id(tenant_id, session_id)
-        .await
-    {
-        // If consumption fails (e.g. concurrent request), log but don't fail —
-        // the SAML Response is already built and valid.
-        tracing::warn!(
-            session_id = %session_id,
-            error = %e,
-            "Failed to consume session after response generation (possible race)"
-        );
-    }
+    sso_session_consumed(
+        state
+            .session_store
+            .consume_by_id(tenant_id, session_id)
+            .await,
+    )?;
 
     // Record SP session for SLO tracking
     let sp_session = crate::session::SpSession {
@@ -229,15 +222,8 @@ async fn continue_sso_inner(
             + chrono::Duration::seconds(i64::from(sp.assertion_validity_seconds).max(28800)),
         revoked_at: None,
     };
-    if let Err(e) = state.sp_session_store.record(sp_session).await {
-        tracing::warn!(
-            tenant_id = %tenant_id,
-            user_id = %user.id,
-            sp_id = %sp.id,
-            error = %e,
-            "Failed to record SP session for SLO (non-fatal)"
-        );
-    }
+    crate::session::slo_session_recorded(state.sp_session_store.record(sp_session).await)
+        .map_err(|e| SamlError::SpSessionError(e.to_string()))?;
 
     tracing::info!(
         tenant_id = %tenant_id,
@@ -254,8 +240,16 @@ async fn continue_sso_inner(
     })
 }
 
+/// AuthnRequest session consume after assertion build. Errors must not return
+/// a SAML Response that can be replayed.
+pub(crate) fn sso_session_consumed<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
+    use super::sso_session_consumed;
+
     #[test]
     fn continue_sso_does_not_fail_open_on_group_load_errors() {
         let src = include_str!("continue_sso.rs");
@@ -267,6 +261,24 @@ mod tests {
         assert!(
             production.contains("load_groups_for_assertion") && production.contains(".await?"),
             "continue SSO must propagate group-load errors"
+        );
+    }
+
+    #[test]
+    fn continue_sso_does_not_return_assertion_when_session_persist_fails() {
+        assert!(sso_session_consumed(Ok::<(), &str>(())).is_ok());
+        assert!(sso_session_consumed::<(), &str>(Err("db")).is_err());
+
+        let src = include_str!("continue_sso.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("sso_session_consumed(")
+                && production.contains("slo_session_recorded("),
+            "continue SSO must fail closed on session consume and SLO persist"
+        );
+        assert!(
+            !production.contains("possible race") && !production.contains("non-fatal"),
+            "must not issue a SAML Response when session persist fails"
         );
     }
 }
