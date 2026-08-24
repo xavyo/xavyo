@@ -343,14 +343,14 @@ impl SlaMonitoringService {
 
             // Lookup assignee email if task is assigned
             let assignee_email = match full_task.assignee_id {
-                Some(assignee_id) => self.get_user_email(tenant_id, assignee_id).await,
+                Some(assignee_id) => self.get_user_email(tenant_id, assignee_id).await?,
                 None => None,
             };
 
             // Get user display name for the user receiving access
             let user_display_name = self
                 .get_user_display_name(tenant_id, full_task.user_id)
-                .await;
+                .await?;
 
             let notification = SlaBreachNotification {
                 tenant_id,
@@ -413,24 +413,21 @@ impl SlaMonitoringService {
     }
 
     /// Lookup user email by ID (include `tenant_id` for defense-in-depth).
-    async fn get_user_email(&self, tenant_id: Uuid, user_id: Uuid) -> Option<String> {
+    async fn get_user_email(&self, tenant_id: Uuid, user_id: Uuid) -> Result<Option<String>> {
         match User::find_by_id_in_tenant(&self.pool, tenant_id, user_id).await {
-            Ok(Some(user)) => Some(user.email),
+            Ok(Some(user)) => Ok(Some(user.email)),
             Ok(None) => {
                 tracing::warn!(user_id = %user_id, "User not found for email lookup");
-                None
+                Ok(None)
             }
-            Err(e) => {
-                tracing::error!(user_id = %user_id, error = %e, "Failed to lookup user email");
-                None
-            }
+            Err(e) => Err(GovernanceError::Database(e)),
         }
     }
 
     /// Get user display name or fallback to email or ID (include `tenant_id` for defense-in-depth).
-    async fn get_user_display_name(&self, tenant_id: Uuid, user_id: Uuid) -> String {
+    async fn get_user_display_name(&self, tenant_id: Uuid, user_id: Uuid) -> Result<String> {
         match User::find_by_id_in_tenant(&self.pool, tenant_id, user_id).await {
-            Ok(Some(user)) => user
+            Ok(Some(user)) => Ok(user
                 .display_name
                 .or_else(|| {
                     // Build name from first + last
@@ -441,9 +438,9 @@ impl SlaMonitoringService {
                         (None, None) => None,
                     }
                 })
-                .unwrap_or_else(|| user.email.clone()),
-            Ok(None) => user_id.to_string(),
-            Err(_) => user_id.to_string(),
+                .unwrap_or_else(|| user.email.clone())),
+            Ok(None) => Ok(user_id.to_string()),
+            Err(e) => Err(GovernanceError::Database(e)),
         }
     }
 
@@ -516,14 +513,14 @@ impl SlaMonitoringService {
 
         // Lookup assignee email if task is assigned
         let assignee_email = match full_task.assignee_id {
-            Some(assignee_id) => self.get_user_email(tenant_id, assignee_id).await,
+            Some(assignee_id) => self.get_user_email(tenant_id, assignee_id).await?,
             None => None,
         };
 
         // Get user display name for the user receiving access
         let user_display_name = self
             .get_user_display_name(tenant_id, full_task.user_id)
-            .await;
+            .await?;
 
         let notification = SlaWarningNotification {
             tenant_id,
@@ -822,5 +819,29 @@ mod tests {
                 "{fn_name} must fail when the task cannot be loaded for notification"
             );
         }
+    }
+
+    #[test]
+    fn sla_user_lookups_do_not_fail_open_on_query_errors() {
+        let src = include_str!("sla_monitoring_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let email = production
+            .split("async fn get_user_email")
+            .nth(1)
+            .and_then(|s| s.split("    async fn ").next())
+            .expect("get_user_email");
+        assert!(
+            email.contains("Err(GovernanceError::Database(e))"),
+            "user email lookup errors must fail SLA notification"
+        );
+        let name = production
+            .split("async fn get_user_display_name")
+            .nth(1)
+            .and_then(|s| s.split("    async fn ").next())
+            .expect("get_user_display_name");
+        assert!(
+            name.contains("Err(GovernanceError::Database(e))"),
+            "user display-name lookup errors must fail SLA notification"
+        );
     }
 }

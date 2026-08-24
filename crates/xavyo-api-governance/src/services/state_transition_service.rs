@@ -1550,13 +1550,11 @@ impl StateTransitionService {
             if let Some(ref producer) = self.event_producer {
                 for (request_id, object_id, _object_type, to_state_id) in &expired_details {
                     // Get the state name for the event
-                    let state_name = if let Ok(Some(state)) =
-                        GovLifecycleState::find_by_id(&self.pool, tenant_id, *to_state_id).await
-                    {
-                        state.name
-                    } else {
-                        "unknown".to_string()
-                    };
+                    let state_name =
+                        GovLifecycleState::find_by_id(&self.pool, tenant_id, *to_state_id)
+                            .await?
+                            .map(|state| state.name)
+                            .unwrap_or_else(|| "unknown".to_string());
 
                     let event = GracePeriodExpired {
                         request_id: *request_id,
@@ -1616,5 +1614,22 @@ fn escape_csv(value: &str) -> String {
         format!("\"{}\"", value.replace('"', "\"\""))
     } else {
         value.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn grace_period_events_do_not_fail_open_on_state_lookup() {
+        let src = include_str!("state_transition_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("if let Ok(Some(state))"),
+            "lifecycle state lookup errors must not emit GracePeriodExpired with unknown"
+        );
+        assert!(
+            production.contains("GovLifecycleState::find_by_id") && production.contains(".await?"),
+            "lifecycle state lookup errors must fail grace-period expiration"
+        );
     }
 }

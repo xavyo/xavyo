@@ -276,10 +276,17 @@ impl StateAccessRuleService {
 
         for entry in snapshot {
             // Check if assignment still exists
-            if let Ok(Some(assignment)) =
-                GovEntitlementAssignment::find_by_id(&self.pool, tenant_id, entry.assignment_id)
-                    .await
+            let assignment = match GovEntitlementAssignment::find_by_id(
+                &self.pool,
+                tenant_id,
+                entry.assignment_id,
+            )
+            .await
             {
+                Ok(assignment) => assignment,
+                Err(e) => return Err(GovernanceError::Database(e)),
+            };
+            if let Some(assignment) = assignment {
                 // Assignment exists, restore its status
                 let target_status = match entry.status.as_str() {
                     "active" => GovAssignmentStatus::Active,
@@ -439,4 +446,26 @@ pub struct AffectedEntitlement {
     pub current_status: String,
     /// New status after transition.
     pub new_status: String,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn restore_does_not_fail_open_on_assignment_lookup() {
+        let src = include_str!("state_access_rule_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let restore = production
+            .split("pub async fn restore_entitlements_from_snapshot")
+            .nth(1)
+            .and_then(|s| s.split("    pub async fn ").next())
+            .expect("restore_entitlements_from_snapshot");
+        assert!(
+            !restore.contains("if let Ok(Some(assignment))"),
+            "assignment lookup errors must not skip snapshot restore"
+        );
+        assert!(
+            restore.contains("GovernanceError::Database(e)"),
+            "assignment lookup errors must fail restore"
+        );
+    }
 }

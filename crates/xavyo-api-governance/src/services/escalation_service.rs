@@ -771,7 +771,7 @@ impl EscalationService {
                 let approver_id = if let Some(workflow_id) = request.workflow_id {
                     // Get the step to find the approver
                     let step_order = request.current_step + 1;
-                    if let Ok(Some(step)) = GovApprovalStep::find_by_workflow_and_order(
+                    match GovApprovalStep::find_by_workflow_and_order(
                         &self.pool,
                         tenant_id,
                         workflow_id,
@@ -779,12 +779,12 @@ impl EscalationService {
                     )
                     .await
                     {
-                        self.get_current_approver_id(tenant_id, request, &step)
-                            .await
-                            .ok()
-                            .flatten()
-                    } else {
-                        None
+                        Ok(Some(step)) => {
+                            self.get_current_approver_id(tenant_id, request, &step)
+                                .await?
+                        }
+                        Ok(None) => None,
+                        Err(e) => return Err(GovernanceError::Database(e)),
                     }
                 } else {
                     None
@@ -1136,6 +1136,29 @@ mod tests {
         assert!(
             !production.contains("JOIN user_roles ur ON ur.user_id = u.id\n"),
             "must not join user_roles by user_id alone"
+        );
+    }
+
+    #[test]
+    fn escalation_warning_does_not_fail_open_on_step_lookup() {
+        let src = include_str!("escalation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let warning = production
+            .split("pub async fn send_escalation_warning")
+            .nth(1)
+            .and_then(|s| s.split("    pub async fn ").next())
+            .expect("send_escalation_warning");
+        assert!(
+            !warning.contains("if let Ok(Some(step))"),
+            "step lookup errors must not skip escalation warning after marking sent"
+        );
+        assert!(
+            !warning.contains(".ok()\n                            .flatten()"),
+            "approver lookup errors must not skip the warning"
+        );
+        assert!(
+            warning.contains("GovernanceError::Database(e)"),
+            "step lookup errors must fail the warning send"
         );
     }
 }
