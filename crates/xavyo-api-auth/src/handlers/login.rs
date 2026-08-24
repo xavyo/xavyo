@@ -376,21 +376,19 @@ pub async fn login_handler(
                 geo_city: None,
             },
         )
-        .await;
+        .await?;
 
     // Generate alerts for new device/location if detected (F025)
-    if let Ok(ref result) = audit_result {
-        if result.is_new_device {
-            if let Some(ref fingerprint) = device_fingerprint {
-                let _ = alert_service
-                    .generate_new_device_alert(
-                        *tenant_id_val.as_uuid(),
-                        *user_id.as_uuid(),
-                        fingerprint,
-                        ip_str.as_deref(),
-                    )
-                    .await;
-            }
+    if audit_result.is_new_device {
+        if let Some(ref fingerprint) = device_fingerprint {
+            let _ = alert_service
+                .generate_new_device_alert(
+                    *tenant_id_val.as_uuid(),
+                    *user_id.as_uuid(),
+                    fingerprint,
+                    ip_str.as_deref(),
+                )
+                .await;
         }
         // New location alerts would go here when geo-lookup is implemented
     }
@@ -416,10 +414,8 @@ pub async fn login_handler(
     };
 
     // Risk enforcement evaluation (F073)
-    let is_new_device_for_risk = login_new_device_for_risk(
-        audit_result.as_ref().ok().map(|r| r.is_new_device),
-        tracked_new_device,
-    );
+    let is_new_device_for_risk =
+        login_new_device_for_risk(Some(audit_result.is_new_device), tracked_new_device);
     let risk_context = LoginRiskContext {
         ip_address: ip_str.clone(),
         user_agent: user_agent.clone(),
@@ -829,6 +825,25 @@ mod tests {
         assert!(
             production.contains("check_org_ip_restriction("),
             "login must enforce organization IP restriction policies"
+        );
+    }
+
+    #[test]
+    fn login_success_does_not_swallow_audit_writes() {
+        let src = include_str!("login.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let success = production
+            .split("Reset failed attempts on successful authentication")
+            .nth(1)
+            .and_then(|s| s.split("Check TOTP MFA").next())
+            .expect("successful login audit");
+        assert!(
+            !success.contains("if let Ok(ref result) = audit_result"),
+            "successful login must not continue when audit write fails"
+        );
+        assert!(
+            success.contains("record_login_attempt") && success.contains(".await?;"),
+            "successful login must fail closed when the audit row cannot be written"
         );
     }
 
