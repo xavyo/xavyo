@@ -558,9 +558,11 @@ impl ReconciliationService {
         let row: Option<ScheduleRow> = sqlx::query_as(
             r"
             SELECT id, frequency, day_of_week, day_of_month, hour_of_day,
-                   is_enabled, last_run_at, next_run_at, created_at, updated_at
+                   enabled AS is_enabled, last_run_at, next_run_at, created_at, updated_at
             FROM gov_reconciliation_schedules
-            WHERE tenant_id = $1
+            WHERE tenant_id = $1 AND connector_id IS NULL
+            ORDER BY updated_at DESC
+            LIMIT 1
             ",
         )
         .bind(tenant_id)
@@ -624,26 +626,26 @@ impl ReconciliationService {
             updated_at: chrono::DateTime<Utc>,
         }
 
-        let row: ScheduleRow = sqlx::query_as(
+        // Tenant-wide F040 rows have connector_id NULL. The (tenant_id, connector_id)
+        // unique constraint does not match NULL, so UPDATE then INSERT.
+        let updated: Option<ScheduleRow> = sqlx::query_as(
             r"
-            INSERT INTO gov_reconciliation_schedules (
-                tenant_id, frequency, day_of_week, day_of_month, hour_of_day, is_enabled, next_run_at
-            )
-            VALUES ($1, $2, $3, $4, $5, COALESCE($6, true), $7)
-            ON CONFLICT (tenant_id) DO UPDATE SET
-                frequency = EXCLUDED.frequency,
-                day_of_week = EXCLUDED.day_of_week,
-                day_of_month = EXCLUDED.day_of_month,
-                hour_of_day = EXCLUDED.hour_of_day,
-                is_enabled = COALESCE($6, gov_reconciliation_schedules.is_enabled),
+            UPDATE gov_reconciliation_schedules
+            SET
+                frequency = $2,
+                day_of_week = $3,
+                day_of_month = $4,
+                hour_of_day = $5,
+                enabled = COALESCE($6, enabled),
                 next_run_at = CASE
                     WHEN $6::boolean IS TRUE THEN $7
                     WHEN $6::boolean IS FALSE THEN NULL
-                    ELSE gov_reconciliation_schedules.next_run_at
+                    ELSE next_run_at
                 END,
                 updated_at = NOW()
+            WHERE tenant_id = $1 AND connector_id IS NULL
             RETURNING id, frequency, day_of_week, day_of_month, hour_of_day,
-                      is_enabled, last_run_at, next_run_at, created_at, updated_at
+                      enabled AS is_enabled, last_run_at, next_run_at, created_at, updated_at
             ",
         )
         .bind(tenant_id)
@@ -653,9 +655,34 @@ impl ReconciliationService {
         .bind(request.hour_of_day)
         .bind(request.is_enabled)
         .bind(next_run_at)
-        .fetch_one(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(GovernanceError::Database)?;
+
+        let row = if let Some(row) = updated {
+            row
+        } else {
+            sqlx::query_as(
+                r"
+                INSERT INTO gov_reconciliation_schedules (
+                    tenant_id, frequency, day_of_week, day_of_month, hour_of_day, enabled, next_run_at
+                )
+                VALUES ($1, $2, $3, $4, $5, COALESCE($6, true), $7)
+                RETURNING id, frequency, day_of_week, day_of_month, hour_of_day,
+                          enabled AS is_enabled, last_run_at, next_run_at, created_at, updated_at
+                ",
+            )
+            .bind(tenant_id)
+            .bind(frequency_str)
+            .bind(request.day_of_week)
+            .bind(request.day_of_month)
+            .bind(request.hour_of_day)
+            .bind(request.is_enabled)
+            .bind(next_run_at)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(GovernanceError::Database)?
+        };
 
         tracing::info!(
             tenant_id = %tenant_id,
@@ -683,7 +710,7 @@ impl ReconciliationService {
         let result = sqlx::query(
             r"
             DELETE FROM gov_reconciliation_schedules
-            WHERE tenant_id = $1
+            WHERE tenant_id = $1 AND connector_id IS NULL
             ",
         )
         .bind(tenant_id)
@@ -703,11 +730,10 @@ impl ReconciliationService {
         Ok(deleted)
     }
 
-    /// Trigger scheduled reconciliation runs (called by external scheduler).
+    /// Trigger this tenant's scheduled reconciliation run if due.
     ///
-    /// Returns the number of reconciliations triggered.
-    pub async fn trigger_scheduled_runs(&self) -> Result<Vec<(Uuid, Uuid)>> {
-        // Get all enabled schedules that are due
+    /// Scoped to `tenant_id` from the request JWT — never sweeps other tenants.
+    pub async fn trigger_scheduled_runs(&self, tenant_id: Uuid) -> Result<Vec<(Uuid, Uuid)>> {
         #[derive(sqlx::FromRow)]
         struct DueSchedule {
             tenant_id: Uuid,
@@ -717,10 +743,13 @@ impl ReconciliationService {
             r"
             SELECT tenant_id
             FROM gov_reconciliation_schedules
-            WHERE is_enabled = true
+            WHERE tenant_id = $1
+                AND connector_id IS NULL
+                AND enabled = true
                 AND (next_run_at IS NULL OR next_run_at <= NOW())
             ",
         )
+        .bind(tenant_id)
         .fetch_all(&self.pool)
         .await
         .map_err(GovernanceError::Database)?;
@@ -895,7 +924,7 @@ impl ReconciliationService {
                 r"
                 UPDATE gov_reconciliation_schedules
                 SET last_run_at = NOW(), next_run_at = $2
-                WHERE tenant_id = $1
+                WHERE tenant_id = $1 AND connector_id IS NULL
                 ",
             )
             .bind(tenant_id)
@@ -1077,12 +1106,108 @@ mod tests {
             .next()
             .expect("upsert body");
         assert!(
-            upsert.contains("is_enabled = COALESCE($6, gov_reconciliation_schedules.is_enabled)"),
-            "omitted is_enabled must not disable or re-enable the schedule"
+            upsert.contains("enabled = COALESCE($6, enabled)"),
+            "omitted enabled must not disable or re-enable the schedule"
         );
         assert!(
-            !upsert.contains("is_enabled = EXCLUDED.is_enabled"),
-            "must not overwrite is_enabled from a serde default"
+            upsert.contains("enabled AS is_enabled"),
+            "RETURNING must alias enabled for the API is_enabled field"
+        );
+        assert!(
+            !upsert.contains("gov_reconciliation_schedules.is_enabled"),
+            "post-0154 schema column is enabled, not is_enabled"
+        );
+        assert!(
+            !upsert.contains("ON CONFLICT (tenant_id) DO UPDATE"),
+            "tenant-wide rows have connector_id NULL; no unique on tenant_id alone"
+        );
+        assert!(
+            upsert.contains("connector_id IS NULL"),
+            "must not overwrite per-connector reconciliation schedules"
+        );
+    }
+
+    #[test]
+    fn get_schedule_uses_enabled_and_tenant_wide_row() {
+        let src = include_str!("reconciliation_service.rs");
+        let get = src
+            .split("pub async fn get_schedule")
+            .nth(1)
+            .expect("get_schedule")
+            .split("/// Create or update the reconciliation schedule")
+            .next()
+            .expect("get body");
+        assert!(
+            get.contains("enabled AS is_enabled"),
+            "SELECT must use enabled after the 0154 rename"
+        );
+        assert!(
+            !get.contains("                   is_enabled, last_run_at"),
+            "must not SELECT the dropped is_enabled column"
+        );
+        assert!(
+            get.contains("connector_id IS NULL"),
+            "tenant-wide GET must not pick per-connector rows"
+        );
+    }
+
+    #[test]
+    fn delete_schedule_does_not_wipe_connector_schedules() {
+        let src = include_str!("reconciliation_service.rs");
+        let delete = src
+            .split("pub async fn delete_schedule")
+            .nth(1)
+            .expect("delete_schedule")
+            .split("/// Trigger this tenant's scheduled reconciliation run")
+            .next()
+            .expect("delete body");
+        assert!(
+            delete.contains("WHERE tenant_id = $1 AND connector_id IS NULL"),
+            "DELETE must not remove per-connector schedules"
+        );
+    }
+
+    #[test]
+    fn trigger_scheduled_runs_is_tenant_scoped() {
+        let src = include_str!("reconciliation_service.rs");
+        let trigger = src
+            .split("pub async fn trigger_scheduled_runs")
+            .nth(1)
+            .expect("trigger_scheduled_runs")
+            .split("/// Validate schedule parameters")
+            .next()
+            .expect("trigger body");
+        assert!(
+            trigger.contains("WHERE tenant_id = $1"),
+            "must not sweep other tenants' schedules"
+        );
+        assert!(
+            trigger.contains("AND enabled = true"),
+            "must use enabled after the 0154 rename"
+        );
+        assert!(
+            trigger.contains("connector_id IS NULL"),
+            "must not trigger per-connector connector reconciliation from the tenant-wide path"
+        );
+        assert!(
+            !trigger.contains("is_enabled"),
+            "must not filter on the dropped is_enabled column"
+        );
+    }
+
+    #[test]
+    fn update_after_run_is_tenant_wide_only() {
+        let src = include_str!("reconciliation_service.rs");
+        let update = src
+            .split("async fn update_schedule_after_run")
+            .nth(1)
+            .expect("update_schedule_after_run")
+            .split("Ok(())")
+            .next()
+            .expect("update body");
+        assert!(
+            update.contains("WHERE tenant_id = $1 AND connector_id IS NULL"),
+            "must not clobber per-connector next_run_at"
         );
     }
 }
