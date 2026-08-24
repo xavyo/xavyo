@@ -86,16 +86,21 @@ impl GovApprovalStep {
     /// Find all steps for a workflow, ordered by `step_order`.
     pub async fn find_by_workflow(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         workflow_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_approval_steps
-            WHERE workflow_id = $1
-            ORDER BY step_order ASC
+            SELECT s.id, s.workflow_id, s.step_order, s.approver_type,
+                   s.specific_approvers, s.created_at, s.escalation_enabled
+            FROM gov_approval_steps s
+            INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id
+            WHERE s.workflow_id = $1 AND w.tenant_id = $2
+            ORDER BY s.step_order ASC
             ",
         )
         .bind(workflow_id)
+        .bind(tenant_id)
         .fetch_all(pool)
         .await
     }
@@ -103,17 +108,22 @@ impl GovApprovalStep {
     /// Find a specific step by workflow and order.
     pub async fn find_by_workflow_and_order(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         workflow_id: Uuid,
         step_order: i32,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_approval_steps
-            WHERE workflow_id = $1 AND step_order = $2
+            SELECT s.id, s.workflow_id, s.step_order, s.approver_type,
+                   s.specific_approvers, s.created_at, s.escalation_enabled
+            FROM gov_approval_steps s
+            INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id
+            WHERE s.workflow_id = $1 AND s.step_order = $2 AND w.tenant_id = $3
             ",
         )
         .bind(workflow_id)
         .bind(step_order)
+        .bind(tenant_id)
         .fetch_optional(pool)
         .await
     }
@@ -121,15 +131,18 @@ impl GovApprovalStep {
     /// Count steps in a workflow.
     pub async fn count_by_workflow(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         workflow_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
             r"
-            SELECT COUNT(*) FROM gov_approval_steps
-            WHERE workflow_id = $1
+            SELECT COUNT(*) FROM gov_approval_steps s
+            INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id
+            WHERE s.workflow_id = $1 AND w.tenant_id = $2
             ",
         )
         .bind(workflow_id)
+        .bind(tenant_id)
         .fetch_one(pool)
         .await
     }
@@ -170,33 +183,42 @@ impl GovApprovalStep {
         Ok(results)
     }
 
-    /// Delete all steps for a workflow.
+    /// Delete all steps for a workflow within a tenant.
     pub async fn delete_by_workflow(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         workflow_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
             r"
-            DELETE FROM gov_approval_steps
-            WHERE workflow_id = $1
+            DELETE FROM gov_approval_steps s
+            USING gov_approval_workflows w
+            WHERE s.workflow_id = w.id AND s.workflow_id = $1 AND w.tenant_id = $2
             ",
         )
         .bind(workflow_id)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
 
         Ok(result.rows_affected())
     }
 
-    /// Delete a specific step.
-    pub async fn delete(pool: &sqlx::PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
+    /// Delete a specific step within a tenant.
+    pub async fn delete(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r"
-            DELETE FROM gov_approval_steps
-            WHERE id = $1
+            DELETE FROM gov_approval_steps s
+            USING gov_approval_workflows w
+            WHERE s.workflow_id = w.id AND s.id = $1 AND w.tenant_id = $2
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
 
@@ -206,16 +228,19 @@ impl GovApprovalStep {
     /// Check if this is the final step in the workflow.
     pub async fn is_final_step(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         workflow_id: Uuid,
         step_order: i32,
     ) -> Result<bool, sqlx::Error> {
         let max_order: Option<i32> = sqlx::query_scalar(
             r"
-            SELECT MAX(step_order) FROM gov_approval_steps
-            WHERE workflow_id = $1
+            SELECT MAX(s.step_order) FROM gov_approval_steps s
+            INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id
+            WHERE s.workflow_id = $1 AND w.tenant_id = $2
             ",
         )
         .bind(workflow_id)
+        .bind(tenant_id)
         .fetch_one(pool)
         .await?;
 
@@ -257,6 +282,24 @@ mod tests {
         assert!(
             !lookup.contains("FROM gov_approval_steps\n            WHERE id = $1"),
             "must not look up approval steps by id alone"
+        );
+    }
+
+    #[test]
+    fn workflow_scoped_step_queries_join_tenant() {
+        let src = include_str!("gov_approval_step.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("WHERE s.workflow_id = $1 AND w.tenant_id = $2"),
+            "workflow-scoped step queries must filter tenant_id"
+        );
+        assert!(
+            !production.contains("FROM gov_approval_steps\n            WHERE workflow_id = $1"),
+            "must not query approval steps by workflow_id alone"
+        );
+        assert!(
+            production.contains("AND s.workflow_id = $1 AND w.tenant_id = $2"),
+            "step deletes must filter tenant_id via parent workflow"
         );
     }
 

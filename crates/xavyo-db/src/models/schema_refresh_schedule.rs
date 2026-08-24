@@ -193,6 +193,7 @@ impl SchemaRefreshSchedule {
     /// Update after a run.
     pub async fn update_after_run(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         id: Uuid,
         next_run_at: Option<DateTime<Utc>>,
         error: Option<&str>,
@@ -204,12 +205,13 @@ impl SchemaRefreshSchedule {
                 next_run_at = $2,
                 last_error = $3,
                 updated_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $4
             ",
         )
         .bind(id)
         .bind(next_run_at)
         .bind(error)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
 
@@ -286,6 +288,24 @@ mod tests {
         assert!(input.enabled);
         assert_eq!(input.interval_hours, Some(24));
         assert!(input.notify_on_changes);
+    }
+
+    #[test]
+    fn update_after_run_filters_tenant_id() {
+        let src = include_str!("schema_refresh_schedule.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let lookup = production
+            .split("pub async fn update_after_run")
+            .nth(1)
+            .expect("update_after_run");
+        assert!(
+            lookup.contains("WHERE id = $1 AND tenant_id = $4"),
+            "schema refresh run update must filter tenant_id"
+        );
+        assert!(
+            !lookup.contains("WHERE id = $1\n"),
+            "must not update schema refresh schedules by id alone"
+        );
     }
 
     #[test]

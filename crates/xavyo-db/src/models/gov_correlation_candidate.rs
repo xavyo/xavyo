@@ -127,29 +127,38 @@ impl GovCorrelationCandidate {
     /// List candidates for a correlation case, ordered by confidence descending.
     pub async fn list_by_case(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         case_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_correlation_candidates
-            WHERE case_id = $1
-            ORDER BY aggregate_confidence DESC
+            SELECT cand.* FROM gov_correlation_candidates cand
+            INNER JOIN gov_correlation_cases c ON c.id = cand.case_id
+            WHERE cand.case_id = $1 AND c.tenant_id = $2
+            ORDER BY cand.aggregate_confidence DESC
             ",
         )
         .bind(case_id)
+        .bind(tenant_id)
         .fetch_all(pool)
         .await
     }
 
-    /// Find a candidate by its unique ID.
-    pub async fn find_by_id(pool: &sqlx::PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
+    /// Find a candidate by ID within a tenant (via the parent case).
+    pub async fn find_by_id(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_correlation_candidates
-            WHERE id = $1
+            SELECT cand.* FROM gov_correlation_candidates cand
+            INNER JOIN gov_correlation_cases c ON c.id = cand.case_id
+            WHERE cand.id = $1 AND c.tenant_id = $2
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .fetch_optional(pool)
         .await
     }
@@ -212,6 +221,28 @@ mod tests {
         assert_eq!(deserialized.raw_similarity, 1.0);
         assert!(!deserialized.skipped);
         assert!(deserialized.skip_reason.is_none());
+    }
+
+    #[test]
+    fn candidate_lookups_join_case_tenant() {
+        let src = include_str!("gov_correlation_candidate.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("INNER JOIN gov_correlation_cases c ON c.id = cand.case_id"),
+            "candidate lookups must join correlation cases"
+        );
+        assert!(
+            production.contains("AND c.tenant_id = $2"),
+            "candidate lookups must filter case tenant_id"
+        );
+        assert!(
+            !production.contains("FROM gov_correlation_candidates\n            WHERE case_id = $1"),
+            "must not list candidates by case_id alone"
+        );
+        assert!(
+            !production.contains("FROM gov_correlation_candidates\n            WHERE id = $1"),
+            "must not look up candidates by id alone"
+        );
     }
 
     #[test]

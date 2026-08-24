@@ -187,8 +187,12 @@ impl CertificationItemService {
     }
 
     /// Get the decision for an item.
-    pub async fn get_decision(&self, item_id: Uuid) -> Result<Option<GovCertificationDecision>> {
-        GovCertificationDecision::find_by_item_id(&self.pool, item_id)
+    pub async fn get_decision(
+        &self,
+        tenant_id: Uuid,
+        item_id: Uuid,
+    ) -> Result<Option<GovCertificationDecision>> {
+        GovCertificationDecision::find_by_item_id(&self.pool, tenant_id, item_id)
             .await
             .map_err(GovernanceError::Database)
     }
@@ -238,5 +242,19 @@ mod tests {
         assert!(!approved.is_pending());
         assert!(!revoked.is_pending());
         assert!(!skipped.is_pending());
+    }
+
+    #[test]
+    fn get_decision_passes_tenant_id() {
+        let src = include_str!("certification_item_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("find_by_item_id(&self.pool, tenant_id, item_id)"),
+            "certification decision lookup must pass tenant_id"
+        );
+        assert!(
+            !production.contains("find_by_item_id(&self.pool, item_id)"),
+            "must not look up certification decisions by item_id alone"
+        );
     }
 }

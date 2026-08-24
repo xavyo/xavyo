@@ -133,7 +133,8 @@ impl CorrelationCaseService {
             .await?
             .ok_or(GovernanceError::CorrelationCaseNotFound(case_id))?;
 
-        let candidates = GovCorrelationCandidate::list_by_case(&self.pool, case.id).await?;
+        let candidates =
+            GovCorrelationCandidate::list_by_case(&self.pool, tenant_id, case.id).await?;
 
         Ok(case_to_detail(case, candidates))
     }
@@ -459,6 +460,20 @@ mod tests {
     fn test_case_service_creation() {
         // Verifies the type compiles correctly.
         // Actual service tests would require a database connection.
+    }
+
+    #[test]
+    fn get_case_lists_candidates_by_tenant() {
+        let src = include_str!("correlation_case_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("list_by_case(&self.pool, tenant_id, case.id)"),
+            "correlation candidates must be listed with tenant_id"
+        );
+        assert!(
+            !production.contains("list_by_case(&self.pool, case.id)"),
+            "must not list correlation candidates by case_id alone"
+        );
     }
 
     #[test]
