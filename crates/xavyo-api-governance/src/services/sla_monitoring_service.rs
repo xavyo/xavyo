@@ -74,7 +74,7 @@ impl SlaMonitoringService {
                 p.target_duration_seconds,
                 p.escalation_contacts
             FROM gov_manual_provisioning_tasks t
-            INNER JOIN gov_sla_policies p ON t.sla_policy_id = p.id
+            INNER JOIN gov_sla_policies p ON t.sla_policy_id = p.id AND p.tenant_id = t.tenant_id
             WHERE t.status NOT IN ('completed', 'rejected', 'cancelled', 'failed_permanent')
             AND t.sla_deadline IS NOT NULL
             AND t.sla_warning_sent = false
@@ -145,7 +145,7 @@ impl SlaMonitoringService {
                 p.target_duration_seconds,
                 p.escalation_contacts
             FROM gov_manual_provisioning_tasks t
-            LEFT JOIN gov_sla_policies p ON t.sla_policy_id = p.id
+            LEFT JOIN gov_sla_policies p ON t.sla_policy_id = p.id AND p.tenant_id = t.tenant_id
             WHERE t.status NOT IN ('completed', 'rejected', 'cancelled', 'failed_permanent')
             AND t.sla_deadline IS NOT NULL
             AND t.sla_breached = false
@@ -198,7 +198,7 @@ impl SlaMonitoringService {
                 p.target_duration_seconds,
                 p.escalation_contacts
             FROM gov_manual_provisioning_tasks t
-            LEFT JOIN gov_sla_policies p ON t.sla_policy_id = p.id
+            LEFT JOIN gov_sla_policies p ON t.sla_policy_id = p.id AND p.tenant_id = t.tenant_id
             WHERE t.tenant_id = $1
             AND t.status NOT IN ('completed', 'rejected', 'cancelled', 'failed_permanent')
             AND t.sla_deadline IS NOT NULL
@@ -781,5 +781,24 @@ mod tests {
         assert_eq!(result.breached_count, 0);
         assert_eq!(result.warned_count, 0);
         assert!(result.errors.is_empty());
+    }
+
+    #[test]
+    fn sla_policy_joins_filter_tenant_id() {
+        let src = include_str!("sla_monitoring_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let joined = production
+            .matches(
+                "JOIN gov_sla_policies p ON t.sla_policy_id = p.id AND p.tenant_id = t.tenant_id",
+            )
+            .count();
+        assert!(
+            joined >= 3,
+            "warning, breach, and tenant SLA lookups must join policies on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN gov_sla_policies p ON t.sla_policy_id = p.id\n"),
+            "must not join SLA policies by id alone"
+        );
     }
 }

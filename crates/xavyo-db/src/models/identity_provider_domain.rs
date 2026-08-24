@@ -127,6 +127,7 @@ impl IdentityProviderDomain {
             SELECT ipd.identity_provider_id
             FROM identity_provider_domains ipd
             JOIN tenant_identity_providers tip ON ipd.identity_provider_id = tip.id
+                AND tip.tenant_id = ipd.tenant_id
             WHERE ipd.tenant_id = $1
               AND ipd.domain = $2
               AND tip.is_enabled = true
@@ -217,5 +218,24 @@ impl IdentityProviderDomain {
         .execute(pool)
         .await?;
         Ok(result.rows_affected())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn hrd_idp_lookup_joins_provider_tenant_id() {
+        let src = include_str!("identity_provider_domain.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("AND tip.tenant_id = ipd.tenant_id"),
+            "HRD IdP lookup must join providers on tenant_id"
+        );
+        assert!(
+            !production.contains(
+                "JOIN tenant_identity_providers tip ON ipd.identity_provider_id = tip.id\n            WHERE ipd.tenant_id = $1"
+            ),
+            "must not join identity providers by id alone"
+        );
     }
 }

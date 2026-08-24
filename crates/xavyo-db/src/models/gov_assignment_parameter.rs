@@ -332,7 +332,7 @@ impl AssignmentParameterWithDefinition {
                 ap.created_at,
                 ap.updated_at
             FROM gov_role_assignment_parameters ap
-            JOIN gov_role_parameters p ON ap.parameter_id = p.id
+            JOIN gov_role_parameters p ON ap.parameter_id = p.id AND p.tenant_id = ap.tenant_id
             WHERE ap.tenant_id = $1 AND ap.assignment_id = $2
             ORDER BY p.display_order ASC, p.name ASC
             ",
@@ -421,5 +421,21 @@ mod tests {
         // Date value (stored as string)
         let date_val = serde_json::json!("2026-01-26");
         assert!(date_val.is_string());
+    }
+
+    #[test]
+    fn assignment_parameter_lookups_join_tenant_on_definitions() {
+        let src = include_str!("gov_assignment_parameter.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains(
+                "JOIN gov_role_parameters p ON ap.parameter_id = p.id AND p.tenant_id = ap.tenant_id"
+            ),
+            "assignment parameter lookups must join definitions on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN gov_role_parameters p ON ap.parameter_id = p.id\n"),
+            "must not join parameter definitions by id alone"
+        );
     }
 }

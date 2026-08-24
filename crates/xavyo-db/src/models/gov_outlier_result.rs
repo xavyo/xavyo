@@ -106,7 +106,7 @@ impl GovOutlierResult {
         sqlx::query_as(
             r"
             SELECT r.* FROM gov_outlier_results r
-            JOIN gov_outlier_analyses a ON r.analysis_id = a.id
+            JOIN gov_outlier_analyses a ON r.analysis_id = a.id AND a.tenant_id = r.tenant_id
             WHERE r.tenant_id = $1 AND r.user_id = $2 AND a.status = 'completed'
             ORDER BY r.created_at DESC
             LIMIT 1
@@ -363,7 +363,7 @@ impl GovOutlierResult {
         sqlx::query_as(
             r"
             SELECT r.* FROM gov_outlier_results r
-            JOIN gov_outlier_analyses a ON r.analysis_id = a.id
+            JOIN gov_outlier_analyses a ON r.analysis_id = a.id AND a.tenant_id = r.tenant_id
             WHERE r.tenant_id = $1 AND r.user_id = $2 AND a.status = 'completed'
             ORDER BY r.created_at DESC
             LIMIT $3
@@ -505,5 +505,24 @@ mod tests {
         assert!(parsed.role_frequency.is_some());
         let rf = parsed.role_frequency.unwrap();
         assert!((rf.contribution - 25.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn outlier_user_lookups_join_analysis_tenant_id() {
+        let src = include_str!("gov_outlier_result.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let joined = production
+            .matches(
+                "JOIN gov_outlier_analyses a ON r.analysis_id = a.id AND a.tenant_id = r.tenant_id",
+            )
+            .count();
+        assert!(
+            joined >= 2,
+            "latest and history lookups must join analyses on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN gov_outlier_analyses a ON r.analysis_id = a.id\n"),
+            "must not join analyses by id alone"
+        );
     }
 }
