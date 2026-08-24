@@ -373,11 +373,18 @@ impl SyncPipeline {
         }
 
         // Determine sync situation through correlation
-        let situation = self.determine_situation(&mut change).await;
+        let situation = match self.determine_situation(&mut change).await {
+            Ok(situation) => situation,
+            Err(e) => return ProcessedChange::failed(&change, e.to_string()),
+        };
         change.sync_situation = situation;
 
         // Check for conflicts
-        if let Ok(Some(detected_conflict)) = self.conflict_detector.detect_conflict(&change).await {
+        let detected_conflict = match self.conflict_detector.detect_conflict(&change).await {
+            Ok(conflict) => conflict,
+            Err(e) => return ProcessedChange::failed(&change, e.to_string()),
+        };
+        if let Some(detected_conflict) = detected_conflict {
             // Handle based on conflict resolution strategy
             match self.config.conflict_resolution {
                 ConflictResolution::InboundWins => {
@@ -610,32 +617,38 @@ impl SyncPipeline {
     /// 2. Search for existing links → Linked or Collision
     /// 3. Use correlation to find potential owners → Unlinked or Disputed
     /// 4. Default → Unmatched
-    async fn determine_situation(&self, change: &mut InboundChange) -> SyncSituation {
+    async fn determine_situation(&self, change: &mut InboundChange) -> SyncResult<SyncSituation> {
         use super::types::ChangeType;
 
         // Step 1: Check if this is a delete operation
         if change.change_type == ChangeType::Delete {
             // Look for existing shadow to mark as deleted
-            if let Ok(Some(shadow)) = self
+            let shadow = self
                 .shadow_repo
                 .find_by_target_uid(change.tenant_id, change.connector_id, &change.external_uid)
                 .await
-            {
+                .map_err(|e| SyncError::Internal {
+                    message: e.to_string(),
+                })?;
+            if let Some(shadow) = shadow {
                 change.linked_identity_id = shadow.user_id;
             }
-            return SyncSituation::Deleted;
+            return Ok(SyncSituation::Deleted);
         }
 
         // Step 2: Check for existing links via shadow
-        if let Ok(Some(shadow)) = self
+        let shadow = self
             .shadow_repo
             .find_by_target_uid(change.tenant_id, change.connector_id, &change.external_uid)
             .await
-        {
+            .map_err(|e| SyncError::Internal {
+                message: e.to_string(),
+            })?;
+        if let Some(shadow) = shadow {
             if let Some(user_id) = shadow.user_id {
                 // Check for collision: is this shadow linked to multiple users?
                 // This would be an error state in the database
-                if let Ok(collision_count) = self
+                let collision_count = self
                     .shadow_repo
                     .count_links_for_target(
                         change.tenant_id,
@@ -643,27 +656,28 @@ impl SyncPipeline {
                         &change.external_uid,
                     )
                     .await
-                {
-                    if collision_count > 1 {
-                        info!(
-                            external_uid = %change.external_uid,
-                            link_count = collision_count,
-                            "Collision detected: shadow linked to multiple users"
-                        );
-                        change.linked_identity_id = Some(user_id);
-                        return SyncSituation::Collision;
-                    }
+                    .map_err(|e| SyncError::Internal {
+                        message: e.to_string(),
+                    })?;
+                if collision_count > 1 {
+                    info!(
+                        external_uid = %change.external_uid,
+                        link_count = collision_count,
+                        "Collision detected: shadow linked to multiple users"
+                    );
+                    change.linked_identity_id = Some(user_id);
+                    return Ok(SyncSituation::Collision);
                 }
 
                 change.linked_identity_id = Some(user_id);
-                return SyncSituation::Linked;
+                return Ok(SyncSituation::Linked);
             }
             // Shadow exists but no user linked - attempt correlation
-            return self.attempt_correlation(change).await;
+            return Ok(self.attempt_correlation(change).await);
         }
 
         // Step 3: No shadow found - try to correlate to find potential owners
-        self.attempt_correlation(change).await
+        Ok(self.attempt_correlation(change).await)
     }
 
     /// Attempt to correlate an inbound change to an internal user.
@@ -922,6 +936,43 @@ mod tests {
         let failed = ProcessedChange::failed(&change, "test error".to_string());
         assert_eq!(failed.status, ProcessingStatus::Failed);
         assert_eq!(failed.error, Some("test error".to_string()));
+    }
+
+    #[test]
+    fn conflict_and_shadow_lookups_do_not_fail_open_on_query_errors() {
+        let src = include_str!("pipeline.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let process = production
+            .split("async fn process_change(")
+            .nth(1)
+            .and_then(|s| s.split("    async fn ").next())
+            .expect("process_change");
+        assert!(
+            !process.contains("if let Ok(Some(detected_conflict))"),
+            "conflict detection errors must fail the change, not proceed as no conflict"
+        );
+        assert!(
+            process.contains("detect_conflict(&change).await")
+                && process.contains("ProcessedChange::failed(&change, e.to_string())"),
+            "conflict detection errors must mark the change failed"
+        );
+        let situation = production
+            .split("async fn determine_situation")
+            .nth(1)
+            .and_then(|s| s.split("    async fn ").next())
+            .expect("determine_situation");
+        assert!(
+            !situation.contains("if let Ok(Some(shadow))"),
+            "shadow lookup errors must not treat the account as unmatched"
+        );
+        assert!(
+            !situation.contains("if let Ok(collision_count)"),
+            "collision-count errors must not skip Collision detection"
+        );
+        assert!(
+            situation.contains("map_err(|e| SyncError::Internal"),
+            "shadow and collision lookups must propagate query errors"
+        );
     }
 
     #[test]

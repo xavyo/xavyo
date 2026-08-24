@@ -625,13 +625,33 @@ where
         }
 
         // Update shadow with new expected state
-        if let Ok(Some(mut shadow)) = self
+        match self
             .shadow_repository
             .find_by_target_uid(self.tenant_id, connector_id, external_uid)
             .await
         {
-            shadow.update_attributes(serde_json::to_value(&identity_attrs).unwrap_or_default());
-            let _ = self.shadow_repository.upsert(&shadow).await;
+            Ok(Some(mut shadow)) => {
+                shadow.update_attributes(serde_json::to_value(&identity_attrs).unwrap_or_default());
+                if let Err(e) = self.shadow_repository.upsert(&shadow).await {
+                    return RemediationResult::failure(
+                        discrepancy_id,
+                        ActionType::Update,
+                        format!("Failed to update shadow after target update: {e}"),
+                        false,
+                    )
+                    .with_before_state(before_state);
+                }
+            }
+            Ok(None) => {}
+            Err(e) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Update,
+                    format!("Failed to load shadow after target update: {e}"),
+                    false,
+                )
+                .with_before_state(before_state);
+            }
         }
 
         tracing::info!(
@@ -719,13 +739,33 @@ where
         }
 
         // Update shadow
-        if let Ok(Some(mut shadow)) = self
+        match self
             .shadow_repository
             .find_by_target_uid(self.tenant_id, connector_id, external_uid)
             .await
         {
-            shadow.update_attributes(serde_json::to_value(&target_attrs).unwrap_or_default());
-            let _ = self.shadow_repository.upsert(&shadow).await;
+            Ok(Some(mut shadow)) => {
+                shadow.update_attributes(serde_json::to_value(&target_attrs).unwrap_or_default());
+                if let Err(e) = self.shadow_repository.upsert(&shadow).await {
+                    return RemediationResult::failure(
+                        discrepancy_id,
+                        ActionType::Update,
+                        format!("Failed to update shadow after source update: {e}"),
+                        false,
+                    )
+                    .with_before_state(before_state);
+                }
+            }
+            Ok(None) => {}
+            Err(e) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Update,
+                    format!("Failed to load shadow after source update: {e}"),
+                    false,
+                )
+                .with_before_state(before_state);
+            }
         }
 
         tracing::info!(
@@ -1649,5 +1689,26 @@ mod tests {
         assert_eq!(bulk_result.summary.total, 3);
         assert_eq!(bulk_result.summary.succeeded, 2);
         assert_eq!(bulk_result.summary.failed, 1);
+    }
+
+    #[test]
+    fn shadow_updates_do_not_fail_open_on_query_errors() {
+        let src = include_str!("remediation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for fn_name in ["fn update_to_target", "fn update_to_source"] {
+            let window = production
+                .split(fn_name)
+                .nth(1)
+                .and_then(|s| s.split("    async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                !window.contains("if let Ok(Some(mut shadow))"),
+                "{fn_name} must not report success when shadow lookup errors"
+            );
+            assert!(
+                window.contains("RemediationResult::failure"),
+                "{fn_name} must fail remediation when shadow lookup errors"
+            );
+        }
     }
 }

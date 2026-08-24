@@ -226,12 +226,34 @@ async fn process_operation<P: OperationProcessor>(
 
     // Update shadow to pending state if we have a target_uid
     if let Some(ref uid) = target_uid {
-        if let Ok(Some(mut shadow)) = shadow_repo
+        match shadow_repo
             .find_by_target_uid(tenant_id, connector_id, uid)
             .await
         {
-            shadow.mark_pending();
-            let _ = shadow_repo.upsert(&shadow).await;
+            Ok(Some(mut shadow)) => {
+                shadow.mark_pending();
+                if let Err(e) = shadow_repo.upsert(&shadow).await {
+                    error!(error = %e, "Failed to mark shadow pending");
+                    if let Err(re) = queue
+                        .fail(tenant_id, operation_id, &e.to_string(), true)
+                        .await
+                    {
+                        error!(error = %re, "Failed to schedule retry after shadow pending error");
+                    }
+                    return;
+                }
+            }
+            Ok(None) => {}
+            Err(e) => {
+                error!(error = %e, "Failed to load shadow before processing");
+                if let Err(re) = queue
+                    .fail(tenant_id, operation_id, &e.to_string(), true)
+                    .await
+                {
+                    error!(error = %re, "Failed to schedule retry after shadow lookup error");
+                }
+                return;
+            }
         }
     }
 
@@ -413,6 +435,25 @@ mod tests {
         assert!(
             !production.contains("fail(operation_id,"),
             "must not fail operations by id alone"
+        );
+    }
+
+    #[test]
+    fn pending_shadow_lookup_does_not_fail_open_on_query_errors() {
+        let src = include_str!("worker.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let process = production
+            .split("async fn process_operation")
+            .nth(1)
+            .and_then(|s| s.split("async fn ").next())
+            .expect("process_operation");
+        assert!(
+            !process.contains("if let Ok(Some(mut shadow))"),
+            "shadow lookup errors must not skip pending-state before processing"
+        );
+        assert!(
+            process.contains("Failed to load shadow before processing"),
+            "shadow lookup errors must fail the queued operation"
         );
     }
 
