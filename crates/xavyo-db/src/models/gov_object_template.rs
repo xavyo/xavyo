@@ -495,7 +495,7 @@ impl GovObjectTemplate {
                 WHERE id = $1 AND tenant_id = $2
                 UNION ALL
                 SELECT t.* FROM gov_object_templates t
-                JOIN ancestors a ON t.id = a.parent_template_id
+                JOIN ancestors a ON t.id = a.parent_template_id AND t.tenant_id = $2
                 WHERE t.tenant_id = $2
             )
             SELECT * FROM ancestors WHERE id != $1
@@ -566,5 +566,20 @@ mod tests {
         assert!(filter.priority_min.is_none());
         assert!(filter.priority_max.is_none());
         assert!(filter.parent_template_id.is_none());
+    }
+
+    #[test]
+    fn ancestor_chain_joins_templates_on_tenant_id() {
+        let src = include_str!("gov_object_template.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production
+                .contains("JOIN ancestors a ON t.id = a.parent_template_id AND t.tenant_id = $2"),
+            "template ancestor walks must join on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN ancestors a ON t.id = a.parent_template_id\n"),
+            "must not join template ancestors by id alone"
+        );
     }
 }

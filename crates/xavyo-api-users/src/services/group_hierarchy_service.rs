@@ -66,7 +66,7 @@ impl GroupHierarchyService {
 
                 SELECT g.id, g.parent_id, d.depth + 1
                 FROM groups g
-                JOIN depth_calc d ON g.id = d.parent_id
+                JOIN depth_calc d ON g.id = d.parent_id AND g.tenant_id = $1
                 WHERE g.tenant_id = $1
             )
             SELECT MAX(depth) AS group_depth FROM depth_calc
@@ -104,7 +104,7 @@ impl GroupHierarchyService {
 
                 SELECT g.id, g.parent_id
                 FROM groups g
-                JOIN ancestors_of_new_parent a ON g.id = a.parent_id
+                JOIN ancestors_of_new_parent a ON g.id = a.parent_id AND g.tenant_id = $1
                 WHERE g.tenant_id = $1
             )
             SELECT EXISTS (
@@ -144,7 +144,7 @@ impl GroupHierarchyService {
 
                 SELECT g.id, g.parent_id, s.relative_depth + 1
                 FROM groups g
-                JOIN subtree s ON g.parent_id = s.id
+                JOIN subtree s ON g.parent_id = s.id AND g.tenant_id = $1
                 WHERE g.tenant_id = $1
             )
             SELECT MAX(relative_depth) AS max_relative_depth FROM subtree
@@ -312,7 +312,7 @@ impl GroupHierarchyService {
 
                 SELECT g.id, g.parent_id, g.display_name, g.group_type, a.depth + 1
                 FROM groups g
-                JOIN ancestors a ON g.id = a.parent_id
+                JOIN ancestors a ON g.id = a.parent_id AND g.tenant_id = $1
                 WHERE g.tenant_id = $1
             )
             SELECT id, display_name, group_type, depth
@@ -364,7 +364,7 @@ impl GroupHierarchyService {
 
                 SELECT g.id, g.parent_id, g.display_name, g.group_type, s.relative_depth + 1
                 FROM groups g
-                JOIN subtree s ON g.parent_id = s.id
+                JOIN subtree s ON g.parent_id = s.id AND g.tenant_id = $1
                 WHERE g.tenant_id = $1
             )
             SELECT id, parent_id, display_name, group_type, relative_depth
@@ -450,7 +450,7 @@ impl GroupHierarchyService {
 
                 SELECT g.id
                 FROM groups g
-                JOIN subtree s ON g.parent_id = s.id
+                JOIN subtree s ON g.parent_id = s.id AND g.tenant_id = $1
                 WHERE g.tenant_id = $1
             )
             SELECT COUNT(DISTINCT u.id)
@@ -477,7 +477,7 @@ impl GroupHierarchyService {
 
                 SELECT g.id
                 FROM groups g
-                JOIN subtree s ON g.parent_id = s.id
+                JOIN subtree s ON g.parent_id = s.id AND g.tenant_id = $1
                 WHERE g.tenant_id = $1
             )
             SELECT DISTINCT u.id AS user_id, u.email, u.display_name
@@ -607,5 +607,31 @@ mod tests {
     #[test]
     fn test_allowed_group_types() {
         assert_eq!(ALLOWED_GROUP_TYPES.len(), 6);
+    }
+
+    #[test]
+    fn hierarchy_walks_join_groups_on_tenant_id() {
+        let src = include_str!("group_hierarchy_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("JOIN depth_calc d ON g.id = d.parent_id AND g.tenant_id = $1"),
+            "depth walks must join groups on tenant_id"
+        );
+        assert!(
+            production.contains("JOIN ancestors a ON g.id = a.parent_id AND g.tenant_id = $1"),
+            "ancestor walks must join groups on tenant_id"
+        );
+        assert!(
+            production.contains("JOIN subtree s ON g.parent_id = s.id AND g.tenant_id = $1"),
+            "subtree walks must join groups on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN depth_calc d ON g.id = d.parent_id\n"),
+            "must not join depth_calc by id alone"
+        );
+        assert!(
+            !production.contains("JOIN subtree s ON g.parent_id = s.id\n"),
+            "must not join subtree by parent_id alone"
+        );
     }
 }

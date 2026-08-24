@@ -185,7 +185,7 @@ impl GovRoleEffectiveEntitlement {
 
                 SELECT r.id
                 FROM gov_roles r
-                INNER JOIN descendants d ON r.parent_role_id = d.id
+                INNER JOIN descendants d ON r.parent_role_id = d.id AND r.tenant_id = $2
                 WHERE r.tenant_id = $2
             )
             INSERT INTO gov_role_effective_entitlements (tenant_id, role_id, entitlement_id, source_role_id, is_inherited)
@@ -222,7 +222,7 @@ impl GovRoleEffectiveEntitlement {
                 UNION ALL
 
                 SELECT r.id FROM gov_roles r
-                INNER JOIN descendants d ON r.parent_role_id = d.id
+                INNER JOIN descendants d ON r.parent_role_id = d.id AND r.tenant_id = $2
                 WHERE r.tenant_id = $2
             )
             SELECT id FROM descendants
@@ -265,7 +265,7 @@ impl GovRoleEffectiveEntitlement {
 
                 SELECT r.id, r.parent_role_id
                 FROM gov_roles r
-                INNER JOIN ancestors a ON r.id = a.parent_role_id
+                INNER JOIN ancestors a ON r.id = a.parent_role_id AND r.tenant_id = $2
                 WHERE r.tenant_id = $2
             )
             SELECT id FROM ancestors
@@ -398,5 +398,30 @@ mod tests {
 
         assert_eq!(details.entitlement_name, "deploy-to-production");
         assert!(details.is_inherited);
+    }
+
+    #[test]
+    fn recompute_walks_join_roles_on_tenant_id() {
+        let src = include_str!("gov_role_effective_entitlement.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains(
+                "INNER JOIN descendants d ON r.parent_role_id = d.id AND r.tenant_id = $2"
+            ),
+            "descendant recomputes must join roles on tenant_id"
+        );
+        assert!(
+            production
+                .contains("INNER JOIN ancestors a ON r.id = a.parent_role_id AND r.tenant_id = $2"),
+            "ancestor recomputes must join roles on tenant_id"
+        );
+        assert!(
+            !production.contains("INNER JOIN descendants d ON r.parent_role_id = d.id\n"),
+            "must not join descendant roles by parent_role_id alone"
+        );
+        assert!(
+            !production.contains("INNER JOIN ancestors a ON r.id = a.parent_role_id\n"),
+            "must not join ancestor roles by id alone"
+        );
     }
 }
