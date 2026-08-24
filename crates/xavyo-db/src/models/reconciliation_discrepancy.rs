@@ -485,7 +485,7 @@ impl ReconciliationDiscrepancy {
                     d.discrepancy_type as discrepancy_type,
                     COUNT(*) as count
                 FROM gov_reconciliation_discrepancies d
-                JOIN gov_connector_reconciliation_runs r ON d.run_id = r.id
+                JOIN gov_connector_reconciliation_runs r ON d.run_id = r.id AND r.tenant_id = d.tenant_id
                 WHERE d.tenant_id = $1
                   AND r.connector_id = $2
                   AND d.detected_at >= $3
@@ -638,6 +638,22 @@ mod tests {
                 ReconciliationActionType::Link,
                 ReconciliationActionType::Delete
             ]
+        );
+    }
+
+    #[test]
+    fn trend_lookups_join_runs_on_tenant_id() {
+        let src = include_str!("reconciliation_discrepancy.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains(
+                "JOIN gov_connector_reconciliation_runs r ON d.run_id = r.id AND r.tenant_id = d.tenant_id"
+            ),
+            "connector trend lookups must join runs on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN gov_connector_reconciliation_runs r ON d.run_id = r.id\n"),
+            "must not join reconciliation runs by id alone"
         );
     }
 }

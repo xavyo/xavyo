@@ -201,9 +201,9 @@ impl GovStateTransitionRequest {
                 r.grace_period_ends_at, r.rollback_available, r.error_message,
                 r.created_at, r.updated_at
             FROM gov_state_transition_requests r
-            JOIN gov_lifecycle_transitions t ON r.transition_id = t.id
-            JOIN gov_lifecycle_states fs ON r.from_state_id = fs.id
-            JOIN gov_lifecycle_states ts ON r.to_state_id = ts.id
+            JOIN gov_lifecycle_transitions t ON r.transition_id = t.id AND t.tenant_id = r.tenant_id
+            JOIN gov_lifecycle_states fs ON r.from_state_id = fs.id AND fs.tenant_id = r.tenant_id
+            JOIN gov_lifecycle_states ts ON r.to_state_id = ts.id AND ts.tenant_id = r.tenant_id
             WHERE r.id = $1 AND r.tenant_id = $2
             ",
         )
@@ -650,6 +650,42 @@ mod tests {
         assert!(
             !production.contains("WHERE id = $1 AND rollback_available = true"),
             "must not expire grace periods by id alone"
+        );
+    }
+
+    #[test]
+    fn state_lookups_join_lifecycle_on_tenant_id() {
+        let src = include_str!("gov_state_transition_request.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains(
+                "JOIN gov_lifecycle_transitions t ON r.transition_id = t.id AND t.tenant_id = r.tenant_id"
+            ),
+            "transition lookups must join transitions on tenant_id"
+        );
+        assert!(
+            production.contains(
+                "JOIN gov_lifecycle_states fs ON r.from_state_id = fs.id AND fs.tenant_id = r.tenant_id"
+            ),
+            "from-state lookups must join states on tenant_id"
+        );
+        assert!(
+            production.contains(
+                "JOIN gov_lifecycle_states ts ON r.to_state_id = ts.id AND ts.tenant_id = r.tenant_id"
+            ),
+            "to-state lookups must join states on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN gov_lifecycle_transitions t ON r.transition_id = t.id\n"),
+            "must not join transitions by id alone"
+        );
+        assert!(
+            !production.contains("JOIN gov_lifecycle_states fs ON r.from_state_id = fs.id\n"),
+            "must not join from-states by id alone"
+        );
+        assert!(
+            !production.contains("JOIN gov_lifecycle_states ts ON r.to_state_id = ts.id\n"),
+            "must not join to-states by id alone"
         );
     }
 }

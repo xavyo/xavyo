@@ -193,9 +193,8 @@ impl GovLicenseEntitlementLink {
         tenant_id: Uuid,
         entitlement_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
-        sqlx::query_as!(
-            Self,
-            r#"
+        sqlx::query_as(
+            r"
             SELECT
                 l.id,
                 l.tenant_id,
@@ -206,17 +205,17 @@ impl GovLicenseEntitlementLink {
                 l.created_at,
                 l.created_by
             FROM gov_license_entitlement_links l
-            JOIN gov_license_pools p ON p.id = l.license_pool_id
+            JOIN gov_license_pools p ON p.id = l.license_pool_id AND p.tenant_id = l.tenant_id
             WHERE l.tenant_id = $1
               AND l.entitlement_id = $2
               AND l.enabled = true
               AND p.status = 'active'
               AND p.allocated_count < p.total_capacity
             ORDER BY l.priority ASC, l.created_at ASC
-            "#,
-            tenant_id,
-            entitlement_id
+            ",
         )
+        .bind(tenant_id)
+        .bind(entitlement_id)
         .fetch_all(pool)
         .await
     }
@@ -268,9 +267,8 @@ impl GovLicenseEntitlementLink {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<LicenseEntitlementLinkWithDetails>, sqlx::Error> {
-        sqlx::query_as!(
-            LicenseEntitlementLinkWithDetails,
-            r#"
+        sqlx::query_as(
+            r"
             SELECT
                 l.id,
                 l.tenant_id,
@@ -284,22 +282,22 @@ impl GovLicenseEntitlementLink {
                 p.vendor as pool_vendor,
                 e.name as entitlement_name
             FROM gov_license_entitlement_links l
-            LEFT JOIN gov_license_pools p ON p.id = l.license_pool_id
-            LEFT JOIN gov_entitlements e ON e.id = l.entitlement_id
+            LEFT JOIN gov_license_pools p ON p.id = l.license_pool_id AND p.tenant_id = l.tenant_id
+            LEFT JOIN gov_entitlements e ON e.id = l.entitlement_id AND e.tenant_id = l.tenant_id
             WHERE l.tenant_id = $1
               AND ($2::uuid IS NULL OR l.license_pool_id = $2)
               AND ($3::uuid IS NULL OR l.entitlement_id = $3)
               AND ($4::boolean IS NULL OR l.enabled = $4)
             ORDER BY l.priority ASC, l.created_at DESC
             LIMIT $5 OFFSET $6
-            "#,
-            tenant_id,
-            filter.license_pool_id,
-            filter.entitlement_id,
-            filter.enabled,
-            limit,
-            offset
+            ",
         )
+        .bind(tenant_id)
+        .bind(filter.license_pool_id)
+        .bind(filter.entitlement_id)
+        .bind(filter.enabled)
+        .bind(limit)
+        .bind(offset)
         .fetch_all(pool)
         .await
     }
@@ -519,5 +517,37 @@ mod tests {
         assert!(filter.license_pool_id.is_none());
         assert!(filter.entitlement_id.is_none());
         assert!(filter.enabled.is_none());
+    }
+
+    #[test]
+    fn license_link_lookups_join_pools_and_entitlements_on_tenant_id() {
+        let src = include_str!("gov_license_entitlement_link.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains(
+                "JOIN gov_license_pools p ON p.id = l.license_pool_id AND p.tenant_id = l.tenant_id"
+            ),
+            "available-pool lookups must join pools on tenant_id"
+        );
+        assert!(
+            production.contains(
+                "LEFT JOIN gov_license_pools p ON p.id = l.license_pool_id AND p.tenant_id = l.tenant_id"
+            ),
+            "detail lookups must join pools on tenant_id"
+        );
+        assert!(
+            production.contains(
+                "LEFT JOIN gov_entitlements e ON e.id = l.entitlement_id AND e.tenant_id = l.tenant_id"
+            ),
+            "detail lookups must join entitlements on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN gov_license_pools p ON p.id = l.license_pool_id\n"),
+            "must not join license pools by id alone"
+        );
+        assert!(
+            !production.contains("LEFT JOIN gov_entitlements e ON e.id = l.entitlement_id\n"),
+            "must not join entitlements by id alone"
+        );
     }
 }

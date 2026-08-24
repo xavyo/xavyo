@@ -375,14 +375,13 @@ impl GovLicenseReclamationRule {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<LicenseReclamationRuleWithDetails>, sqlx::Error> {
-        sqlx::query_as!(
-            LicenseReclamationRuleWithDetails,
-            r#"
+        sqlx::query_as(
+            r"
             SELECT
                 r.id,
                 r.tenant_id,
                 r.license_pool_id,
-                r.trigger_type as "trigger_type: LicenseReclamationTrigger",
+                r.trigger_type,
                 r.threshold_days,
                 r.lifecycle_state,
                 r.notification_days_before,
@@ -393,24 +392,24 @@ impl GovLicenseReclamationRule {
                 p.name as pool_name,
                 p.vendor as pool_vendor
             FROM gov_license_reclamation_rules r
-            LEFT JOIN gov_license_pools p ON p.id = r.license_pool_id
+            LEFT JOIN gov_license_pools p ON p.id = r.license_pool_id AND p.tenant_id = r.tenant_id
             WHERE r.tenant_id = $1
               AND ($2::uuid IS NULL OR r.license_pool_id = $2)
               AND ($3::text IS NULL OR r.trigger_type::text = $3)
               AND ($4::boolean IS NULL OR r.enabled = $4)
             ORDER BY r.created_at DESC
             LIMIT $5 OFFSET $6
-            "#,
-            tenant_id,
-            filter.license_pool_id,
-            filter.trigger_type.as_ref().map(|t| match t {
-                LicenseReclamationTrigger::Inactivity => "inactivity",
-                LicenseReclamationTrigger::LifecycleState => "lifecycle_state",
-            }),
-            filter.enabled,
-            limit,
-            offset
+            ",
         )
+        .bind(tenant_id)
+        .bind(filter.license_pool_id)
+        .bind(filter.trigger_type.as_ref().map(|t| match t {
+            LicenseReclamationTrigger::Inactivity => "inactivity",
+            LicenseReclamationTrigger::LifecycleState => "lifecycle_state",
+        }))
+        .bind(filter.enabled)
+        .bind(limit)
+        .bind(offset)
         .fetch_all(pool)
         .await
     }
@@ -688,5 +687,21 @@ mod tests {
         assert!(filter.license_pool_id.is_none());
         assert!(filter.trigger_type.is_none());
         assert!(filter.enabled.is_none());
+    }
+
+    #[test]
+    fn reclamation_detail_lookups_join_pools_on_tenant_id() {
+        let src = include_str!("gov_license_reclamation_rule.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains(
+                "LEFT JOIN gov_license_pools p ON p.id = r.license_pool_id AND p.tenant_id = r.tenant_id"
+            ),
+            "detail lookups must join license pools on tenant_id"
+        );
+        assert!(
+            !production.contains("LEFT JOIN gov_license_pools p ON p.id = r.license_pool_id\n"),
+            "must not join license pools by id alone"
+        );
     }
 }
