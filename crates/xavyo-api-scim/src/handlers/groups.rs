@@ -89,7 +89,7 @@ pub async fn list_groups(
 
     match &result {
         Ok(_) => {
-            if let Err(e) = audit_service
+            audit_service
                 .log(
                     auth.tenant_id,
                     Some(auth.token.id),
@@ -102,10 +102,7 @@ pub async fn list_groups(
                     200,
                     None,
                 )
-                .await
-            {
-                tracing::warn!(error = %e, "Failed to write SCIM group audit log");
-            }
+                .await?;
         }
         Err(e) => {
             audit_service
@@ -158,7 +155,7 @@ pub async fn create_group(
 
     match &result {
         Ok(group) => {
-            if let Err(e) = audit_service
+            audit_service
                 .log(
                     auth.tenant_id,
                     Some(auth.token.id),
@@ -171,10 +168,7 @@ pub async fn create_group(
                     201,
                     None,
                 )
-                .await
-            {
-                tracing::warn!(error = %e, "Failed to write SCIM group audit log");
-            }
+                .await?;
         }
         Err(e) => {
             audit_service
@@ -243,7 +237,7 @@ pub async fn get_group(
 
     match &result {
         Ok(_) => {
-            if let Err(e) = audit_service
+            audit_service
                 .log(
                     auth.tenant_id,
                     Some(auth.token.id),
@@ -256,10 +250,7 @@ pub async fn get_group(
                     200,
                     None,
                 )
-                .await
-            {
-                tracing::warn!(error = %e, "Failed to write SCIM group audit log");
-            }
+                .await?;
         }
         Err(e) => {
             audit_service
@@ -318,7 +309,7 @@ pub async fn replace_group(
 
     match &result {
         Ok(_) => {
-            if let Err(e) = audit_service
+            audit_service
                 .log(
                     auth.tenant_id,
                     Some(auth.token.id),
@@ -331,10 +322,7 @@ pub async fn replace_group(
                     200,
                     None,
                 )
-                .await
-            {
-                tracing::warn!(error = %e, "Failed to write SCIM group audit log");
-            }
+                .await?;
         }
         Err(e) => {
             audit_service
@@ -407,7 +395,7 @@ pub async fn update_group(
 
     match &result {
         Ok(_) => {
-            if let Err(e) = audit_service
+            audit_service
                 .log(
                     auth.tenant_id,
                     Some(auth.token.id),
@@ -420,10 +408,7 @@ pub async fn update_group(
                     200,
                     None,
                 )
-                .await
-            {
-                tracing::warn!(error = %e, "Failed to write SCIM group audit log");
-            }
+                .await?;
         }
         Err(e) => {
             audit_service
@@ -493,7 +478,7 @@ pub async fn delete_group(
 
     match &result {
         Ok(()) => {
-            if let Err(e) = audit_service
+            audit_service
                 .log(
                     auth.tenant_id,
                     Some(auth.token.id),
@@ -506,10 +491,7 @@ pub async fn delete_group(
                     204,
                     None,
                 )
-                .await
-            {
-                tracing::warn!(error = %e, "Failed to write SCIM group audit log");
-            }
+                .await?;
         }
         Err(e) => {
             audit_service
@@ -545,4 +527,25 @@ pub async fn delete_group(
     }
 
     Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn group_success_audits_do_not_swallow_write_errors() {
+        let src = include_str!("groups.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("Failed to write SCIM group audit log"),
+            "SCIM group handlers must not swallow success-path audit errors"
+        );
+        assert!(
+            !production.contains("if let Err(e) = audit_service"),
+            "SCIM group success audits must not be wrapped in if-let-Err"
+        );
+        assert!(
+            production.matches(".await?;").count() >= 6 && production.contains("audit_service"),
+            "SCIM group success audits must fail closed when the audit row cannot be written"
+        );
+    }
 }

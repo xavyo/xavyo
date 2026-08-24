@@ -62,21 +62,21 @@ impl AuditService {
         source_ip: IpAddr,
         user_agent: Option<String>,
         response_code: i32,
-    ) {
-        let _ = self
-            .log(
-                tenant_id,
-                Some(token_id),
-                operation,
-                ScimResourceType::User,
-                user_id,
-                source_ip,
-                user_agent,
-                None,
-                response_code,
-                None,
-            )
-            .await;
+    ) -> ScimResult<()> {
+        self.log(
+            tenant_id,
+            Some(token_id),
+            operation,
+            ScimResourceType::User,
+            user_id,
+            source_ip,
+            user_agent,
+            None,
+            response_code,
+            None,
+        )
+        .await?;
+        Ok(())
     }
 
     /// Log a failed operation.
@@ -205,5 +205,24 @@ mod tests {
 
         assert!(result.get("_truncated").is_some());
         assert!(result.get("_original_size").is_some());
+    }
+
+    #[test]
+    fn log_user_success_does_not_swallow_write_errors() {
+        let src = include_str!("audit_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let success = production
+            .split("pub async fn log_user_success")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("log_user_success");
+        assert!(
+            !success.contains("let _ = self"),
+            "log_user_success must not swallow SCIM audit writes"
+        );
+        assert!(
+            success.contains("-> ScimResult<()>") && success.contains(".await?;"),
+            "log_user_success must propagate audit write errors"
+        );
     }
 }

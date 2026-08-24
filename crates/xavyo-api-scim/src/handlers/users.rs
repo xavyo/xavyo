@@ -100,7 +100,7 @@ pub async fn list_users(
                     user_agent,
                     200,
                 )
-                .await;
+                .await?;
         }
         Err(e) => {
             audit_service
@@ -162,7 +162,7 @@ pub async fn create_user(
                     user_agent,
                     201,
                 )
-                .await;
+                .await?;
         }
         Err(e) => {
             audit_service
@@ -240,7 +240,7 @@ pub async fn get_user(
                     user_agent,
                     200,
                 )
-                .await;
+                .await?;
         }
         Err(e) => {
             audit_service
@@ -306,7 +306,7 @@ pub async fn replace_user(
                     user_agent,
                     200,
                 )
-                .await;
+                .await?;
         }
         Err(e) => {
             audit_service
@@ -388,7 +388,7 @@ pub async fn update_user(
                     user_agent,
                     200,
                 )
-                .await;
+                .await?;
         }
         Err(e) => {
             audit_service
@@ -467,7 +467,7 @@ pub async fn delete_user(
                     user_agent,
                     204,
                 )
-                .await;
+                .await?;
         }
         Err(e) => {
             audit_service
@@ -504,4 +504,26 @@ pub async fn delete_user(
 
     // Return 204 No Content
     Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn user_success_audits_do_not_swallow_write_errors() {
+        let src = include_str!("users.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.matches("log_user_success(").count() >= 6
+                && production.matches(".await?;").count() >= 6,
+            "SCIM user success audits must fail closed when the audit row cannot be written"
+        );
+        assert!(
+            !production.contains(".log_user_success(")
+                || production
+                    .split(".log_user_success(")
+                    .skip(1)
+                    .all(|chunk| chunk.contains(".await?;")),
+            "SCIM user success audits must not discard log_user_success errors"
+        );
+    }
 }
