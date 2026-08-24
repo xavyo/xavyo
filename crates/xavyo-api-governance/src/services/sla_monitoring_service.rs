@@ -330,53 +330,51 @@ impl SlaMonitoringService {
             let escalation_emails = self.extract_escalation_emails(&task.escalation_contacts);
 
             // Get task details for notification
-            if let Ok(Some(full_task)) =
-                GovManualProvisioningTask::find_by_id(&self.pool, tenant_id, task_id).await
-            {
-                let (app_name, ent_name) = self
-                    .get_task_names(
-                        tenant_id,
-                        full_task.application_id,
-                        full_task.entitlement_id,
-                    )
-                    .await
-                    .unwrap_or_else(|_| ("Unknown".to_string(), "Unknown".to_string()));
-
-                // Lookup assignee email if task is assigned
-                let assignee_email = match full_task.assignee_id {
-                    Some(assignee_id) => self.get_user_email(tenant_id, assignee_id).await,
-                    None => None,
-                };
-
-                // Get user display name for the user receiving access
-                let user_display_name = self
-                    .get_user_display_name(tenant_id, full_task.user_id)
-                    .await;
-
-                let notification = SlaBreachNotification {
+            let full_task = GovManualProvisioningTask::find_by_id(&self.pool, tenant_id, task_id)
+                .await?
+                .ok_or(GovernanceError::ManualProvisioningTaskNotFound(task_id))?;
+            let (app_name, ent_name) = self
+                .get_task_names(
                     tenant_id,
-                    task_id,
-                    application_name: app_name,
-                    entitlement_name: ent_name,
-                    user_display_name,
-                    sla_deadline: deadline,
-                    overdue_minutes,
-                    policy_name: task.policy_name.clone().unwrap_or_default(),
-                    escalation_emails,
-                    assignee_email,
-                };
+                    full_task.application_id,
+                    full_task.entitlement_id,
+                )
+                .await?;
 
-                if let Err(e) = self
-                    .notification_service
-                    .send_breach_notification(&notification)
-                    .await
-                {
-                    tracing::error!(
-                        task_id = %task_id,
-                        error = %e,
-                        "Failed to send breach notification"
-                    );
-                }
+            // Lookup assignee email if task is assigned
+            let assignee_email = match full_task.assignee_id {
+                Some(assignee_id) => self.get_user_email(tenant_id, assignee_id).await,
+                None => None,
+            };
+
+            // Get user display name for the user receiving access
+            let user_display_name = self
+                .get_user_display_name(tenant_id, full_task.user_id)
+                .await;
+
+            let notification = SlaBreachNotification {
+                tenant_id,
+                task_id,
+                application_name: app_name,
+                entitlement_name: ent_name,
+                user_display_name,
+                sla_deadline: deadline,
+                overdue_minutes,
+                policy_name: task.policy_name.clone().unwrap_or_default(),
+                escalation_emails,
+                assignee_email,
+            };
+
+            if let Err(e) = self
+                .notification_service
+                .send_breach_notification(&notification)
+                .await
+            {
+                tracing::error!(
+                    task_id = %task_id,
+                    error = %e,
+                    "Failed to send breach notification"
+                );
             }
         }
 
@@ -502,58 +500,55 @@ impl SlaMonitoringService {
         );
 
         // Send warning notifications
-        // Get task details for notification
-        if let Ok(Some(full_task)) =
-            GovManualProvisioningTask::find_by_id(&self.pool, tenant_id, task_id).await
-        {
-            let (app_name, ent_name) = self
-                .get_task_names(
-                    tenant_id,
-                    full_task.application_id,
-                    full_task.entitlement_id,
-                )
-                .await
-                .unwrap_or_else(|_| ("Unknown".to_string(), "Unknown".to_string()));
-
-            // Extract recipient emails from escalation contacts
-            let recipient_emails = self.extract_escalation_emails(&task.escalation_contacts);
-
-            // Lookup assignee email if task is assigned
-            let assignee_email = match full_task.assignee_id {
-                Some(assignee_id) => self.get_user_email(tenant_id, assignee_id).await,
-                None => None,
-            };
-
-            // Get user display name for the user receiving access
-            let user_display_name = self
-                .get_user_display_name(tenant_id, full_task.user_id)
-                .await;
-
-            let notification = SlaWarningNotification {
+        let full_task = GovManualProvisioningTask::find_by_id(&self.pool, tenant_id, task_id)
+            .await?
+            .ok_or(GovernanceError::ManualProvisioningTaskNotFound(task_id))?;
+        let (app_name, ent_name) = self
+            .get_task_names(
                 tenant_id,
-                task_id,
-                application_name: app_name,
-                entitlement_name: ent_name,
-                user_display_name,
-                sla_deadline: deadline,
-                time_remaining_minutes: time_remaining.num_minutes(),
-                warning_threshold_percent: task.warning_threshold_percent.unwrap_or(75),
-                policy_name: task.policy_name.clone().unwrap_or_default(),
-                recipient_emails,
-                assignee_email,
-            };
+                full_task.application_id,
+                full_task.entitlement_id,
+            )
+            .await?;
 
-            if let Err(e) = self
-                .notification_service
-                .send_warning_notification(&notification)
-                .await
-            {
-                tracing::error!(
-                    task_id = %task_id,
-                    error = %e,
-                    "Failed to send warning notification"
-                );
-            }
+        // Extract recipient emails from escalation contacts
+        let recipient_emails = self.extract_escalation_emails(&task.escalation_contacts);
+
+        // Lookup assignee email if task is assigned
+        let assignee_email = match full_task.assignee_id {
+            Some(assignee_id) => self.get_user_email(tenant_id, assignee_id).await,
+            None => None,
+        };
+
+        // Get user display name for the user receiving access
+        let user_display_name = self
+            .get_user_display_name(tenant_id, full_task.user_id)
+            .await;
+
+        let notification = SlaWarningNotification {
+            tenant_id,
+            task_id,
+            application_name: app_name,
+            entitlement_name: ent_name,
+            user_display_name,
+            sla_deadline: deadline,
+            time_remaining_minutes: time_remaining.num_minutes(),
+            warning_threshold_percent: task.warning_threshold_percent.unwrap_or(75),
+            policy_name: task.policy_name.clone().unwrap_or_default(),
+            recipient_emails,
+            assignee_email,
+        };
+
+        if let Err(e) = self
+            .notification_service
+            .send_warning_notification(&notification)
+            .await
+        {
+            tracing::error!(
+                task_id = %task_id,
+                error = %e,
+                "Failed to send warning notification"
+            );
         }
 
         Ok(())
@@ -800,5 +795,32 @@ mod tests {
             !production.contains("JOIN gov_sla_policies p ON t.sla_policy_id = p.id\n"),
             "must not join SLA policies by id alone"
         );
+    }
+
+    #[test]
+    fn sla_notifications_do_not_fail_open_on_task_lookups() {
+        let src = include_str!("sla_monitoring_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for fn_name in ["fn mark_breach", "fn send_warning"] {
+            let window = production
+                .split(fn_name)
+                .nth(1)
+                .and_then(|s| s.split("    async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                !window.contains("if let Ok(Some(full_task))"),
+                "{fn_name} must not skip notifications when the task lookup errors"
+            );
+            assert!(
+                !window.contains(
+                    "unwrap_or_else(|_| (\"Unknown\".to_string(), \"Unknown\".to_string()))"
+                ),
+                "{fn_name} must not hide name-lookup errors as Unknown"
+            );
+            assert!(
+                window.contains("ManualProvisioningTaskNotFound(task_id)"),
+                "{fn_name} must fail when the task cannot be loaded for notification"
+            );
+        }
     }
 }

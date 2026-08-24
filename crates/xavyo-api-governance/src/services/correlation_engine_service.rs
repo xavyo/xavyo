@@ -512,8 +512,8 @@ impl CorrelationEngineService {
             let already_queued =
                 GovCorrelationCase::find_pending_by_account(&self.pool, tenant_id, account_id)
                     .await
-                    .map(|opt| opt.is_some())
-                    .unwrap_or(false);
+                    .map_err(GovernanceError::Database)?
+                    .is_some();
 
             if already_queued {
                 tracing::info!(
@@ -917,6 +917,19 @@ impl CorrelationEngineService {
     }
 }
 
+async fn fail_correlation_job(
+    jobs: &Arc<Mutex<HashMap<Uuid, CorrelationJobStatus>>>,
+    job_id: Uuid,
+    error_message: String,
+) {
+    let mut map = jobs.lock().await;
+    if let Some(job) = map.get_mut(&job_id) {
+        job.status = "failed".to_string();
+        job.error_message = Some(error_message);
+        job.completed_at = Some(Utc::now());
+    }
+}
+
 // =============================================================================
 // Async batch runner (free function for tokio::spawn)
 // =============================================================================
@@ -970,12 +983,14 @@ async fn run_batch_evaluation(
                     }
                     Err(e) => {
                         tracing::error!(account_id = %id, error = %e, "Error fetching shadow account");
+                        fail_correlation_job(&jobs, job_id, e.to_string()).await;
+                        return;
                     }
                 }
             }
             result
         }
-        None => sqlx::query_as::<_, (Uuid, serde_json::Value)>(
+        None => match sqlx::query_as::<_, (Uuid, serde_json::Value)>(
             r"
                 SELECT id, attributes FROM gov_shadows
                 WHERE tenant_id = $1
@@ -990,7 +1005,20 @@ async fn run_batch_evaluation(
         .bind(connector_id)
         .fetch_all(&pool)
         .await
-        .unwrap_or_default(),
+        {
+            Ok(accounts) => accounts,
+            Err(e) => {
+                tracing::error!(
+                    job_id = %job_id,
+                    tenant_id = %tenant_id,
+                    connector_id = %connector_id,
+                    error = %e,
+                    "Failed to load shadow accounts for correlation job"
+                );
+                fail_correlation_job(&jobs, job_id, e.to_string()).await;
+                return;
+            }
+        },
     };
 
     // Update total count now that we know the actual number.
@@ -1633,6 +1661,38 @@ mod tests {
 
         // Unicode characters: lowercased.
         assert_eq!(normalize_attribute("ALICE"), "alice");
+    }
+
+    #[test]
+    fn batch_and_case_lookups_do_not_fail_open_on_query_errors() {
+        let src = include_str!("correlation_engine_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let runner = production
+            .split("async fn run_batch_evaluation")
+            .nth(1)
+            .and_then(|s| s.split("// Scoring functions").next())
+            .expect("run_batch_evaluation");
+        assert!(
+            !runner.contains("unwrap_or_default()"),
+            "batch correlation must not treat shadow-account query errors as zero accounts"
+        );
+        assert!(
+            runner.contains("fail_correlation_job"),
+            "batch correlation must mark the job failed when account lookups error"
+        );
+        let evaluate = production
+            .split("pub async fn evaluate_account")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("evaluate_account");
+        assert!(
+            !evaluate.contains("unwrap_or(false)"),
+            "pending-case lookup errors must not skip duplicate prevention"
+        );
+        assert!(
+            evaluate.contains("map_err(GovernanceError::Database)?"),
+            "pending-case lookup errors must fail the evaluation"
+        );
     }
 
     // ---- test_apply_thresholds ----

@@ -391,8 +391,8 @@ impl JobService {
             operations.iter().map(|op| op.connector_id).collect();
 
         for connector_id in connector_ids {
-            if let Ok(Some(config)) =
-                ConnectorConfiguration::find_by_id(&self.pool, tenant_id, connector_id).await
+            if let Some(config) =
+                ConnectorConfiguration::find_by_id(&self.pool, tenant_id, connector_id).await?
             {
                 names.insert(connector_id, config.name);
             }
@@ -443,8 +443,8 @@ impl JobService {
 
         // If no attempts found but operation has been processed, create a synthetic attempt
         if attempts.is_empty() {
-            if let Ok(Some(op)) =
-                ProvisioningOperation::find_by_id(&self.pool, tenant_id, job_id).await
+            if let Some(op) =
+                ProvisioningOperation::find_by_id(&self.pool, tenant_id, job_id).await?
             {
                 if op.started_at.is_some() {
                     attempts.push(JobAttempt {
@@ -549,5 +549,37 @@ mod tests {
 
         let err = JobServiceError::AlreadyReplayed(Uuid::new_v4());
         assert!(err.to_string().contains("already been replayed"));
+    }
+
+    #[test]
+    fn connector_and_operation_lookups_do_not_fail_open_on_query_errors() {
+        let src = include_str!("job_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let names = production
+            .split("async fn get_connector_names")
+            .nth(1)
+            .and_then(|s| s.split("    async fn ").next())
+            .expect("get_connector_names");
+        assert!(
+            !names.contains("if let Ok(Some(config))"),
+            "connector name lookup must not omit names when the query errors"
+        );
+        assert!(
+            names.contains("find_by_id(&self.pool, tenant_id, connector_id).await?"),
+            "connector name lookup must propagate query errors"
+        );
+        let attempts = production
+            .split("async fn get_job_attempts")
+            .nth(1)
+            .and_then(|s| s.split("    fn ").next())
+            .expect("get_job_attempts");
+        assert!(
+            !attempts.contains("if let Ok(Some(op))"),
+            "job attempt lookup must not omit history when the query errors"
+        );
+        assert!(
+            attempts.contains("find_by_id(&self.pool, tenant_id, job_id).await?"),
+            "job attempt lookup must propagate query errors"
+        );
     }
 }
