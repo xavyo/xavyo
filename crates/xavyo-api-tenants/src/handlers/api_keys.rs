@@ -108,7 +108,7 @@ pub async fn create_api_key_handler(
         .map_err(|e| TenantError::Database(e.to_string()))?;
 
     // Create audit log entry
-    let _ = AdminAuditLog::create(
+    AdminAuditLog::create(
         &state.pool,
         CreateAuditLogEntry {
             tenant_id,
@@ -128,7 +128,8 @@ pub async fn create_api_key_handler(
             user_agent: None,
         },
     )
-    .await;
+    .await
+    .map_err(|e| TenantError::Database(e.to_string()))?;
 
     tracing::info!(
         tenant_id = %tenant_id,
@@ -271,7 +272,7 @@ pub async fn rotate_api_key_handler(
     };
 
     // Audit log - note: we don't log the plaintext key, only the key_id
-    let _ = AdminAuditLog::create(
+    AdminAuditLog::create(
         &state.pool,
         CreateAuditLogEntry {
             tenant_id,
@@ -294,7 +295,8 @@ pub async fn rotate_api_key_handler(
             user_agent: None,
         },
     )
-    .await;
+    .await
+    .map_err(|e| TenantError::Database(e.to_string()))?;
 
     tracing::info!(
         tenant_id = %tenant_id,
@@ -443,7 +445,7 @@ pub async fn deactivate_api_key_handler(
         .map_err(|e| TenantError::Database(e.to_string()))?;
 
     // Audit log
-    let _ = AdminAuditLog::create(
+    AdminAuditLog::create(
         &state.pool,
         CreateAuditLogEntry {
             tenant_id,
@@ -463,7 +465,8 @@ pub async fn deactivate_api_key_handler(
             user_agent: None,
         },
     )
-    .await;
+    .await
+    .map_err(|e| TenantError::Database(e.to_string()))?;
 
     tracing::info!(
         tenant_id = %tenant_id,
@@ -727,4 +730,22 @@ pub async fn introspect_api_key_handler(
         has_full_access,
         scopes,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn api_key_mutations_do_not_swallow_audit_errors() {
+        let src = include_str!("api_keys.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("let _ = AdminAuditLog::create("),
+            "API key mutations must not swallow admin audit errors"
+        );
+        assert!(
+            production.matches("AdminAuditLog::create(").count() >= 3
+                && production.contains("map_err(|e| TenantError::Database(e.to_string()))?"),
+            "API key mutations must fail when admin audit cannot be written"
+        );
+    }
 }

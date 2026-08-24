@@ -113,7 +113,7 @@ pub async fn delete_tenant_handler(
             .map_err(|e| TenantError::Database(e.to_string()))?;
 
     // Audit log
-    let _ = AdminAuditLog::create(
+    AdminAuditLog::create(
         &state.pool,
         CreateAuditLogEntry {
             tenant_id: SYSTEM_TENANT_ID,
@@ -136,7 +136,8 @@ pub async fn delete_tenant_handler(
             user_agent: None,
         },
     )
-    .await;
+    .await
+    .map_err(|e| TenantError::Database(e.to_string()))?;
 
     tracing::info!(
         tenant_id = %tenant_id,
@@ -234,7 +235,7 @@ pub async fn restore_tenant_handler(
     let restored_at = Utc::now();
 
     // Audit log
-    let _ = AdminAuditLog::create(
+    AdminAuditLog::create(
         &state.pool,
         CreateAuditLogEntry {
             tenant_id: SYSTEM_TENANT_ID,
@@ -257,7 +258,8 @@ pub async fn restore_tenant_handler(
             user_agent: None,
         },
     )
-    .await;
+    .await
+    .map_err(|e| TenantError::Database(e.to_string()))?;
 
     tracing::info!(
         tenant_id = %tenant_id,
@@ -327,4 +329,22 @@ pub async fn list_deleted_tenants_handler(
         deleted_tenants: deleted_tenant_infos,
         total,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn delete_mutations_do_not_swallow_audit_errors() {
+        let src = include_str!("delete.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("let _ = AdminAuditLog::create("),
+            "tenant delete/restore must not swallow admin audit errors"
+        );
+        assert!(
+            production.matches("AdminAuditLog::create(").count() >= 2
+                && production.contains("map_err(|e| TenantError::Database(e.to_string()))?"),
+            "tenant delete/restore must fail when admin audit cannot be written"
+        );
+    }
 }
