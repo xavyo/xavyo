@@ -706,8 +706,9 @@ impl MicroCertificationService {
 
                     // Actually revoke the assignment
                     if let Some(to_revoke) = revoked_assignment_id {
-                        let _ = GovEntitlementAssignment::revoke(&self.pool, tenant_id, to_revoke)
-                            .await;
+                        GovEntitlementAssignment::revoke(&self.pool, tenant_id, to_revoke)
+                            .await
+                            .map_err(GovernanceError::Database)?;
 
                         // Update certification with revoked assignment
                         GovMicroCertification::set_revoked_assignment(
@@ -1701,6 +1702,21 @@ mod tests {
         assert!(
             production.contains("MicroCertTriggerNotFound(entitlement_id)"),
             "missing trigger errors must identify the entitlement"
+        );
+    }
+
+    #[test]
+    fn revoke_decision_does_not_swallow_assignment_revoke() {
+        let src = include_str!("micro_certification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("let _ = GovEntitlementAssignment::revoke"),
+            "micro-cert revoke must not swallow assignment revocation"
+        );
+        assert!(
+            production.contains("GovEntitlementAssignment::revoke")
+                && production.contains("map_err(GovernanceError::Database)?"),
+            "micro-cert revoke must fail when the assignment cannot be revoked"
         );
     }
 
