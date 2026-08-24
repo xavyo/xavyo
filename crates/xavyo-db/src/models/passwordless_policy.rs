@@ -84,7 +84,7 @@ impl PasswordlessPolicy {
     /// Get the parsed enabled methods.
     #[must_use]
     pub fn parsed_enabled_methods(&self) -> EnabledMethods {
-        EnabledMethods::parse(&self.enabled_methods).unwrap_or(EnabledMethods::AllMethods)
+        EnabledMethods::parse(&self.enabled_methods).unwrap_or(EnabledMethods::Disabled)
     }
 
     /// Check if magic link is enabled for this policy.
@@ -257,5 +257,34 @@ mod tests {
         policy.enabled_methods = "disabled".to_string();
         assert!(!policy.magic_link_enabled());
         assert!(!policy.email_otp_enabled());
+
+        // Unknown stored values must fail closed, not enable all methods.
+        policy.enabled_methods = "garbage".to_string();
+        assert_eq!(
+            policy.parsed_enabled_methods(),
+            EnabledMethods::Disabled
+        );
+        assert!(!policy.magic_link_enabled());
+        assert!(!policy.email_otp_enabled());
+    }
+
+    #[test]
+    fn unknown_enabled_methods_fail_closed() {
+        let src = include_str!("passwordless_policy.rs");
+        let parser = src
+            .split("pub fn parsed_enabled_methods")
+            .nth(1)
+            .expect("parsed_enabled_methods")
+            .split("/// Check if magic link is enabled")
+            .next()
+            .expect("parser body");
+        assert!(
+            parser.contains("unwrap_or(EnabledMethods::Disabled)"),
+            "corrupt enabled_methods must not fail open to AllMethods"
+        );
+        assert!(
+            !parser.contains("unwrap_or(EnabledMethods::AllMethods)"),
+            "must not enable all passwordless methods on parse failure"
+        );
     }
 }

@@ -420,7 +420,7 @@ impl ReconciliationService {
         day_of_week: Option<i32>,
         day_of_month: Option<i32>,
         hour_of_day: i32,
-        enabled: bool,
+        enabled: Option<bool>,
     ) -> ReconciliationServiceResult<ReconciliationSchedule> {
         let recon_mode: ConnectorReconciliationMode =
             mode.parse().unwrap_or(ConnectorReconciliationMode::Full);
@@ -449,7 +449,7 @@ impl ReconciliationService {
         tracing::info!(
             connector_id = %connector_id,
             frequency = %frequency,
-            enabled = %enabled,
+            enabled = ?enabled,
             "Reconciliation schedule updated"
         );
 

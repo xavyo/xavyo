@@ -152,7 +152,6 @@ impl GovEscalationRule {
                 timeout = EXCLUDED.timeout,
                 warning_threshold = EXCLUDED.warning_threshold,
                 final_fallback = EXCLUDED.final_fallback,
-                is_enabled = true,
                 updated_at = NOW()
             RETURNING *
             ",
@@ -358,5 +357,25 @@ mod tests {
         };
 
         assert_eq!(input.timeout_secs, 86400);
+    }
+
+    #[test]
+    fn upsert_does_not_reenable_disabled_rule_on_conflict() {
+        let src = include_str!("gov_escalation_rule.rs");
+        let upsert = src
+            .split("pub async fn upsert")
+            .nth(1)
+            .expect("upsert")
+            .split("/// Update a rule")
+            .next()
+            .expect("upsert body");
+        assert!(
+            !upsert.contains("is_enabled = true"),
+            "updating timeout must not silently re-enable a disabled escalation rule"
+        );
+        assert!(
+            upsert.contains("ON CONFLICT (step_id) DO UPDATE SET"),
+            "upsert must still update timeout fields on conflict"
+        );
     }
 }

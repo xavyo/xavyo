@@ -104,15 +104,19 @@ impl ReconciliationSchedule {
                 tenant_id, connector_id, mode, frequency,
                 day_of_week, day_of_month, hour_of_day, enabled, next_run_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, true), $9)
             ON CONFLICT (tenant_id, connector_id) DO UPDATE SET
                 mode = EXCLUDED.mode,
                 frequency = EXCLUDED.frequency,
                 day_of_week = EXCLUDED.day_of_week,
                 day_of_month = EXCLUDED.day_of_month,
                 hour_of_day = EXCLUDED.hour_of_day,
-                enabled = EXCLUDED.enabled,
-                next_run_at = EXCLUDED.next_run_at,
+                enabled = COALESCE($8, gov_reconciliation_schedules.enabled),
+                next_run_at = CASE
+                    WHEN $8::boolean IS TRUE THEN $9
+                    WHEN $8::boolean IS FALSE THEN NULL
+                    ELSE gov_reconciliation_schedules.next_run_at
+                END,
                 updated_at = NOW()
             RETURNING *
             ",
@@ -304,18 +308,15 @@ pub struct UpsertReconciliationSchedule {
     pub day_of_month: Option<i32>,
     #[serde(default = "default_hour")]
     pub hour_of_day: i32,
-    #[serde(default = "default_enabled")]
-    pub enabled: bool,
+    /// Whether enabled. `None` preserves the existing flag on update.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next_run_at: Option<DateTime<Utc>>,
 }
 
 fn default_hour() -> i32 {
     2 // 2 AM UTC
-}
-
-fn default_enabled() -> bool {
-    true
 }
 
 impl Default for UpsertReconciliationSchedule {
@@ -326,7 +327,7 @@ impl Default for UpsertReconciliationSchedule {
             day_of_week: None,
             day_of_month: None,
             hour_of_day: 2,
-            enabled: true,
+            enabled: Some(true),
             next_run_at: None,
         }
     }
@@ -431,5 +432,32 @@ mod tests {
             ..Default::default()
         };
         assert!(input.validate().is_err());
+    }
+
+    #[test]
+    fn upsert_does_not_reenable_when_enabled_omitted() {
+        let src = include_str!("reconciliation_schedule.rs");
+        let upsert = src
+            .split("pub async fn upsert")
+            .nth(1)
+            .expect("upsert")
+            .split("/// Find schedule by connector")
+            .next()
+            .expect("upsert body");
+        assert!(
+            !upsert.contains("unwrap_or("),
+            "omitted enabled must not be replaced with a default before bind"
+        );
+        assert!(
+            upsert.contains("enabled = COALESCE($8, gov_reconciliation_schedules.enabled)"),
+            "update must preserve omitted enabled"
+        );
+    }
+
+    #[test]
+    fn omitted_enabled_deserializes_to_none() {
+        let json = r#"{"mode":"full","frequency":"daily"}"#;
+        let input: UpsertReconciliationSchedule = serde_json::from_str(json).unwrap();
+        assert_eq!(input.enabled, None);
     }
 }

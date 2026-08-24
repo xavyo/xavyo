@@ -597,8 +597,9 @@ impl ReconciliationService {
             ScheduleFrequency::Monthly => "monthly",
         };
 
-        // Calculate next run time
-        let next_run_at = if request.is_enabled {
+        // Calculate next run time for insert (default enabled) and explicit enable.
+        // On update, omitted is_enabled preserves existing next_run_at in SQL.
+        let next_run_at = if request.is_enabled.unwrap_or(true) {
             Some(self.calculate_next_run(
                 request.frequency,
                 request.day_of_week,
@@ -628,14 +629,18 @@ impl ReconciliationService {
             INSERT INTO gov_reconciliation_schedules (
                 tenant_id, frequency, day_of_week, day_of_month, hour_of_day, is_enabled, next_run_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            VALUES ($1, $2, $3, $4, $5, COALESCE($6, true), $7)
             ON CONFLICT (tenant_id) DO UPDATE SET
                 frequency = EXCLUDED.frequency,
                 day_of_week = EXCLUDED.day_of_week,
                 day_of_month = EXCLUDED.day_of_month,
                 hour_of_day = EXCLUDED.hour_of_day,
-                is_enabled = EXCLUDED.is_enabled,
-                next_run_at = EXCLUDED.next_run_at,
+                is_enabled = COALESCE($6, gov_reconciliation_schedules.is_enabled),
+                next_run_at = CASE
+                    WHEN $6::boolean IS TRUE THEN $7
+                    WHEN $6::boolean IS FALSE THEN NULL
+                    ELSE gov_reconciliation_schedules.next_run_at
+                END,
                 updated_at = NOW()
             RETURNING id, frequency, day_of_week, day_of_month, hour_of_day,
                       is_enabled, last_run_at, next_run_at, created_at, updated_at
@@ -655,7 +660,7 @@ impl ReconciliationService {
         tracing::info!(
             tenant_id = %tenant_id,
             frequency = frequency_str,
-            is_enabled = request.is_enabled,
+            is_enabled = ?request.is_enabled,
             "Reconciliation schedule updated"
         );
 
@@ -929,7 +934,7 @@ mod tests {
             day_of_week,
             day_of_month,
             hour_of_day,
-            is_enabled: true,
+            is_enabled: Some(true),
         }
     }
 
@@ -1059,5 +1064,25 @@ mod tests {
     fn test_validate_schedule_monthly_day_zero() {
         let request = make_schedule_request(ScheduleFrequency::Monthly, None, Some(0), 9);
         assert!(TestableScheduleValidator::validate_schedule(&request).is_err());
+    }
+
+    #[test]
+    fn upsert_does_not_overwrite_omitted_is_enabled() {
+        let src = include_str!("reconciliation_service.rs");
+        let upsert = src
+            .split("pub async fn upsert_schedule")
+            .nth(1)
+            .expect("upsert_schedule")
+            .split("tracing::info!")
+            .next()
+            .expect("upsert body");
+        assert!(
+            upsert.contains("is_enabled = COALESCE($6, gov_reconciliation_schedules.is_enabled)"),
+            "omitted is_enabled must not disable or re-enable the schedule"
+        );
+        assert!(
+            !upsert.contains("is_enabled = EXCLUDED.is_enabled"),
+            "must not overwrite is_enabled from a serde default"
+        );
     }
 }

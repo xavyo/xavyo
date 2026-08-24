@@ -95,8 +95,8 @@ pub struct SchemaRefreshSchedule {
 /// Input for creating/updating a schedule.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpsertSchedule {
-    /// Whether enabled.
-    pub enabled: bool,
+    /// Whether enabled. `None` preserves the existing flag on update.
+    pub enabled: Option<bool>,
     /// Schedule type.
     pub schedule_type: ScheduleType,
     /// Interval hours (if interval type).
@@ -163,14 +163,18 @@ impl SchemaRefreshSchedule {
                 interval_hours, cron_expression, next_run_at,
                 notify_on_changes, notify_email
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            VALUES ($1, $2, COALESCE($3, true), $4, $5, $6, $7, $8, $9)
             ON CONFLICT (connector_id)
             DO UPDATE SET
-                enabled = EXCLUDED.enabled,
+                enabled = COALESCE($3, schema_refresh_schedules.enabled),
                 schedule_type = EXCLUDED.schedule_type,
                 interval_hours = EXCLUDED.interval_hours,
                 cron_expression = EXCLUDED.cron_expression,
-                next_run_at = EXCLUDED.next_run_at,
+                next_run_at = CASE
+                    WHEN $3::boolean IS TRUE THEN $7
+                    WHEN $3::boolean IS FALSE THEN NULL
+                    ELSE schema_refresh_schedules.next_run_at
+                END,
                 notify_on_changes = EXCLUDED.notify_on_changes,
                 notify_email = EXCLUDED.notify_email,
                 updated_at = NOW()
@@ -277,7 +281,7 @@ mod tests {
     #[test]
     fn test_upsert_schedule_input() {
         let input = UpsertSchedule {
-            enabled: true,
+            enabled: Some(true),
             schedule_type: ScheduleType::Interval,
             interval_hours: Some(24),
             cron_expression: None,
@@ -285,9 +289,29 @@ mod tests {
             notify_email: Some("admin@example.com".to_string()),
         };
 
-        assert!(input.enabled);
+        assert_eq!(input.enabled, Some(true));
         assert_eq!(input.interval_hours, Some(24));
         assert!(input.notify_on_changes);
+    }
+
+    #[test]
+    fn upsert_does_not_reenable_when_enabled_omitted() {
+        let src = include_str!("schema_refresh_schedule.rs");
+        let upsert = src
+            .split("pub async fn upsert")
+            .nth(1)
+            .expect("upsert")
+            .split("/// Update after a run")
+            .next()
+            .expect("upsert body");
+        assert!(
+            !upsert.contains("unwrap_or("),
+            "omitted enabled must not be replaced with a default before bind"
+        );
+        assert!(
+            upsert.contains("enabled = COALESCE($3, schema_refresh_schedules.enabled)"),
+            "update must preserve omitted enabled"
+        );
     }
 
     #[test]
@@ -311,7 +335,7 @@ mod tests {
     #[test]
     fn test_upsert_cron_schedule() {
         let input = UpsertSchedule {
-            enabled: true,
+            enabled: Some(true),
             schedule_type: ScheduleType::Cron,
             interval_hours: None,
             cron_expression: Some("0 2 * * 0".to_string()),
