@@ -17,6 +17,7 @@ use crate::models::{
     BulkCreateAssignmentsRequest, CreateAssignmentRequest, ListAssignmentsQuery,
 };
 use crate::router::GovernanceState;
+use xavyo_governance::error::GovernanceError;
 use xavyo_webhooks::{EventPublisher, WebhookEvent};
 
 /// Helper function to check if target is a persona and log audit event if so.
@@ -30,35 +31,39 @@ async fn maybe_log_persona_entitlement_audit(
     entitlement_name: &str,
     is_add: bool,
     reason: Option<&str>,
-) {
+) -> ApiResult<()> {
     // Check if target_id is a persona
-    if let Ok(Some(_persona)) = GovPersona::find_by_id(state.pool(), tenant_id, target_id).await {
-        // Target is a persona - log persona audit event
-        if is_add {
-            let _ = state
-                .persona_audit_service
-                .log_entitlement_added(
-                    tenant_id,
-                    actor_id,
-                    target_id,
-                    entitlement_id,
-                    entitlement_name,
-                )
-                .await;
-        } else {
-            let _ = state
-                .persona_audit_service
-                .log_entitlement_removed(
-                    tenant_id,
-                    actor_id,
-                    target_id,
-                    entitlement_id,
-                    entitlement_name,
-                    reason.unwrap_or("Entitlement removed"),
-                )
-                .await;
-        }
+    let persona = GovPersona::find_by_id(state.pool(), tenant_id, target_id)
+        .await
+        .map_err(GovernanceError::Database)?;
+    if persona.is_none() {
+        return Ok(());
     }
+    if is_add {
+        state
+            .persona_audit_service
+            .log_entitlement_added(
+                tenant_id,
+                actor_id,
+                target_id,
+                entitlement_id,
+                entitlement_name,
+            )
+            .await?;
+    } else {
+        state
+            .persona_audit_service
+            .log_entitlement_removed(
+                tenant_id,
+                actor_id,
+                target_id,
+                entitlement_id,
+                entitlement_name,
+                reason.unwrap_or("Entitlement removed"),
+            )
+            .await?;
+    }
+    Ok(())
 }
 
 /// List assignments with optional filtering and pagination.
@@ -192,24 +197,21 @@ pub async fn create_assignment(
     let response: AssignmentResponse = assignment.into();
 
     // F063: Log persona audit event if target is a persona
-    // Get entitlement name for audit log
-    if let Ok(entitlement) = state
+    let entitlement = state
         .entitlement_service
         .get_entitlement(tenant_id, request.entitlement_id)
-        .await
-    {
-        maybe_log_persona_entitlement_audit(
-            &state,
-            tenant_id,
-            assigned_by,
-            request.target_id,
-            request.entitlement_id,
-            &entitlement.name,
-            true, // is_add
-            None,
-        )
-        .await;
-    }
+        .await?;
+    maybe_log_persona_entitlement_audit(
+        &state,
+        tenant_id,
+        assigned_by,
+        request.target_id,
+        request.entitlement_id,
+        &entitlement.name,
+        true, // is_add
+        None,
+    )
+    .await?;
 
     // F085: Publish role.assigned webhook event
     if let Some(Extension(publisher)) = publisher {
@@ -311,8 +313,7 @@ pub async fn revoke_assignment(
     let assignment = state
         .assignment_service
         .get_assignment(tenant_id, id)
-        .await
-        .ok();
+        .await?;
 
     state
         .assignment_service
@@ -320,24 +321,22 @@ pub async fn revoke_assignment(
         .await?;
 
     // F063: Log persona audit event if target was a persona
-    if let (Some(assignment), Some(actor)) = (&assignment, actor_id) {
-        if let Ok(entitlement) = state
+    if let Some(actor) = actor_id {
+        let entitlement = state
             .entitlement_service
             .get_entitlement(tenant_id, assignment.entitlement_id)
-            .await
-        {
-            maybe_log_persona_entitlement_audit(
-                &state,
-                tenant_id,
-                actor,
-                assignment.target_id,
-                assignment.entitlement_id,
-                &entitlement.name,
-                false, // is_add = false (revoke)
-                Some("Assignment revoked"),
-            )
-            .await;
-        }
+            .await?;
+        maybe_log_persona_entitlement_audit(
+            &state,
+            tenant_id,
+            actor,
+            assignment.target_id,
+            assignment.entitlement_id,
+            &entitlement.name,
+            false, // is_add = false (revoke)
+            Some("Assignment revoked"),
+        )
+        .await?;
     }
 
     // F085: Publish role.unassigned webhook event
@@ -355,4 +354,26 @@ pub async fn revoke_assignment(
     }
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn persona_audit_does_not_fail_open_on_lookup_errors() {
+        let src = include_str!("assignments.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("if let Ok(Some(_persona))"),
+            "persona lookup errors must not skip entitlement audit"
+        );
+        assert!(
+            !production.contains(".await\n        .ok();") && !production.contains(".await.ok();"),
+            "assignment lookup errors must not skip persona audit on revoke"
+        );
+        assert!(
+            production.contains("maybe_log_persona_entitlement_audit")
+                && production.contains(".await?;"),
+            "persona audit must propagate lookup and write errors"
+        );
+    }
 }

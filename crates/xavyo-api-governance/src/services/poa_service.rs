@@ -642,22 +642,20 @@ impl PoaService {
             .ok_or(GovernanceError::PoaAssumedSessionNotFound(session.id))?;
 
         // Get the PoA for audit event
-        if let Ok(poa) = self.get_poa(tenant_id, session.poa_id).await {
-            // T037: Create audit event for identity_dropped
-            self.create_audit_event(
-                tenant_id,
-                session.poa_id,
-                attorney_id,
-                Some(poa.donor_id),
-                PoaEventType::IdentityDropped,
-                None,
-                Some(serde_json::json!({
-                    "session_id": session.id,
-                    "reason": "user_initiated"
-                })),
-            )
-            .await?;
-        }
+        let poa = self.get_poa(tenant_id, session.poa_id).await?;
+        self.create_audit_event(
+            tenant_id,
+            session.poa_id,
+            attorney_id,
+            Some(poa.donor_id),
+            PoaEventType::IdentityDropped,
+            None,
+            Some(serde_json::json!({
+                "session_id": session.id,
+                "reason": "user_initiated"
+            })),
+        )
+        .await?;
 
         tracing::info!(
             session_id = %session.id,
@@ -829,6 +827,25 @@ mod tests {
         assert!(
             !production.contains("unwrap_or_else(|_| vec![\"user\""),
             "must not default PoA roles to [\"user\"]"
+        );
+    }
+
+    #[test]
+    fn drop_identity_does_not_skip_audit_on_poa_lookup_error() {
+        let src = include_str!("poa_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let drop = production
+            .split("pub async fn drop_identity")
+            .nth(1)
+            .and_then(|s| s.split("    pub async fn ").next())
+            .expect("drop_identity");
+        assert!(
+            !drop.contains("if let Ok(poa)"),
+            "PoA lookup errors must not skip identity-dropped audit"
+        );
+        assert!(
+            drop.contains("get_poa(tenant_id, session.poa_id).await?"),
+            "PoA lookup errors must fail drop_identity"
         );
     }
 }
