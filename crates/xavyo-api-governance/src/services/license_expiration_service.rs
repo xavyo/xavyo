@@ -267,8 +267,7 @@ impl LicenseExpirationService {
                 );
 
                 // Log audit event for pool expiration
-                let _ = self
-                    .audit_service
+                self.audit_service
                     .record_pool_event(
                         tenant_id,
                         RecordPoolEventParams {
@@ -282,7 +281,7 @@ impl LicenseExpirationService {
                             })),
                         },
                     )
-                    .await;
+                    .await?;
 
                 // Apply the expiration policy
                 let policy_result = self
@@ -371,8 +370,7 @@ impl LicenseExpirationService {
 
                 // Log audit event for bulk revocation
                 if assignments_revoked > 0 {
-                    let _ = self
-                        .audit_service
+                    self.audit_service
                         .record_pool_event(
                             tenant_id,
                             RecordPoolEventParams {
@@ -385,7 +383,7 @@ impl LicenseExpirationService {
                                 })),
                             },
                         )
-                        .await;
+                        .await?;
                 }
             }
             ExpirationAction::WarnOnly => {
@@ -998,6 +996,22 @@ mod tests {
         assert!(
             !production.contains("Uuid::nil()"),
             "must not persist Uuid::nil as actor_id"
+        );
+    }
+
+    #[test]
+    fn expiration_mutations_do_not_swallow_audit_writes() {
+        let src = include_str!("license_expiration_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("let _ = self.audit_service")
+                && !production.contains("let _ = self\n                    .audit_service"),
+            "license expiration must not swallow audit writes"
+        );
+        assert!(
+            production.matches("record_pool_event(").count() >= 2
+                && production.contains(".await?;"),
+            "license expiration must fail when audit rows cannot be written"
         );
     }
 }

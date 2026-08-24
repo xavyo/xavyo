@@ -429,8 +429,8 @@ impl LicenseAssignmentService {
 
             match tx_result {
                 Ok(()) => {
-                    // Log individual reclamation audit event (outside tx — non-critical)
-                    let _ = self
+                    // Log individual reclamation audit event (outside tx)
+                    if let Err(e) = self
                         .audit_service
                         .log_license_reclaimed(
                             tenant_id,
@@ -440,7 +440,14 @@ impl LicenseAssignmentService {
                             &request.reason,
                             actor_id,
                         )
-                        .await;
+                        .await
+                    {
+                        failures.push(BulkOperationFailure {
+                            item_id: *assignment_id,
+                            error: e.to_string(),
+                        });
+                        continue;
+                    }
 
                     reclaimed_user_ids.push(assignment.user_id);
                     success_count += 1;
@@ -898,5 +905,24 @@ mod tests {
         let deserialized: BulkReclaimLicenseRequest = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.assignment_ids.len(), 1);
         assert_eq!(deserialized.reason, "Audit finding");
+    }
+
+    #[test]
+    fn bulk_reclaim_does_not_swallow_audit_writes() {
+        let src = include_str!("license_assignment_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let reclaim = production
+            .split("pub async fn bulk_reclaim")
+            .nth(1)
+            .and_then(|s| s.split("    pub async fn ").next())
+            .expect("bulk_reclaim");
+        assert!(
+            !reclaim.contains("let _ = self"),
+            "bulk reclaim must not swallow per-item audit writes"
+        );
+        assert!(
+            reclaim.contains("log_license_reclaimed") && reclaim.contains("failures.push"),
+            "bulk reclaim must treat audit write errors as item failures"
+        );
     }
 }

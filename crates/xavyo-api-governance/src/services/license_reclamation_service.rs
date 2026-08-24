@@ -616,9 +616,8 @@ impl LicenseReclamationService {
 
             match tx_result {
                 Ok(true) => {
-                    // Log audit event (outside transaction — non-critical)
                     let reason_str = format!("{:?}", candidate.reason).to_lowercase();
-                    let _ = self
+                    if let Err(e) = self
                         .audit_service
                         .log_license_reclaimed(
                             tenant_id,
@@ -628,9 +627,12 @@ impl LicenseReclamationService {
                             &reason_str,
                             actor_id,
                         )
-                        .await;
-
-                    outcomes.push(Ok(true));
+                        .await
+                    {
+                        outcomes.push(Err(e.to_string()));
+                    } else {
+                        outcomes.push(Ok(true));
+                    }
                 }
                 Ok(false) => {
                     outcomes.push(Ok(false));
@@ -1239,5 +1241,24 @@ mod tests {
         let (limit, offset) = enforce_list_limits(i64::MAX, i64::MAX);
         assert_eq!(limit, 100);
         assert_eq!(offset, i64::MAX);
+    }
+
+    #[test]
+    fn execute_reclamation_does_not_swallow_audit_writes() {
+        let src = include_str!("license_reclamation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let execute = production
+            .split("pub async fn execute_reclamation")
+            .nth(1)
+            .and_then(|s| s.split("    pub async fn ").next())
+            .expect("execute_reclamation");
+        assert!(
+            !execute.contains("let _ = self"),
+            "reclamation execution must not swallow audit writes"
+        );
+        assert!(
+            execute.contains("log_license_reclaimed") && execute.contains("outcomes.push(Err"),
+            "reclamation execution must treat audit write errors as item failures"
+        );
     }
 }
