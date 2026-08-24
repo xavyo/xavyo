@@ -155,15 +155,18 @@ pub async fn login_handler(
                         )
                         .await?;
 
-                    // Check failed attempts threshold for alert (F025)
-                    let _ = alert_service
-                        .check_failed_attempts_threshold(
-                            *tenant_id.as_uuid(),
-                            user.id,
-                            &request.email,
-                            ip_str.as_deref(),
-                        )
-                        .await;
+                    // Check failed attempts threshold for alert (F025).
+                    // Persist errors must not look like the login attempt was ignored.
+                    login_alert_recorded(
+                        alert_service
+                            .check_failed_attempts_threshold(
+                                *tenant_id.as_uuid(),
+                                user.id,
+                                &request.email,
+                                ip_str.as_deref(),
+                            )
+                            .await,
+                    )?;
 
                     if lockout_status.is_locked {
                         if let Some(until) = lockout_status.locked_until {
@@ -363,17 +366,20 @@ pub async fn login_handler(
         )
         .await?;
 
-    // Generate alerts for new device/location if detected (F025)
+    // Generate alerts for new device/location if detected (F025).
+    // Persist errors must not look like the new-device check succeeded.
     if audit_result.is_new_device {
         if let Some(ref fingerprint) = device_fingerprint {
-            let _ = alert_service
-                .generate_new_device_alert(
-                    *tenant_id_val.as_uuid(),
-                    *user_id.as_uuid(),
-                    fingerprint,
-                    ip_str.as_deref(),
-                )
-                .await;
+            login_alert_recorded(
+                alert_service
+                    .generate_new_device_alert(
+                        *tenant_id_val.as_uuid(),
+                        *user_id.as_uuid(),
+                        fingerprint,
+                        ip_str.as_deref(),
+                    )
+                    .await,
+            )?;
         }
         // New location alerts would go here when geo-lookup is implemented
     }
@@ -525,19 +531,20 @@ pub async fn login_handler(
         )
         .await?;
 
-    // Create session entry for tracking
-    // The session service handles user_agent parsing and policy enforcement
-    if let Err(e) = session_service
-        .create_session(
-            *user_id.as_uuid(),
-            *tenant_id_val.as_uuid(),
-            None, // No refresh_token_id linking for now
-            user_agent.as_deref(),
-            ip_address.map(|ip| ip.to_string()).as_deref(),
-        )
-        .await
-    {
-        // Emit structured security audit event for session creation failure
+    // Create session entry for tracking. Errors must refuse login so the
+    // issued tokens are not advertised without a tracked session.
+    login_session_recorded(
+        session_service
+            .create_session(
+                *user_id.as_uuid(),
+                *tenant_id_val.as_uuid(),
+                None, // No refresh_token_id linking for now
+                user_agent.as_deref(),
+                ip_address.map(|ip| ip.to_string()).as_deref(),
+            )
+            .await,
+    )
+    .map_err(|e| {
         SecurityAudit::emit(
             SecurityEventType::SessionCreationFailed,
             Some(*tenant_id_val.as_uuid()),
@@ -547,7 +554,8 @@ pub async fn login_handler(
             "failure",
             &format!("Failed to create session entry: {e}"),
         );
-    }
+        e
+    })?;
 
     let response = TokenResponse::new(access_token, refresh_token, expires_in);
 
@@ -663,6 +671,16 @@ pub fn user_for_lockout_record<T, E: std::fmt::Display>(
             Err(e)
         }
     }
+}
+
+/// Session persist on login. Errors must not issue tokens without a session.
+pub fn login_session_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
+/// Security-alert persist on login. Errors must not look like the check ran.
+pub fn login_alert_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
 }
 
 #[cfg(test)]
@@ -876,6 +894,52 @@ mod tests {
         assert!(
             !locked.contains("let _ = audit_service") && locked.contains(".await?;"),
             "locked-account login must not swallow the audit trail"
+        );
+        assert!(
+            failed.contains("login_alert_recorded(")
+                && failed.contains("check_failed_attempts_threshold")
+                && !failed.contains("let _ = alert_service"),
+            "failed login must not swallow failed-attempts threshold alerts"
+        );
+    }
+
+    #[test]
+    fn login_session_recorded_propagates_errors() {
+        assert!(login_session_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(login_session_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn login_alert_recorded_propagates_errors() {
+        assert!(login_alert_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(login_alert_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn login_success_does_not_swallow_session_or_new_device_alert() {
+        let src = include_str!("login.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let tokens = production
+            .split("MFA not enabled - issue full tokens")
+            .nth(1)
+            .and_then(|s| s.split("pub(crate) fn login_client_ip").next())
+            .expect("full-token success path");
+        assert!(
+            tokens.contains("login_session_recorded(")
+                && !tokens.contains("let _ = session_service")
+                && !tokens.contains("if let Err(e) = session_service"),
+            "login must not issue tokens when session persist fails"
+        );
+        let new_device = production
+            .split("Generate alerts for new device/location if detected")
+            .nth(1)
+            .and_then(|s| s.split("Track device on login").next())
+            .expect("new-device alert path");
+        assert!(
+            new_device.contains("login_alert_recorded(")
+                && new_device.contains("generate_new_device_alert")
+                && !new_device.contains("let _ = alert_service"),
+            "login must not swallow new-device alerts"
         );
     }
 }
