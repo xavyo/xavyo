@@ -370,9 +370,10 @@ impl DelegationService {
                     ar.justification,
                     ar.created_at
                 FROM gov_access_requests ar
-                JOIN gov_entitlements e ON e.id = ar.entitlement_id
-                JOIN gov_applications a ON a.id = e.application_id
-                LEFT JOIN gov_approval_steps step ON step.workflow_id = ar.workflow_id
+                JOIN gov_entitlements e ON e.id = ar.entitlement_id AND e.tenant_id = ar.tenant_id
+                JOIN gov_applications a ON a.id = e.application_id AND a.tenant_id = ar.tenant_id
+                LEFT JOIN gov_approval_workflows w ON w.id = ar.workflow_id AND w.tenant_id = ar.tenant_id
+                LEFT JOIN gov_approval_steps step ON step.workflow_id = w.id
                     AND step.step_order = ar.current_step + 1
                 WHERE ar.tenant_id = $1
                     AND ar.status IN ('pending', 'pending_approval')
@@ -572,5 +573,37 @@ mod tests {
         assert!(delegation.ends_at > delegation.starts_at);
         assert_eq!(delegation.status, DelegationStatus::Active);
         assert!(!delegation.expiry_warning_sent);
+    }
+
+    #[test]
+    fn pending_work_items_join_tenant_on_both_sides() {
+        let src = include_str!("delegation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains(
+                "JOIN gov_entitlements e ON e.id = ar.entitlement_id AND e.tenant_id = ar.tenant_id"
+            ),
+            "delegated work items must join entitlements on tenant_id"
+        );
+        assert!(
+            production.contains(
+                "JOIN gov_applications a ON a.id = e.application_id AND a.tenant_id = ar.tenant_id"
+            ),
+            "delegated work items must join applications on tenant_id"
+        );
+        assert!(
+            production.contains(
+                "LEFT JOIN gov_approval_workflows w ON w.id = ar.workflow_id AND w.tenant_id = ar.tenant_id"
+            ),
+            "delegated work items must join workflows on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN gov_entitlements e ON e.id = ar.entitlement_id\n"),
+            "must not join entitlements by id alone"
+        );
+        assert!(
+            !production.contains("JOIN gov_applications a ON a.id = e.application_id\n"),
+            "must not join applications by id alone"
+        );
     }
 }

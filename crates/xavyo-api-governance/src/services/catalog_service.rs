@@ -404,7 +404,9 @@ impl CatalogService {
             SELECT COUNT(DISTINCT gre.role_id)
             FROM gov_role_entitlements gre
             JOIN gov_entitlement_assignments gea ON gre.entitlement_id = gea.entitlement_id
-            WHERE gea.tenant_id = $1
+                AND gea.tenant_id = gre.tenant_id
+            WHERE gre.tenant_id = $1
+              AND gea.tenant_id = $1
               AND gea.target_id = $2
               AND gea.target_type = 'user'
               AND gea.status = 'active'
@@ -784,8 +786,8 @@ impl CatalogService {
         let cart_count: i64 = sqlx::query_scalar(
             r"
             SELECT COUNT(*) FROM request_cart_items rci
-            JOIN request_carts rc ON rci.cart_id = rc.id
-            WHERE rci.catalog_item_id = $1 AND rc.tenant_id = $2
+            JOIN request_carts rc ON rci.cart_id = rc.id AND rc.tenant_id = rci.tenant_id
+            WHERE rci.catalog_item_id = $1 AND rci.tenant_id = $2
             ",
         )
         .bind(item_id)
@@ -1213,8 +1215,9 @@ impl CatalogService {
         }
 
         // Clear the cart within the same transaction
-        sqlx::query("DELETE FROM request_cart_items WHERE cart_id = $1")
+        sqlx::query("DELETE FROM request_cart_items WHERE cart_id = $1 AND tenant_id = $2")
             .bind(cart.id)
+            .bind(tenant_id)
             .execute(&mut *tx)
             .await
             .map_err(GovernanceError::Database)?;
@@ -1442,6 +1445,39 @@ mod tests {
         assert!(
             production.contains("RequestCartNotFound(requester_id)"),
             "cart lookup errors must identify the requester"
+        );
+    }
+
+    #[test]
+    fn catalog_queries_filter_tenant_on_both_join_sides() {
+        let src = include_str!("catalog_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("AND gea.tenant_id = gre.tenant_id"),
+            "prerequisite role lookups must join assignments on tenant_id"
+        );
+        assert!(
+            production.contains("WHERE gre.tenant_id = $1"),
+            "prerequisite role lookups must filter role entitlements by tenant_id"
+        );
+        assert!(
+            production.contains(
+                "JOIN request_carts rc ON rci.cart_id = rc.id AND rc.tenant_id = rci.tenant_id"
+            ),
+            "cart item counts must join carts on tenant_id"
+        );
+        assert!(
+            production.contains("WHERE rci.catalog_item_id = $1 AND rci.tenant_id = $2"),
+            "cart item counts must filter items by tenant_id"
+        );
+        assert!(
+            production
+                .contains("DELETE FROM request_cart_items WHERE cart_id = $1 AND tenant_id = $2"),
+            "cart submit must clear items by tenant_id"
+        );
+        assert!(
+            !production.contains("DELETE FROM request_cart_items WHERE cart_id = $1\""),
+            "must not delete cart items by cart_id alone"
         );
     }
 

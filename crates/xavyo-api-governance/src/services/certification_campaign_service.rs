@@ -389,7 +389,7 @@ impl CertificationCampaignService {
         sqlx::query_as::<_, GovEntitlementAssignment>(
             r"
             SELECT a.* FROM gov_entitlement_assignments a
-            JOIN gov_entitlements e ON a.entitlement_id = e.id
+            JOIN gov_entitlements e ON a.entitlement_id = e.id AND e.tenant_id = a.tenant_id
             WHERE a.tenant_id = $1
               AND e.application_id = $2
               AND a.target_type = 'user'
@@ -439,7 +439,7 @@ impl CertificationCampaignService {
         sqlx::query_as::<_, GovEntitlementAssignment>(
             r"
             SELECT a.* FROM gov_entitlement_assignments a
-            JOIN users u ON a.target_id = u.id
+            JOIN users u ON a.target_id = u.id AND u.tenant_id = a.tenant_id
             WHERE a.tenant_id = $1
               AND u.department = $2
               AND a.target_type = 'user'
@@ -656,5 +656,29 @@ mod tests {
         assert!(snapshot.get("assignment_id").is_some());
         assert!(snapshot.get("assigned_at").is_some());
         assert!(snapshot.get("justification").is_some());
+    }
+
+    #[test]
+    fn assignment_lookups_join_tenant_on_both_sides() {
+        let src = include_str!("certification_campaign_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains(
+                "JOIN gov_entitlements e ON a.entitlement_id = e.id AND e.tenant_id = a.tenant_id"
+            ),
+            "application-scoped assignments must join entitlements on tenant_id"
+        );
+        assert!(
+            production.contains("JOIN users u ON a.target_id = u.id AND u.tenant_id = a.tenant_id"),
+            "department-scoped assignments must join users on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN gov_entitlements e ON a.entitlement_id = e.id\n"),
+            "must not join entitlements by id alone"
+        );
+        assert!(
+            !production.contains("JOIN users u ON a.target_id = u.id\n"),
+            "must not join users by id alone"
+        );
     }
 }
