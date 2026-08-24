@@ -190,19 +190,6 @@ pub struct ReportTemplateFilter {
 }
 
 impl GovReportTemplate {
-    /// Find a template by ID.
-    pub async fn find_by_id(pool: &sqlx::PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as(
-            r"
-            SELECT * FROM gov_report_templates
-            WHERE id = $1
-            ",
-        )
-        .bind(id)
-        .fetch_optional(pool)
-        .await
-    }
-
     /// Find a template by ID within a tenant (includes system templates).
     pub async fn find_by_id_for_tenant(
         pool: &sqlx::PgPool,
@@ -492,6 +479,20 @@ impl GovReportTemplate {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn find_by_id_is_tenant_scoped() {
+        let src = include_str!("gov_report_template.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("find_by_id_for_tenant"),
+            "tenant-scoped template lookup must remain"
+        );
+        assert!(
+            !production.contains("SELECT * FROM gov_report_templates\n            WHERE id = $1\n"),
+            "must not look up report templates by id alone"
+        );
+    }
 
     #[test]
     fn test_template_status_methods() {

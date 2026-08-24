@@ -536,6 +536,7 @@ impl GovMergeOperation {
     /// Set `SoD` override within a transaction.
     pub async fn set_sod_override<'e>(
         executor: impl sqlx::Executor<'e, Database = sqlx::Postgres>,
+        tenant_id: Uuid,
         id: Uuid,
         sod_check_result: Option<serde_json::Value>,
         sod_override_reason: Option<String>,
@@ -543,11 +544,12 @@ impl GovMergeOperation {
         sqlx::query(
             r"
             UPDATE gov_merge_operations
-            SET sod_check_result = $2, sod_override_reason = $3
-            WHERE id = $1
+            SET sod_check_result = $3, sod_override_reason = $4
+            WHERE id = $1 AND tenant_id = $2
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .bind(sod_check_result)
         .bind(sod_override_reason)
         .execute(executor)
@@ -642,5 +644,19 @@ mod tests {
         let json = serde_json::to_string(&result).unwrap();
         assert!(json.contains("has_violations"));
         assert!(json.contains("Payment Segregation"));
+    }
+
+    #[test]
+    fn sod_override_filters_tenant_id() {
+        let src = include_str!("gov_merge_operation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $2"),
+            "SoD override must filter tenant_id"
+        );
+        assert!(
+            !production.contains("WHERE id = $1\n            \""),
+            "must not update merge operations by id alone"
+        );
     }
 }
