@@ -470,8 +470,7 @@ pub async fn device_login_handler(
                 }
             }
 
-            // Audit log
-            let _ = audit_service
+            if let Err(e) = audit_service
                 .record_login_attempt(
                     tenant_id,
                     xavyo_api_auth::RecordLoginAttemptInput {
@@ -487,7 +486,16 @@ pub async fn device_login_handler(
                         geo_city: None,
                     },
                 )
-                .await;
+                .await
+            {
+                warn!(error = %e, "Failed to write device login failure audit");
+                return render_login_error_with_csrf(
+                    &request.user_code,
+                    &client_id,
+                    &scopes,
+                    "An error occurred. Please try again.",
+                );
+            }
 
             return render_login_error_with_csrf(
                 &request.user_code,
@@ -1521,6 +1529,29 @@ mod tests {
         assert!(
             !production.contains("let _ = delete_mfa_session("),
             "must not swallow MFA session delete after TOTP success"
+        );
+    }
+
+    #[test]
+    fn device_login_failure_does_not_swallow_audit_writes() {
+        let src = include_str!("device_login.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let failed = production
+            .split("Err(xavyo_api_auth::ApiAuthError::InvalidCredentials) =>")
+            .nth(1)
+            .and_then(|s| {
+                s.split("Err(xavyo_api_auth::ApiAuthError::AccountInactive)")
+                    .next()
+            })
+            .expect("device login invalid-credentials path");
+        assert!(
+            !failed.contains("let _ = audit_service"),
+            "device login failure must not swallow audit writes"
+        );
+        assert!(
+            failed.contains("record_login_attempt")
+                && failed.contains("An error occurred. Please try again."),
+            "device login failure must fail closed when the audit row cannot be written"
         );
     }
 

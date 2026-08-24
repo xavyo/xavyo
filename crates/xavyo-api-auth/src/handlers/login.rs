@@ -137,7 +137,7 @@ pub async fn login_handler(
                         .await?;
 
                     // Record audit trail (F025) - with device/location tracking
-                    let _ = audit_service
+                    audit_service
                         .record_login_attempt(
                             *tenant_id.as_uuid(),
                             RecordLoginAttemptInput {
@@ -153,7 +153,7 @@ pub async fn login_handler(
                                 geo_city: None,
                             },
                         )
-                        .await;
+                        .await?;
 
                     // Check failed attempts threshold for alert (F025)
                     let _ = alert_service
@@ -173,9 +173,9 @@ pub async fn login_handler(
                     }
                 }
                 None => {
-                    // Unknown email - log but don't reveal
-                    // Best-effort: don't propagate DB errors (e.g. non-existent tenant)
-                    if let Err(_e) = lockout_service
+                    // Unknown email - log but don't reveal. Recording errors
+                    // must not skip lockout or the login-attempt audit trail.
+                    lockout_service
                         .record_login_attempt(
                             *tenant_id.as_uuid(),
                             None,
@@ -183,16 +183,9 @@ pub async fn login_handler(
                             ip_str.as_deref(),
                             FailureReason::UnknownEmail,
                         )
-                        .await
-                    {
-                        tracing::debug!(
-                            tenant_id = %tenant_id,
-                            "Failed to record login attempt (tenant may not exist)"
-                        );
-                    }
+                        .await?;
 
-                    // Record audit trail for unknown email (F025)
-                    let _ = audit_service
+                    audit_service
                         .record_login_attempt(
                             *tenant_id.as_uuid(),
                             RecordLoginAttemptInput {
@@ -208,7 +201,7 @@ pub async fn login_handler(
                                 geo_city: None,
                             },
                         )
-                        .await;
+                        .await?;
                 }
             }
             // F082-US8: Emit structured security audit event for login failure
@@ -245,7 +238,7 @@ pub async fn login_handler(
                     .get_user_by_email(tenant_id, &request.email)
                     .await,
             )? {
-                if let Err(e) = lockout_service
+                lockout_service
                     .record_login_attempt(
                         *tenant_id.as_uuid(),
                         Some(user.id),
@@ -253,17 +246,9 @@ pub async fn login_handler(
                         ip_str.as_deref(),
                         FailureReason::AccountInactive,
                     )
-                    .await
-                {
-                    tracing::warn!(
-                        tenant_id = %tenant_id,
-                        error = %e,
-                        "Failed to record login attempt for inactive account"
-                    );
-                }
+                    .await?;
 
-                // Record audit trail for inactive account (F025)
-                let _ = audit_service
+                audit_service
                     .record_login_attempt(
                         *tenant_id.as_uuid(),
                         RecordLoginAttemptInput {
@@ -279,7 +264,7 @@ pub async fn login_handler(
                             geo_city: None,
                         },
                     )
-                    .await;
+                    .await?;
             }
             return Err(ApiAuthError::AccountInactive);
         }
@@ -307,7 +292,7 @@ pub async fn login_handler(
             .await?;
 
         // Record audit trail for locked account (F025)
-        let _ = audit_service
+        audit_service
             .record_login_attempt(
                 *tenant_id_val.as_uuid(),
                 RecordLoginAttemptInput {
@@ -323,7 +308,7 @@ pub async fn login_handler(
                     geo_city: None,
                 },
             )
-            .await;
+            .await?;
 
         if let Some(until) = lockout_status.locked_until {
             return Err(ApiAuthError::AccountLockedUntil(until.to_rfc3339()));
@@ -859,6 +844,38 @@ mod tests {
         assert_eq!(
             login_client_ip(&headers, true, Some(peer)).as_deref(),
             Some("10.0.0.1")
+        );
+    }
+
+    #[test]
+    fn failed_login_does_not_swallow_lockout_or_audit_writes() {
+        let src = include_str!("login.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let failed = production
+            .split("Err(ApiAuthError::InvalidCredentials) =>")
+            .nth(1)
+            .and_then(|s| s.split("let user_id = user.user_id()").next())
+            .expect("failed-login path");
+        assert!(
+            !failed.contains("let _ = audit_service")
+                && !failed.contains("Failed to record login attempt (tenant may not exist)")
+                && !failed.contains("Failed to record login attempt for inactive account"),
+            "failed login must not swallow lockout or audit writes"
+        );
+        assert!(
+            failed.contains("record_failed_attempt")
+                && failed.contains("record_login_attempt")
+                && failed.contains(".await?;"),
+            "failed login must fail closed when lockout or audit cannot be written"
+        );
+        let locked = production
+            .split("Record the attempt for locked account")
+            .nth(1)
+            .and_then(|s| s.split("Check if password is expired").next())
+            .expect("locked-account path");
+        assert!(
+            !locked.contains("let _ = audit_service") && locked.contains(".await?;"),
+            "locked-account login must not swallow the audit trail"
         );
     }
 }
