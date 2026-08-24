@@ -87,6 +87,7 @@ impl xavyo_events::consumer::EventHandler<UserCreated> for ScimUserCreatedHandle
             "Provisioning user creation to SCIM targets"
         );
 
+        let mut any_failed = false;
         for target in &targets {
             let client = match build_client(target, &self.encryption, tenant_id) {
                 Ok(c) => c,
@@ -95,8 +96,9 @@ impl xavyo_events::consumer::EventHandler<UserCreated> for ScimUserCreatedHandle
                         target_id = %target.id,
                         target_name = %target.name,
                         error = %e,
-                        "Failed to build SCIM client, skipping target"
+                        "Failed to build SCIM client"
                     );
+                    any_failed = true;
                     continue;
                 }
             };
@@ -105,33 +107,33 @@ impl xavyo_events::consumer::EventHandler<UserCreated> for ScimUserCreatedHandle
                 ScimTargetAttributeMapping::list_by_target(&self.pool, tenant_id, target.id, None)
                     .await?;
 
-            if let Err(e) = self
-                .provisioner
-                .provision_user_create(
-                    &client,
-                    tenant_id,
-                    target.id,
-                    event.user_id,
-                    Some(&event.email),
-                    event.display_name.as_deref(),
-                    user.first_name.as_deref(),
-                    user.last_name.as_deref(),
-                    true, // new users are active
-                    &mappings,
-                )
-                .await
-            {
+            if let Err(e) = scim_target_provisioned(
+                self.provisioner
+                    .provision_user_create(
+                        &client,
+                        tenant_id,
+                        target.id,
+                        event.user_id,
+                        Some(&event.email),
+                        event.display_name.as_deref(),
+                        user.first_name.as_deref(),
+                        user.last_name.as_deref(),
+                        true, // new users are active
+                        &mappings,
+                    )
+                    .await,
+            ) {
                 error!(
                     target_id = %target.id,
                     user_id = %event.user_id,
                     error = %e,
                     "Failed to provision user creation to SCIM target"
                 );
-                // Continue to next target — don't fail the entire event.
+                any_failed = true;
             }
         }
 
-        Ok(())
+        scim_event_completed(any_failed)
     }
 }
 
@@ -218,6 +220,7 @@ impl xavyo_events::consumer::EventHandler<UserUpdated> for ScimUserUpdatedHandle
             "Provisioning user update to SCIM targets"
         );
 
+        let mut any_failed = false;
         for target in &targets {
             let client = match build_client(target, &self.encryption, tenant_id) {
                 Ok(c) => c,
@@ -225,8 +228,9 @@ impl xavyo_events::consumer::EventHandler<UserUpdated> for ScimUserUpdatedHandle
                     error!(
                         target_id = %target.id,
                         error = %e,
-                        "Failed to build SCIM client, skipping target"
+                        "Failed to build SCIM client"
                     );
+                    any_failed = true;
                     continue;
                 }
             };
@@ -235,28 +239,29 @@ impl xavyo_events::consumer::EventHandler<UserUpdated> for ScimUserUpdatedHandle
                 ScimTargetAttributeMapping::list_by_target(&self.pool, tenant_id, target.id, None)
                     .await?;
 
-            if let Err(e) = self
-                .provisioner
-                .provision_user_update(
-                    &client,
-                    tenant_id,
-                    target.id,
-                    event.user_id,
-                    &changed_fields,
-                    &mappings,
-                )
-                .await
-            {
+            if let Err(e) = scim_target_provisioned(
+                self.provisioner
+                    .provision_user_update(
+                        &client,
+                        tenant_id,
+                        target.id,
+                        event.user_id,
+                        &changed_fields,
+                        &mappings,
+                    )
+                    .await,
+            ) {
                 error!(
                     target_id = %target.id,
                     user_id = %event.user_id,
                     error = %e,
                     "Failed to provision user update to SCIM target"
                 );
+                any_failed = true;
             }
         }
 
-        Ok(())
+        scim_event_completed(any_failed)
     }
 }
 
@@ -345,6 +350,7 @@ impl xavyo_events::consumer::EventHandler<UserDeleted> for ScimUserDeletedHandle
             "Deprovisioning user from SCIM targets"
         );
 
+        let mut any_failed = false;
         for target in &targets {
             let client = match build_client(target, &self.encryption, tenant_id) {
                 Ok(c) => c,
@@ -352,33 +358,35 @@ impl xavyo_events::consumer::EventHandler<UserDeleted> for ScimUserDeletedHandle
                     error!(
                         target_id = %target.id,
                         error = %e,
-                        "Failed to build SCIM client, skipping target"
+                        "Failed to build SCIM client"
                     );
+                    any_failed = true;
                     continue;
                 }
             };
 
-            if let Err(e) = self
-                .provisioner
-                .provision_user_deprovision(
-                    &client,
-                    tenant_id,
-                    target.id,
-                    event.user_id,
-                    &target.deprovisioning_strategy,
-                )
-                .await
-            {
+            if let Err(e) = scim_target_provisioned(
+                self.provisioner
+                    .provision_user_deprovision(
+                        &client,
+                        tenant_id,
+                        target.id,
+                        event.user_id,
+                        &target.deprovisioning_strategy,
+                    )
+                    .await,
+            ) {
                 error!(
                     target_id = %target.id,
                     user_id = %event.user_id,
                     error = %e,
                     "Failed to deprovision user from SCIM target"
                 );
+                any_failed = true;
             }
         }
 
-        Ok(())
+        scim_event_completed(any_failed)
     }
 }
 
@@ -449,11 +457,13 @@ impl xavyo_events::consumer::EventHandler<GroupCreated> for ScimGroupCreatedHand
             "Provisioning group creation to SCIM targets"
         );
 
+        let mut any_failed = false;
         for target in &targets {
             let client = match build_client(target, &self.encryption, tenant_id) {
                 Ok(c) => c,
                 Err(e) => {
-                    error!(target_id = %target.id, error = %e, "Failed to build SCIM client, skipping target");
+                    error!(target_id = %target.id, error = %e, "Failed to build SCIM client");
+                    any_failed = true;
                     continue;
                 }
             };
@@ -467,23 +477,24 @@ impl xavyo_events::consumer::EventHandler<GroupCreated> for ScimGroupCreatedHand
             )
             .await;
 
-            if let Err(e) = self
-                .provisioner
-                .provision_group_create(
-                    &client,
-                    tenant_id,
-                    target.id,
-                    event.group_id,
-                    &event.display_name,
-                    &member_external_ids,
-                )
-                .await
-            {
+            if let Err(e) = scim_target_provisioned(
+                self.provisioner
+                    .provision_group_create(
+                        &client,
+                        tenant_id,
+                        target.id,
+                        event.group_id,
+                        &event.display_name,
+                        &member_external_ids,
+                    )
+                    .await,
+            ) {
                 error!(target_id = %target.id, group_id = %event.group_id, error = %e, "Failed to provision group creation");
+                any_failed = true;
             }
         }
 
-        Ok(())
+        scim_event_completed(any_failed)
     }
 }
 
@@ -567,25 +578,28 @@ impl xavyo_events::consumer::EventHandler<GroupDeleted> for ScimGroupDeletedHand
             "Deprovisioning group from SCIM targets"
         );
 
+        let mut any_failed = false;
         for target in &targets {
             let client = match build_client(target, &self.encryption, tenant_id) {
                 Ok(c) => c,
                 Err(e) => {
-                    error!(target_id = %target.id, error = %e, "Failed to build SCIM client, skipping target");
+                    error!(target_id = %target.id, error = %e, "Failed to build SCIM client");
+                    any_failed = true;
                     continue;
                 }
             };
 
-            if let Err(e) = self
-                .provisioner
-                .provision_group_delete(&client, tenant_id, target.id, event.group_id)
-                .await
-            {
+            if let Err(e) = scim_target_provisioned(
+                self.provisioner
+                    .provision_group_delete(&client, tenant_id, target.id, event.group_id)
+                    .await,
+            ) {
                 error!(target_id = %target.id, group_id = %event.group_id, error = %e, "Failed to deprovision group");
+                any_failed = true;
             }
         }
 
-        Ok(())
+        scim_event_completed(any_failed)
     }
 }
 
@@ -643,11 +657,13 @@ impl xavyo_events::consumer::EventHandler<GroupMemberAdded> for ScimGroupMemberA
             return Ok(());
         }
 
+        let mut any_failed = false;
         for target in &targets {
             let client = match build_client(target, &self.encryption, tenant_id) {
                 Ok(c) => c,
                 Err(e) => {
-                    error!(target_id = %target.id, error = %e, "Failed to build SCIM client, skipping target");
+                    error!(target_id = %target.id, error = %e, "Failed to build SCIM client");
+                    any_failed = true;
                     continue;
                 }
             };
@@ -665,22 +681,23 @@ impl xavyo_events::consumer::EventHandler<GroupMemberAdded> for ScimGroupMemberA
                 continue;
             }
 
-            if let Err(e) = self
-                .provisioner
-                .provision_member_add(
-                    &client,
-                    tenant_id,
-                    target.id,
-                    event.group_id,
-                    &target_member_ids,
-                )
-                .await
-            {
+            if let Err(e) = scim_target_provisioned(
+                self.provisioner
+                    .provision_member_add(
+                        &client,
+                        tenant_id,
+                        target.id,
+                        event.group_id,
+                        &target_member_ids,
+                    )
+                    .await,
+            ) {
                 error!(target_id = %target.id, group_id = %event.group_id, error = %e, "Failed to add member to group");
+                any_failed = true;
             }
         }
 
-        Ok(())
+        scim_event_completed(any_failed)
     }
 }
 
@@ -738,11 +755,13 @@ impl xavyo_events::consumer::EventHandler<GroupMemberRemoved> for ScimGroupMembe
             return Ok(());
         }
 
+        let mut any_failed = false;
         for target in &targets {
             let client = match build_client(target, &self.encryption, tenant_id) {
                 Ok(c) => c,
                 Err(e) => {
-                    error!(target_id = %target.id, error = %e, "Failed to build SCIM client, skipping target");
+                    error!(target_id = %target.id, error = %e, "Failed to build SCIM client");
+                    any_failed = true;
                     continue;
                 }
             };
@@ -759,22 +778,23 @@ impl xavyo_events::consumer::EventHandler<GroupMemberRemoved> for ScimGroupMembe
                 continue;
             }
 
-            if let Err(e) = self
-                .provisioner
-                .provision_member_remove(
-                    &client,
-                    tenant_id,
-                    target.id,
-                    event.group_id,
-                    &target_member_ids,
-                )
-                .await
-            {
+            if let Err(e) = scim_target_provisioned(
+                self.provisioner
+                    .provision_member_remove(
+                        &client,
+                        tenant_id,
+                        target.id,
+                        event.group_id,
+                        &target_member_ids,
+                    )
+                    .await,
+            ) {
                 error!(target_id = %target.id, group_id = %event.group_id, error = %e, "Failed to remove member from group");
+                any_failed = true;
             }
         }
 
-        Ok(())
+        scim_event_completed(any_failed)
     }
 }
 
@@ -1061,4 +1081,58 @@ async fn start_group_member_removed_consumer(
     let typed = consumer.subscribe::<GroupMemberRemoved, _>(handler).await?;
     typed.run().await?;
     Ok(())
+}
+
+/// Per-target provision results must fail closed.
+fn scim_target_provisioned<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
+/// Kafka must not commit the event when any SCIM target failed.
+fn scim_event_completed(any_failed: bool) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    if any_failed {
+        Err("SCIM provisioning failed for one or more targets".into())
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scim_target_provisioned_propagates_errors() {
+        assert!(scim_target_provisioned(Ok::<(), &str>(())).is_ok());
+        assert!(scim_target_provisioned(Err::<(), _>("scim")).is_err());
+    }
+
+    #[test]
+    fn scim_event_completed_fails_when_any_target_failed() {
+        assert!(scim_event_completed(false).is_ok());
+        assert!(scim_event_completed(true).is_err());
+    }
+
+    #[test]
+    fn scim_handlers_do_not_commit_on_target_failure() {
+        let src = include_str!("consumer.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("scim_target_provisioned(")
+                && production.contains("scim_event_completed("),
+            "SCIM target provision errors must fail closed"
+        );
+        assert!(
+            !production.contains("don't fail the entire event")
+                && !production.contains("Failed to build SCIM client, skipping target"),
+            "must not report the event handled when a SCIM target failed"
+        );
+        assert!(
+            production
+                .matches("scim_event_completed(any_failed)")
+                .count()
+                >= 7,
+            "all lifecycle handlers must fail the event when any target failed"
+        );
+    }
 }

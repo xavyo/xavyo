@@ -135,12 +135,18 @@ impl<E: Event, H: EventHandler<E>> TypedConsumer<E, H> {
 
         while let Some(result) = stream.next().await {
             match result {
-                Ok(message) => {
-                    if let Err(e) = self.process_message(&message).await {
-                        error!(error = %e, "Failed to process message");
-                        // Continue processing other messages
+                Ok(message) => loop {
+                    match event_handler_recorded(self.process_message(&message).await) {
+                        Ok(()) => break,
+                        Err(e) => {
+                            error!(
+                                error = %e,
+                                "Failed to process message, retrying without advancing offset"
+                            );
+                            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                        }
                     }
-                }
+                },
                 Err(e) => {
                     error!(error = %e, "Error receiving message");
                 }
@@ -237,6 +243,12 @@ impl<E: Event, H: EventHandler<E>> TypedConsumer<E, H> {
     }
 }
 
+/// Handler errors must fail closed. Skipping ahead would commit a later
+/// offset and drop the failed event.
+fn event_handler_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -272,5 +284,31 @@ mod tests {
     fn test_handler_trait_compiles() {
         // Verify the EventHandler trait works correctly
         let _handler = TestHandler;
+    }
+
+    #[test]
+    fn event_handler_recorded_propagates_errors() {
+        assert!(event_handler_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(event_handler_recorded(Err::<(), _>("handler")).is_err());
+    }
+
+    #[test]
+    fn run_does_not_skip_ahead_on_handler_failure() {
+        let src = include_str!("consumer.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let run = production
+            .split("pub async fn run")
+            .nth(1)
+            .and_then(|s| s.split("async fn process_message").next())
+            .expect("run");
+        assert!(
+            run.contains("event_handler_recorded(")
+                && run.contains("retrying without advancing offset"),
+            "handler errors must retry without committing a later offset"
+        );
+        assert!(
+            !run.contains("Continue processing other messages"),
+            "must not skip a failed event and commit a later offset"
+        );
     }
 }

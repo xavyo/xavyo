@@ -73,3 +73,29 @@ pub fn publish_scim_webhook(
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn scim_handlers_do_not_commit_on_target_failure() {
+        let src = include_str!("consumer.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("scim_target_provisioned(")
+                && production.contains("scim_event_completed("),
+            "SCIM target provision errors must fail closed"
+        );
+        assert!(
+            !production.contains("don't fail the entire event")
+                && !production.contains("Failed to build SCIM client, skipping target"),
+            "must not report the event handled when a SCIM target failed"
+        );
+        assert!(
+            production
+                .matches("scim_event_completed(any_failed)")
+                .count()
+                >= 7,
+            "all lifecycle handlers must fail the event when any target failed"
+        );
+    }
+}
