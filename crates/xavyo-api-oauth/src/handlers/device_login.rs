@@ -631,12 +631,21 @@ pub async fn device_login_handler(
     };
 
     // Reset failed attempts on successful login
-    let _ = lockout_service
+    if let Err(e) = lockout_service
         .reset_failed_attempts(user.id, tenant_id)
-        .await;
+        .await
+    {
+        warn!(error = %e, "Failed to reset failed attempts after device login");
+        return render_login_error_with_csrf(
+            &request.user_code,
+            &client_id,
+            &scopes,
+            "An error occurred. Please try again.",
+        );
+    }
 
     // Audit log successful login
-    let _ = audit_service
+    if let Err(e) = audit_service
         .record_login_attempt(
             tenant_id,
             xavyo_api_auth::RecordLoginAttemptInput {
@@ -652,7 +661,16 @@ pub async fn device_login_handler(
                 geo_city: None,
             },
         )
-        .await;
+        .await
+    {
+        warn!(error = %e, "Failed to write device login audit");
+        return render_login_error_with_csrf(
+            &request.user_code,
+            &client_id,
+            &scopes,
+            "An error occurred. Please try again.",
+        );
+    }
 
     info!(
         user_id = %user.id,
@@ -1053,7 +1071,7 @@ pub async fn device_mfa_handler(
     };
 
     // Audit log successful MFA
-    let _ = audit_service
+    if let Err(e) = audit_service
         .record_login_attempt(
             tenant_id,
             xavyo_api_auth::RecordLoginAttemptInput {
@@ -1069,7 +1087,15 @@ pub async fn device_mfa_handler(
                 geo_city: None,
             },
         )
-        .await;
+        .await
+    {
+        warn!(error = %e, "Failed to write device MFA login audit");
+        return render_mfa_error_with_csrf(
+            &user_code,
+            &request.mfa_session_id,
+            "An error occurred. Please try again.",
+        );
+    }
 
     info!(
         user_id = %user_id,
@@ -1513,6 +1539,46 @@ mod tests {
         assert!(
             !window.contains("let _ = lockout_service"),
             "must not swallow lockout recording: {window}"
+        );
+    }
+
+    #[test]
+    fn device_login_success_does_not_swallow_lockout_reset_or_audit() {
+        let src = include_str!("device_login.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let success = production
+            .split("Reset failed attempts on successful login")
+            .nth(1)
+            .and_then(|s| s.split("Device login successful").next())
+            .expect("device login success");
+        assert!(
+            !success.contains("let _ = lockout_service")
+                && !success.contains("let _ = audit_service"),
+            "device login must not swallow lockout reset or audit writes"
+        );
+        assert!(
+            success.contains("reset_failed_attempts") && success.contains("record_login_attempt"),
+            "device login must reset lockout and write audit on success"
+        );
+    }
+
+    #[test]
+    fn device_mfa_success_does_not_swallow_audit_writes() {
+        let src = include_str!("device_login.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let success = production
+            .split("Audit log successful MFA")
+            .nth(1)
+            .and_then(|s| s.split("Device MFA verification successful").next())
+            .expect("device MFA success audit");
+        assert!(
+            !success.contains("let _ = audit_service"),
+            "device MFA must not swallow login audit writes"
+        );
+        assert!(
+            success.contains("record_login_attempt")
+                && success.contains("render_mfa_error_with_csrf"),
+            "device MFA must fail closed when the audit row cannot be written"
         );
     }
 }

@@ -445,14 +445,12 @@ where
         );
 
         if let Err(e) = self.shadow_repository.upsert(&shadow).await {
-            tracing::warn!(
-                tenant_id = %self.tenant_id,
-                discrepancy_id = %discrepancy_id,
-                error = %e,
-                "Failed to create shadow link after account creation"
+            return RemediationResult::failure(
+                discrepancy_id,
+                ActionType::Create,
+                format!("Failed to create shadow link after account creation: {e}"),
+                false,
             );
-            // Account was created, but shadow link failed - still return success
-            // but log the warning for manual cleanup
         }
 
         tracing::info!(
@@ -870,7 +868,15 @@ where
         // Mark shadow as deleted
         if let Some(mut shadow) = shadow {
             shadow.mark_deleted();
-            let _ = self.shadow_repository.upsert(&shadow).await;
+            if let Err(e) = self.shadow_repository.upsert(&shadow).await {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Delete,
+                    format!("Failed to mark shadow as deleted: {e}"),
+                    false,
+                )
+                .with_before_state(before_state);
+            }
         }
 
         tracing::info!(
@@ -1710,5 +1716,39 @@ mod tests {
                 "{fn_name} must fail remediation when shadow lookup errors"
             );
         }
+    }
+
+    #[test]
+    fn create_and_delete_do_not_report_success_when_shadow_upsert_fails() {
+        let src = include_str!("remediation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let create = production
+            .split("Create shadow link for the new account")
+            .nth(1)
+            .and_then(|s| s.split("    /// Execute an update action.").next())
+            .expect("create shadow upsert");
+        assert!(
+            !create.contains("still return success"),
+            "create must not report success when shadow upsert fails"
+        );
+        assert!(
+            create.contains("RemediationResult::failure")
+                && create.contains("Failed to create shadow link"),
+            "create must fail remediation when shadow upsert fails"
+        );
+        let delete = production
+            .split("Mark shadow as deleted")
+            .nth(1)
+            .and_then(|s| s.split("    /// Execute a link action.").next())
+            .expect("delete shadow upsert");
+        assert!(
+            !delete.contains("let _ = self.shadow_repository.upsert"),
+            "delete must not swallow shadow upsert"
+        );
+        assert!(
+            delete.contains("RemediationResult::failure")
+                && delete.contains("Failed to mark shadow as deleted"),
+            "delete must fail remediation when shadow upsert fails"
+        );
     }
 }
