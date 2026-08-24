@@ -602,11 +602,10 @@ impl DefaultOperationProcessor {
 
                 match process_result {
                     Ok(target_uid) => {
-                        // Record successful attempt
                         let completion = AttemptCompletion::success_with_data(
                             serde_json::json!({ "target_uid": target_uid }),
                         );
-                        let _ = self
+                        if let Err(e) = self
                             .attempt_service
                             .complete_attempt(
                                 &self.pool,
@@ -614,26 +613,43 @@ impl DefaultOperationProcessor {
                                 attempt_id,
                                 &completion,
                             )
-                            .await;
+                            .await
+                        {
+                            error!(
+                                operation_id = %operation.id,
+                                error = %e,
+                                "Failed to complete attempt after isolated batch success"
+                            );
+                            connector_result.operations_failed += 1;
+                            connector_result.errors.push(format!(
+                                "Operation {}: attempt completion failed - {}",
+                                operation.id, e
+                            ));
+                            continue;
+                        }
 
-                        // Record health success
                         if let Some(ref health_service) = self.health_service {
                             let _ = health_service
                                 .record_success(operation.tenant_id, connector_id)
                                 .await;
                         }
 
-                        // Complete the operation
                         if let Err(e) = self
                             .queue
                             .complete(operation.tenant_id, operation.id, target_uid.as_deref())
                             .await
                         {
-                            warn!(
+                            error!(
                                 operation_id = %operation.id,
                                 error = %e,
                                 "Failed to mark operation as complete"
                             );
+                            connector_result.operations_failed += 1;
+                            connector_result.errors.push(format!(
+                                "Operation {}: queue complete failed - {}",
+                                operation.id, e
+                            ));
+                            continue;
                         }
 
                         connector_result.operations_succeeded += 1;
@@ -641,9 +657,8 @@ impl DefaultOperationProcessor {
                     Err(e) => {
                         let (error_code, is_transient) = self.classify_error(&e);
 
-                        // Record failed attempt
                         let completion = AttemptCompletion::failure(&error_code, e.to_string());
-                        let _ = self
+                        if let Err(ae) = self
                             .attempt_service
                             .complete_attempt(
                                 &self.pool,
@@ -651,9 +666,21 @@ impl DefaultOperationProcessor {
                                 attempt_id,
                                 &completion,
                             )
-                            .await;
+                            .await
+                        {
+                            error!(
+                                operation_id = %operation.id,
+                                error = %ae,
+                                "Failed to complete attempt after isolated batch failure"
+                            );
+                            connector_result.operations_failed += 1;
+                            connector_result.errors.push(format!(
+                                "Operation {}: attempt completion failed - {}",
+                                operation.id, ae
+                            ));
+                            continue;
+                        }
 
-                        // Record health failure for connector errors
                         if matches!(e, ProcessorError::Connector(_)) {
                             if let Some(ref health_service) = self.health_service {
                                 let _ = health_service
@@ -666,7 +693,6 @@ impl DefaultOperationProcessor {
                             }
                         }
 
-                        // Mark operation as failed
                         if let Err(fe) = self
                             .queue
                             .fail(
@@ -677,11 +703,17 @@ impl DefaultOperationProcessor {
                             )
                             .await
                         {
-                            warn!(
+                            error!(
                                 operation_id = %operation.id,
                                 error = %fe,
                                 "Failed to mark operation as failed"
                             );
+                            connector_result.operations_failed += 1;
+                            connector_result.errors.push(format!(
+                                "Operation {}: queue fail failed - {}",
+                                operation.id, fe
+                            ));
+                            continue;
                         }
 
                         connector_result.operations_failed += 1;
@@ -1192,6 +1224,37 @@ mod tests {
         assert!(
             !production.contains("proceeding with execution"),
             "health check errors must not fail-open into execution"
+        );
+    }
+
+    #[test]
+    fn isolated_batch_does_not_count_success_when_persist_fails() {
+        let src = include_str!("processor.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let isolated = production
+            .split("pub async fn process_batches_isolated")
+            .nth(1)
+            .and_then(|s| s.split("    fn classify_error").next())
+            .expect("process_batches_isolated");
+        assert!(
+            !isolated.contains("let _ = self\n                            .attempt_service")
+                && !isolated.contains("let _ = self.attempt_service"),
+            "isolated batch must not swallow attempt completion"
+        );
+        assert!(
+            isolated.contains("queue complete failed") && isolated.contains("queue fail failed"),
+            "isolated batch must not report success or failure when queue persist errors"
+        );
+        let success_arm = isolated
+            .split("Ok(target_uid) =>")
+            .nth(1)
+            .and_then(|s| s.split("Err(e) =>").next())
+            .expect("isolated success arm");
+        assert!(
+            success_arm.contains("continue;")
+                && success_arm.contains("operations_failed += 1")
+                && success_arm.contains("operations_succeeded += 1"),
+            "isolated success persist errors must not increment succeeded"
         );
     }
 
