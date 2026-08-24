@@ -71,6 +71,27 @@ fn parse_user_id(claims: &JwtClaims) -> Result<Uuid, ApiAuthError> {
     Uuid::parse_str(&claims.sub).map_err(|_| ApiAuthError::Unauthorized)
 }
 
+/// Overlay `patch` keys onto an existing policy JSON object.
+///
+/// Org policy configs are stored as a blob. A partial PUT that omits
+/// `require_uppercase` / `required` / `require_reauth_sensitive` / CIDR lists
+/// must not serde-default those flags to false and persist the wipe.
+fn merge_policy_config(
+    existing: Option<&serde_json::Value>,
+    patch: serde_json::Value,
+) -> serde_json::Value {
+    match (existing, patch) {
+        (Some(serde_json::Value::Object(base)), serde_json::Value::Object(overlay)) => {
+            let mut merged = base.clone();
+            for (key, value) in overlay {
+                merged.insert(key, value);
+            }
+            serde_json::Value::Object(merged)
+        }
+        (_, patch) => patch,
+    }
+}
+
 /// Validate policy configuration based on policy type.
 fn validate_policy_config(
     policy_type: &OrgPolicyType,
@@ -269,17 +290,20 @@ pub async fn create_org_policy(
 
     let policy_type = from_policy_type_dto(&request.policy_type);
 
-    // Validate config
-    validate_policy_config(&policy_type, &request.config)?;
-
     let service = OrgPolicyService::new(Arc::new(pool.clone()));
+    let existing = service
+        .get_policy(tenant_id, org_id, policy_type)
+        .await
+        .map_err(to_api_error)?;
+    let config = merge_policy_config(existing.as_ref().map(|p| &p.config), request.config);
+    validate_policy_config(&policy_type, &config)?;
 
     let policy = service
         .upsert_policy(
             tenant_id,
             org_id,
             policy_type,
-            request.config.clone(),
+            config,
             request.is_active,
             Some(user_id),
         )
@@ -421,9 +445,6 @@ pub async fn upsert_org_policy(
 
     let policy_type = parse_policy_type(&policy_type_str)?;
 
-    // Validate config
-    validate_policy_config(&policy_type, &request.config)?;
-
     let service = OrgPolicyService::new(Arc::new(pool.clone()));
 
     // Check if policy exists to determine status code
@@ -432,12 +453,15 @@ pub async fn upsert_org_policy(
         .await
         .map_err(to_api_error)?;
 
+    let config = merge_policy_config(existing.as_ref().map(|p| &p.config), request.config);
+    validate_policy_config(&policy_type, &config)?;
+
     let policy = service
         .upsert_policy(
             tenant_id,
             org_id,
             policy_type,
-            request.config.clone(),
+            config,
             request
                 .is_active
                 .or_else(|| existing.as_ref().map(|p| p.is_active))
@@ -741,6 +765,99 @@ mod tests {
             "allowed_methods": ["invalid_method"]
         });
         assert!(validate_policy_config(&OrgPolicyType::Mfa, &invalid).is_err());
+    }
+
+    #[test]
+    fn merge_preserves_password_complexity_flags() {
+        let existing = serde_json::json!({
+            "min_length": 12,
+            "require_uppercase": true,
+            "require_lowercase": true,
+            "require_digit": true,
+            "require_special": true,
+            "check_breached_passwords": true
+        });
+        let patch = serde_json::json!({ "min_length": 14 });
+        let merged = merge_policy_config(Some(&existing), patch);
+        assert_eq!(merged["min_length"], 14);
+        assert_eq!(merged["require_uppercase"], true);
+        assert_eq!(merged["require_special"], true);
+        assert_eq!(merged["check_breached_passwords"], true);
+    }
+
+    #[test]
+    fn merge_preserves_mfa_required() {
+        let existing = serde_json::json!({
+            "required": true,
+            "allowed_methods": ["totp", "webauthn"],
+            "grace_period_hours": 24
+        });
+        let patch = serde_json::json!({ "grace_period_hours": 48 });
+        let merged = merge_policy_config(Some(&existing), patch);
+        assert_eq!(merged["required"], true);
+        assert_eq!(
+            merged["allowed_methods"],
+            serde_json::json!(["totp", "webauthn"])
+        );
+        assert_eq!(merged["grace_period_hours"], 48);
+    }
+
+    #[test]
+    fn merge_preserves_session_reauth_flag() {
+        let existing = serde_json::json!({
+            "max_duration_hours": 8,
+            "idle_timeout_minutes": 15,
+            "require_reauth_sensitive": true
+        });
+        let patch = serde_json::json!({ "idle_timeout_minutes": 10 });
+        let merged = merge_policy_config(Some(&existing), patch);
+        assert_eq!(merged["require_reauth_sensitive"], true);
+        assert_eq!(merged["max_duration_hours"], 8);
+        assert_eq!(merged["idle_timeout_minutes"], 10);
+    }
+
+    #[test]
+    fn merge_preserves_ip_allow_deny_lists() {
+        let existing = serde_json::json!({
+            "allowed_cidrs": ["10.0.0.0/8"],
+            "denied_cidrs": ["192.0.2.1/32"],
+            "action_on_violation": "deny"
+        });
+        let patch = serde_json::json!({ "action_on_violation": "warn" });
+        let merged = merge_policy_config(Some(&existing), patch);
+        assert_eq!(merged["allowed_cidrs"], serde_json::json!(["10.0.0.0/8"]));
+        assert_eq!(merged["denied_cidrs"], serde_json::json!(["192.0.2.1/32"]));
+        assert_eq!(merged["action_on_violation"], "warn");
+    }
+
+    #[test]
+    fn omitted_password_flags_serde_default_to_false() {
+        // Documents why merge is required: deserializing a partial blob
+        // would fail-open complexity and MFA-required flags.
+        let cfg: PasswordPolicyConfig =
+            serde_json::from_value(serde_json::json!({ "min_length": 12 })).unwrap();
+        assert!(!cfg.require_uppercase);
+        assert!(!cfg.require_digit);
+        let mfa: MfaPolicyConfig =
+            serde_json::from_value(serde_json::json!({ "grace_period_hours": 1 })).unwrap();
+        assert!(!mfa.required);
+    }
+
+    #[test]
+    fn upsert_and_create_merge_existing_config() {
+        let src = include_str!("org_security_policy.rs");
+        let production = src.split("mod tests").next().expect("production");
+        assert!(
+            production.contains("merge_policy_config(existing.as_ref().map(|p| &p.config)"),
+            "create and upsert must merge omitted security flags onto the existing blob"
+        );
+        assert_eq!(
+            production
+                .matches("merge_policy_config(existing.as_ref().map(|p| &p.config)")
+                .count(),
+            2,
+            "both create_org_policy and upsert_org_policy must merge"
+        );
     }
 
     #[test]
