@@ -34,10 +34,7 @@ async fn group_to_detail(
     tenant_id: Uuid,
     group: &Group,
 ) -> Result<GroupDetail, ApiUsersError> {
-    let path = service
-        .get_ancestor_path_names(tenant_id, group.id)
-        .await
-        .unwrap_or_default();
+    let path = service.get_ancestor_path_names(tenant_id, group.id).await?;
 
     Ok(GroupDetail {
         id: group.id,
@@ -337,6 +334,17 @@ pub async fn remove_group_member_handler(
 
 #[cfg(test)]
 mod tests {
-    // Handler tests require integration test setup with database
-    // See quickstart.md for manual API testing scenarios
+    #[test]
+    fn group_detail_does_not_fail_open_on_ancestor_path_errors() {
+        let src = include_str!("group_crud.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or_default()"),
+            "group detail must not swallow ancestor-path errors as an empty path"
+        );
+        assert!(
+            production.contains("get_ancestor_path_names(tenant_id, group.id).await?"),
+            "group detail must propagate ancestor-path errors"
+        );
+    }
 }

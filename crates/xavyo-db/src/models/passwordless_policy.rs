@@ -260,10 +260,7 @@ mod tests {
 
         // Unknown stored values must fail closed, not enable all methods.
         policy.enabled_methods = "garbage".to_string();
-        assert_eq!(
-            policy.parsed_enabled_methods(),
-            EnabledMethods::Disabled
-        );
+        assert_eq!(policy.parsed_enabled_methods(), EnabledMethods::Disabled);
         assert!(!policy.magic_link_enabled());
         assert!(!policy.email_otp_enabled());
     }
