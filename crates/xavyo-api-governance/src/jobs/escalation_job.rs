@@ -195,6 +195,7 @@ impl EscalationJob {
         let step_order = request.current_step + 1;
         let step = GovApprovalStep::find_by_workflow_and_order(
             self.escalation_service.pool(),
+            request.tenant_id,
             workflow_id,
             step_order,
         )

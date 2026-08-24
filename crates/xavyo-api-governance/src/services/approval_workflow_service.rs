@@ -47,7 +47,8 @@ impl ApprovalWorkflowService {
 
         let mut result = Vec::with_capacity(workflows.len());
         for workflow in workflows {
-            let steps = GovApprovalStep::find_by_workflow(&self.pool, workflow.id).await?;
+            let steps =
+                GovApprovalStep::find_by_workflow(&self.pool, tenant_id, workflow.id).await?;
             result.push(WorkflowWithSteps { workflow, steps });
         }
 
@@ -64,7 +65,7 @@ impl ApprovalWorkflowService {
             .await?
             .ok_or(GovernanceError::WorkflowNotFound(workflow_id))?;
 
-        let steps = GovApprovalStep::find_by_workflow(&self.pool, workflow.id).await?;
+        let steps = GovApprovalStep::find_by_workflow(&self.pool, tenant_id, workflow.id).await?;
 
         Ok(WorkflowWithSteps { workflow, steps })
     }
@@ -177,7 +178,7 @@ impl ApprovalWorkflowService {
         // Update steps if provided
         let final_steps = if let Some(new_steps) = steps {
             // Delete existing steps
-            GovApprovalStep::delete_by_workflow(&self.pool, workflow_id).await?;
+            GovApprovalStep::delete_by_workflow(&self.pool, tenant_id, workflow_id).await?;
 
             // Create new steps
             let mut created_steps = Vec::with_capacity(new_steps.len());
@@ -217,7 +218,7 @@ impl ApprovalWorkflowService {
         }
 
         // Delete steps first (cascade should handle this, but be explicit)
-        GovApprovalStep::delete_by_workflow(&self.pool, workflow_id).await?;
+        GovApprovalStep::delete_by_workflow(&self.pool, tenant_id, workflow_id).await?;
 
         // Delete workflow
         GovApprovalWorkflow::delete(&self.pool, tenant_id, workflow_id).await?;
@@ -235,7 +236,7 @@ impl ApprovalWorkflowService {
             .await?
             .ok_or(GovernanceError::WorkflowNotFound(workflow_id))?;
 
-        let steps = GovApprovalStep::find_by_workflow(&self.pool, workflow.id).await?;
+        let steps = GovApprovalStep::find_by_workflow(&self.pool, tenant_id, workflow.id).await?;
 
         Ok(WorkflowWithSteps { workflow, steps })
     }
@@ -290,6 +291,28 @@ mod tests {
     #[test]
     fn test_max_workflow_steps() {
         assert_eq!(MAX_WORKFLOW_STEPS, 5);
+    }
+
+    #[test]
+    fn workflow_step_ops_pass_tenant_id() {
+        let src = include_str!("approval_workflow_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("find_by_workflow(&self.pool, tenant_id, workflow.id)"),
+            "listing approval steps must pass tenant_id"
+        );
+        assert!(
+            production.contains("delete_by_workflow(&self.pool, tenant_id, workflow_id)"),
+            "deleting approval steps must pass tenant_id"
+        );
+        assert!(
+            !production.contains("find_by_workflow(&self.pool, workflow.id)"),
+            "must not list approval steps by workflow_id alone"
+        );
+        assert!(
+            !production.contains("delete_by_workflow(&self.pool, workflow_id)"),
+            "must not delete approval steps by workflow_id alone"
+        );
     }
 
     #[test]

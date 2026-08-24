@@ -115,7 +115,10 @@ pub async fn get_item(
 
     let item = state.certification_item_service.get(tenant_id, id).await?;
 
-    let decision = state.certification_item_service.get_decision(id).await?;
+    let decision = state
+        .certification_item_service
+        .get_decision(tenant_id, id)
+        .await?;
 
     Ok(Json(ItemWithDetailsResponse {
         item: item.into(),
@@ -345,4 +348,21 @@ pub async fn get_my_certifications_summary(
         total_pending,
         campaigns,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn get_item_passes_tenant_to_decision_lookup() {
+        let src = include_str!("certification_items.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("get_decision(tenant_id, id)"),
+            "certification item GET must look up decisions with JWT tenant_id"
+        );
+        assert!(
+            !production.contains("get_decision(id)"),
+            "must not look up certification decisions without tenant_id"
+        );
+    }
 }

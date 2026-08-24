@@ -773,6 +773,7 @@ impl EscalationService {
                     let step_order = request.current_step + 1;
                     if let Ok(Some(step)) = GovApprovalStep::find_by_workflow_and_order(
                         &self.pool,
+                        tenant_id,
                         workflow_id,
                         step_order,
                     )
@@ -1028,9 +1029,14 @@ impl EscalationService {
     ) -> Result<Option<GovApprovalStep>> {
         if let Some(workflow_id) = request.workflow_id {
             let step_order = request.current_step + 1;
-            GovApprovalStep::find_by_workflow_and_order(&self.pool, workflow_id, step_order)
-                .await
-                .map_err(GovernanceError::Database)
+            GovApprovalStep::find_by_workflow_and_order(
+                &self.pool,
+                request.tenant_id,
+                workflow_id,
+                step_order,
+            )
+            .await
+            .map_err(GovernanceError::Database)
         } else {
             Ok(None)
         }

@@ -62,44 +62,59 @@ pub struct CreateCertificationDecision {
 }
 
 impl GovCertificationDecision {
-    /// Find a decision by ID.
-    pub async fn find_by_id(pool: &sqlx::PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
+    /// Find a decision by ID within a tenant (via the parent item).
+    pub async fn find_by_id(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_certification_decisions
-            WHERE id = $1
+            SELECT d.* FROM gov_certification_decisions d
+            INNER JOIN gov_certification_items i ON i.id = d.item_id
+            WHERE d.id = $1 AND i.tenant_id = $2
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .fetch_optional(pool)
         .await
     }
 
-    /// Find a decision by item ID.
+    /// Find a decision by item ID within a tenant.
     pub async fn find_by_item_id(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         item_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_certification_decisions
-            WHERE item_id = $1
+            SELECT d.* FROM gov_certification_decisions d
+            INNER JOIN gov_certification_items i ON i.id = d.item_id
+            WHERE d.item_id = $1 AND i.tenant_id = $2
             ",
         )
         .bind(item_id)
+        .bind(tenant_id)
         .fetch_optional(pool)
         .await
     }
 
-    /// Check if a decision exists for an item.
-    pub async fn exists_for_item(pool: &sqlx::PgPool, item_id: Uuid) -> Result<bool, sqlx::Error> {
+    /// Check if a decision exists for an item within a tenant.
+    pub async fn exists_for_item(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        item_id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
             r"
-            SELECT COUNT(*) FROM gov_certification_decisions
-            WHERE item_id = $1
+            SELECT COUNT(*) FROM gov_certification_decisions d
+            INNER JOIN gov_certification_items i ON i.id = d.item_id
+            WHERE d.item_id = $1 AND i.tenant_id = $2
             ",
         )
         .bind(item_id)
+        .bind(tenant_id)
         .fetch_one(pool)
         .await?;
 
@@ -131,22 +146,25 @@ impl GovCertificationDecision {
         .await
     }
 
-    /// List decisions made by a specific user.
+    /// List decisions made by a specific user within a tenant.
     pub async fn list_by_decided_by(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         decided_by: Uuid,
         limit: i64,
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_certification_decisions
-            WHERE decided_by = $1
-            ORDER BY decided_at DESC
-            LIMIT $2 OFFSET $3
+            SELECT d.* FROM gov_certification_decisions d
+            INNER JOIN gov_certification_items i ON i.id = d.item_id
+            WHERE d.decided_by = $1 AND i.tenant_id = $2
+            ORDER BY d.decided_at DESC
+            LIMIT $3 OFFSET $4
             ",
         )
         .bind(decided_by)
+        .bind(tenant_id)
         .bind(limit)
         .bind(offset)
         .fetch_all(pool)
@@ -252,6 +270,34 @@ mod tests {
 
         assert!(request.decision_type.is_revoked());
         assert!(request.justification.is_some());
+    }
+
+    #[test]
+    fn decision_lookups_join_item_tenant() {
+        let src = include_str!("gov_certification_decision.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("INNER JOIN gov_certification_items i ON i.id = d.item_id"),
+            "decision lookups must join certification items"
+        );
+        assert!(
+            production.contains("AND i.tenant_id = $2"),
+            "decision lookups must filter item tenant_id"
+        );
+        assert!(
+            !production
+                .contains("FROM gov_certification_decisions\n            WHERE item_id = $1"),
+            "must not look up decisions by item_id alone"
+        );
+        assert!(
+            !production.contains("FROM gov_certification_decisions\n            WHERE id = $1"),
+            "must not look up decisions by id alone"
+        );
+        assert!(
+            !production
+                .contains("FROM gov_certification_decisions\n            WHERE decided_by = $1"),
+            "must not list decisions by decided_by alone"
+        );
     }
 
     #[test]

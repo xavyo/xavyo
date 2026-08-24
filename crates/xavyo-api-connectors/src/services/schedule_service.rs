@@ -229,6 +229,7 @@ impl ScheduleService {
 
         SchemaRefreshSchedule::update_after_run(
             &self.pool,
+            schedule.tenant_id,
             schedule.id,
             next_run_at,
             if success {
@@ -461,5 +462,19 @@ mod tests {
         let result =
             validate_schedule_config(&ScheduleType::Cron, None, Some("not a cron expression"));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn mark_executed_passes_tenant_id() {
+        let src = include_str!("schedule_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let lookup = production
+            .split("fn mark_executed")
+            .nth(1)
+            .expect("mark_executed");
+        assert!(
+            lookup.contains("schedule.tenant_id"),
+            "schema refresh run update must pass tenant_id"
+        );
     }
 }

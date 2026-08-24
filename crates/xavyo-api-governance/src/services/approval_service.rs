@@ -114,6 +114,7 @@ impl ApprovalService {
 
         let step = GovApprovalStep::find_by_workflow_and_order(
             &self.pool,
+            request.tenant_id,
             workflow_id,
             request.current_step + 1, // Steps are 1-indexed
         )
@@ -219,7 +220,9 @@ impl ApprovalService {
         }
 
         // Get total steps
-        let total_steps = GovApprovalStep::count_by_workflow(&self.pool, workflow_id).await? as i32;
+        let total_steps =
+            GovApprovalStep::count_by_workflow(&self.pool, request.tenant_id, workflow_id).await?
+                as i32;
 
         // Get previous decisions
         let previous_decisions =
@@ -406,9 +409,13 @@ impl ApprovalService {
         let workflow_id = request.workflow_id.ok_or_else(|| {
             GovernanceError::Validation("Access request is missing a workflow".to_string())
         })?;
-        let is_final =
-            GovApprovalStep::is_final_step(&self.pool, workflow_id, request.current_step + 1)
-                .await?;
+        let is_final = GovApprovalStep::is_final_step(
+            &self.pool,
+            tenant_id,
+            workflow_id,
+            request.current_step + 1,
+        )
+        .await?;
 
         if is_final {
             // All approvals complete - provision the entitlement
@@ -434,6 +441,7 @@ impl ApprovalService {
                 let next_step_order = updated_request.current_step + 1;
                 if let Some(next_step) = GovApprovalStep::find_by_workflow_and_order(
                     &self.pool,
+                    tenant_id,
                     workflow_id,
                     next_step_order,
                 )
@@ -723,6 +731,14 @@ mod tests {
         assert!(
             production.contains("delegation audit requires a delegator"),
             "delegate approvals must record the real delegator"
+        );
+        assert!(
+            production.contains("count_by_workflow(&self.pool, request.tenant_id, workflow_id)"),
+            "approval step counts must pass tenant_id"
+        );
+        assert!(
+            !production.contains("count_by_workflow(&self.pool, workflow_id)"),
+            "must not count approval steps by workflow_id alone"
         );
     }
 
