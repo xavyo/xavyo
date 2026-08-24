@@ -102,7 +102,7 @@ pub async fn suspend_tenant_handler(
         .map_err(|e| TenantError::Database(e.to_string()))?;
 
     // Audit log
-    let _ = AdminAuditLog::create(
+    AdminAuditLog::create(
         &state.pool,
         CreateAuditLogEntry {
             tenant_id: SYSTEM_TENANT_ID,
@@ -122,7 +122,8 @@ pub async fn suspend_tenant_handler(
             user_agent: None,
         },
     )
-    .await;
+    .await
+    .map_err(|e| TenantError::Database(e.to_string()))?;
 
     tracing::info!(
         tenant_id = %tenant_id,
@@ -210,7 +211,7 @@ pub async fn reactivate_tenant_handler(
         .map_err(|e| TenantError::Database(e.to_string()))?;
 
     // Audit log
-    let _ = AdminAuditLog::create(
+    AdminAuditLog::create(
         &state.pool,
         CreateAuditLogEntry {
             tenant_id: SYSTEM_TENANT_ID,
@@ -230,7 +231,8 @@ pub async fn reactivate_tenant_handler(
             user_agent: None,
         },
     )
-    .await;
+    .await
+    .map_err(|e| TenantError::Database(e.to_string()))?;
 
     tracing::info!(
         tenant_id = %tenant_id,
@@ -304,4 +306,22 @@ pub async fn get_tenant_status_handler(
         scheduled_purge_at: tenant.scheduled_purge_at,
         created_at: tenant.created_at,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn suspend_mutations_do_not_swallow_audit_errors() {
+        let src = include_str!("suspend.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("let _ = AdminAuditLog::create("),
+            "suspend/reactivate must not swallow admin audit errors"
+        );
+        assert!(
+            production.matches("AdminAuditLog::create(").count() >= 2
+                && production.contains("map_err(|e| TenantError::Database(e.to_string()))?"),
+            "suspend/reactivate must fail when admin audit cannot be written"
+        );
+    }
 }

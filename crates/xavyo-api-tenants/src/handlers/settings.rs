@@ -169,7 +169,7 @@ pub async fn update_tenant_user_settings_handler(
         .map_err(|e| TenantError::Database(e.to_string()))?;
 
     // F-056 US4: Audit log for setting changes
-    let _ = AdminAuditLog::create(
+    AdminAuditLog::create(
         &state.pool,
         CreateAuditLogEntry {
             tenant_id, // Log to the tenant being modified (not SYSTEM_TENANT_ID)
@@ -183,7 +183,8 @@ pub async fn update_tenant_user_settings_handler(
             user_agent: None,
         },
     )
-    .await;
+    .await
+    .map_err(|e| TenantError::Database(e.to_string()))?;
 
     tracing::info!(
         tenant_id = %tenant_id,
@@ -273,7 +274,7 @@ pub async fn update_settings_handler(
         .map_err(|e| TenantError::Database(e.to_string()))?;
 
     // Audit log
-    let _ = AdminAuditLog::create(
+    AdminAuditLog::create(
         &state.pool,
         CreateAuditLogEntry {
             tenant_id: SYSTEM_TENANT_ID,
@@ -287,7 +288,8 @@ pub async fn update_settings_handler(
             user_agent: None,
         },
     )
-    .await;
+    .await
+    .map_err(|e| TenantError::Database(e.to_string()))?;
 
     tracing::info!(
         tenant_id = %tenant_id,
@@ -386,5 +388,20 @@ mod tests {
         assert!(json.contains("tenant_id"));
         assert!(json.contains("settings"));
         assert!(json.contains("max_mau"));
+    }
+
+    #[test]
+    fn settings_mutations_do_not_swallow_audit_errors() {
+        let src = include_str!("settings.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("let _ = AdminAuditLog::create("),
+            "settings mutations must not swallow admin audit errors"
+        );
+        assert!(
+            production.matches("AdminAuditLog::create(").count() >= 2
+                && production.contains("map_err(|e| TenantError::Database(e.to_string()))?"),
+            "settings mutations must fail when admin audit cannot be written"
+        );
     }
 }

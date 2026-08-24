@@ -106,7 +106,7 @@ pub async fn rotate_oauth_secret_handler(
         })?;
 
     // Audit log - note: we don't log the plaintext secret
-    let _ = AdminAuditLog::create(
+    AdminAuditLog::create(
         &state.pool,
         CreateAuditLogEntry {
             tenant_id,
@@ -129,7 +129,8 @@ pub async fn rotate_oauth_secret_handler(
             user_agent: None,
         },
     )
-    .await;
+    .await
+    .map_err(|e| TenantError::Database(e.to_string()))?;
 
     tracing::info!(
         tenant_id = %tenant_id,
@@ -294,7 +295,7 @@ pub async fn deactivate_oauth_client_handler(
         })?;
 
     // Audit log
-    let _ = AdminAuditLog::create(
+    AdminAuditLog::create(
         &state.pool,
         CreateAuditLogEntry {
             tenant_id,
@@ -312,7 +313,8 @@ pub async fn deactivate_oauth_client_handler(
             user_agent: None,
         },
     )
-    .await;
+    .await
+    .map_err(|e| TenantError::Database(e.to_string()))?;
 
     tracing::info!(
         tenant_id = %tenant_id,
@@ -323,4 +325,22 @@ pub async fn deactivate_oauth_client_handler(
     );
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn oauth_client_mutations_do_not_swallow_audit_errors() {
+        let src = include_str!("oauth_clients.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("let _ = AdminAuditLog::create("),
+            "OAuth client mutations must not swallow admin audit errors"
+        );
+        assert!(
+            production.matches("AdminAuditLog::create(").count() >= 2
+                && production.contains("map_err(|e| TenantError::Database(e.to_string()))?"),
+            "OAuth client mutations must fail when admin audit cannot be written"
+        );
+    }
 }

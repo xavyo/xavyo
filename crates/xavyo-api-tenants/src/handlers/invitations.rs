@@ -94,7 +94,7 @@ pub async fn create_invitation_handler(
         .await?;
 
     // Create audit log entry
-    let _ = AdminAuditLog::create(
+    AdminAuditLog::create(
         &state.pool,
         CreateAuditLogEntry {
             tenant_id,
@@ -112,7 +112,8 @@ pub async fn create_invitation_handler(
             user_agent: None,
         },
     )
-    .await;
+    .await
+    .map_err(|e| TenantError::Database(e.to_string()))?;
 
     Ok((
         StatusCode::CREATED,
@@ -282,7 +283,7 @@ pub async fn cancel_invitation_handler(
         .await?;
 
     // Create audit log entry
-    let _ = AdminAuditLog::create(
+    AdminAuditLog::create(
         &state.pool,
         CreateAuditLogEntry {
             tenant_id,
@@ -301,7 +302,8 @@ pub async fn cancel_invitation_handler(
             user_agent: None,
         },
     )
-    .await;
+    .await
+    .map_err(|e| TenantError::Database(e.to_string()))?;
 
     Ok(Json(InvitationResponse {
         id: invitation.id,
@@ -570,6 +572,21 @@ mod tests {
         assert!(
             production.contains("trust_xff.is_some()"),
             "forwarded headers require TrustXff"
+        );
+    }
+
+    #[test]
+    fn invitation_mutations_do_not_swallow_audit_errors() {
+        let src = include_str!("invitations.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("let _ = AdminAuditLog::create("),
+            "invitation mutations must not swallow admin audit errors"
+        );
+        assert!(
+            production.matches("AdminAuditLog::create(").count() >= 2
+                && production.contains("map_err(|e| TenantError::Database(e.to_string()))?"),
+            "invitation mutations must fail when admin audit cannot be written"
         );
     }
 }
