@@ -592,8 +592,8 @@ impl OperationService {
 
     /// Release stale operations (operations stuck in `in_progress`).
     #[instrument(skip(self))]
-    pub async fn release_stale_operations(&self) -> OperationServiceResult<u64> {
-        let count = self.queue.release_stale_operations().await?;
+    pub async fn release_stale_operations(&self, tenant_id: Uuid) -> OperationServiceResult<u64> {
+        let count = self.queue.release_stale_operations(Some(tenant_id)).await?;
         info!(count = count, "Released stale operations");
         Ok(count)
     }
@@ -958,6 +958,14 @@ mod tests {
         assert!(
             !production.contains("filter(|op| op.tenant_id == tenant_id)"),
             "must not filter dead letters in memory after an unscoped query"
+        );
+        assert!(
+            production.contains("release_stale_operations(Some(tenant_id))"),
+            "stale release from HTTP must pass tenant_id"
+        );
+        assert!(
+            !production.contains("release_stale_operations().await"),
+            "must not release stale operations across tenants from HTTP"
         );
     }
 

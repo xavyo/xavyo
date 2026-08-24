@@ -880,7 +880,11 @@ impl OperationQueue {
 
     /// Transition operations to `awaiting_system` status when connector is offline.
     #[instrument(skip(self))]
-    pub async fn transition_to_awaiting_system(&self, connector_id: Uuid) -> QueueResult<u64> {
+    pub async fn transition_to_awaiting_system(
+        &self,
+        tenant_id: Uuid,
+        connector_id: Uuid,
+    ) -> QueueResult<u64> {
         let now = Utc::now();
 
         let result = sqlx::query(
@@ -888,11 +892,13 @@ impl OperationQueue {
             UPDATE provisioning_operations
             SET status = 'awaiting_system',
                 updated_at = $1
-            WHERE connector_id = $2
+            WHERE tenant_id = $2
+            AND connector_id = $3
             AND status IN ('pending', 'failed')
             ",
         )
         .bind(now)
+        .bind(tenant_id)
         .bind(connector_id)
         .execute(&self.pool)
         .await?;
@@ -911,7 +917,11 @@ impl OperationQueue {
 
     /// Resume operations when connector comes back online.
     #[instrument(skip(self))]
-    pub async fn resume_awaiting_operations(&self, connector_id: Uuid) -> QueueResult<u64> {
+    pub async fn resume_awaiting_operations(
+        &self,
+        tenant_id: Uuid,
+        connector_id: Uuid,
+    ) -> QueueResult<u64> {
         let now = Utc::now();
 
         let result = sqlx::query(
@@ -919,11 +929,13 @@ impl OperationQueue {
             UPDATE provisioning_operations
             SET status = 'pending',
                 updated_at = $1
-            WHERE connector_id = $2
+            WHERE tenant_id = $2
+            AND connector_id = $3
             AND status = 'awaiting_system'
             ",
         )
         .bind(now)
+        .bind(tenant_id)
         .bind(connector_id)
         .execute(&self.pool)
         .await?;
@@ -1061,24 +1073,44 @@ impl OperationQueue {
     /// Release stale in-progress operations.
     ///
     /// This should be called periodically to handle processors that crashed.
-    pub async fn release_stale_operations(&self) -> QueueResult<u64> {
+    /// Pass `tenant_id` for tenant-scoped HTTP callers; `None` is the worker sweeper.
+    pub async fn release_stale_operations(&self, tenant_id: Option<Uuid>) -> QueueResult<u64> {
         let now = Utc::now();
         let stale_threshold = now - Duration::seconds(self.config.lock_timeout_secs);
 
-        let result = sqlx::query(
-            r"
-            UPDATE provisioning_operations
-            SET status = 'pending',
-                started_at = NULL,
-                updated_at = $1
-            WHERE status = 'in_progress'
-            AND started_at < $2
-            ",
-        )
-        .bind(now)
-        .bind(stale_threshold)
-        .execute(&self.pool)
-        .await?;
+        let result = if let Some(tid) = tenant_id {
+            sqlx::query(
+                r"
+                UPDATE provisioning_operations
+                SET status = 'pending',
+                    started_at = NULL,
+                    updated_at = $1
+                WHERE tenant_id = $3
+                AND status = 'in_progress'
+                AND started_at < $2
+                ",
+            )
+            .bind(now)
+            .bind(stale_threshold)
+            .bind(tid)
+            .execute(&self.pool)
+            .await?
+        } else {
+            sqlx::query(
+                r"
+                UPDATE provisioning_operations
+                SET status = 'pending',
+                    started_at = NULL,
+                    updated_at = $1
+                WHERE status = 'in_progress'
+                AND started_at < $2
+                ",
+            )
+            .bind(now)
+            .bind(stale_threshold)
+            .execute(&self.pool)
+            .await?
+        };
 
         let count = result.rows_affected();
         if count > 0 {
@@ -1222,6 +1254,25 @@ mod tests {
             !production
                 .contains("FROM provisioning_operations\n            WHERE status = 'dead_letter'"),
             "must not list all tenants' dead letters"
+        );
+        assert!(
+            production.contains("WHERE tenant_id = $2\n            AND connector_id = $3"),
+            "awaiting_system transition/resume must filter tenant_id"
+        );
+        assert!(
+            !production.contains(
+                "WHERE connector_id = $2\n            AND status IN ('pending', 'failed')"
+            ),
+            "must not transition awaiting_system by connector_id alone"
+        );
+        assert!(
+            !production
+                .contains("WHERE connector_id = $2\n            AND status = 'awaiting_system'"),
+            "must not resume awaiting_system by connector_id alone"
+        );
+        assert!(
+            production.contains("WHERE tenant_id = $3\n                AND status = 'in_progress'"),
+            "tenant-scoped stale release must filter tenant_id"
         );
     }
 

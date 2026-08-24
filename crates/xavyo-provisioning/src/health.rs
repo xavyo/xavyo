@@ -495,7 +495,7 @@ impl HealthMonitor {
                 // Resume awaiting operations for this connector
                 match self
                     .queue
-                    .resume_awaiting_operations(health_info.connector_id)
+                    .resume_awaiting_operations(tenant_id, health_info.connector_id)
                     .await
                 {
                     Ok(count) => {
@@ -538,6 +538,20 @@ struct HealthRow {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resume_awaiting_passes_tenant_id() {
+        let src = include_str!("health.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("resume_awaiting_operations(tenant_id, health_info.connector_id)"),
+            "resume awaiting must pass tenant_id"
+        );
+        assert!(
+            !production.contains("resume_awaiting_operations(health_info.connector_id)"),
+            "must not resume awaiting operations by connector_id alone"
+        );
+    }
 
     #[test]
     fn test_health_config_default() {
