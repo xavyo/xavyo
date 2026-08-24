@@ -115,9 +115,6 @@ impl TenantIpSettings {
     where
         E: PgExecutor<'e>,
     {
-        let enforcement_mode = data.enforcement_mode.unwrap_or(IpEnforcementMode::Disabled);
-        let bypass_for_super_admin = data.bypass_for_super_admin.unwrap_or(true);
-
         sqlx::query_as(
             r"
             INSERT INTO tenant_ip_settings (
@@ -127,7 +124,7 @@ impl TenantIpSettings {
                 updated_at,
                 updated_by
             )
-            VALUES ($1, $2, $3, NOW(), $4)
+            VALUES ($1, COALESCE($2, 'disabled'::ip_enforcement_mode), COALESCE($3, true), NOW(), $4)
             ON CONFLICT (tenant_id) DO UPDATE SET
                 enforcement_mode = COALESCE($2, tenant_ip_settings.enforcement_mode),
                 bypass_for_super_admin = COALESCE($3, tenant_ip_settings.bypass_for_super_admin),
@@ -137,8 +134,8 @@ impl TenantIpSettings {
             ",
         )
         .bind(tenant_id)
-        .bind(enforcement_mode)
-        .bind(bypass_for_super_admin)
+        .bind(data.enforcement_mode)
+        .bind(data.bypass_for_super_admin)
         .bind(updated_by)
         .fetch_one(executor)
         .await
@@ -175,6 +172,30 @@ mod tests {
         assert_eq!(settings.tenant_id, tenant_id);
         assert_eq!(settings.enforcement_mode, IpEnforcementMode::Disabled);
         assert!(settings.bypass_for_super_admin);
+    }
+
+    #[test]
+    fn upsert_does_not_fail_open_omitted_enforcement() {
+        let src = include_str!("tenant_ip_settings.rs");
+        let upsert = src
+            .split("pub async fn upsert")
+            .nth(1)
+            .expect("upsert")
+            .split("/// Delete IP restriction settings")
+            .next()
+            .expect("upsert body");
+        assert!(
+            !upsert.contains("unwrap_or("),
+            "omitted IP enforcement must not fail-open to Disabled before bind"
+        );
+        assert!(
+            upsert.contains("COALESCE($2, tenant_ip_settings.enforcement_mode)"),
+            "update must preserve omitted enforcement_mode"
+        );
+        assert!(
+            upsert.contains("COALESCE($3, tenant_ip_settings.bypass_for_super_admin)"),
+            "update must preserve omitted bypass_for_super_admin"
+        );
     }
 
     #[test]

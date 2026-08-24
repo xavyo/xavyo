@@ -94,19 +94,19 @@ impl TenantLockoutPolicy {
             INSERT INTO tenant_lockout_policies (
                 tenant_id, max_failed_attempts, lockout_duration_minutes, notify_on_lockout
             )
-            VALUES ($1, $2, $3, $4)
+            VALUES ($1, COALESCE($2, 5), COALESCE($3, 30), COALESCE($4, false))
             ON CONFLICT (tenant_id) DO UPDATE SET
-                max_failed_attempts = EXCLUDED.max_failed_attempts,
-                lockout_duration_minutes = EXCLUDED.lockout_duration_minutes,
-                notify_on_lockout = EXCLUDED.notify_on_lockout,
+                max_failed_attempts = COALESCE($2, tenant_lockout_policies.max_failed_attempts),
+                lockout_duration_minutes = COALESCE($3, tenant_lockout_policies.lockout_duration_minutes),
+                notify_on_lockout = COALESCE($4, tenant_lockout_policies.notify_on_lockout),
                 updated_at = now()
             RETURNING *
             ",
         )
         .bind(tenant_id)
-        .bind(data.max_failed_attempts.unwrap_or(5))
-        .bind(data.lockout_duration_minutes.unwrap_or(30))
-        .bind(data.notify_on_lockout.unwrap_or(false))
+        .bind(data.max_failed_attempts)
+        .bind(data.lockout_duration_minutes)
+        .bind(data.notify_on_lockout)
         .fetch_one(executor)
         .await
     }
@@ -156,6 +156,26 @@ mod tests {
         let policy = TenantLockoutPolicy::default_for_tenant(tenant_id);
         assert_eq!(policy.tenant_id, tenant_id);
         assert_eq!(policy.max_failed_attempts, 5);
+    }
+
+    #[test]
+    fn upsert_does_not_fail_open_omitted_lockout_limits() {
+        let src = include_str!("lockout_policy.rs");
+        let upsert = src
+            .split("pub async fn upsert")
+            .nth(1)
+            .expect("upsert")
+            .split("/// Check if lockout is enabled")
+            .next()
+            .expect("upsert body");
+        assert!(
+            !upsert.contains("unwrap_or("),
+            "omitted lockout limits must not be replaced with defaults before bind"
+        );
+        assert!(
+            upsert.contains("COALESCE($2, tenant_lockout_policies.max_failed_attempts)"),
+            "update must preserve omitted max_failed_attempts"
+        );
     }
 
     #[test]

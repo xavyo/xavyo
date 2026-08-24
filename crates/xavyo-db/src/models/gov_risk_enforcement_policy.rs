@@ -92,15 +92,10 @@ impl GovRiskEnforcementPolicy {
         tenant_id: Uuid,
         input: &UpsertEnforcementPolicy,
     ) -> Result<Self, sqlx::Error> {
-        let mode = input.enforcement_mode.unwrap_or(EnforcementMode::Disabled);
-        let fail_open = input.fail_open.unwrap_or(false);
-        let speed = input.impossible_travel_speed_kmh.unwrap_or(900);
-        let travel_enabled = input.impossible_travel_enabled.unwrap_or(true);
-
         sqlx::query_as::<_, Self>(
             "INSERT INTO gov_risk_enforcement_policies \
              (tenant_id, enforcement_mode, fail_open, impossible_travel_speed_kmh, impossible_travel_enabled) \
-             VALUES ($1, $2, $3, $4, $5) \
+             VALUES ($1, COALESCE($2, 'disabled'::enforcement_mode), COALESCE($3, false), COALESCE($4, 900), COALESCE($5, true)) \
              ON CONFLICT (tenant_id) DO UPDATE SET \
                 enforcement_mode = COALESCE($2, gov_risk_enforcement_policies.enforcement_mode), \
                 fail_open = COALESCE($3, gov_risk_enforcement_policies.fail_open), \
@@ -112,10 +107,10 @@ impl GovRiskEnforcementPolicy {
                        created_at, updated_at",
         )
         .bind(tenant_id)
-        .bind(mode)
-        .bind(fail_open)
-        .bind(speed)
-        .bind(travel_enabled)
+        .bind(input.enforcement_mode)
+        .bind(input.fail_open)
+        .bind(input.impossible_travel_speed_kmh)
+        .bind(input.impossible_travel_enabled)
         .fetch_one(pool)
         .await
     }
@@ -152,6 +147,26 @@ mod tests {
         assert!(!EnforcementMode::Disabled.is_enforcing());
         assert!(!EnforcementMode::Monitor.is_enforcing());
         assert!(EnforcementMode::Enforce.is_enforcing());
+    }
+
+    #[test]
+    fn upsert_does_not_fail_open_omitted_enforcement_mode() {
+        let src = include_str!("gov_risk_enforcement_policy.rs");
+        let upsert = src
+            .split("pub async fn upsert")
+            .nth(1)
+            .expect("upsert")
+            .split("/// Returns a default policy")
+            .next()
+            .expect("upsert body");
+        assert!(
+            !upsert.contains("unwrap_or("),
+            "omitted enforcement_mode must not fail-open to Disabled before bind"
+        );
+        assert!(
+            upsert.contains("COALESCE($2, gov_risk_enforcement_policies.enforcement_mode)"),
+            "update must preserve omitted enforcement_mode"
+        );
     }
 
     #[test]

@@ -162,33 +162,45 @@ impl TenantPasswordPolicy {
                 require_digit, require_special, expiration_days, history_count, min_age_hours,
                 check_breached_passwords
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            VALUES (
+                $1,
+                COALESCE($2, 8),
+                COALESCE($3, 128),
+                COALESCE($4, false),
+                COALESCE($5, false),
+                COALESCE($6, false),
+                COALESCE($7, false),
+                COALESCE($8, 0),
+                COALESCE($9, 0),
+                COALESCE($10, 0),
+                COALESCE($11, true)
+            )
             ON CONFLICT (tenant_id) DO UPDATE SET
-                min_length = EXCLUDED.min_length,
-                max_length = EXCLUDED.max_length,
-                require_uppercase = EXCLUDED.require_uppercase,
-                require_lowercase = EXCLUDED.require_lowercase,
-                require_digit = EXCLUDED.require_digit,
-                require_special = EXCLUDED.require_special,
-                expiration_days = EXCLUDED.expiration_days,
-                history_count = EXCLUDED.history_count,
-                min_age_hours = EXCLUDED.min_age_hours,
-                check_breached_passwords = EXCLUDED.check_breached_passwords,
+                min_length = COALESCE($2, tenant_password_policies.min_length),
+                max_length = COALESCE($3, tenant_password_policies.max_length),
+                require_uppercase = COALESCE($4, tenant_password_policies.require_uppercase),
+                require_lowercase = COALESCE($5, tenant_password_policies.require_lowercase),
+                require_digit = COALESCE($6, tenant_password_policies.require_digit),
+                require_special = COALESCE($7, tenant_password_policies.require_special),
+                expiration_days = COALESCE($8, tenant_password_policies.expiration_days),
+                history_count = COALESCE($9, tenant_password_policies.history_count),
+                min_age_hours = COALESCE($10, tenant_password_policies.min_age_hours),
+                check_breached_passwords = COALESCE($11, tenant_password_policies.check_breached_passwords),
                 updated_at = now()
             RETURNING *
             ",
         )
         .bind(tenant_id)
-        .bind(data.min_length.unwrap_or(8))
-        .bind(data.max_length.unwrap_or(128))
-        .bind(data.require_uppercase.unwrap_or(false))
-        .bind(data.require_lowercase.unwrap_or(false))
-        .bind(data.require_digit.unwrap_or(false))
-        .bind(data.require_special.unwrap_or(false))
-        .bind(data.expiration_days.unwrap_or(0))
-        .bind(data.history_count.unwrap_or(0))
-        .bind(data.min_age_hours.unwrap_or(0))
-        .bind(data.check_breached_passwords.unwrap_or(true))
+        .bind(data.min_length)
+        .bind(data.max_length)
+        .bind(data.require_uppercase)
+        .bind(data.require_lowercase)
+        .bind(data.require_digit)
+        .bind(data.require_special)
+        .bind(data.expiration_days)
+        .bind(data.history_count)
+        .bind(data.min_age_hours)
+        .bind(data.check_breached_passwords)
         .fetch_one(executor)
         .await
     }
@@ -260,6 +272,30 @@ mod tests {
         let policy = TenantPasswordPolicy::default_for_tenant(tenant_id);
         assert_eq!(policy.tenant_id, tenant_id);
         assert_eq!(policy.min_length, 8);
+    }
+
+    #[test]
+    fn upsert_does_not_fail_open_omitted_complexity_flags() {
+        let src = include_str!("password_policy.rs");
+        let upsert = src
+            .split("pub async fn upsert")
+            .nth(1)
+            .expect("upsert")
+            .split("/// Check if this policy has any character requirements")
+            .next()
+            .expect("upsert body");
+        assert!(
+            !upsert.contains("unwrap_or(false)"),
+            "omitted complexity flags must not fail-open to false"
+        );
+        assert!(
+            upsert.contains("COALESCE($4, tenant_password_policies.require_uppercase)"),
+            "update must preserve omitted require_uppercase"
+        );
+        assert!(
+            upsert.contains("COALESCE($11, tenant_password_policies.check_breached_passwords)"),
+            "update must preserve omitted HIBP check"
+        );
     }
 
     #[test]
