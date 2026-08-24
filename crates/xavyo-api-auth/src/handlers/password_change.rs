@@ -38,13 +38,15 @@ pub(crate) async fn do_password_change(
         )
         .await?;
 
-    let _ = alert_service
-        .generate_password_change_alert(
-            *tenant_id.as_uuid(),
-            *user_id.as_uuid(),
-            Some(&addr.ip().to_string()),
-        )
-        .await;
+    password_change_alert_recorded(
+        alert_service
+            .generate_password_change_alert(
+                *tenant_id.as_uuid(),
+                *user_id.as_uuid(),
+                Some(&addr.ip().to_string()),
+            )
+            .await,
+    )?;
 
     tracing::info!(
         user_id = %user_id,
@@ -57,6 +59,12 @@ pub(crate) async fn do_password_change(
     Ok(Json(PasswordChangeResponse::success(
         result.sessions_revoked,
     )))
+}
+
+/// Password-change alerts must fail closed. Swallowing persist errors would
+/// look like the security notification was recorded.
+pub(crate) fn password_change_alert_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
 }
 
 /// Handle password change request.
@@ -107,5 +115,25 @@ mod tests {
         let response = PasswordChangeResponse::success(3);
         assert_eq!(response.sessions_revoked, 3);
         assert!(response.message.contains("successfully"));
+    }
+
+    #[test]
+    fn password_change_alert_recorded_propagates_errors() {
+        assert!(password_change_alert_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(password_change_alert_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn password_change_does_not_swallow_security_alert() {
+        let src = include_str!("password_change.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("password_change_alert_recorded("),
+            "password-change alert persist must fail closed"
+        );
+        assert!(
+            !production.contains("let _ = alert_service"),
+            "must not report password change success when the alert was not recorded"
+        );
     }
 }
