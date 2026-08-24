@@ -174,7 +174,7 @@ impl GovMergeAudit {
         }
 
         if filter.operator_id.is_some() || filter.identity_id.is_some() {
-            joins.push("JOIN gov_merge_operations o ON a.operation_id = o.id");
+            joins.push("JOIN gov_merge_operations o ON a.operation_id = o.id AND o.tenant_id = a.tenant_id");
 
             if filter.operator_id.is_some() {
                 param_count += 1;
@@ -252,7 +252,7 @@ impl GovMergeAudit {
         }
 
         if filter.operator_id.is_some() || filter.identity_id.is_some() {
-            joins.push("JOIN gov_merge_operations o ON a.operation_id = o.id");
+            joins.push("JOIN gov_merge_operations o ON a.operation_id = o.id AND o.tenant_id = a.tenant_id");
 
             if filter.operator_id.is_some() {
                 param_count += 1;
@@ -393,7 +393,7 @@ impl GovMergeAudit {
         sqlx::query_as(
             r"
             SELECT a.* FROM gov_merge_audits a
-            JOIN gov_merge_operations o ON a.operation_id = o.id
+            JOIN gov_merge_operations o ON a.operation_id = o.id AND o.tenant_id = a.tenant_id
             WHERE a.tenant_id = $1
               AND (o.source_identity_id = $2 OR o.target_identity_id = $2)
             ORDER BY a.created_at DESC
@@ -468,5 +468,26 @@ mod tests {
         let json = serde_json::to_string(&decision).unwrap();
         assert!(json.contains("display_name"));
         assert!(json.contains("John Smith"));
+    }
+
+    #[test]
+    fn merge_audit_lookups_join_operations_on_tenant_id() {
+        let src = include_str!("gov_merge_audit.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let joined = production
+            .matches("JOIN gov_merge_operations o ON a.operation_id = o.id AND o.tenant_id = a.tenant_id")
+            .count();
+        assert!(
+            joined >= 3,
+            "list, count, and identity lookups must join operations on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN gov_merge_operations o ON a.operation_id = o.id\""),
+            "must not join merge operations by id alone"
+        );
+        assert!(
+            !production.contains("JOIN gov_merge_operations o ON a.operation_id = o.id\n"),
+            "must not join merge operations by id alone"
+        );
     }
 }
