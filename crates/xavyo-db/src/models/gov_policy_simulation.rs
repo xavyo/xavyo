@@ -389,10 +389,11 @@ impl GovPolicySimulation {
                     let updated: Option<DateTime<Utc>> = sqlx::query_scalar(
                         r"
                         SELECT updated_at FROM gov_sod_rules
-                        WHERE id = $1 AND updated_at > $2
+                        WHERE id = $1 AND tenant_id = $2 AND updated_at > $3
                         ",
                     )
                     .bind(policy_id)
+                    .bind(self.tenant_id)
                     .bind(snapshot_at)
                     .fetch_optional(pool)
                     .await?;
@@ -405,10 +406,11 @@ impl GovPolicySimulation {
                     let updated: Option<DateTime<Utc>> = sqlx::query_scalar(
                         r"
                         SELECT updated_at FROM gov_birthright_policies
-                        WHERE id = $1 AND updated_at > $2
+                        WHERE id = $1 AND tenant_id = $2 AND updated_at > $3
                         ",
                     )
                     .bind(policy_id)
+                    .bind(self.tenant_id)
                     .bind(snapshot_at)
                     .fetch_optional(pool)
                     .await?;
@@ -486,5 +488,27 @@ mod tests {
         assert_eq!(summary.total_users_analyzed, 100);
         assert_eq!(summary.affected_users, 5);
         assert_eq!(summary.by_severity.critical, 2);
+    }
+
+    #[test]
+    fn check_staleness_filters_tenant_id() {
+        let src = include_str!("gov_policy_simulation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("FROM gov_sod_rules"),
+            "SoD staleness check must query gov_sod_rules"
+        );
+        assert!(
+            production.contains("FROM gov_birthright_policies"),
+            "birthright staleness check must query gov_birthright_policies"
+        );
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $2 AND updated_at > $3"),
+            "staleness checks must filter tenant_id"
+        );
+        assert!(
+            !production.contains("WHERE id = $1 AND updated_at > $2"),
+            "must not look up policies by id alone"
+        );
     }
 }

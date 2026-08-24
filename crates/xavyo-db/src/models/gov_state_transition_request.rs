@@ -514,15 +514,20 @@ impl GovStateTransitionRequest {
     }
 
     /// Mark grace period as expired (rollback no longer available).
-    pub async fn expire_grace_period(pool: &sqlx::PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
+    pub async fn expire_grace_period(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r"
             UPDATE gov_state_transition_requests
             SET rollback_available = false, updated_at = NOW()
-            WHERE id = $1 AND rollback_available = true
+            WHERE id = $1 AND tenant_id = $2 AND rollback_available = true
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
 
@@ -629,5 +634,22 @@ impl GovStateTransitionRequest {
         )
         .fetch_all(pool)
         .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn expire_grace_period_filters_tenant_id() {
+        let src = include_str!("gov_state_transition_request.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $2 AND rollback_available = true"),
+            "expire_grace_period must filter tenant_id"
+        );
+        assert!(
+            !production.contains("WHERE id = $1 AND rollback_available = true"),
+            "must not expire grace periods by id alone"
+        );
     }
 }

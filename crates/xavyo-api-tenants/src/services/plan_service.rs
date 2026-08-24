@@ -81,7 +81,7 @@ impl PlanService {
         .map_err(|e| TenantError::Database(e.to_string()))?;
 
         // Mark as applied immediately
-        let change = TenantPlanChange::mark_applied(&self.pool, change.id)
+        let change = TenantPlanChange::mark_applied(&self.pool, tenant_id, change.id)
             .await
             .map_err(|e| TenantError::Database(e.to_string()))?;
 
@@ -258,7 +258,7 @@ impl PlanService {
             .ok_or_else(|| TenantError::Validation("No pending downgrade to cancel".to_string()))?;
 
         // Cancel the downgrade
-        let cancelled = TenantPlanChange::mark_cancelled(&self.pool, pending.id)
+        let cancelled = TenantPlanChange::mark_cancelled(&self.pool, tenant_id, pending.id)
             .await
             .map_err(|e| TenantError::Database(e.to_string()))?;
 
@@ -418,7 +418,7 @@ impl PlanService {
             }
 
             // Mark as applied
-            match TenantPlanChange::mark_applied(&self.pool, change.id).await {
+            match TenantPlanChange::mark_applied(&self.pool, change.tenant_id, change.id).await {
                 Ok(applied) => {
                     tracing::info!(
                         change_id = %change.id,
