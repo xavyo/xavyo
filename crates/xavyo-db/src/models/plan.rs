@@ -283,32 +283,34 @@ impl TenantPlanChange {
     }
 
     /// Mark a plan change as applied.
-    pub async fn mark_applied(pool: &PgPool, id: Uuid) -> Result<Self, DbError> {
+    pub async fn mark_applied(pool: &PgPool, tenant_id: Uuid, id: Uuid) -> Result<Self, DbError> {
         sqlx::query_as::<_, Self>(
             r"
             UPDATE tenant_plan_changes
             SET status = 'applied'
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             RETURNING id, tenant_id, change_type, old_plan, new_plan, effective_at, status, admin_user_id, reason, created_at
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .fetch_one(pool)
         .await
         .map_err(DbError::QueryFailed)
     }
 
     /// Mark a plan change as cancelled.
-    pub async fn mark_cancelled(pool: &PgPool, id: Uuid) -> Result<Self, DbError> {
+    pub async fn mark_cancelled(pool: &PgPool, tenant_id: Uuid, id: Uuid) -> Result<Self, DbError> {
         sqlx::query_as::<_, Self>(
             r"
             UPDATE tenant_plan_changes
             SET status = 'cancelled'
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             RETURNING id, tenant_id, change_type, old_plan, new_plan, effective_at, status, admin_user_id, reason, created_at
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .fetch_one(pool)
         .await
         .map_err(DbError::QueryFailed)
@@ -492,5 +494,34 @@ mod tests {
         assert_eq!(next.hour(), 0);
         assert_eq!(next.minute(), 0);
         assert_eq!(next.second(), 0);
+    }
+
+    #[test]
+    fn mark_applied_and_cancelled_filter_tenant_id() {
+        let src = include_str!("plan.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("SET status = 'applied'"),
+            "must still mark plan changes applied"
+        );
+        assert!(
+            production.contains("SET status = 'cancelled'"),
+            "must still mark plan changes cancelled"
+        );
+        let applied_count = production
+            .matches("WHERE id = $1 AND tenant_id = $2")
+            .count();
+        assert!(
+            applied_count >= 2,
+            "mark_applied and mark_cancelled must filter tenant_id"
+        );
+        assert!(
+            !production.contains("SET status = 'applied'\n            WHERE id = $1\n"),
+            "must not apply plan changes by id alone"
+        );
+        assert!(
+            !production.contains("SET status = 'cancelled'\n            WHERE id = $1\n"),
+            "must not cancel plan changes by id alone"
+        );
     }
 }
