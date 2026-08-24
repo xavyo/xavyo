@@ -215,9 +215,9 @@ impl NhiService {
             environment: None,
         };
 
-        if let Err(e) = NhiServiceAccountModel::create(&self.pool, sa_input).await {
-            tracing::warn!(error = %e, "Failed to create NHI service account extension row");
-        }
+        NhiServiceAccountModel::create(&self.pool, sa_input)
+            .await
+            .map_err(GovernanceError::Database)?;
 
         // Record audit event
         let audit_event = CreateGovNhiAuditEvent {
@@ -234,9 +234,9 @@ impl NhiService {
             source_ip: None,
         };
 
-        if let Err(e) = GovNhiAuditEvent::create(&self.pool, tenant_id, audit_event).await {
-            tracing::warn!(error = %e, "Failed to create NHI audit event");
-        }
+        GovNhiAuditEvent::create(&self.pool, tenant_id, audit_event)
+            .await
+            .map_err(GovernanceError::Database)?;
 
         tracing::info!(
             tenant_id = %tenant_id,
@@ -375,9 +375,9 @@ impl NhiService {
             source_ip: None,
         };
 
-        if let Err(e) = GovNhiAuditEvent::create(&self.pool, tenant_id, audit_event).await {
-            tracing::warn!(error = %e, "Failed to create NHI audit event");
-        }
+        GovNhiAuditEvent::create(&self.pool, tenant_id, audit_event)
+            .await
+            .map_err(GovernanceError::Database)?;
 
         tracing::info!(
             tenant_id = %tenant_id,
@@ -414,9 +414,9 @@ impl NhiService {
             source_ip: None,
         };
 
-        if let Err(e) = GovNhiAuditEvent::create(&self.pool, tenant_id, audit_event).await {
-            tracing::warn!(error = %e, "Failed to create NHI audit event");
-        }
+        GovNhiAuditEvent::create(&self.pool, tenant_id, audit_event)
+            .await
+            .map_err(GovernanceError::Database)?;
 
         let deleted = GovServiceAccount::delete(&self.pool, tenant_id, id)
             .await
@@ -488,9 +488,9 @@ impl NhiService {
             source_ip: None,
         };
 
-        if let Err(e) = GovNhiAuditEvent::create(&self.pool, tenant_id, audit_event).await {
-            tracing::warn!(error = %e, "Failed to create NHI audit event");
-        }
+        GovNhiAuditEvent::create(&self.pool, tenant_id, audit_event)
+            .await
+            .map_err(GovernanceError::Database)?;
 
         tracing::info!(
             tenant_id = %tenant_id,
@@ -557,9 +557,9 @@ impl NhiService {
             source_ip: None,
         };
 
-        if let Err(e) = GovNhiAuditEvent::create(&self.pool, tenant_id, audit_event).await {
-            tracing::warn!(error = %e, "Failed to create NHI audit event");
-        }
+        GovNhiAuditEvent::create(&self.pool, tenant_id, audit_event)
+            .await
+            .map_err(GovernanceError::Database)?;
 
         tracing::info!(
             tenant_id = %tenant_id,
@@ -630,9 +630,9 @@ impl NhiService {
             source_ip: None,
         };
 
-        if let Err(e) = GovNhiAuditEvent::create(&self.pool, tenant_id, audit_event).await {
-            tracing::warn!(error = %e, "Failed to create NHI audit event");
-        }
+        GovNhiAuditEvent::create(&self.pool, tenant_id, audit_event)
+            .await
+            .map_err(GovernanceError::Database)?;
 
         tracing::info!(
             tenant_id = %tenant_id,
@@ -686,9 +686,9 @@ impl NhiService {
             source_ip: None,
         };
 
-        if let Err(e) = GovNhiAuditEvent::create(&self.pool, tenant_id, audit_event).await {
-            tracing::warn!(error = %e, "Failed to create NHI audit event");
-        }
+        GovNhiAuditEvent::create(&self.pool, tenant_id, audit_event)
+            .await
+            .map_err(GovernanceError::Database)?;
 
         tracing::info!(
             tenant_id = %tenant_id,
@@ -1456,6 +1456,26 @@ mod tests {
             detect.contains("exists_in_tenant")
                 && detect.contains("map_err(GovernanceError::Database)?"),
             "orphaned NHI detection must propagate backup-owner lookup errors"
+        );
+    }
+
+    #[test]
+    fn nhi_mutations_do_not_swallow_extension_or_audit_writes() {
+        let src = include_str!("nhi_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("Failed to create NHI service account extension row"),
+            "NHI create must not swallow service-account extension writes"
+        );
+        assert!(
+            !production.contains("Failed to create NHI audit event"),
+            "NHI mutations must not swallow audit writes"
+        );
+        assert!(
+            production.matches("GovNhiAuditEvent::create(").count() >= 7
+                && production.contains("NhiServiceAccountModel::create")
+                && production.contains("map_err(GovernanceError::Database)?"),
+            "NHI mutations must fail when extension or audit rows cannot be written"
         );
     }
 

@@ -203,9 +203,7 @@ pub async fn import_tools_handler(
                 })),
                 source_ip: None,
             };
-            if let Err(e) = GovNhiAuditEvent::create(&state.pool, tenant_uuid, audit_event).await {
-                tracing::warn!(error = %e, nhi_id = %nhi_id, "Failed to create NHI audit event for imported tool");
-            }
+            GovNhiAuditEvent::create(&state.pool, tenant_uuid, audit_event).await?;
         }
     }
 
@@ -256,4 +254,26 @@ pub async fn sync_check_handler(
         .map_err(map_discovery_error)?;
 
     Ok(Json(result))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn import_does_not_swallow_nhi_audit_writes() {
+        let src = include_str!("mcp_discovery.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let import = production
+            .split("pub async fn import_tools_handler")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("import_tools_handler");
+        assert!(
+            !import.contains("if let Err(e) = GovNhiAuditEvent::create"),
+            "MCP tool import must not swallow NHI audit writes"
+        );
+        assert!(
+            import.contains("GovNhiAuditEvent::create(") && import.contains(".await?;"),
+            "MCP tool import must fail when NHI audit rows cannot be written"
+        );
+    }
 }
