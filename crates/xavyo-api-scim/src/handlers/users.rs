@@ -115,7 +115,7 @@ pub async fn list_users(
                     i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
-                .await;
+                .await?;
         }
     }
 
@@ -177,7 +177,7 @@ pub async fn create_user(
                     i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
-                .await;
+                .await?;
         }
     }
 
@@ -255,7 +255,7 @@ pub async fn get_user(
                     i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
-                .await;
+                .await?;
         }
     }
 
@@ -321,7 +321,7 @@ pub async fn replace_user(
                     i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
-                .await;
+                .await?;
         }
     }
 
@@ -403,7 +403,7 @@ pub async fn update_user(
                     i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
-                .await;
+                .await?;
         }
     }
 
@@ -482,7 +482,7 @@ pub async fn delete_user(
                     i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
-                .await;
+                .await?;
         }
     }
 
@@ -524,6 +524,23 @@ mod tests {
                     .skip(1)
                     .all(|chunk| chunk.contains(".await?;")),
             "SCIM user success audits must not discard log_user_success errors"
+        );
+    }
+
+    #[test]
+    fn user_error_audits_do_not_swallow_write_errors() {
+        let src = include_str!("users.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.matches("log_error(").count() >= 6,
+            "SCIM user handlers must audit error paths"
+        );
+        assert!(
+            production
+                .split(".log_error(")
+                .skip(1)
+                .all(|chunk| chunk.contains(".await?;")),
+            "SCIM user error audits must fail closed when the audit row cannot be written"
         );
     }
 }

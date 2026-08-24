@@ -216,20 +216,19 @@ impl SyncEngine {
         match result {
             Ok(progress) => {
                 // Flush final counters.
-                if let Err(e) = ScimSyncRun::update_progress(
-                    pool,
-                    tenant_id,
-                    run_id,
-                    progress.processed,
-                    progress.created,
-                    progress.updated,
-                    progress.skipped,
-                    progress.failed,
-                )
-                .await
-                {
-                    warn!(run_id = %run_id, error = %e, "Failed to update final sync progress");
-                }
+                scim_sync_progress_recorded(
+                    ScimSyncRun::update_progress(
+                        pool,
+                        tenant_id,
+                        run_id,
+                        progress.processed,
+                        progress.created,
+                        progress.updated,
+                        progress.skipped,
+                        progress.failed,
+                    )
+                    .await,
+                )?;
 
                 ScimSyncRun::complete(pool, tenant_id, run_id).await?;
 
@@ -330,7 +329,7 @@ async fn execute_sync(
 
             // Periodically flush progress.
             if progress.processed % PROGRESS_FLUSH_INTERVAL == 0 {
-                flush_progress(pool, tenant_id, run_id, &progress).await;
+                flush_progress(pool, tenant_id, run_id, &progress).await?;
             }
         }
 
@@ -360,7 +359,7 @@ async fn execute_sync(
             .await;
 
             if progress.processed % PROGRESS_FLUSH_INTERVAL == 0 {
-                flush_progress(pool, tenant_id, run_id, &progress).await;
+                flush_progress(pool, tenant_id, run_id, &progress).await?;
             }
         }
 
@@ -625,27 +624,31 @@ async fn get_group_member_external_ids(
 // ---------------------------------------------------------------------------
 
 /// Write current progress counters to the sync run record.
-///
-/// Errors during flushing are logged but do not abort the sync.
-async fn flush_progress(pool: &PgPool, tenant_id: Uuid, run_id: Uuid, progress: &SyncProgress) {
-    if let Err(e) = ScimSyncRun::update_progress(
-        pool,
-        tenant_id,
-        run_id,
-        progress.processed,
-        progress.created,
-        progress.updated,
-        progress.skipped,
-        progress.failed,
-    )
-    .await
-    {
-        warn!(
-            run_id = %run_id,
-            error = %e,
-            "Failed to flush sync progress"
-        );
-    }
+async fn flush_progress(
+    pool: &PgPool,
+    tenant_id: Uuid,
+    run_id: Uuid,
+    progress: &SyncProgress,
+) -> Result<(), sqlx::Error> {
+    scim_sync_progress_recorded(
+        ScimSyncRun::update_progress(
+            pool,
+            tenant_id,
+            run_id,
+            progress.processed,
+            progress.created,
+            progress.updated,
+            progress.skipped,
+            progress.failed,
+        )
+        .await,
+    )?;
+    Ok(())
+}
+
+/// Persist SCIM sync progress. Errors must not complete the run with stale counters.
+fn scim_sync_progress_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
 }
 
 #[cfg(test)]
@@ -695,6 +698,28 @@ mod tests {
         assert!(
             consumer.matches("list_by_target").count() >= 2 && consumer.contains(".await?"),
             "SCIM consumers must propagate attribute-mapping load errors"
+        );
+    }
+
+    #[test]
+    fn scim_sync_progress_recorded_propagates_errors() {
+        assert!(scim_sync_progress_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(scim_sync_progress_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn full_sync_does_not_swallow_progress_persist() {
+        let src = include_str!("sync.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("scim_sync_progress_recorded("),
+            "sync progress persist must fail closed"
+        );
+        assert!(
+            !production.contains("Failed to update final sync progress")
+                && !production.contains("Failed to flush sync progress")
+                && !production.contains("Errors during flushing are logged but do not abort"),
+            "must not complete a sync run with stale progress counters"
         );
     }
 }

@@ -92,9 +92,9 @@ impl AuditService {
         user_agent: Option<String>,
         response_code: i32,
         error_message: String,
-    ) {
-        let _ = self
-            .log(
+    ) -> ScimResult<()> {
+        scim_audit_recorded(
+            self.log(
                 tenant_id,
                 token_id,
                 operation,
@@ -106,7 +106,9 @@ impl AuditService {
                 response_code,
                 Some(error_message),
             )
-            .await;
+            .await,
+        )?;
+        Ok(())
     }
 
     /// Log an authentication failure.
@@ -123,9 +125,9 @@ impl AuditService {
         tenant_id: Uuid,
         source_ip: IpAddr,
         user_agent: Option<String>,
-    ) {
-        let _ = self
-            .log(
+    ) -> ScimResult<()> {
+        scim_audit_recorded(
+            self.log(
                 tenant_id,
                 None,
                 ScimOperation::List, // Auth failures aren't tied to a specific CRUD operation
@@ -137,7 +139,9 @@ impl AuditService {
                 401,
                 Some("Authentication failed".to_string()),
             )
-            .await;
+            .await,
+        )?;
+        Ok(())
     }
 
     /// List audit logs for a tenant.
@@ -169,6 +173,11 @@ impl AuditService {
         let deleted = ScimAuditLog::delete_older_than(&self.pool, retention_days).await?;
         Ok(deleted)
     }
+}
+
+/// Error-path SCIM audit writes must fail closed.
+fn scim_audit_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
 }
 
 /// Truncate a JSON value to a maximum size.
@@ -223,6 +232,40 @@ mod tests {
         assert!(
             success.contains("-> ScimResult<()>") && success.contains(".await?;"),
             "log_user_success must propagate audit write errors"
+        );
+    }
+
+    #[test]
+    fn scim_audit_recorded_propagates_errors() {
+        assert!(scim_audit_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(scim_audit_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn log_error_and_auth_failure_do_not_swallow_write_errors() {
+        let src = include_str!("audit_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("scim_audit_recorded("),
+            "error-path SCIM audit persist must fail closed"
+        );
+        let error = production
+            .split("pub async fn log_error")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn log_auth_failure").next())
+            .expect("log_error");
+        assert!(
+            error.contains("-> ScimResult<()>") && !error.contains("let _ = self"),
+            "log_error must not swallow audit writes"
+        );
+        let auth = production
+            .split("pub async fn log_auth_failure")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn list_logs").next())
+            .expect("log_auth_failure");
+        assert!(
+            auth.contains("-> ScimResult<()>") && !auth.contains("let _ = self"),
+            "log_auth_failure must not swallow audit writes"
         );
     }
 }

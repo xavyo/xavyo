@@ -103,15 +103,11 @@ impl TokenService {
             return Err(ScimError::Unauthorized);
         }
 
-        // Update last used timestamp (fire and forget).
-        // SECURITY: Pass tenant_id so the spawned task includes it in the WHERE clause,
-        // since the spawned task does not inherit the connection's RLS context.
-        let pool = self.pool.clone();
-        let token_id = token.id;
-        let token_tenant_id = token.tenant_id;
-        tokio::spawn(async move {
-            let _ = ScimToken::update_last_used(&pool, token_tenant_id, token_id).await;
-        });
+        // Update last used timestamp. Persist errors must not look like
+        // the token was unused for rotation/inactivity.
+        scim_last_used_recorded(
+            ScimToken::update_last_used(&self.pool, token.tenant_id, token.id).await,
+        )?;
 
         Ok(token)
     }
@@ -142,6 +138,12 @@ impl TokenService {
         let result = hasher.finalize();
         hex::encode(result)
     }
+}
+
+/// Persist last_used_at on SCIM token validation. Errors must not skip
+/// inactivity/rotation tracking.
+fn scim_last_used_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
 }
 
 mod hex {
@@ -178,5 +180,27 @@ mod tests {
     #[test]
     fn test_token_prefix() {
         assert_eq!(TOKEN_PREFIX, "xscim_");
+    }
+
+    #[test]
+    fn scim_last_used_recorded_propagates_errors() {
+        assert!(scim_last_used_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(scim_last_used_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn validate_token_does_not_swallow_last_used_persist() {
+        let src = include_str!("token_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("scim_last_used_recorded(")
+                && production.contains("ScimToken::update_last_used"),
+            "last_used persist must fail closed"
+        );
+        assert!(
+            !production.contains("tokio::spawn")
+                && !production.contains("let _ = ScimToken::update_last_used"),
+            "must not fire-and-forget last_used persist"
+        );
     }
 }
