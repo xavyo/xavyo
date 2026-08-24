@@ -23,7 +23,7 @@ use chrono::{Duration, Utc};
 use sqlx::PgPool;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::info;
 use uuid::Uuid;
 use validator::Validate;
 use xavyo_core::TenantId;
@@ -147,34 +147,19 @@ pub async fn signup_handler(
         )
         .await?;
 
-    // Send verification email (async, non-blocking)
-    // We spawn this as a background task to not block the response
-    let email_sender_clone = email_sender.clone();
-    let pool_clone = pool.clone();
-    let user_id_uuid = *user_id.as_uuid();
-    let email_clone = email.clone();
-    let tenant_id_clone = tenant_id;
+    // Send verification email. Errors must not look like the user can verify.
     let ip = ip_address.unwrap_or_else(|| addr.ip());
-
-    tokio::spawn(async move {
-        if let Err(e) = send_verification_email(
-            &pool_clone,
-            email_sender_clone.as_ref(),
-            tenant_id_clone,
-            user_id_uuid,
-            &email_clone,
+    verification_email_sent(
+        send_verification_email(
+            &pool,
+            email_sender.as_ref(),
+            tenant_id,
+            *user_id.as_uuid(),
+            &email,
             ip,
         )
-        .await
-        {
-            warn!(
-                user_id = %user_id_uuid,
-                tenant_id = %SYSTEM_TENANT_ID,
-                error = %e,
-                "Failed to send verification email during signup"
-            );
-        }
-    });
+        .await,
+    )?;
 
     // Audit log
     info!(
@@ -187,6 +172,11 @@ pub async fn signup_handler(
     let response = SignupResponse::new(*user_id.as_uuid(), email, access_token, expires_in);
 
     Ok((StatusCode::CREATED, Json(response)))
+}
+
+/// Signup must not report success when the verification email was not sent.
+fn verification_email_sent<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
 }
 
 /// Validate display name.
@@ -344,6 +334,27 @@ mod tests {
         assert_eq!(
             login_client_ip(&headers, true, Some(peer)).as_deref(),
             Some("10.0.0.1")
+        );
+    }
+
+    #[test]
+    fn verification_email_sent_propagates_errors() {
+        assert!(verification_email_sent(Ok::<(), &str>(())).is_ok());
+        assert!(verification_email_sent(Err::<(), _>("smtp")).is_err());
+    }
+
+    #[test]
+    fn signup_does_not_swallow_verification_email() {
+        let src = include_str!("signup.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("verification_email_sent("),
+            "verification email send must fail closed"
+        );
+        assert!(
+            !production.contains("tokio::spawn")
+                && !production.contains("if let Err(e) = send_verification_email"),
+            "must not report signup created when verification email was not sent"
         );
     }
 }

@@ -86,24 +86,18 @@ pub async fn register_handler(
         .register(tenant_id, &request.email, &request.password)
         .await?;
 
-    // Send verification email (best effort - don't fail registration if email fails)
-    if let Err(e) = send_verification_email(
-        &pool,
-        email_sender.as_ref(),
-        tenant_id,
-        *user_id.as_uuid(),
-        &email,
-        addr.ip(),
-    )
-    .await
-    {
-        tracing::warn!(
-            user_id = %user_id,
-            tenant_id = %tenant_id,
-            error = %e,
-            "Failed to send verification email during registration"
-        );
-    }
+    // Send verification email. Errors must not look like the user can verify.
+    verification_email_sent(
+        send_verification_email(
+            &pool,
+            email_sender.as_ref(),
+            tenant_id,
+            *user_id.as_uuid(),
+            &email,
+            addr.ip(),
+        )
+        .await,
+    )?;
 
     let response = RegisterResponse {
         id: *user_id.as_uuid(),
@@ -162,8 +156,33 @@ async fn send_verification_email(
     Ok(())
 }
 
+/// Registration must not report success when the verification email was not sent.
+fn verification_email_sent<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
-    // Handler tests require integration test setup with mock services
-    // See tests/integration_test.rs for full handler tests
+    use super::*;
+
+    #[test]
+    fn verification_email_sent_propagates_errors() {
+        assert!(verification_email_sent(Ok::<(), &str>(())).is_ok());
+        assert!(verification_email_sent(Err::<(), _>("smtp")).is_err());
+    }
+
+    #[test]
+    fn register_does_not_swallow_verification_email() {
+        let src = include_str!("register.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("verification_email_sent("),
+            "verification email send must fail closed"
+        );
+        assert!(
+            !production.contains("best effort - don't fail registration if email fails")
+                && !production.contains("if let Err(e) = send_verification_email"),
+            "must not report registration created when verification email was not sent"
+        );
+    }
 }

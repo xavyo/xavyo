@@ -72,10 +72,22 @@ pub async fn process_job(
     let mut skip_count: i32 = 0;
     let mut processed: i32 = 0;
 
-    // Record pre-existing parse errors (from CSV validation)
+    // Record pre-existing parse errors (from CSV validation). Persist
+    // failures must not complete the job with a missing error list.
     for row_error in &parse_result.errors {
-        if let Err(e) = record_error(&pool, tenant_id, job_id, row_error).await {
+        if let Err(e) =
+            import_error_recorded(record_error(&pool, tenant_id, job_id, row_error).await)
+        {
             tracing::error!(job_id = %job_id, error = %e, "Failed to record parse error");
+            fail_job_after_persist_error(
+                &pool,
+                tenant_id,
+                job_id,
+                &e.to_string(),
+                &event_publisher,
+            )
+            .await;
+            return;
         }
         error_count += 1;
         processed += 1;
@@ -93,9 +105,25 @@ pub async fn process_job(
         )
         .await
         {
-            RowOutcome::Created => success_count += 1,
-            RowOutcome::Skipped => skip_count += 1,
-            RowOutcome::Error => error_count += 1,
+            Ok(RowOutcome::Created) => success_count += 1,
+            Ok(RowOutcome::Skipped) => skip_count += 1,
+            Ok(RowOutcome::Error) => error_count += 1,
+            Err(e) => {
+                tracing::error!(
+                    job_id = %job_id,
+                    error = %e,
+                    "Failed to persist import row outcome"
+                );
+                fail_job_after_persist_error(
+                    &pool,
+                    tenant_id,
+                    job_id,
+                    &e.to_string(),
+                    &event_publisher,
+                )
+                .await;
+                return;
+            }
         }
         processed += 1;
 
@@ -206,6 +234,39 @@ enum RowOutcome {
     Error,
 }
 
+/// Mark the import job failed after a persist error so it does not stay
+/// running or complete with a missing error list.
+async fn fail_job_after_persist_error(
+    pool: &PgPool,
+    tenant_id: Uuid,
+    job_id: Uuid,
+    error: &str,
+    event_publisher: &Option<EventPublisher>,
+) {
+    match import_mark_failed_result(
+        UserImportJob::mark_failed(pool, tenant_id, job_id, error).await,
+    ) {
+        Ok(_) => {
+            publish_import_event(
+                event_publisher,
+                "import.failed",
+                tenant_id,
+                serde_json::json!({
+                    "job_id": job_id,
+                    "error": error,
+                }),
+            );
+        }
+        Err(fail_err) => {
+            tracing::error!(
+                job_id = %job_id,
+                error = %fail_err,
+                "Failed to mark import job as failed after persist error"
+            );
+        }
+    }
+}
+
 /// Process a single CSV row: check for duplicate, create user, handle errors.
 async fn process_single_row(
     pool: &PgPool,
@@ -214,7 +275,7 @@ async fn process_single_row(
     row: &ParsedRow,
     send_invitations: bool,
     email_sender: &Arc<dyn EmailSender>,
-) -> RowOutcome {
+) -> Result<RowOutcome, sqlx::Error> {
     // Check if user already exists in this tenant
     match sqlx::query_scalar::<_, bool>(
         "SELECT EXISTS(SELECT 1 FROM users WHERE tenant_id = $1 AND email = $2)",
@@ -236,8 +297,8 @@ async fn process_single_row(
                     row.email
                 ),
             };
-            let _ = record_error(pool, tenant_id, job_id, &err).await;
-            return RowOutcome::Skipped;
+            import_error_recorded(record_error(pool, tenant_id, job_id, &err).await)?;
+            return Ok(RowOutcome::Skipped);
         }
         Ok(false) => { /* proceed to create */ }
         Err(e) => {
@@ -248,8 +309,8 @@ async fn process_single_row(
                 error_type: "system".to_string(),
                 error_message: format!("Database error checking duplicate: {e}"),
             };
-            let _ = record_error(pool, tenant_id, job_id, &err).await;
-            return RowOutcome::Error;
+            import_error_recorded(record_error(pool, tenant_id, job_id, &err).await)?;
+            return Ok(RowOutcome::Error);
         }
     }
 
@@ -297,8 +358,8 @@ async fn process_single_row(
                 error_type: "system".to_string(),
                 error_message: format!("Failed to create user: {e}"),
             };
-            let _ = record_error(pool, tenant_id, job_id, &err).await;
-            return RowOutcome::Error;
+            import_error_recorded(record_error(pool, tenant_id, job_id, &err).await)?;
+            return Ok(RowOutcome::Error);
         }
     };
 
@@ -318,7 +379,7 @@ async fn process_single_row(
                 error_type: "group_error".to_string(),
                 error_message: format!("Failed to assign group '{group_name}': {e}"),
             };
-            let _ = record_error(pool, tenant_id, job_id, &err).await;
+            import_error_recorded(record_error(pool, tenant_id, job_id, &err).await)?;
         }
     }
 
@@ -356,6 +417,15 @@ async fn process_single_row(
                         error = %e,
                         "Failed to send invitation email during import"
                     );
+                    let err = RowError {
+                        line_number: row.line_number,
+                        email: Some(row.email.clone()),
+                        column_name: Some("email".to_string()),
+                        error_type: "invitation_error".to_string(),
+                        error_message: format!("Failed to send invitation email: {e}"),
+                    };
+                    import_error_recorded(record_error(pool, tenant_id, job_id, &err).await)?;
+                    return Ok(RowOutcome::Error);
                 } else if let Err(e) = import_mark_sent_result(
                     xavyo_db::models::UserInvitation::mark_sent(pool, tenant_id, invitation.id)
                         .await,
@@ -372,7 +442,8 @@ async fn process_single_row(
                         error_type: "invitation_error".to_string(),
                         error_message: format!("Invitation email sent but mark_sent failed: {e}"),
                     };
-                    let _ = record_error(pool, tenant_id, job_id, &err).await;
+                    import_error_recorded(record_error(pool, tenant_id, job_id, &err).await)?;
+                    return Ok(RowOutcome::Error);
                 }
             }
             Err(e) => {
@@ -381,11 +452,20 @@ async fn process_single_row(
                     error = %e,
                     "Failed to create invitation during import"
                 );
+                let err = RowError {
+                    line_number: row.line_number,
+                    email: Some(row.email.clone()),
+                    column_name: Some("email".to_string()),
+                    error_type: "invitation_error".to_string(),
+                    error_message: format!("Failed to create invitation: {e}"),
+                };
+                import_error_recorded(record_error(pool, tenant_id, job_id, &err).await)?;
+                return Ok(RowOutcome::Error);
             }
         }
     }
 
-    RowOutcome::Created
+    Ok(RowOutcome::Created)
 }
 
 /// Find or create a group by display name, then add the user as a member.
@@ -434,6 +514,12 @@ pub(crate) fn import_mark_sent_result<T>(
 pub(crate) fn import_mark_failed_result<T>(
     result: Result<T, sqlx::Error>,
 ) -> Result<T, sqlx::Error> {
+    result
+}
+
+/// Row-error persist must fail closed so the job does not complete with a
+/// missing error list or count a fake Created/Skipped outcome.
+pub(crate) fn import_error_recorded<T>(result: Result<T, sqlx::Error>) -> Result<T, sqlx::Error> {
     result
 }
 
@@ -573,6 +659,57 @@ mod tests {
         assert!(
             !production.contains("let _ = UserImportJob::mark_failed"),
             "must not swallow mark_failed persist errors"
+        );
+    }
+
+    #[test]
+    fn import_error_recorded_propagates_errors() {
+        assert!(import_error_recorded(Ok::<(), sqlx::Error>(())).is_ok());
+        assert!(import_error_recorded(Err::<(), _>(sqlx::Error::Protocol("db".into()))).is_err());
+    }
+
+    #[test]
+    fn process_single_row_does_not_swallow_row_error_persist() {
+        let src = include_str!("job_processor.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let process = production
+            .split("async fn process_single_row")
+            .nth(1)
+            .and_then(|s| s.split("async fn assign_group").next())
+            .expect("process_single_row");
+        assert!(
+            process.contains("import_error_recorded("),
+            "row-error persist must fail closed"
+        );
+        assert!(
+            !process.contains("let _ = record_error"),
+            "must not swallow import row error persist"
+        );
+        assert!(
+            process.contains("Failed to send invitation email")
+                && process.contains("Failed to create invitation")
+                && process.contains("return Ok(RowOutcome::Error)"),
+            "invitation create/send failures must not count as Created"
+        );
+    }
+
+    #[test]
+    fn process_job_does_not_swallow_parse_error_persist() {
+        let src = include_str!("job_processor.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let process_job = production
+            .split("pub async fn process_job")
+            .nth(1)
+            .and_then(|s| s.split("fn publish_import_event").next())
+            .expect("process_job");
+        assert!(
+            process_job.contains("import_error_recorded(")
+                && process_job.contains("fail_job_after_persist_error("),
+            "parse-error persist must fail closed"
+        );
+        assert!(
+            !process_job.contains("if let Err(e) = record_error"),
+            "must not complete an import with a missing parse-error list"
         );
     }
 }

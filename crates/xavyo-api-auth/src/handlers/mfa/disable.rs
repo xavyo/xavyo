@@ -97,11 +97,18 @@ pub async fn disable_mfa(
         "Revoked sessions and refresh tokens after MFA disable"
     );
 
-    // Generate MFA disabled alert (F025)
+    // Generate MFA disabled alert (F025). Persist errors must not look like
+    // MFA was disabled without the security notification.
     let ip_str = ip_address.map(|ip| ip.to_string());
-    let _ = alert_service
-        .generate_mfa_disabled_alert(*tenant_id.as_uuid(), *user_id.as_uuid(), ip_str.as_deref())
-        .await;
+    mfa_disable_alert_recorded(
+        alert_service
+            .generate_mfa_disabled_alert(
+                *tenant_id.as_uuid(),
+                *user_id.as_uuid(),
+                ip_str.as_deref(),
+            )
+            .await,
+    )?;
 
     info!(
         user_id = %user_id.as_uuid(),
@@ -114,6 +121,11 @@ pub async fn disable_mfa(
             message: "MFA has been disabled.".to_string(),
         }),
     ))
+}
+
+/// MFA-disable alerts must fail closed.
+pub(crate) fn mfa_disable_alert_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
 }
 
 #[cfg(test)]
@@ -129,6 +141,26 @@ mod tests {
         assert!(
             !production.contains("UPDATE sessions SET"),
             "must not revoke sessions without refresh tokens"
+        );
+    }
+
+    #[test]
+    fn mfa_disable_alert_recorded_propagates_errors() {
+        assert!(super::mfa_disable_alert_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(super::mfa_disable_alert_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn mfa_disable_does_not_swallow_security_alert() {
+        let src = include_str!("disable.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("mfa_disable_alert_recorded("),
+            "MFA-disable alert persist must fail closed"
+        );
+        assert!(
+            !production.contains("let _ = alert_service"),
+            "must not report MFA disabled when the alert was not recorded"
         );
     }
 }
