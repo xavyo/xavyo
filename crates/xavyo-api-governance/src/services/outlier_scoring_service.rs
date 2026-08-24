@@ -681,13 +681,16 @@ impl OutlierScoringService {
 
         if valid_peer_stats.is_empty() {
             // No valid peer groups - fail the analysis
-            let _ = GovOutlierAnalysis::fail(
-                &self.pool,
-                tenant_id,
-                analysis_id,
-                "No peer groups meet minimum size requirement",
-            )
-            .await;
+            outlier_analysis_fail_recorded(
+                GovOutlierAnalysis::fail(
+                    &self.pool,
+                    tenant_id,
+                    analysis_id,
+                    "No peer groups meet minimum size requirement",
+                )
+                .await
+                .map_err(GovernanceError::Database),
+            )?;
             return Err(GovernanceError::NoPeerGroupsForAnalysis);
         }
 
@@ -1268,6 +1271,13 @@ pub struct AlertSummary {
     pub low_count: i64,
 }
 
+/// Persist an outlier analysis as failed. Errors must not leave it running.
+fn outlier_analysis_fail_recorded<T, E>(
+    result: std::result::Result<T, E>,
+) -> std::result::Result<T, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1654,6 +1664,31 @@ mod tests {
         assert!(
             (score - 33.0).abs() < 0.001,
             "Missing factors should be skipped"
+        );
+    }
+
+    #[test]
+    fn outlier_analysis_fail_recorded_propagates_errors() {
+        assert!(outlier_analysis_fail_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(outlier_analysis_fail_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn execute_analysis_does_not_swallow_fail_persist() {
+        let src = include_str!("outlier_scoring_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let execute = production
+            .split("pub async fn execute_analysis")
+            .nth(1)
+            .and_then(|s| s.split("async fn load_peer_group_stats").next())
+            .expect("execute_analysis");
+        assert!(
+            execute.contains("outlier_analysis_fail_recorded("),
+            "fail persist errors must fail closed"
+        );
+        assert!(
+            !execute.contains("let _ = GovOutlierAnalysis::fail"),
+            "must not swallow outlier analysis fail persist"
         );
     }
 }

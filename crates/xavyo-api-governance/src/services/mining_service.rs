@@ -153,7 +153,9 @@ impl MiningService {
             }
             Err(e) => {
                 tracing::error!(job_id = %job.id, error = %e, "Mining job failed");
-                let _ = GovRoleMiningJob::fail(&self.pool, tenant_id, job_id, &e.to_string()).await;
+                mining_job_fail_recorded(
+                    GovRoleMiningJob::fail(&self.pool, tenant_id, job_id, &e.to_string()).await,
+                )?;
                 Err(e)
             }
         }
@@ -1134,6 +1136,11 @@ fn validate_parameters(params: &MiningJobParameters) -> Result<()> {
     Ok(())
 }
 
+/// Persist a mining job as failed. Errors must not leave the job running.
+fn mining_job_fail_recorded<T, E>(result: std::result::Result<T, E>) -> std::result::Result<T, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1321,6 +1328,31 @@ mod tests {
                 "INNER JOIN gov_entitlement_assignments ea ON ea.target_id = g.id\n                AND ea.target_type = 'group'"
             ),
             "must not join group assignments by target_id alone"
+        );
+    }
+
+    #[test]
+    fn mining_job_fail_recorded_propagates_errors() {
+        assert!(mining_job_fail_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(mining_job_fail_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn run_job_does_not_swallow_fail_persist() {
+        let src = include_str!("mining_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let run_job = production
+            .split("pub async fn run_job")
+            .nth(1)
+            .and_then(|s| s.split("async fn execute_mining_analysis").next())
+            .expect("run_job");
+        assert!(
+            run_job.contains("mining_job_fail_recorded("),
+            "fail persist errors must fail closed"
+        );
+        assert!(
+            !run_job.contains("let _ = GovRoleMiningJob::fail"),
+            "must not swallow mining job fail persist"
         );
     }
 }

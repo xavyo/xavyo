@@ -286,15 +286,16 @@ impl GovReportSchedule {
         q.fetch_one(pool).await
     }
 
-    /// List due schedules (active schedules past their `next_run_at`).
-    pub async fn list_due(pool: &sqlx::PgPool) -> Result<Vec<Self>, sqlx::Error> {
+    /// List due schedules for a tenant (active schedules past their `next_run_at`).
+    pub async fn list_due(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
             SELECT * FROM gov_report_schedules
-            WHERE status = 'active' AND next_run_at <= NOW()
+            WHERE tenant_id = $1 AND status = 'active' AND next_run_at <= NOW()
             ORDER BY next_run_at ASC
             ",
         )
+        .bind(tenant_id)
         .fetch_all(pool)
         .await
     }
@@ -786,5 +787,31 @@ mod tests {
         let next = calculate_next_run(ScheduleFrequency::Monthly, 8, None, Some(28), Some(now));
         assert_eq!(next.day(), 28);
         assert_eq!(next.month(), 1);
+    }
+
+    #[test]
+    fn list_due_filters_tenant_id() {
+        let src = include_str!("gov_report_schedule.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list_due = production
+            .split("pub async fn list_due")
+            .nth(1)
+            .expect("list_due");
+        assert!(
+            list_due.contains("tenant_id: Uuid"),
+            "list_due must take tenant_id"
+        );
+        assert!(
+            list_due.contains("WHERE tenant_id = $1 AND status = 'active'"),
+            "due-schedule lookup must filter by tenant_id"
+        );
+        assert!(
+            list_due.contains(".bind(tenant_id)"),
+            "list_due must bind tenant_id"
+        );
+        assert!(
+            !list_due.contains("WHERE status = 'active' AND next_run_at"),
+            "must not list due schedules across all tenants"
+        );
     }
 }

@@ -347,30 +347,46 @@ pub async fn trigger_due_schedules(
                     .await
                 {
                     Ok(_) => {
-                        triggered_count += 1;
-                        // Record success in schedule
-                        let _ = state
-                            .report_schedule_service
-                            .record_success(tenant_id, schedule.id)
-                            .await;
+                        match schedule_run_recorded(
+                            state
+                                .report_schedule_service
+                                .record_success(tenant_id, schedule.id)
+                                .await,
+                        ) {
+                            Ok(_) => triggered_count += 1,
+                            Err(e) => errors
+                                .push(format!("Schedule {} success persist: {}", schedule.id, e)),
+                        }
                     }
                     Err(e) => {
                         errors.push(format!("Schedule {} generation: {}", schedule.id, e));
-                        // Record failure in schedule
-                        let _ = state
-                            .report_schedule_service
-                            .record_failure(tenant_id, schedule.id, e.to_string())
-                            .await;
+                        if let Err(persist) = schedule_run_recorded(
+                            state
+                                .report_schedule_service
+                                .record_failure(tenant_id, schedule.id, e.to_string())
+                                .await,
+                        ) {
+                            errors.push(format!(
+                                "Schedule {} failure persist: {}",
+                                schedule.id, persist
+                            ));
+                        }
                     }
                 }
             }
             Err(e) => {
                 errors.push(format!("Schedule {} creation: {}", schedule.id, e));
-                // Record failure
-                let _ = state
-                    .report_schedule_service
-                    .record_failure(tenant_id, schedule.id, e.to_string())
-                    .await;
+                if let Err(persist) = schedule_run_recorded(
+                    state
+                        .report_schedule_service
+                        .record_failure(tenant_id, schedule.id, e.to_string())
+                        .await,
+                ) {
+                    errors.push(format!(
+                        "Schedule {} failure persist: {}",
+                        schedule.id, persist
+                    ));
+                }
             }
         }
     }
@@ -381,9 +397,54 @@ pub async fn trigger_due_schedules(
     }))
 }
 
+/// Persist last_run / next_run after a scheduled execution. Errors must surface.
+fn schedule_run_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
 /// Response for trigger due operation.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct TriggerDueResponse {
     pub triggered_count: i64,
     pub errors: Vec<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn schedule_run_recorded_propagates_errors() {
+        assert!(schedule_run_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(schedule_run_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn trigger_due_does_not_swallow_schedule_run_persist() {
+        let src = include_str!("report_schedules.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let trigger = production
+            .split("pub async fn trigger_due_schedules")
+            .nth(1)
+            .expect("trigger_due_schedules");
+        assert!(
+            trigger.contains("schedule_run_recorded("),
+            "schedule last_run/next_run persist must fail closed"
+        );
+        assert!(
+            !trigger
+                .contains("let _ = state\n                            .report_schedule_service")
+                && !trigger.contains("let _ = state\n                .report_schedule_service")
+                && !trigger.contains("let _ = state.report_schedule_service"),
+            "must not swallow record_success or record_failure"
+        );
+        assert!(
+            trigger.contains("Ok(_) => triggered_count += 1"),
+            "triggered_count must increment only after record_success succeeds"
+        );
+        assert!(
+            trigger.contains("success persist") && trigger.contains("failure persist"),
+            "persist errors must be reported instead of counting a fake trigger"
+        );
+    }
 }

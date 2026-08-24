@@ -154,17 +154,28 @@ pub async fn process_job(
         }
         Err(e) => {
             tracing::error!(job_id = %job_id, error = %e, "Failed to mark job as completed");
-            let _ = UserImportJob::mark_failed(&pool, tenant_id, job_id, &e.to_string()).await;
-            // Publish import.failed event
-            publish_import_event(
-                &event_publisher,
-                "import.failed",
-                tenant_id,
-                serde_json::json!({
-                    "job_id": job_id,
-                    "error": e.to_string(),
-                }),
-            );
+            match import_mark_failed_result(
+                UserImportJob::mark_failed(&pool, tenant_id, job_id, &e.to_string()).await,
+            ) {
+                Ok(_) => {
+                    publish_import_event(
+                        &event_publisher,
+                        "import.failed",
+                        tenant_id,
+                        serde_json::json!({
+                            "job_id": job_id,
+                            "error": e.to_string(),
+                        }),
+                    );
+                }
+                Err(fail_err) => {
+                    tracing::error!(
+                        job_id = %job_id,
+                        error = %fail_err,
+                        "Failed to mark import job as failed after complete failed"
+                    );
+                }
+            }
         }
     }
 }
@@ -419,6 +430,13 @@ pub(crate) fn import_mark_sent_result<T>(
     }
 }
 
+/// Completing the job failed; marking failed must not be swallowed either.
+pub(crate) fn import_mark_failed_result<T>(
+    result: Result<T, sqlx::Error>,
+) -> Result<T, sqlx::Error> {
+    result
+}
+
 /// Validate that a role name exists as a `gov_entitlement` with type "role",
 /// and record an error if not found.
 async fn validate_and_record_role(
@@ -533,6 +551,28 @@ mod tests {
         assert!(
             window.contains("import_mark_sent_result("),
             "must not swallow mark_sent after sending the invitation email: {window}"
+        );
+    }
+
+    #[test]
+    fn import_mark_failed_result_does_not_skip_on_error() {
+        assert!(import_mark_failed_result(Ok::<(), sqlx::Error>(())).is_ok());
+        assert!(
+            import_mark_failed_result(Err::<(), _>(sqlx::Error::Protocol("db".into()))).is_err()
+        );
+    }
+
+    #[test]
+    fn import_does_not_swallow_mark_failed_after_complete_fails() {
+        let src = include_str!("job_processor.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("import_mark_failed_result("),
+            "mark_failed after complete failure must fail closed"
+        );
+        assert!(
+            !production.contains("let _ = UserImportJob::mark_failed"),
+            "must not swallow mark_failed persist errors"
         );
     }
 }
