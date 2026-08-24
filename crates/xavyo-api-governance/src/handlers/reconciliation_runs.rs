@@ -260,13 +260,38 @@ pub async fn trigger_scheduled_runs(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
 ) -> ApiResult<Json<Vec<(Uuid, Uuid)>>> {
-    // Verify user is authorized (could add admin check here)
-    let _ = claims.tenant_id().ok_or(ApiGovernanceError::Unauthorized)?;
+    let tenant_id = *claims
+        .tenant_id()
+        .ok_or(ApiGovernanceError::Unauthorized)?
+        .as_uuid();
 
     let triggered = state
         .reconciliation_service
-        .trigger_scheduled_runs()
+        .trigger_scheduled_runs(tenant_id)
         .await?;
 
     Ok(Json(triggered))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn trigger_scheduled_runs_passes_jwt_tenant_id() {
+        let src = include_str!("reconciliation_runs.rs");
+        let trigger = src
+            .split("pub async fn trigger_scheduled_runs")
+            .nth(1)
+            .expect("trigger_scheduled_runs")
+            .split("#[cfg(test)]")
+            .next()
+            .expect("handler body");
+        assert!(
+            trigger.contains("trigger_scheduled_runs(tenant_id)"),
+            "must pass JWT tenant_id, not sweep every tenant"
+        );
+        assert!(
+            !trigger.contains("let _ = claims.tenant_id()"),
+            "must not discard the JWT tenant id"
+        );
+    }
 }
