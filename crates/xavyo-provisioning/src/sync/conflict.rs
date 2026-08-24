@@ -195,7 +195,7 @@ impl SyncConflictDetector {
                    c.outbound_value, c.resolution_strategy, c.resolved_by,
                    c.resolved_at, c.resolution_notes, c.created_at
             FROM gov_sync_conflicts c
-            JOIN gov_inbound_changes ic ON c.inbound_change_id = ic.id
+            JOIN gov_inbound_changes ic ON c.inbound_change_id = ic.id AND ic.tenant_id = c.tenant_id
             WHERE c.tenant_id = $1
                 AND ic.connector_id = $2
                 AND c.resolution_strategy = 'pending'
@@ -221,7 +221,7 @@ impl SyncConflictDetector {
         let count: i64 = sqlx::query_scalar(
             r"
             SELECT COUNT(*) FROM gov_sync_conflicts c
-            JOIN gov_inbound_changes ic ON c.inbound_change_id = ic.id
+            JOIN gov_inbound_changes ic ON c.inbound_change_id = ic.id AND ic.tenant_id = c.tenant_id
             WHERE c.tenant_id = $1
                 AND ic.connector_id = $2
                 AND c.resolution_strategy = 'pending'
@@ -356,5 +356,24 @@ mod tests {
         conflict.resolved_at = Some(Utc::now());
         assert!(conflict.is_resolved());
         assert!(!conflict.needs_manual_resolution());
+    }
+
+    #[test]
+    fn pending_conflict_lookups_join_inbound_changes_on_tenant_id() {
+        let src = include_str!("conflict.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let joined = production
+            .matches(
+                "JOIN gov_inbound_changes ic ON c.inbound_change_id = ic.id AND ic.tenant_id = c.tenant_id",
+            )
+            .count();
+        assert!(
+            joined >= 2,
+            "pending list and count must join inbound changes on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN gov_inbound_changes ic ON c.inbound_change_id = ic.id\n"),
+            "must not join inbound changes by id alone"
+        );
     }
 }

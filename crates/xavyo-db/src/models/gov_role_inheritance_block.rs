@@ -136,8 +136,8 @@ impl GovRoleInheritanceBlock {
                 b.created_by,
                 b.created_at
             FROM gov_role_inheritance_blocks b
-            JOIN gov_entitlements e ON b.entitlement_id = e.id
-            LEFT JOIN gov_applications a ON e.application_id = a.id
+            JOIN gov_entitlements e ON b.entitlement_id = e.id AND e.tenant_id = b.tenant_id
+            LEFT JOIN gov_applications a ON e.application_id = a.id AND a.tenant_id = b.tenant_id
             WHERE b.role_id = $1 AND b.tenant_id = $2
             ORDER BY e.name
             ",
@@ -334,5 +334,31 @@ mod tests {
         };
 
         assert_eq!(details.entitlement_name, "deploy-to-production");
+    }
+
+    #[test]
+    fn inheritance_block_details_join_entitlements_on_tenant_id() {
+        let src = include_str!("gov_role_inheritance_block.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains(
+                "JOIN gov_entitlements e ON b.entitlement_id = e.id AND e.tenant_id = b.tenant_id"
+            ),
+            "detail lookups must join entitlements on tenant_id"
+        );
+        assert!(
+            production.contains(
+                "LEFT JOIN gov_applications a ON e.application_id = a.id AND a.tenant_id = b.tenant_id"
+            ),
+            "detail lookups must join applications on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN gov_entitlements e ON b.entitlement_id = e.id\n"),
+            "must not join entitlements by id alone"
+        );
+        assert!(
+            !production.contains("LEFT JOIN gov_applications a ON e.application_id = a.id\n"),
+            "must not join applications by id alone"
+        );
     }
 }

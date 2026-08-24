@@ -257,8 +257,8 @@ impl ReconciliationEngine {
                 c.name as connector_name,
                 u.email as triggered_by_name
             FROM gov_connector_reconciliation_runs r
-            LEFT JOIN connector_configurations c ON c.id = r.connector_id
-            LEFT JOIN users u ON u.id = r.triggered_by
+            LEFT JOIN connector_configurations c ON c.id = r.connector_id AND c.tenant_id = r.tenant_id
+            LEFT JOIN users u ON u.id = r.triggered_by AND u.tenant_id = r.tenant_id
             WHERE r.id = $1 AND r.tenant_id = $2
             ",
         )
@@ -591,5 +591,31 @@ mod tests {
         assert!(RunStatus::Completed.is_terminal());
         assert!(RunStatus::Failed.is_terminal());
         assert!(RunStatus::Cancelled.is_terminal());
+    }
+
+    #[test]
+    fn run_lookups_join_connector_and_user_on_tenant_id() {
+        let src = include_str!("engine.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains(
+                "LEFT JOIN connector_configurations c ON c.id = r.connector_id AND c.tenant_id = r.tenant_id"
+            ),
+            "run lookups must join connectors on tenant_id"
+        );
+        assert!(
+            production.contains(
+                "LEFT JOIN users u ON u.id = r.triggered_by AND u.tenant_id = r.tenant_id"
+            ),
+            "run lookups must join users on tenant_id"
+        );
+        assert!(
+            !production.contains("LEFT JOIN connector_configurations c ON c.id = r.connector_id\n"),
+            "must not join connectors by id alone"
+        );
+        assert!(
+            !production.contains("LEFT JOIN users u ON u.id = r.triggered_by\n"),
+            "must not join users by id alone"
+        );
     }
 }

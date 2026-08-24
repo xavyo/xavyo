@@ -735,7 +735,7 @@ impl EscalationService {
             r"
             SELECT DISTINCT u.id
             FROM users u
-            JOIN user_roles ur ON ur.user_id = u.id
+            JOIN user_roles ur ON ur.user_id = u.id AND u.tenant_id = $1
             WHERE u.tenant_id = $1
               AND ur.role_name IN ('admin', 'tenant_admin', 'governance_admin')
               AND u.is_active = true
@@ -1123,5 +1123,19 @@ mod tests {
             result.fallback_action,
             Some(FinalFallbackAction::AutoReject)
         ));
+    }
+
+    #[test]
+    fn tenant_admin_lookups_join_roles_on_tenant_id() {
+        let src = include_str!("escalation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("JOIN user_roles ur ON ur.user_id = u.id AND u.tenant_id = $1"),
+            "tenant admin lookups must join user_roles through the tenant-scoped user"
+        );
+        assert!(
+            !production.contains("JOIN user_roles ur ON ur.user_id = u.id\n"),
+            "must not join user_roles by user_id alone"
+        );
     }
 }
