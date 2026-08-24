@@ -206,8 +206,8 @@ impl GovLifecycleTransition {
                 t.requires_approval, t.approval_workflow_id,
                 t.grace_period_hours, t.created_at
             FROM gov_lifecycle_transitions t
-            JOIN gov_lifecycle_states fs ON t.from_state_id = fs.id
-            JOIN gov_lifecycle_states ts ON t.to_state_id = ts.id
+            JOIN gov_lifecycle_states fs ON t.from_state_id = fs.id AND fs.tenant_id = t.tenant_id
+            JOIN gov_lifecycle_states ts ON t.to_state_id = ts.id AND ts.tenant_id = t.tenant_id
             WHERE t.config_id = $1 AND t.tenant_id = $2
             ORDER BY t.name ASC
             ",
@@ -233,8 +233,8 @@ impl GovLifecycleTransition {
                 t.requires_approval, t.approval_workflow_id,
                 t.grace_period_hours, t.created_at
             FROM gov_lifecycle_transitions t
-            JOIN gov_lifecycle_states fs ON t.from_state_id = fs.id
-            JOIN gov_lifecycle_states ts ON t.to_state_id = ts.id
+            JOIN gov_lifecycle_states fs ON t.from_state_id = fs.id AND fs.tenant_id = t.tenant_id
+            JOIN gov_lifecycle_states ts ON t.to_state_id = ts.id AND ts.tenant_id = t.tenant_id
             WHERE t.from_state_id = $1 AND t.tenant_id = $2
             ORDER BY t.name ASC
             ",
@@ -481,5 +481,34 @@ impl GovLifecycleTransition {
         .bind(conditions)
         .fetch_optional(pool)
         .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn transition_state_lookups_join_tenant_id() {
+        let src = include_str!("gov_lifecycle_transition.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains(
+                "JOIN gov_lifecycle_states fs ON t.from_state_id = fs.id AND fs.tenant_id = t.tenant_id"
+            ),
+            "from-state lookups must join states on tenant_id"
+        );
+        assert!(
+            production.contains(
+                "JOIN gov_lifecycle_states ts ON t.to_state_id = ts.id AND ts.tenant_id = t.tenant_id"
+            ),
+            "to-state lookups must join states on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN gov_lifecycle_states fs ON t.from_state_id = fs.id\n"),
+            "must not join from-states by id alone"
+        );
+        assert!(
+            !production.contains("JOIN gov_lifecycle_states ts ON t.to_state_id = ts.id\n"),
+            "must not join to-states by id alone"
+        );
     }
 }
