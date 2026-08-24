@@ -65,3 +65,26 @@ pub use health::HealthStatus;
 pub use consumer::{EventConsumer, EventHandler};
 #[cfg(feature = "kafka")]
 pub use producer::EventProducer;
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn consumer_run_does_not_skip_ahead_on_handler_failure() {
+        let src = include_str!("consumer.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let run = production
+            .split("pub async fn run")
+            .nth(1)
+            .and_then(|s| s.split("async fn process_message").next())
+            .expect("run");
+        assert!(
+            run.contains("event_handler_recorded(")
+                && run.contains("retrying without advancing offset"),
+            "handler errors must retry without committing a later offset"
+        );
+        assert!(
+            !run.contains("Continue processing other messages"),
+            "must not skip a failed event and commit a later offset"
+        );
+    }
+}
