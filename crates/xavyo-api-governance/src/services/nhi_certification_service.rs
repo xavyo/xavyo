@@ -723,7 +723,7 @@ impl NhiCertificationService {
         .bind(campaign_id)
         .fetch_one(&self.pool)
         .await
-        .unwrap_or((0, 0, 0, 0, 0));
+        .map_err(GovernanceError::Database)?;
 
         Ok(NhiCertificationSummary {
             total: row.0,
@@ -1585,5 +1585,19 @@ mod tests {
             expired: 0,
         };
         assert_eq!(empty.completion_rate(), 0.0);
+    }
+
+    #[test]
+    fn campaign_summary_does_not_fail_open_on_query_errors() {
+        let src = include_str!("nhi_certification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains(".unwrap_or((0, 0, 0, 0, 0))"),
+            "campaign summary must not swallow query errors as zeros"
+        );
+        assert!(
+            production.contains(".map_err(GovernanceError::Database)?"),
+            "campaign summary must propagate database errors"
+        );
     }
 }

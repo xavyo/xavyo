@@ -1361,8 +1361,7 @@ mod tests {
 
     #[test]
     fn omitted_enabled_deserializes_to_none() {
-        let request: ScheduleRequest =
-            serde_json::from_str(r#"{"frequency":"daily"}"#).unwrap();
+        let request: ScheduleRequest = serde_json::from_str(r#"{"frequency":"daily"}"#).unwrap();
         assert_eq!(request.enabled, None);
         assert_eq!(request.hour_of_day, 2);
         assert_eq!(request.mode, "full");

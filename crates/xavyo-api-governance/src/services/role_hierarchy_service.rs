@@ -458,7 +458,7 @@ impl RoleHierarchyService {
         .bind(role_id)
         .fetch_one(&self.pool)
         .await
-        .unwrap_or(0);
+        .map_err(GovernanceError::Database)?;
 
         Ok(count)
     }
@@ -538,13 +538,13 @@ impl RoleHierarchyService {
         let direct_count =
             xavyo_db::models::GovRoleEntitlement::count_by_role_id(&self.pool, tenant_id, role.id)
                 .await
-                .unwrap_or(0);
+                .map_err(GovernanceError::Database)?;
 
         // Get effective entitlement count
         let effective_count =
             GovRoleEffectiveEntitlement::count_for_role(&self.pool, tenant_id, role.id)
                 .await
-                .unwrap_or(0);
+                .map_err(GovernanceError::Database)?;
 
         // Count distinct users with active entitlement assignments for this role's
         // effective entitlements (direct + inherited).
@@ -922,7 +922,7 @@ impl RoleHierarchyService {
         .bind(&affected_role_ids)
         .fetch_one(&self.pool)
         .await
-        .unwrap_or(0);
+        .map_err(GovernanceError::Database)?;
 
         // Note: Actual SoD violation scanning would be handled by a background job
         // or the SodViolationService::scan_all_rules() method. Here we just identify
@@ -1037,6 +1037,24 @@ mod tests {
         assert!(
             production.contains("RoleEntitlementNotFound(entitlement_id)"),
             "not-found errors must identify the entitlement"
+        );
+    }
+
+    #[test]
+    fn count_lookups_do_not_fail_open_on_query_errors() {
+        let src = include_str!("role_hierarchy_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains(".await\n                .unwrap_or(0)"),
+            "role count lookups must not swallow query errors as zero"
+        );
+        assert!(
+            !production.contains(".await\n        .unwrap_or(0)"),
+            "role count lookups must not swallow query errors as zero"
+        );
+        assert!(
+            production.contains(".map_err(GovernanceError::Database)?"),
+            "role count lookups must propagate database errors"
         );
     }
 }
