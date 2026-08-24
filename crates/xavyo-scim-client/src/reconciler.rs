@@ -212,7 +212,9 @@ impl ReconciliationEngine {
                     "SCIM reconciliation failed"
                 );
                 let error_msg = format!("{e}");
-                let _ = ScimSyncRun::fail(pool, tenant_id, run_id, &error_msg).await;
+                scim_sync_fail_recorded(
+                    ScimSyncRun::fail(pool, tenant_id, run_id, &error_msg).await,
+                )?;
 
                 // Publish scim.sync.failed webhook event.
                 crate::publish_scim_webhook(
@@ -674,6 +676,11 @@ impl ReconciliationEngine {
     }
 }
 
+/// Persist a SCIM sync run as failed. Errors must not leave the run running.
+fn scim_sync_fail_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -938,5 +945,30 @@ mod tests {
 
         assert_eq!(stats.drift_count, 1);
         assert!(stats.discrepancies[0].description.contains("externalId"));
+    }
+
+    #[test]
+    fn scim_sync_fail_recorded_propagates_errors() {
+        assert!(scim_sync_fail_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(scim_sync_fail_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn reconcile_does_not_swallow_fail_persist() {
+        let src = include_str!("reconciler.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let reconcile = production
+            .split("pub async fn run_reconciliation")
+            .nth(1)
+            .and_then(|s| s.split("async fn execute_reconciliation").next())
+            .expect("run_reconciliation");
+        assert!(
+            reconcile.contains("scim_sync_fail_recorded("),
+            "fail persist errors must fail closed"
+        );
+        assert!(
+            !reconcile.contains("let _ = ScimSyncRun::fail"),
+            "must not swallow SCIM sync fail persist"
+        );
     }
 }

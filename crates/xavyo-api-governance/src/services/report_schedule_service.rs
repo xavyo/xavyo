@@ -222,9 +222,9 @@ impl ReportScheduleService {
             .ok_or(GovernanceError::ReportScheduleNotFound(schedule_id))
     }
 
-    /// List schedules that are due for execution (no tenant filter - global).
-    pub async fn list_due(&self, _tenant_id: Uuid) -> Result<Vec<GovReportSchedule>> {
-        GovReportSchedule::list_due(&self.pool)
+    /// List schedules that are due for execution in the caller's tenant.
+    pub async fn list_due(&self, tenant_id: Uuid) -> Result<Vec<GovReportSchedule>> {
+        GovReportSchedule::list_due(&self.pool, tenant_id)
             .await
             .map_err(GovernanceError::Database)
     }
@@ -345,5 +345,28 @@ mod tests {
         assert!(!is_valid_email("@example.com"));
         assert!(!is_valid_email("test@"));
         assert!(!is_valid_email("test@domain"));
+    }
+
+    #[test]
+    fn list_due_does_not_ignore_tenant_id() {
+        let src = include_str!("report_schedule_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list_due = production
+            .split("pub async fn list_due")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn record_success").next())
+            .expect("list_due");
+        assert!(
+            list_due.contains("tenant_id: Uuid"),
+            "list_due must take tenant_id"
+        );
+        assert!(
+            !list_due.contains("_tenant_id"),
+            "must not ignore JWT tenant_id when listing due schedules"
+        );
+        assert!(
+            list_due.contains("list_due(&self.pool, tenant_id)"),
+            "service list_due must pass tenant_id to the model"
+        );
     }
 }
