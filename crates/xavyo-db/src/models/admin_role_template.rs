@@ -86,23 +86,6 @@ impl AdminRoleTemplate {
         .await
     }
 
-    /// Get a role template by ID without tenant check (for internal use).
-    pub async fn get_by_id_any<'e, E>(executor: E, id: Uuid) -> Result<Option<Self>, sqlx::Error>
-    where
-        E: PgExecutor<'e>,
-    {
-        sqlx::query_as::<_, Self>(
-            r"
-            SELECT id, tenant_id, name, description, is_system, created_at, updated_at
-            FROM admin_role_templates
-            WHERE id = $1
-            ",
-        )
-        .bind(id)
-        .fetch_optional(executor)
-        .await
-    }
-
     /// List all role templates for a tenant (includes system templates).
     pub async fn list<'e, E>(
         executor: E,
@@ -230,9 +213,10 @@ impl AdminRoleTemplate {
         Ok(row.0)
     }
 
-    /// Get permissions for a template.
+    /// Get permissions for a template in this tenant (includes system templates).
     pub async fn get_permissions<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         template_id: Uuid,
     ) -> Result<Vec<AdminPermission>, sqlx::Error>
     where
@@ -243,11 +227,13 @@ impl AdminRoleTemplate {
             SELECT p.id, p.code, p.name, p.description, p.category, p.created_at
             FROM admin_permissions p
             JOIN admin_role_template_permissions tp ON tp.permission_id = p.id
-            WHERE tp.template_id = $1
+            JOIN admin_role_templates t ON t.id = tp.template_id
+            WHERE tp.template_id = $1 AND (t.tenant_id IS NULL OR t.tenant_id = $2)
             ORDER BY p.category, p.code
             ",
         )
         .bind(template_id)
+        .bind(tenant_id)
         .fetch_all(executor)
         .await
     }
@@ -256,31 +242,39 @@ impl AdminRoleTemplate {
     /// Note: Uses a transaction internally, requires a pool or connection.
     pub async fn set_permissions(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         template_id: Uuid,
         permission_ids: &[Uuid],
     ) -> Result<(), sqlx::Error> {
-        // Delete existing permissions
+        // Delete existing permissions only when the parent template is in scope.
         sqlx::query(
             r"
-            DELETE FROM admin_role_template_permissions
-            WHERE template_id = $1
+            DELETE FROM admin_role_template_permissions tp
+            USING admin_role_templates t
+            WHERE tp.template_id = t.id
+              AND tp.template_id = $1
+              AND (t.tenant_id IS NULL OR t.tenant_id = $2)
             ",
         )
         .bind(template_id)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
 
-        // Insert new permissions
+        // Insert new permissions only if the template belongs to this tenant
+        // (or is a system template).
         for permission_id in permission_ids {
             sqlx::query(
                 r"
                 INSERT INTO admin_role_template_permissions (template_id, permission_id)
-                VALUES ($1, $2)
+                SELECT $1, $2 FROM admin_role_templates
+                WHERE id = $1 AND (tenant_id IS NULL OR tenant_id = $3)
                 ON CONFLICT DO NOTHING
                 ",
             )
             .bind(template_id)
             .bind(permission_id)
+            .bind(tenant_id)
             .execute(pool)
             .await?;
         }
@@ -292,6 +286,7 @@ impl AdminRoleTemplate {
     /// Note: Uses a pool to allow multiple executions.
     pub async fn add_permissions(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         template_id: Uuid,
         permission_ids: &[Uuid],
     ) -> Result<(), sqlx::Error> {
@@ -299,12 +294,14 @@ impl AdminRoleTemplate {
             sqlx::query(
                 r"
                 INSERT INTO admin_role_template_permissions (template_id, permission_id)
-                VALUES ($1, $2)
+                SELECT $1, $2 FROM admin_role_templates
+                WHERE id = $1 AND (tenant_id IS NULL OR tenant_id = $3)
                 ON CONFLICT DO NOTHING
                 ",
             )
             .bind(template_id)
             .bind(permission_id)
+            .bind(tenant_id)
             .execute(pool)
             .await?;
         }
@@ -334,6 +331,36 @@ impl AdminRoleTemplate {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn template_lookups_and_permissions_are_tenant_scoped() {
+        let src = include_str!("admin_role_template.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("get_by_id_any"),
+            "unscoped get_by_id_any must not exist"
+        );
+        assert!(
+            production.contains("(t.tenant_id IS NULL OR t.tenant_id = $2)"),
+            "permission reads must join parent tenant"
+        );
+        assert!(
+            production.contains("(t.tenant_id IS NULL OR t.tenant_id = $2)"),
+            "permission deletes must join parent tenant"
+        );
+        assert!(
+            production.contains("WHERE id = $1 AND (tenant_id IS NULL OR tenant_id = $3)"),
+            "permission inserts must check parent tenant"
+        );
+        assert!(
+            !production.contains("WHERE tp.template_id = $1\n            ORDER BY"),
+            "must not list permissions by template_id alone"
+        );
+        assert!(
+            !production.contains("WHERE template_id = $1\n            \""),
+            "must not delete permissions by template_id alone"
+        );
+    }
 
     #[test]
     fn test_create_role_template_input() {

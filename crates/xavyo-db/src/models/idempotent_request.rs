@@ -180,6 +180,7 @@ impl IdempotentRequest {
     /// Update request with successful response (marks as completed).
     pub async fn complete(
         pool: &PgPool,
+        tenant_id: Uuid,
         id: Uuid,
         status: i16,
         body: &[u8],
@@ -193,13 +194,14 @@ impl IdempotentRequest {
                 response_body = $3,
                 response_headers = $4,
                 completed_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $5
             ",
         )
         .bind(id)
         .bind(status)
         .bind(body)
         .bind(headers)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
 
@@ -209,6 +211,7 @@ impl IdempotentRequest {
     /// Mark request as failed.
     pub async fn fail(
         pool: &PgPool,
+        tenant_id: Uuid,
         id: Uuid,
         status: i16,
         body: &[u8],
@@ -220,12 +223,13 @@ impl IdempotentRequest {
                 response_status = $2,
                 response_body = $3,
                 completed_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $4
             ",
         )
         .bind(id)
         .bind(status)
         .bind(body)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
 
@@ -233,17 +237,22 @@ impl IdempotentRequest {
     }
 
     /// Delete a stale processing request (for timeout recovery).
-    pub async fn delete_stale(pool: &PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
+    pub async fn delete_stale(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
         let timeout_threshold = Utc::now() - Duration::seconds(PROCESSING_TIMEOUT_SECONDS);
 
         let result = sqlx::query(
             r"
             DELETE FROM idempotent_requests
-            WHERE id = $1 AND state = 'processing' AND created_at < $2
+            WHERE id = $1 AND tenant_id = $3 AND state = 'processing' AND created_at < $2
             ",
         )
         .bind(id)
         .bind(timeout_threshold)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
 
@@ -314,5 +323,27 @@ mod tests {
     #[test]
     fn test_timeout_constant() {
         assert_eq!(PROCESSING_TIMEOUT_SECONDS, 60);
+    }
+
+    #[test]
+    fn complete_fail_delete_filter_tenant_id() {
+        let src = include_str!("idempotent_request.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $5"),
+            "complete must filter tenant_id"
+        );
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $4"),
+            "fail must filter tenant_id"
+        );
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $3 AND state = 'processing'"),
+            "delete_stale must filter tenant_id"
+        );
+        assert!(
+            !production.contains("WHERE id = $1\n            \""),
+            "must not complete/fail idempotent requests by id alone"
+        );
     }
 }

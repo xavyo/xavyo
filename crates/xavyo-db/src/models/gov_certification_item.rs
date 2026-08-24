@@ -134,22 +134,6 @@ impl GovCertificationItem {
         .await
     }
 
-    /// Find an item by ID without tenant check (for internal use with FK lookups).
-    pub async fn find_by_id_internal(
-        pool: &sqlx::PgPool,
-        id: Uuid,
-    ) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as(
-            r"
-            SELECT * FROM gov_certification_items
-            WHERE id = $1
-            ",
-        )
-        .bind(id)
-        .fetch_optional(pool)
-        .await
-    }
-
     /// Check if a pending item exists for this user-entitlement in the given campaign.
     ///
     /// Scoped to a single campaign so that the same user+entitlement pair can be
@@ -550,6 +534,24 @@ impl GovCertificationItem {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn find_by_id_is_tenant_scoped() {
+        let src = include_str!("gov_certification_item.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $2"),
+            "certification item lookup must filter tenant_id"
+        );
+        assert!(
+            !production.contains("find_by_id_internal"),
+            "unscoped find_by_id_internal must not exist"
+        );
+        assert!(
+            !production.contains("FROM gov_certification_items\n            WHERE id = $1\n"),
+            "must not look up certification items by id alone"
+        );
+    }
 
     #[test]
     fn test_item_status_is_pending() {

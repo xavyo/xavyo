@@ -881,6 +881,7 @@ async fn idempotency_middleware_inner(
             if is_success {
                 if let Err(e) = IdempotentRequest::complete(
                     &state.pool,
+                    tenant_uuid,
                     record_id,
                     status,
                     &resp_bytes,
@@ -891,7 +892,8 @@ async fn idempotency_middleware_inner(
                     tracing::error!(error = %e, "Failed to cache idempotent response");
                 }
             } else if let Err(e) =
-                IdempotentRequest::fail(&state.pool, record_id, status, &resp_bytes).await
+                IdempotentRequest::fail(&state.pool, tenant_uuid, record_id, status, &resp_bytes)
+                    .await
             {
                 tracing::error!(error = %e, "Failed to cache failed idempotent response");
             }
@@ -907,7 +909,8 @@ async fn idempotency_middleware_inner(
                     if existing.is_processing_timed_out() {
                         // Try to delete stale record and retry
                         if let Ok(true) =
-                            IdempotentRequest::delete_stale(&state.pool, existing.id).await
+                            IdempotentRequest::delete_stale(&state.pool, tenant_uuid, existing.id)
+                                .await
                         {
                             tracing::warn!(
                                 idempotency_key = %key,
@@ -1210,6 +1213,39 @@ mod tests {
     }
 
     // ── Idempotency Middleware Tests ──────────────────────────────────────
+
+    #[test]
+    fn idempotent_complete_fail_delete_pass_tenant_id() {
+        let src = include_str!("middleware.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains(
+                "&state.pool,\n                    tenant_uuid,\n                    record_id,"
+            ),
+            "idempotent complete must pass tenant_id"
+        );
+        assert!(
+            production.contains("IdempotentRequest::fail(&state.pool, tenant_uuid, record_id,"),
+            "idempotent fail must pass tenant_id"
+        );
+        assert!(
+            production
+                .contains("IdempotentRequest::delete_stale(&state.pool, tenant_uuid, existing.id)"),
+            "idempotent delete_stale must pass tenant_id"
+        );
+        assert!(
+            !production.contains("&state.pool,\n                    record_id,"),
+            "must not complete idempotent requests by id alone"
+        );
+        assert!(
+            !production.contains("IdempotentRequest::fail(&state.pool, record_id,"),
+            "must not fail idempotent requests by id alone"
+        );
+        assert!(
+            !production.contains("IdempotentRequest::delete_stale(&state.pool, existing.id)"),
+            "must not delete stale idempotent requests by id alone"
+        );
+    }
 
     #[test]
     fn test_extract_idempotency_key_valid() {

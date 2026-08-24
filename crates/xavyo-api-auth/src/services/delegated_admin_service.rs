@@ -186,7 +186,7 @@ impl DelegatedAdminService {
         .map_err(ApiAuthError::Database)?;
 
         // Add permissions
-        AdminRoleTemplate::set_permissions(&self.pool, template.id, &permission_ids)
+        AdminRoleTemplate::set_permissions(&self.pool, tenant_id, template.id, &permission_ids)
             .await
             .map_err(ApiAuthError::Database)?;
 
@@ -241,7 +241,7 @@ impl DelegatedAdminService {
             .map_err(ApiAuthError::Database)?
             .ok_or(ApiAuthError::TemplateNotFound)?;
 
-        let permissions = AdminRoleTemplate::get_permissions(&mut *conn, id)
+        let permissions = AdminRoleTemplate::get_permissions(&mut *conn, tenant_id, id)
             .await
             .map_err(ApiAuthError::Database)?;
 
@@ -340,7 +340,7 @@ impl DelegatedAdminService {
         }
 
         // Get old permissions for audit
-        let old_permissions = AdminRoleTemplate::get_permissions(&mut *conn, id)
+        let old_permissions = AdminRoleTemplate::get_permissions(&mut *conn, tenant_id, id)
             .await
             .map_err(ApiAuthError::Database)?;
         let old_permission_codes: Vec<String> =
@@ -363,7 +363,7 @@ impl DelegatedAdminService {
         // Update permissions if provided
         if let Some(ref codes) = permission_codes {
             let permission_ids = self.validate_permission_codes(codes).await?;
-            AdminRoleTemplate::set_permissions(&self.pool, id, &permission_ids)
+            AdminRoleTemplate::set_permissions(&self.pool, tenant_id, id, &permission_ids)
                 .await
                 .map_err(ApiAuthError::Database)?;
 
@@ -615,7 +615,7 @@ impl DelegatedAdminService {
             .ok_or(ApiAuthError::AssignmentNotFound)?;
 
         // Get template name
-        let template = AdminRoleTemplate::get_by_id_any(&mut *conn, assignment.template_id)
+        let template = AdminRoleTemplate::get_by_id(&mut *conn, tenant_id, assignment.template_id)
             .await
             .map_err(ApiAuthError::Database)?;
 
@@ -666,7 +666,7 @@ impl DelegatedAdminService {
         // Get template names for all assignments
         let mut responses = Vec::with_capacity(assignments.len());
         for a in assignments {
-            let template = AdminRoleTemplate::get_by_id_any(&mut *conn, a.template_id)
+            let template = AdminRoleTemplate::get_by_id(&mut *conn, tenant_id, a.template_id)
                 .await
                 .map_err(ApiAuthError::Database)?;
 
@@ -820,7 +820,7 @@ impl DelegatedAdminService {
         for assignment in assignments {
             // Get permissions for this template
             let template_permissions =
-                AdminRoleTemplate::get_permissions(&mut *conn, assignment.template_id)
+                AdminRoleTemplate::get_permissions(&mut *conn, tenant_id, assignment.template_id)
                     .await
                     .map_err(ApiAuthError::Database)?;
 
@@ -1092,6 +1092,29 @@ mod tests {
         assert!(
             !production.contains("let _ = sqlx::query("),
             "must not swallow session revoke after assign/revoke"
+        );
+    }
+
+    #[test]
+    fn template_lookups_pass_tenant_id() {
+        let src = include_str!("delegated_admin_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("get_by_id_any"),
+            "assignment template names must not skip tenant_id"
+        );
+        assert!(
+            production.contains("get_by_id(&mut *conn, tenant_id, assignment.template_id)")
+                || production.contains("get_by_id(&mut *conn, tenant_id, a.template_id)"),
+            "assignment template lookup must pass tenant_id"
+        );
+        assert!(
+            production.contains("get_permissions(&mut *conn, tenant_id, id)"),
+            "template permission reads must pass tenant_id"
+        );
+        assert!(
+            production.contains("set_permissions(&self.pool, tenant_id,"),
+            "template permission writes must pass tenant_id"
         );
     }
 }

@@ -137,19 +137,6 @@ impl TenantIdentityProvider {
         .await
     }
 
-    /// Find an identity provider by ID.
-    ///
-    /// # Security
-    /// This method does NOT filter by `tenant_id`. Use `find_by_id_and_tenant` instead
-    /// for all tenant-scoped operations.
-    #[deprecated(note = "Use find_by_id_and_tenant for tenant-isolated access")]
-    pub async fn find_by_id(pool: &sqlx::PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as("SELECT * FROM tenant_identity_providers WHERE id = $1")
-            .bind(id)
-            .fetch_optional(pool)
-            .await
-    }
-
     /// Find an identity provider by ID within a tenant.
     pub async fn find_by_id_and_tenant(
         pool: &sqlx::PgPool,
@@ -387,5 +374,22 @@ impl TenantIdentityProvider {
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn find_by_id_requires_tenant() {
+        let src = include_str!("tenant_identity_provider.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $2"),
+            "IdP lookup must filter tenant_id"
+        );
+        assert!(
+            !production.contains("WHERE id = $1\""),
+            "must not look up identity providers by id alone"
+        );
     }
 }

@@ -252,15 +252,20 @@ impl DetectedAnomaly {
     }
 
     /// Mark an anomaly as alert sent.
-    pub async fn mark_alert_sent(pool: &PgPool, id: Uuid) -> Result<(), sqlx::Error> {
+    pub async fn mark_alert_sent(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<(), sqlx::Error> {
         sqlx::query(
             r"
             UPDATE detected_anomalies
             SET alert_sent = true, alert_sent_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
 
@@ -295,5 +300,22 @@ impl DetectedAnomaly {
         .await?;
 
         Ok(row.get::<bool, _>("exists"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn mark_alert_sent_filters_tenant_id() {
+        let src = include_str!("detected_anomaly.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $2"),
+            "mark_alert_sent must filter tenant_id"
+        );
+        assert!(
+            !production.contains("WHERE id = $1\n            \""),
+            "must not update anomalies by id alone"
+        );
     }
 }
