@@ -169,8 +169,6 @@ impl EmailTemplate {
     where
         E: PgExecutor<'e>,
     {
-        let is_active = data.is_active.unwrap_or(true);
-
         sqlx::query_as(
             r"
             INSERT INTO email_templates (
@@ -178,13 +176,13 @@ impl EmailTemplate {
                 body_html, body_text, available_variables,
                 is_active, created_by, updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+            VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, true), $9, NOW())
             ON CONFLICT (tenant_id, template_type, locale) DO UPDATE SET
                 subject = EXCLUDED.subject,
                 body_html = EXCLUDED.body_html,
                 body_text = EXCLUDED.body_text,
                 available_variables = EXCLUDED.available_variables,
-                is_active = EXCLUDED.is_active,
+                is_active = COALESCE($8, email_templates.is_active),
                 updated_at = NOW()
             RETURNING *
             ",
@@ -196,7 +194,7 @@ impl EmailTemplate {
         .bind(&data.body_html)
         .bind(&data.body_text)
         .bind(sqlx::types::Json(available_variables))
-        .bind(is_active)
+        .bind(data.is_active)
         .bind(created_by)
         .fetch_one(executor)
         .await
@@ -296,5 +294,25 @@ mod tests {
         };
         let json = serde_json::to_string(&var).unwrap();
         assert!(json.contains("user_name"));
+    }
+
+    #[test]
+    fn upsert_does_not_reactivate_when_is_active_omitted() {
+        let src = include_str!("email_template.rs");
+        let upsert = src
+            .split("pub async fn upsert")
+            .nth(1)
+            .expect("upsert")
+            .split("/// Delete a template")
+            .next()
+            .expect("upsert body");
+        assert!(
+            !upsert.contains("unwrap_or("),
+            "omitted is_active must not be replaced with true before bind"
+        );
+        assert!(
+            upsert.contains("is_active = COALESCE($8, email_templates.is_active)"),
+            "update must preserve omitted is_active"
+        );
     }
 }

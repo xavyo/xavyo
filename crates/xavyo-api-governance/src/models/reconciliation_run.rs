@@ -189,9 +189,9 @@ pub struct UpsertScheduleRequest {
     #[serde(default = "default_hour")]
     pub hour_of_day: i32,
 
-    /// Whether the schedule is enabled.
-    #[serde(default)]
-    pub is_enabled: bool,
+    /// Whether the schedule is enabled. Omitted on update preserves the existing flag.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_enabled: Option<bool>,
 }
 
 fn default_hour() -> i32 {
@@ -208,4 +208,24 @@ pub enum ScheduleFrequency {
     Weekly,
     /// Run monthly.
     Monthly,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn omitted_is_enabled_deserializes_to_none() {
+        let request: UpsertScheduleRequest =
+            serde_json::from_str(r#"{"frequency":"daily"}"#).unwrap();
+        assert_eq!(request.is_enabled, None);
+        assert_eq!(request.hour_of_day, 2);
+    }
+
+    #[test]
+    fn explicit_is_enabled_false_is_preserved() {
+        let request: UpsertScheduleRequest =
+            serde_json::from_str(r#"{"frequency":"weekly","is_enabled":false}"#).unwrap();
+        assert_eq!(request.is_enabled, Some(false));
+    }
 }

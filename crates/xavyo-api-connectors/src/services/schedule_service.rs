@@ -131,7 +131,7 @@ impl ScheduleService {
         &self,
         tenant_id: Uuid,
         connector_id: Uuid,
-        enabled: bool,
+        enabled: Option<bool>,
         schedule_type: ScheduleType,
         interval_hours: Option<i32>,
         cron_expression: Option<String>,
@@ -141,8 +141,9 @@ impl ScheduleService {
         // Validate schedule configuration
         validate_schedule_config(&schedule_type, interval_hours, cron_expression.as_deref())?;
 
-        // Compute next_run_at
-        let next_run_at = if enabled {
+        // Compute next_run_at for insert (default enabled) and explicit enable.
+        // On update, omitted enabled preserves existing next_run_at in SQL.
+        let next_run_at = if enabled.unwrap_or(true) {
             compute_next_run_at(
                 &schedule_type,
                 interval_hours,
@@ -168,7 +169,7 @@ impl ScheduleService {
 
         info!(
             connector_id = %connector_id,
-            enabled = enabled,
+            enabled = ?enabled,
             schedule_type = ?schedule_type,
             next_run_at = ?next_run_at,
             "Schema refresh schedule updated"

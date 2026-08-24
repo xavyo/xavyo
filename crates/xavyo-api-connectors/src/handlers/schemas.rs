@@ -218,9 +218,9 @@ pub struct AttributeListResponse {
 /// Request for configuring refresh schedule.
 #[derive(Debug, Clone, Deserialize, ToSchema)]
 pub struct RefreshScheduleRequest {
-    /// Whether schedule is enabled.
-    #[serde(default = "default_enabled")]
-    pub enabled: bool,
+    /// Whether schedule is enabled. Omitted on update preserves the existing flag.
+    #[serde(default)]
+    pub enabled: Option<bool>,
     /// Schedule type: interval or cron.
     pub schedule_type: ScheduleType,
     /// Hours between refreshes (required if interval type).
@@ -232,10 +232,6 @@ pub struct RefreshScheduleRequest {
     pub notify_on_changes: bool,
     /// Email for notifications.
     pub notify_email: Option<String>,
-}
-
-fn default_enabled() -> bool {
-    true
 }
 
 /// Response for refresh schedule.

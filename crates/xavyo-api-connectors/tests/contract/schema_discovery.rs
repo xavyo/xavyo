@@ -416,7 +416,7 @@ fn test_refresh_schedule_request_interval() {
 
     let request: RefreshScheduleRequest = serde_json::from_value(json).unwrap();
 
-    assert!(request.enabled);
+    assert_eq!(request.enabled, Some(true));
     assert_eq!(request.schedule_type, ScheduleType::Interval);
     assert_eq!(request.interval_hours, Some(24));
     assert!(request.cron_expression.is_none());
@@ -434,11 +434,24 @@ fn test_refresh_schedule_request_cron() {
 
     let request: RefreshScheduleRequest = serde_json::from_value(json).unwrap();
 
-    assert!(request.enabled); // default true
+    assert_eq!(request.enabled, None);
     assert_eq!(request.schedule_type, ScheduleType::Cron);
     assert!(request.interval_hours.is_none());
     assert_eq!(request.cron_expression, Some("0 2 * * 0".to_string()));
     assert!(!request.notify_on_changes); // default false
+}
+
+/// Test: omitted `enabled` must not deserialize as true (would re-enable a disabled schedule).
+#[test]
+fn test_refresh_schedule_request_omitted_enabled_is_none() {
+    let json = json!({
+        "schedule_type": "interval",
+        "interval_hours": 12
+    });
+
+    let request: RefreshScheduleRequest = serde_json::from_value(json).unwrap();
+    assert_eq!(request.enabled, None);
+    assert_eq!(request.interval_hours, Some(12));
 }
 
 /// Test: `RefreshScheduleResponse` serializes correctly

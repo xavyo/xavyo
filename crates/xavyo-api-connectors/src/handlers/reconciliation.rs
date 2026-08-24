@@ -237,17 +237,13 @@ pub struct ScheduleRequest {
     /// Hour of day (0-23 UTC).
     #[serde(default = "default_hour")]
     pub hour_of_day: i32,
-    /// Whether enabled.
-    #[serde(default = "default_enabled")]
-    pub enabled: bool,
+    /// Whether enabled. Omitted on update preserves the existing flag.
+    #[serde(default)]
+    pub enabled: Option<bool>,
 }
 
 fn default_hour() -> i32 {
     2
-}
-
-fn default_enabled() -> bool {
-    true
 }
 
 /// Response for a schedule.
@@ -1356,5 +1352,26 @@ fn get_suggested_actions(discrepancy_type: &str) -> Vec<String> {
             "inactivate_identity".to_string(),
         ],
         _ => vec![],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn omitted_enabled_deserializes_to_none() {
+        let request: ScheduleRequest =
+            serde_json::from_str(r#"{"frequency":"daily"}"#).unwrap();
+        assert_eq!(request.enabled, None);
+        assert_eq!(request.hour_of_day, 2);
+        assert_eq!(request.mode, "full");
+    }
+
+    #[test]
+    fn explicit_enabled_false_is_preserved() {
+        let request: ScheduleRequest =
+            serde_json::from_str(r#"{"frequency":"weekly","enabled":false}"#).unwrap();
+        assert_eq!(request.enabled, Some(false));
     }
 }
