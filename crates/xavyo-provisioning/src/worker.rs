@@ -248,7 +248,10 @@ async fn process_operation<P: OperationProcessor>(
             );
 
             // Mark as complete
-            if let Err(e) = queue.complete(operation_id, result_uid.as_deref()).await {
+            if let Err(e) = queue
+                .complete(tenant_id, operation_id, result_uid.as_deref())
+                .await
+            {
                 error!(error = %e, "Failed to mark operation as complete");
             }
 
@@ -281,12 +284,12 @@ async fn process_operation<P: OperationProcessor>(
 
             if can_retry {
                 // Schedule retry (transient error)
-                if let Err(re) = queue.fail(operation_id, &error_msg, true).await {
+                if let Err(re) = queue.fail(tenant_id, operation_id, &error_msg, true).await {
                     error!(error = %re, "Failed to schedule retry");
                 }
             } else {
                 // Move to dead letter queue (permanent failure)
-                if let Err(re) = queue.fail(operation_id, &error_msg, false).await {
+                if let Err(re) = queue.fail(tenant_id, operation_id, &error_msg, false).await {
                     error!(error = %re, "Failed to move to dead letter");
                 }
             }
@@ -390,6 +393,28 @@ fn is_retryable_error(error: &ProcessorError) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn queue_complete_and_fail_pass_tenant_id() {
+        let src = include_str!("worker.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("complete(tenant_id, operation_id,"),
+            "worker complete must pass tenant_id"
+        );
+        assert!(
+            production.contains("fail(tenant_id, operation_id,"),
+            "worker fail must pass tenant_id"
+        );
+        assert!(
+            !production.contains("complete(operation_id,"),
+            "must not complete operations by id alone"
+        );
+        assert!(
+            !production.contains("fail(operation_id,"),
+            "must not fail operations by id alone"
+        );
+    }
 
     #[test]
     fn test_worker_config_default() {

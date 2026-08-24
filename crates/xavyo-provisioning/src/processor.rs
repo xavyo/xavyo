@@ -433,7 +433,7 @@ impl DefaultOperationProcessor {
 
                     // Complete the operation
                     self.queue
-                        .complete(operation.id, target_uid.as_deref())
+                        .complete(operation.tenant_id, operation.id, target_uid.as_deref())
                         .await?;
                 }
                 Err(e) => {
@@ -471,18 +471,27 @@ impl DefaultOperationProcessor {
                     match &e {
                         ProcessorError::ConflictRequiresManual { .. } => {
                             // Mark as failed (not transient) - requires manual resolution
-                            self.queue.fail(operation.id, &e.to_string(), false).await?;
+                            self.queue
+                                .fail(operation.tenant_id, operation.id, &e.to_string(), false)
+                                .await?;
                         }
                         ProcessorError::OperationSuperseded { .. } => {
                             // Operation was superseded, mark as completed with note
                             // We use complete() since resolve() requires a user ID and is for DLQ items
-                            self.queue.complete(operation.id, None).await?;
+                            self.queue
+                                .complete(operation.tenant_id, operation.id, None)
+                                .await?;
                             info!(operation_id = %operation.id, "Operation superseded by conflict resolution");
                         }
                         _ => {
                             // Regular failure handling
                             self.queue
-                                .fail(operation.id, &e.to_string(), is_transient)
+                                .fail(
+                                    operation.tenant_id,
+                                    operation.id,
+                                    &e.to_string(),
+                                    is_transient,
+                                )
                                 .await?;
                         }
                     }
@@ -604,7 +613,7 @@ impl DefaultOperationProcessor {
                         // Complete the operation
                         if let Err(e) = self
                             .queue
-                            .complete(operation.id, target_uid.as_deref())
+                            .complete(operation.tenant_id, operation.id, target_uid.as_deref())
                             .await
                         {
                             warn!(
@@ -647,7 +656,12 @@ impl DefaultOperationProcessor {
                         // Mark operation as failed
                         if let Err(fe) = self
                             .queue
-                            .fail(operation.id, &e.to_string(), is_transient)
+                            .fail(
+                                operation.tenant_id,
+                                operation.id,
+                                &e.to_string(),
+                                is_transient,
+                            )
                             .await
                         {
                             warn!(
@@ -1130,6 +1144,29 @@ impl OperationProcessor for DefaultOperationProcessor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn queue_complete_and_fail_pass_tenant_id() {
+        let src = include_str!("processor.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("complete(operation.tenant_id, operation.id,"),
+            "processor complete must pass tenant_id"
+        );
+        assert!(
+            production.contains("fail(\n                                    operation.tenant_id,")
+                || production.contains(".fail(operation.tenant_id, operation.id,"),
+            "processor fail must pass tenant_id"
+        );
+        assert!(
+            !production.contains("complete(operation.id,"),
+            "must not complete operations by id alone"
+        );
+        assert!(
+            !production.contains("fail(operation.id,"),
+            "must not fail operations by id alone"
+        );
+    }
 
     #[test]
     fn test_processor_config_default() {

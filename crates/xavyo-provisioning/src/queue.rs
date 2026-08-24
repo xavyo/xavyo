@@ -609,9 +609,13 @@ impl OperationQueue {
         Ok(result)
     }
 
-    /// Get an operation by ID.
+    /// Get an operation by ID within a tenant.
     #[instrument(skip(self))]
-    pub async fn get_operation(&self, id: Uuid) -> QueueResult<Option<QueuedOperation>> {
+    pub async fn get_operation(
+        &self,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> QueueResult<Option<QueuedOperation>> {
         let now = Utc::now();
         let row = sqlx::query(
             r"
@@ -621,10 +625,11 @@ impl OperationQueue {
                    priority, created_at, updated_at, started_at, completed_at, idempotency_key,
                    resolution_notes, resolved_by, resolved_at
             FROM provisioning_operations
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -633,7 +638,12 @@ impl OperationQueue {
 
     /// Mark an operation as completed successfully.
     #[instrument(skip(self), fields(operation_id = %id))]
-    pub async fn complete(&self, id: Uuid, target_uid: Option<&str>) -> QueueResult<()> {
+    pub async fn complete(
+        &self,
+        tenant_id: Uuid,
+        id: Uuid,
+        target_uid: Option<&str>,
+    ) -> QueueResult<()> {
         let now = Utc::now();
 
         let result = sqlx::query(
@@ -644,12 +654,13 @@ impl OperationQueue {
                 completed_at = $3,
                 updated_at = $3,
                 error_message = NULL
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $4
             ",
         )
         .bind(id)
         .bind(target_uid)
         .bind(now)
+        .bind(tenant_id)
         .execute(&self.pool)
         .await?;
 
@@ -664,14 +675,21 @@ impl OperationQueue {
 
     /// Mark an operation as failed and schedule retry.
     #[instrument(skip(self), fields(operation_id = %id))]
-    pub async fn fail(&self, id: Uuid, error: &str, is_transient: bool) -> QueueResult<()> {
+    pub async fn fail(
+        &self,
+        tenant_id: Uuid,
+        id: Uuid,
+        error: &str,
+        is_transient: bool,
+    ) -> QueueResult<()> {
         let now = Utc::now();
 
         // Get current retry count
         let row = sqlx::query(
-            r"SELECT retry_count, max_retries FROM provisioning_operations WHERE id = $1",
+            r"SELECT retry_count, max_retries FROM provisioning_operations WHERE id = $1 AND tenant_id = $2",
         )
         .bind(id)
+        .bind(tenant_id)
         .fetch_optional(&self.pool)
         .await?
         .ok_or(QueueError::NotFound { id })?;
@@ -699,7 +717,7 @@ impl OperationQueue {
                 next_retry_at = $4,
                 error_message = $5,
                 updated_at = $6
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $7
             ",
         )
         .bind(id)
@@ -708,6 +726,7 @@ impl OperationQueue {
         .bind(next_retry)
         .bind(error)
         .bind(now)
+        .bind(tenant_id)
         .execute(&self.pool)
         .await?;
 
@@ -731,7 +750,7 @@ impl OperationQueue {
 
     /// Cancel a pending operation.
     #[instrument(skip(self), fields(operation_id = %id))]
-    pub async fn cancel(&self, id: Uuid) -> QueueResult<()> {
+    pub async fn cancel(&self, tenant_id: Uuid, id: Uuid) -> QueueResult<()> {
         let now = Utc::now();
 
         let result = sqlx::query(
@@ -739,11 +758,12 @@ impl OperationQueue {
             UPDATE provisioning_operations
             SET status = 'cancelled',
                 updated_at = $2
-            WHERE id = $1 AND status IN ('pending', 'failed')
+            WHERE id = $1 AND tenant_id = $3 AND status IN ('pending', 'failed')
             ",
         )
         .bind(id)
         .bind(now)
+        .bind(tenant_id)
         .execute(&self.pool)
         .await?;
 
@@ -761,7 +781,7 @@ impl OperationQueue {
 
     /// Retry a dead-lettered operation.
     #[instrument(skip(self), fields(operation_id = %id))]
-    pub async fn retry_dead_letter(&self, id: Uuid) -> QueueResult<()> {
+    pub async fn retry_dead_letter(&self, tenant_id: Uuid, id: Uuid) -> QueueResult<()> {
         let now = Utc::now();
 
         let result = sqlx::query(
@@ -772,11 +792,12 @@ impl OperationQueue {
                 next_retry_at = NULL,
                 error_message = NULL,
                 updated_at = $2
-            WHERE id = $1 AND status = 'dead_letter'
+            WHERE id = $1 AND tenant_id = $3 AND status = 'dead_letter'
             ",
         )
         .bind(id)
         .bind(now)
+        .bind(tenant_id)
         .execute(&self.pool)
         .await?;
 
@@ -792,28 +813,17 @@ impl OperationQueue {
         Ok(())
     }
 
-    /// Get operation by ID.
-    pub async fn get(&self, id: Uuid) -> QueueResult<Option<QueuedOperation>> {
-        let row = sqlx::query(
-            r"
-            SELECT id, tenant_id, connector_id, user_id, operation_type,
-                   object_class, target_uid, payload, status,
-                   retry_count, max_retries, next_retry_at, error_message,
-                   priority, created_at, updated_at, started_at, completed_at, idempotency_key,
-                   resolution_notes, resolved_by, resolved_at
-            FROM provisioning_operations
-            WHERE id = $1
-            ",
-        )
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(row.map(|r| row_to_operation(&r, Utc::now())))
+    /// Get operation by ID within a tenant.
+    pub async fn get(&self, tenant_id: Uuid, id: Uuid) -> QueueResult<Option<QueuedOperation>> {
+        self.get_operation(tenant_id, id).await
     }
 
-    /// Get queue statistics.
-    pub async fn stats(&self, connector_id: Option<Uuid>) -> QueueResult<QueueStats> {
+    /// Get queue statistics for a tenant.
+    pub async fn stats(
+        &self,
+        tenant_id: Uuid,
+        connector_id: Option<Uuid>,
+    ) -> QueueResult<QueueStats> {
         let query = if connector_id.is_some() {
             r"
             SELECT
@@ -825,7 +835,7 @@ impl OperationQueue {
                 COUNT(*) FILTER (WHERE status = 'awaiting_system') as awaiting_system,
                 AVG(EXTRACT(EPOCH FROM (completed_at - created_at))) FILTER (WHERE status = 'completed') as avg_processing_time
             FROM provisioning_operations
-            WHERE connector_id = $1
+            WHERE tenant_id = $1 AND connector_id = $2
             "
         } else {
             r"
@@ -838,13 +848,21 @@ impl OperationQueue {
                 COUNT(*) FILTER (WHERE status = 'awaiting_system') as awaiting_system,
                 AVG(EXTRACT(EPOCH FROM (completed_at - created_at))) FILTER (WHERE status = 'completed') as avg_processing_time
             FROM provisioning_operations
+            WHERE tenant_id = $1
             "
         };
 
         let row = if let Some(cid) = connector_id {
-            sqlx::query(query).bind(cid).fetch_one(&self.pool).await?
+            sqlx::query(query)
+                .bind(tenant_id)
+                .bind(cid)
+                .fetch_one(&self.pool)
+                .await?
         } else {
-            sqlx::query(query).fetch_one(&self.pool).await?
+            sqlx::query(query)
+                .bind(tenant_id)
+                .fetch_one(&self.pool)
+                .await?
         };
 
         Ok(QueueStats {
@@ -926,6 +944,7 @@ impl OperationQueue {
     #[instrument(skip(self), fields(operation_id = %id))]
     pub async fn resolve(
         &self,
+        tenant_id: Uuid,
         id: Uuid,
         resolved_by: Uuid,
         notes: Option<&str>,
@@ -941,6 +960,7 @@ impl OperationQueue {
                 resolution_notes = $4,
                 updated_at = $2
             WHERE id = $1
+            AND tenant_id = $5
             AND status = 'dead_letter'
             ",
         )
@@ -948,6 +968,7 @@ impl OperationQueue {
         .bind(now)
         .bind(resolved_by)
         .bind(notes)
+        .bind(tenant_id)
         .execute(&self.pool)
         .await?;
 
@@ -963,9 +984,10 @@ impl OperationQueue {
         Ok(())
     }
 
-    /// List dead letter operations.
+    /// List dead letter operations for a tenant.
     pub async fn list_dead_letter(
         &self,
+        tenant_id: Uuid,
         connector_id: Option<Uuid>,
         limit: i64,
         offset: i64,
@@ -979,9 +1001,9 @@ impl OperationQueue {
                    priority, created_at, updated_at, started_at, completed_at, idempotency_key,
                    resolution_notes, resolved_by, resolved_at
             FROM provisioning_operations
-            WHERE connector_id = $1 AND status = 'dead_letter'
+            WHERE tenant_id = $1 AND connector_id = $2 AND status = 'dead_letter'
             ORDER BY created_at DESC
-            LIMIT $2 OFFSET $3
+            LIMIT $3 OFFSET $4
             "
         } else {
             r"
@@ -991,14 +1013,15 @@ impl OperationQueue {
                    priority, created_at, updated_at, started_at, completed_at, idempotency_key,
                    resolution_notes, resolved_by, resolved_at
             FROM provisioning_operations
-            WHERE status = 'dead_letter'
+            WHERE tenant_id = $1 AND status = 'dead_letter'
             ORDER BY created_at DESC
-            LIMIT $1 OFFSET $2
+            LIMIT $2 OFFSET $3
             "
         };
 
         let rows = if let Some(cid) = connector_id {
             sqlx::query(query)
+                .bind(tenant_id)
                 .bind(cid)
                 .bind(limit)
                 .bind(offset)
@@ -1006,6 +1029,7 @@ impl OperationQueue {
                 .await?
         } else {
             sqlx::query(query)
+                .bind(tenant_id)
                 .bind(limit)
                 .bind(offset)
                 .fetch_all(&self.pool)
@@ -1150,6 +1174,56 @@ impl QueueStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn queue_mutations_filter_tenant_id() {
+        let src = include_str!("queue.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $2"),
+            "get_operation/fail lookup must filter tenant_id"
+        );
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $4"),
+            "complete must filter tenant_id"
+        );
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $7"),
+            "fail update must filter tenant_id"
+        );
+        assert!(
+            production
+                .contains("WHERE id = $1 AND tenant_id = $3 AND status IN ('pending', 'failed')"),
+            "cancel must filter tenant_id"
+        );
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $3 AND status = 'dead_letter'"),
+            "retry_dead_letter must filter tenant_id"
+        );
+        assert!(
+            production.contains("AND tenant_id = $5"),
+            "resolve must filter tenant_id"
+        );
+        assert!(
+            production.contains("WHERE tenant_id = $1 AND connector_id = $2"),
+            "stats/list_dead_letter must filter tenant_id"
+        );
+        assert!(
+            !production.contains(
+                "FROM provisioning_operations\n            WHERE id = $1\n            \""
+            ),
+            "must not look up operations by id alone"
+        );
+        assert!(
+            !production.contains("FROM provisioning_operations\n            WHERE connector_id = $1 AND status = 'dead_letter'"),
+            "must not list dead letters without tenant_id"
+        );
+        assert!(
+            !production
+                .contains("FROM provisioning_operations\n            WHERE status = 'dead_letter'"),
+            "must not list all tenants' dead letters"
+        );
+    }
 
     #[test]
     fn test_queued_operation_new() {

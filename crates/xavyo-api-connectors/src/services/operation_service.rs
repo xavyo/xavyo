@@ -371,7 +371,7 @@ impl OperationService {
                 // Return the existing operation
                 let existing = self
                     .queue
-                    .get_operation(existing_id)
+                    .get_operation(tenant_id, existing_id)
                     .await?
                     .ok_or(OperationServiceError::NotFound(existing_id))?;
                 Ok(OperationResponse::from(&existing))
@@ -388,14 +388,9 @@ impl OperationService {
     ) -> OperationServiceResult<OperationResponse> {
         let operation = self
             .queue
-            .get_operation(operation_id)
+            .get_operation(tenant_id, operation_id)
             .await?
             .ok_or(OperationServiceError::NotFound(operation_id))?;
-
-        // Verify tenant access
-        if operation.tenant_id != tenant_id {
-            return Err(OperationServiceError::NotFound(operation_id));
-        }
 
         Ok(OperationResponse::from(&operation))
     }
@@ -492,14 +487,9 @@ impl OperationService {
         // Get the operation
         let operation = self
             .queue
-            .get_operation(operation_id)
+            .get_operation(tenant_id, operation_id)
             .await?
             .ok_or(OperationServiceError::NotFound(operation_id))?;
-
-        // Verify tenant access
-        if operation.tenant_id != tenant_id {
-            return Err(OperationServiceError::NotFound(operation_id));
-        }
 
         // Check if it can be retried
         if operation.status != OperationStatus::Failed
@@ -513,14 +503,16 @@ impl OperationService {
         }
 
         // Retry the operation
-        self.queue.retry_dead_letter(operation_id).await?;
+        self.queue
+            .retry_dead_letter(tenant_id, operation_id)
+            .await?;
 
         info!(operation_id = %operation_id, "Operation scheduled for retry");
 
         // Get the updated operation
         let updated = self
             .queue
-            .get_operation(operation_id)
+            .get_operation(tenant_id, operation_id)
             .await?
             .ok_or(OperationServiceError::NotFound(operation_id))?;
 
@@ -537,14 +529,9 @@ impl OperationService {
         // Get the operation
         let operation = self
             .queue
-            .get_operation(operation_id)
+            .get_operation(tenant_id, operation_id)
             .await?
             .ok_or(OperationServiceError::NotFound(operation_id))?;
-
-        // Verify tenant access
-        if operation.tenant_id != tenant_id {
-            return Err(OperationServiceError::NotFound(operation_id));
-        }
 
         // Check if it can be cancelled
         if operation.status != OperationStatus::Pending {
@@ -556,14 +543,14 @@ impl OperationService {
         }
 
         // Cancel the operation
-        self.queue.cancel(operation_id).await?;
+        self.queue.cancel(tenant_id, operation_id).await?;
 
         info!(operation_id = %operation_id, "Operation cancelled");
 
         // Get the updated operation
         let updated = self
             .queue
-            .get_operation(operation_id)
+            .get_operation(tenant_id, operation_id)
             .await?
             .ok_or(OperationServiceError::NotFound(operation_id))?;
 
@@ -586,10 +573,10 @@ impl OperationService {
     #[instrument(skip(self))]
     pub async fn get_queue_stats(
         &self,
-        _tenant_id: Uuid,
+        tenant_id: Uuid,
         connector_id: Option<Uuid>,
     ) -> OperationServiceResult<QueueStatsResponse> {
-        let stats = self.queue.stats(connector_id).await?;
+        let stats = self.queue.stats(tenant_id, connector_id).await?;
 
         Ok(QueueStatsResponse {
             pending: stats.pending,
@@ -622,17 +609,11 @@ impl OperationService {
     ) -> OperationServiceResult<DlqListResponse> {
         let operations = self
             .queue
-            .list_dead_letter(connector_id, limit, offset)
+            .list_dead_letter(tenant_id, connector_id, limit, offset)
             .await?;
 
-        // Filter by tenant
-        let tenant_ops: Vec<_> = operations
-            .into_iter()
-            .filter(|op| op.tenant_id == tenant_id)
-            .collect();
-
         let responses: Vec<OperationResponse> =
-            tenant_ops.iter().map(OperationResponse::from).collect();
+            operations.iter().map(OperationResponse::from).collect();
 
         Ok(DlqListResponse {
             operations: responses,
@@ -653,14 +634,9 @@ impl OperationService {
         // Get the operation first to verify access
         let operation = self
             .queue
-            .get_operation(operation_id)
+            .get_operation(tenant_id, operation_id)
             .await?
             .ok_or(OperationServiceError::NotFound(operation_id))?;
-
-        // Verify tenant access
-        if operation.tenant_id != tenant_id {
-            return Err(OperationServiceError::NotFound(operation_id));
-        }
 
         // Check if it can be resolved
         if operation.status != OperationStatus::DeadLetter {
@@ -672,14 +648,16 @@ impl OperationService {
         }
 
         // Resolve the operation
-        self.queue.resolve(operation_id, resolved_by, notes).await?;
+        self.queue
+            .resolve(tenant_id, operation_id, resolved_by, notes)
+            .await?;
 
         info!(operation_id = %operation_id, resolved_by = %resolved_by, "Operation resolved");
 
         // Get the updated operation
         let updated = self
             .queue
-            .get_operation(operation_id)
+            .get_operation(tenant_id, operation_id)
             .await?
             .ok_or(OperationServiceError::NotFound(operation_id))?;
 
@@ -943,6 +921,45 @@ impl Default for ListConflictsQuery {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn queue_calls_pass_tenant_id() {
+        let src = include_str!("operation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("get_operation(tenant_id, operation_id)")
+                && production.contains("get_operation(tenant_id, existing_id)"),
+            "operation lookups must pass tenant_id"
+        );
+        assert!(
+            production.contains("retry_dead_letter(tenant_id, operation_id)"),
+            "retry must pass tenant_id"
+        );
+        assert!(
+            production.contains("cancel(tenant_id, operation_id)"),
+            "cancel must pass tenant_id"
+        );
+        assert!(
+            production.contains("stats(tenant_id, connector_id)"),
+            "stats must pass tenant_id"
+        );
+        assert!(
+            production.contains("list_dead_letter(tenant_id, connector_id, limit, offset)"),
+            "dead letter list must pass tenant_id"
+        );
+        assert!(
+            production.contains("resolve(tenant_id, operation_id, resolved_by, notes)"),
+            "resolve must pass tenant_id"
+        );
+        assert!(
+            !production.contains(".get_operation(operation_id)"),
+            "must not look up operations by id alone"
+        );
+        assert!(
+            !production.contains("filter(|op| op.tenant_id == tenant_id)"),
+            "must not filter dead letters in memory after an unscoped query"
+        );
+    }
 
     #[test]
     fn test_trigger_request() {
