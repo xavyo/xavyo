@@ -155,10 +155,10 @@ pub async fn create_script(
         )
         .await?;
 
-    let _ = state
+    state
         .script_audit_service
         .record_created(tenant_id, script.id, actor_id, &script.name)
-        .await;
+        .await?;
 
     Ok((StatusCode::CREATED, Json(map_script(script))))
 }
@@ -233,7 +233,7 @@ pub async fn update_script(
         .update_script(tenant_id, id, body.name, body.description)
         .await?;
 
-    let _ = state
+    state
         .script_audit_service
         .record_updated(
             tenant_id,
@@ -241,7 +241,7 @@ pub async fn update_script(
             actor_id,
             serde_json::json!({ "script_id": id }),
         )
-        .await;
+        .await?;
 
     Ok(Json(map_script(script)))
 }
@@ -283,10 +283,10 @@ pub async fn delete_script(
 
     state.script_service.delete_script(tenant_id, id).await?;
 
-    let _ = state
+    state
         .script_audit_service
         .record_deleted(tenant_id, id, actor_id, &script.name)
-        .await;
+        .await?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -321,10 +321,10 @@ pub async fn activate_script(
 
     let script = state.script_service.activate_script(tenant_id, id).await?;
 
-    let _ = state
+    state
         .script_audit_service
         .record_activated(tenant_id, id, actor_id)
-        .await;
+        .await?;
 
     Ok(Json(map_script(script)))
 }
@@ -362,10 +362,10 @@ pub async fn deactivate_script(
         .deactivate_script(tenant_id, id)
         .await?;
 
-    let _ = state
+    state
         .script_audit_service
         .record_deactivated(tenant_id, id, actor_id)
-        .await;
+        .await?;
 
     Ok(Json(map_script(script)))
 }
@@ -485,7 +485,7 @@ pub async fn create_script_version(
         )
         .await?;
 
-    let _ = state
+    state
         .script_audit_service
         .record_version_created(
             tenant_id,
@@ -494,7 +494,7 @@ pub async fn create_script_version(
             version.version_number,
             version.change_description.as_deref(),
         )
-        .await;
+        .await?;
 
     Ok((StatusCode::CREATED, Json(map_version(version))))
 }
@@ -544,7 +544,7 @@ pub async fn rollback_script(
         )
         .await?;
 
-    let _ = state
+    state
         .script_audit_service
         .record_rollback(
             tenant_id,
@@ -554,7 +554,7 @@ pub async fn rollback_script(
             body.target_version,
             body.reason.as_deref(),
         )
-        .await;
+        .await?;
 
     Ok(Json(map_version(version)))
 }
@@ -655,4 +655,22 @@ pub async fn compare_versions(
         version_b: params.to,
         diff_lines,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn script_mutations_do_not_swallow_audit_writes() {
+        let src = include_str!("provisioning_scripts.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("let _ = state\n        .script_audit_service"),
+            "script mutations must not swallow script audit writes"
+        );
+        assert!(
+            production.matches("script_audit_service").count() >= 7
+                && production.contains(".await?;"),
+            "script mutations must fail when script audit rows cannot be written"
+        );
+    }
 }

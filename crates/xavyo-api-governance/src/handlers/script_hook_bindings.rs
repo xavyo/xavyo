@@ -144,7 +144,7 @@ pub async fn create_binding(
         .await?;
 
     // Record audit event for binding creation.
-    let _ = state
+    state
         .script_audit_service
         .record_bound(
             tenant_id,
@@ -153,7 +153,7 @@ pub async fn create_binding(
             binding.id,
             body.connector_id,
         )
-        .await;
+        .await?;
 
     Ok((StatusCode::CREATED, Json(binding.into())))
 }
@@ -294,7 +294,7 @@ pub async fn delete_binding(
         .await?;
 
     // Record audit event for binding deletion.
-    let _ = state
+    state
         .script_audit_service
         .record_unbound(
             tenant_id,
@@ -303,7 +303,7 @@ pub async fn delete_binding(
             id,
             binding.connector_id,
         )
-        .await;
+        .await?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -378,5 +378,24 @@ impl From<xavyo_db::models::GovScriptHookBinding> for BindingResponse {
             created_at: b.created_at,
             updated_at: b.updated_at,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn binding_mutations_do_not_swallow_audit_writes() {
+        let src = include_str!("script_hook_bindings.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("let _ = state\n        .script_audit_service"),
+            "script binding mutations must not swallow script audit writes"
+        );
+        assert!(
+            production.contains("record_bound")
+                && production.contains("record_unbound")
+                && production.contains(".await?;"),
+            "script binding mutations must fail when script audit rows cannot be written"
+        );
     }
 }
