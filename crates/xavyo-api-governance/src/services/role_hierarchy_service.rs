@@ -107,22 +107,21 @@ impl RoleHierarchyService {
         }
 
         // Audit log: role created (T064)
-        let _ = self
-            .log_audit(
-                tenant_id,
-                created_by,
-                AdminAction::Create,
-                AdminResourceType::GovRole,
-                Some(role.id),
-                None,
-                Some(json!({
-                    "name": role.name,
-                    "parent_role_id": role.parent_role_id,
-                    "is_abstract": role.is_abstract,
-                    "hierarchy_depth": role.hierarchy_depth,
-                })),
-            )
-            .await;
+        self.log_audit(
+            tenant_id,
+            created_by,
+            AdminAction::Create,
+            AdminResourceType::GovRole,
+            Some(role.id),
+            None,
+            Some(json!({
+                "name": role.name,
+                "parent_role_id": role.parent_role_id,
+                "is_abstract": role.is_abstract,
+                "hierarchy_depth": role.hierarchy_depth,
+            })),
+        )
+        .await?;
 
         Ok(role)
     }
@@ -188,25 +187,24 @@ impl RoleHierarchyService {
         }
 
         // Audit log: role updated (T064)
-        let _ = self
-            .log_audit(
-                tenant_id,
-                updated_by,
-                AdminAction::Update,
-                AdminResourceType::GovRole,
-                Some(role_id),
-                Some(json!({
-                    "name": old_role.name,
-                    "parent_role_id": old_role.parent_role_id,
-                    "is_abstract": old_role.is_abstract,
-                })),
-                Some(json!({
-                    "name": role.name,
-                    "parent_role_id": role.parent_role_id,
-                    "is_abstract": role.is_abstract,
-                })),
-            )
-            .await;
+        self.log_audit(
+            tenant_id,
+            updated_by,
+            AdminAction::Update,
+            AdminResourceType::GovRole,
+            Some(role_id),
+            Some(json!({
+                "name": old_role.name,
+                "parent_role_id": old_role.parent_role_id,
+                "is_abstract": old_role.is_abstract,
+            })),
+            Some(json!({
+                "name": role.name,
+                "parent_role_id": role.parent_role_id,
+                "is_abstract": role.is_abstract,
+            })),
+        )
+        .await?;
 
         Ok(role)
     }
@@ -259,23 +257,22 @@ impl RoleHierarchyService {
         }
 
         // Audit log: role deleted (T064)
-        let _ = self
-            .log_audit(
-                tenant_id,
-                deleted_by,
-                AdminAction::Delete,
-                AdminResourceType::GovRole,
-                Some(role_id),
-                Some(json!({
-                    "name": role.name,
-                    "parent_role_id": role.parent_role_id,
-                    "is_abstract": role.is_abstract,
-                    "orphaned_children": child_ids,
-                    "affected_assignment_count": affected_assignment_count,
-                })),
-                None,
-            )
-            .await;
+        self.log_audit(
+            tenant_id,
+            deleted_by,
+            AdminAction::Delete,
+            AdminResourceType::GovRole,
+            Some(role_id),
+            Some(json!({
+                "name": role.name,
+                "parent_role_id": role.parent_role_id,
+                "is_abstract": role.is_abstract,
+                "orphaned_children": child_ids,
+                "affected_assignment_count": affected_assignment_count,
+            })),
+            None,
+        )
+        .await?;
 
         Ok(())
     }
@@ -381,23 +378,22 @@ impl RoleHierarchyService {
         let _ = self.trigger_sod_recheck_for_role(tenant_id, role_id).await;
 
         // Audit log: role moved (T064)
-        let _ = self
-            .log_audit(
-                tenant_id,
-                moved_by,
-                AdminAction::Move,
-                AdminResourceType::GovRole,
-                Some(role_id),
-                Some(json!({
-                    "parent_role_id": old_parent_id,
-                    "name": old_role.name,
-                })),
-                Some(json!({
-                    "parent_role_id": new_parent_id,
-                    "affected_roles_count": affected_count,
-                })),
-            )
-            .await;
+        self.log_audit(
+            tenant_id,
+            moved_by,
+            AdminAction::Move,
+            AdminResourceType::GovRole,
+            Some(role_id),
+            Some(json!({
+                "parent_role_id": old_parent_id,
+                "name": old_role.name,
+            })),
+            Some(json!({
+                "parent_role_id": new_parent_id,
+                "affected_roles_count": affected_count,
+            })),
+        )
+        .await?;
 
         Ok(GovRoleMoveResult {
             role,
@@ -700,20 +696,19 @@ impl RoleHierarchyService {
         let _ = self.trigger_sod_recheck_for_role(tenant_id, role_id).await;
 
         // Audit log: inheritance block created (T065)
-        let _ = self
-            .log_audit(
-                tenant_id,
-                created_by,
-                AdminAction::Create,
-                AdminResourceType::GovRoleInheritanceBlock,
-                Some(block.id),
-                None,
-                Some(json!({
-                    "role_id": role_id,
-                    "entitlement_id": entitlement_id,
-                })),
-            )
-            .await;
+        self.log_audit(
+            tenant_id,
+            created_by,
+            AdminAction::Create,
+            AdminResourceType::GovRoleInheritanceBlock,
+            Some(block.id),
+            None,
+            Some(json!({
+                "role_id": role_id,
+                "entitlement_id": entitlement_id,
+            })),
+        )
+        .await?;
 
         Ok(block)
     }
@@ -748,20 +743,19 @@ impl RoleHierarchyService {
         let _ = self.trigger_sod_recheck_for_role(tenant_id, role_id).await;
 
         // Audit log: inheritance block deleted (T065)
-        let _ = self
-            .log_audit(
-                tenant_id,
-                deleted_by,
-                AdminAction::Delete,
-                AdminResourceType::GovRoleInheritanceBlock,
-                Some(block_id),
-                Some(json!({
-                    "role_id": role_id,
-                    "entitlement_id": block.entitlement_id,
-                })),
-                None,
-            )
-            .await;
+        self.log_audit(
+            tenant_id,
+            deleted_by,
+            AdminAction::Delete,
+            AdminResourceType::GovRoleInheritanceBlock,
+            Some(block_id),
+            Some(json!({
+                "role_id": role_id,
+                "entitlement_id": block.entitlement_id,
+            })),
+            None,
+        )
+        .await?;
 
         Ok(())
     }
@@ -987,25 +981,12 @@ impl RoleHierarchyService {
             user_agent: None,
         };
 
-        match AdminAuditLog::create(&self.pool, entry).await {
-            Ok(_) => {
-                tracing::debug!(
-                    tenant_id = %tenant_id,
-                    resource_id = ?resource_id,
-                    "Audit log entry created for role hierarchy operation"
-                );
-            }
-            Err(e) => {
-                // Log but don't fail the operation if audit logging fails
-                tracing::warn!(
-                    tenant_id = %tenant_id,
-                    resource_id = ?resource_id,
-                    error = %e,
-                    "Failed to create audit log entry for role hierarchy operation"
-                );
-            }
-        }
-
+        AdminAuditLog::create(&self.pool, entry).await?;
+        tracing::debug!(
+            tenant_id = %tenant_id,
+            resource_id = ?resource_id,
+            "Audit log entry created for role hierarchy operation"
+        );
         Ok(())
     }
 }
@@ -1055,6 +1036,25 @@ mod tests {
         assert!(
             production.contains(".map_err(GovernanceError::Database)?"),
             "role count lookups must propagate database errors"
+        );
+    }
+
+    #[test]
+    fn role_hierarchy_mutations_do_not_swallow_audit_writes() {
+        let src = include_str!("role_hierarchy_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("let _ = self.log_audit("),
+            "role hierarchy mutations must not swallow admin audit writes"
+        );
+        assert!(
+            !production.contains("don't fail the operation if audit logging fails"),
+            "log_audit must not swallow AdminAuditLog errors"
+        );
+        assert!(
+            production.matches("self.log_audit(").count() >= 6
+                && production.contains("AdminAuditLog::create(&self.pool, entry).await?"),
+            "role hierarchy mutations must fail when admin audit cannot be written"
         );
     }
 }
