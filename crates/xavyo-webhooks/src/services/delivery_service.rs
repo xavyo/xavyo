@@ -244,7 +244,7 @@ impl DeliveryService {
                         subscription_id = %subscription.id,
                         "Delivery rejected - circuit breaker is open"
                     );
-                    self.handle_delivery_failure(
+                    self.record_delivery_failure(
                         delivery,
                         subscription,
                         "Circuit breaker open - endpoint temporarily unavailable",
@@ -262,7 +262,17 @@ impl DeliveryService {
                         error = %e,
                         "Failed to check circuit breaker status"
                     );
-                    // Continue with delivery on error - fail open
+                    // Fail closed: a CB outage must not skip endpoint protection.
+                    self.record_delivery_failure(
+                        delivery,
+                        subscription,
+                        "Circuit breaker check failed — delivery refused",
+                        None,
+                        None,
+                        None,
+                    )
+                    .await;
+                    return;
                 }
             }
         }
@@ -284,7 +294,7 @@ impl DeliveryService {
         let payload_bytes = match serde_json::to_vec(&delivery.request_payload) {
             Ok(b) => b,
             Err(e) => {
-                self.handle_delivery_failure(
+                self.record_delivery_failure(
                     delivery,
                     subscription,
                     &format!("Failed to serialize payload: {e}"),
@@ -324,13 +334,23 @@ impl DeliveryService {
                     }
                 }
                 Err(e) => {
-                    tracing::warn!(
+                    tracing::error!(
                         target: "webhook_delivery",
                         delivery_id = %delivery.id,
                         subscription_id = %subscription.id,
                         error = %e,
-                        "Failed to decrypt subscription secret — delivering without signature"
+                        "Failed to decrypt subscription secret — refusing unsigned delivery"
                     );
+                    self.record_delivery_failure(
+                        delivery,
+                        subscription,
+                        &format!("Failed to decrypt subscription secret: {e}"),
+                        None,
+                        None,
+                        None,
+                    )
+                    .await;
+                    return;
                 }
             }
         }
@@ -362,17 +382,26 @@ impl DeliveryService {
                     .collect::<String>();
 
                 if (200..300).contains(&(status_code as u16)) {
-                    self.handle_delivery_success(
-                        delivery,
-                        subscription,
-                        status_code,
-                        Some(&body),
-                        latency_ms,
-                        Some(&request_headers_json),
-                    )
-                    .await;
+                    if let Err(e) = self
+                        .handle_delivery_success(
+                            delivery,
+                            subscription,
+                            status_code,
+                            Some(&body),
+                            latency_ms,
+                            Some(&request_headers_json),
+                        )
+                        .await
+                    {
+                        tracing::error!(
+                            target: "webhook_delivery",
+                            delivery_id = %delivery.id,
+                            error = %e,
+                            "Failed to persist delivery success"
+                        );
+                    }
                 } else {
-                    self.handle_delivery_failure(
+                    self.record_delivery_failure(
                         delivery,
                         subscription,
                         &format!("HTTP {status_code}"),
@@ -392,7 +421,7 @@ impl DeliveryService {
                     format!("Request error: {e}")
                 };
 
-                self.handle_delivery_failure(
+                self.record_delivery_failure(
                     delivery,
                     subscription,
                     &error_msg,
@@ -405,6 +434,37 @@ impl DeliveryService {
         }
     }
 
+    /// Persist a delivery failure. Persist errors must not look like the
+    /// attempt was fully recorded.
+    async fn record_delivery_failure(
+        &self,
+        delivery: &WebhookDelivery,
+        subscription: &WebhookSubscription,
+        error_message: &str,
+        response_code: Option<i16>,
+        response_body: Option<&str>,
+        latency_ms: Option<i32>,
+    ) {
+        if let Err(e) = self
+            .handle_delivery_failure(
+                delivery,
+                subscription,
+                error_message,
+                response_code,
+                response_body,
+                latency_ms,
+            )
+            .await
+        {
+            tracing::error!(
+                target: "webhook_delivery",
+                delivery_id = %delivery.id,
+                error = %e,
+                "Failed to persist delivery failure"
+            );
+        }
+    }
+
     /// Handle a successful delivery.
     async fn handle_delivery_success(
         &self,
@@ -414,7 +474,7 @@ impl DeliveryService {
         response_body: Option<&str>,
         latency_ms: i32,
         request_headers: Option<&serde_json::Value>,
-    ) {
+    ) -> Result<(), sqlx::Error> {
         tracing::info!(
             target: "webhook_delivery",
             delivery_id = %delivery.id,
@@ -428,24 +488,18 @@ impl DeliveryService {
             "Webhook delivery succeeded"
         );
 
-        if let Err(e) = WebhookDelivery::mark_success(
-            &self.pool,
-            delivery.tenant_id,
-            delivery.id,
-            response_code,
-            response_body,
-            latency_ms,
-            request_headers,
-        )
-        .await
-        {
-            tracing::error!(
-                target: "webhook_delivery",
-                delivery_id = %delivery.id,
-                error = %e,
-                "Failed to update delivery status to success"
-            );
-        }
+        delivery_persist_recorded(
+            WebhookDelivery::mark_success(
+                &self.pool,
+                delivery.tenant_id,
+                delivery.id,
+                response_code,
+                response_body,
+                latency_ms,
+                request_headers,
+            )
+            .await,
+        )?;
 
         // Record success to circuit breaker
         if let Some(ref cb_registry) = self.circuit_breaker_registry {
@@ -479,6 +533,8 @@ impl DeliveryService {
                 );
             }
         }
+
+        Ok(())
     }
 
     /// Handle a failed delivery — schedule retry or disable subscription.
@@ -490,7 +546,7 @@ impl DeliveryService {
         response_code: Option<i16>,
         response_body: Option<&str>,
         latency_ms: Option<i32>,
-    ) {
+    ) -> Result<(), sqlx::Error> {
         let next_attempt = delivery.attempt_number + 1;
         let next_attempt_at = calculate_next_attempt_at(next_attempt, self.max_attempts);
         let retries_exhausted = next_attempt_at.is_none();
@@ -526,27 +582,21 @@ impl DeliveryService {
         }
 
         // Update delivery record
-        if let Err(e) = WebhookDelivery::mark_failed(
-            &self.pool,
-            delivery.tenant_id,
-            delivery.id,
-            next_attempt,
-            error_message,
-            response_code,
-            response_body,
-            latency_ms,
-            next_attempt_at,
-            None,
-        )
-        .await
-        {
-            tracing::error!(
-                target: "webhook_delivery",
-                delivery_id = %delivery.id,
-                error = %e,
-                "Failed to update delivery status to failed"
-            );
-        }
+        delivery_persist_recorded(
+            WebhookDelivery::mark_failed(
+                &self.pool,
+                delivery.tenant_id,
+                delivery.id,
+                next_attempt,
+                error_message,
+                response_code,
+                response_body,
+                latency_ms,
+                next_attempt_at,
+                None,
+            )
+            .await,
+        )?;
 
         // If retries exhausted, move to DLQ
         if retries_exhausted {
@@ -579,65 +629,41 @@ impl DeliveryService {
         }
 
         // Increment consecutive failures and check threshold
-        match WebhookSubscription::increment_consecutive_failures(
-            &self.pool,
-            subscription.tenant_id,
-            subscription.id,
-        )
-        .await
-        {
-            Ok(failures) => {
-                if failures >= self.disable_threshold {
-                    tracing::warn!(
-                        target: "webhook_delivery",
-                        subscription_id = %subscription.id,
-                        tenant_id = %subscription.tenant_id,
-                        consecutive_failures = failures,
-                        threshold = self.disable_threshold,
-                        "Auto-disabling subscription due to consecutive failures"
-                    );
+        let failures = delivery_persist_recorded(
+            WebhookSubscription::increment_consecutive_failures(
+                &self.pool,
+                subscription.tenant_id,
+                subscription.id,
+            )
+            .await,
+        )?;
+        if failures >= self.disable_threshold {
+            tracing::warn!(
+                target: "webhook_delivery",
+                subscription_id = %subscription.id,
+                tenant_id = %subscription.tenant_id,
+                consecutive_failures = failures,
+                threshold = self.disable_threshold,
+                "Auto-disabling subscription due to consecutive failures"
+            );
 
-                    if let Err(e) = WebhookSubscription::disable(
-                        &self.pool,
-                        subscription.tenant_id,
-                        subscription.id,
-                    )
-                    .await
-                    {
-                        tracing::error!(
-                            target: "webhook_delivery",
-                            subscription_id = %subscription.id,
-                            error = %e,
-                            "Failed to auto-disable subscription"
-                        );
-                    }
+            delivery_persist_recorded(
+                WebhookSubscription::disable(&self.pool, subscription.tenant_id, subscription.id)
+                    .await,
+            )?;
 
-                    // Abandon all pending deliveries for the disabled subscription
-                    if let Err(e) = WebhookDelivery::mark_abandoned_for_subscription(
-                        &self.pool,
-                        subscription.tenant_id,
-                        subscription.id,
-                    )
-                    .await
-                    {
-                        tracing::error!(
-                            target: "webhook_delivery",
-                            subscription_id = %subscription.id,
-                            error = %e,
-                            "Failed to abandon pending deliveries for disabled subscription"
-                        );
-                    }
-                }
-            }
-            Err(e) => {
-                tracing::error!(
-                    target: "webhook_delivery",
-                    subscription_id = %subscription.id,
-                    error = %e,
-                    "Failed to increment consecutive failures"
-                );
-            }
+            // Abandon all pending deliveries for the disabled subscription
+            delivery_persist_recorded(
+                WebhookDelivery::mark_abandoned_for_subscription(
+                    &self.pool,
+                    subscription.tenant_id,
+                    subscription.id,
+                )
+                .await,
+            )?;
         }
+
+        Ok(())
     }
 
     /// Build attempt history for DLQ entry.
@@ -678,21 +704,8 @@ impl DeliveryService {
                     subscription_id = %delivery.subscription_id,
                     "Abandoning retry — subscription is disabled"
                 );
-                let _ = WebhookDelivery::update_status(
-                    &self.pool,
-                    delivery.tenant_id,
-                    delivery.id,
-                    "abandoned",
-                    delivery.attempt_number,
-                    None,
-                    None,
-                    None,
-                    Some("Subscription disabled"),
-                    None,
-                    None,
-                    Some(Utc::now()),
-                )
-                .await;
+                self.persist_abandoned_retry(delivery, "Subscription disabled")
+                    .await;
                 return;
             }
             Ok(None) => {
@@ -703,21 +716,8 @@ impl DeliveryService {
                     subscription_id = %delivery.subscription_id,
                     "Abandoning retry — subscription not found"
                 );
-                let _ = WebhookDelivery::update_status(
-                    &self.pool,
-                    delivery.tenant_id,
-                    delivery.id,
-                    "abandoned",
-                    delivery.attempt_number,
-                    None,
-                    None,
-                    None,
-                    Some("Subscription deleted"),
-                    None,
-                    None,
-                    Some(Utc::now()),
-                )
-                .await;
+                self.persist_abandoned_retry(delivery, "Subscription deleted")
+                    .await;
                 return;
             }
             Err(e) => {
@@ -734,11 +734,45 @@ impl DeliveryService {
         self.execute_delivery(delivery, &subscription).await;
     }
 
+    /// Persist an abandoned retry. Errors must not leave the delivery pending.
+    async fn persist_abandoned_retry(&self, delivery: &WebhookDelivery, reason: &str) {
+        if let Err(e) = delivery_persist_recorded(
+            WebhookDelivery::update_status(
+                &self.pool,
+                delivery.tenant_id,
+                delivery.id,
+                "abandoned",
+                delivery.attempt_number,
+                None,
+                None,
+                None,
+                Some(reason),
+                None,
+                None,
+                Some(Utc::now()),
+            )
+            .await,
+        ) {
+            tracing::error!(
+                target: "webhook_delivery",
+                delivery_id = %delivery.id,
+                error = %e,
+                "Failed to persist abandoned delivery"
+            );
+        }
+    }
+
     /// Get a reference to the connection pool (for the worker).
     #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
+}
+
+/// Delivery status persist must fail closed so jobs are not left pending
+/// after a successful HTTP attempt or an abandon.
+pub(crate) fn delivery_persist_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
 }
 
 /// Calculate the next retry timestamp based on attempt number and backoff schedule.
@@ -873,5 +907,76 @@ mod tests {
         let map = headers_to_map(&headers);
         assert_eq!(map.get("content-type").unwrap(), "application/json");
         assert_eq!(map.get("x-custom").unwrap(), "test-value");
+    }
+
+    #[test]
+    fn delivery_persist_recorded_propagates_errors() {
+        assert!(delivery_persist_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(delivery_persist_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn execute_delivery_does_not_fail_open_circuit_breaker_or_hmac() {
+        let src = include_str!("delivery_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let execute = production
+            .split("pub async fn execute_delivery")
+            .nth(1)
+            .and_then(|s| s.split("async fn record_delivery_failure").next())
+            .expect("execute_delivery");
+        assert!(
+            execute.contains("Circuit breaker check failed") && !execute.contains("fail open"),
+            "circuit breaker check errors must refuse delivery"
+        );
+        assert!(
+            execute.contains("refusing unsigned delivery")
+                && !execute.contains("delivering without signature"),
+            "HMAC decrypt errors must not skip signing"
+        );
+    }
+
+    #[test]
+    fn delivery_status_persist_does_not_swallow_errors() {
+        let src = include_str!("delivery_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("delivery_persist_recorded("),
+            "delivery status persist must fail closed"
+        );
+        assert!(
+            !production.contains("let _ = WebhookDelivery::update_status"),
+            "must not swallow abandoned-retry persist"
+        );
+        let success = production
+            .split("async fn handle_delivery_success")
+            .nth(1)
+            .and_then(|s| s.split("async fn handle_delivery_failure").next())
+            .expect("handle_delivery_success");
+        assert!(
+            success.contains("delivery_persist_recorded(")
+                && success.contains("WebhookDelivery::mark_success"),
+            "mark_success persist must fail closed"
+        );
+        assert!(
+            !success.contains("if let Err(e) = WebhookDelivery::mark_success"),
+            "must not swallow delivery success persist"
+        );
+        let failure = production
+            .split("async fn handle_delivery_failure")
+            .nth(1)
+            .and_then(|s| s.split("async fn build_attempt_history").next())
+            .expect("handle_delivery_failure");
+        assert!(
+            failure.contains("delivery_persist_recorded(")
+                && failure.contains("WebhookDelivery::mark_failed")
+                && failure.contains("WebhookSubscription::disable")
+                && failure.contains("mark_abandoned_for_subscription"),
+            "failure, disable, and abandon persist must fail closed"
+        );
+        assert!(
+            !failure.contains("if let Err(e) = WebhookDelivery::mark_failed")
+                && !failure.contains("if let Err(e) = WebhookSubscription::disable"),
+            "must not swallow delivery failure or auto-disable persist"
+        );
     }
 }
