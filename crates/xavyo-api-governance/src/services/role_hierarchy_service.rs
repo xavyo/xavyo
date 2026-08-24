@@ -375,7 +375,7 @@ impl RoleHierarchyService {
         }
 
         // Trigger SoD re-check for affected users (F088/T063)
-        let _ = self.trigger_sod_recheck_for_role(tenant_id, role_id).await;
+        sod_recheck_recorded(self.trigger_sod_recheck_for_role(tenant_id, role_id).await)?;
 
         // Audit log: role moved (T064)
         self.log_audit(
@@ -693,7 +693,7 @@ impl RoleHierarchyService {
         self.recompute_hierarchy(tenant_id, role_id).await?;
 
         // Trigger SoD re-check for affected users (F088/T063)
-        let _ = self.trigger_sod_recheck_for_role(tenant_id, role_id).await;
+        sod_recheck_recorded(self.trigger_sod_recheck_for_role(tenant_id, role_id).await)?;
 
         // Audit log: inheritance block created (T065)
         self.log_audit(
@@ -740,7 +740,7 @@ impl RoleHierarchyService {
         self.recompute_hierarchy(tenant_id, role_id).await?;
 
         // Trigger SoD re-check for affected users (F088/T063)
-        let _ = self.trigger_sod_recheck_for_role(tenant_id, role_id).await;
+        sod_recheck_recorded(self.trigger_sod_recheck_for_role(tenant_id, role_id).await)?;
 
         // Audit log: inheritance block deleted (T065)
         self.log_audit(
@@ -803,7 +803,7 @@ impl RoleHierarchyService {
         self.recompute_hierarchy(tenant_id, role_id).await?;
 
         // Trigger SoD re-check for affected users (F088/T063)
-        let _ = self.trigger_sod_recheck_for_role(tenant_id, role_id).await;
+        sod_recheck_recorded(self.trigger_sod_recheck_for_role(tenant_id, role_id).await)?;
 
         Ok(mapping)
     }
@@ -834,7 +834,7 @@ impl RoleHierarchyService {
         self.recompute_hierarchy(tenant_id, role_id).await?;
 
         // Trigger SoD re-check for affected users (F088/T063)
-        let _ = self.trigger_sod_recheck_for_role(tenant_id, role_id).await;
+        sod_recheck_recorded(self.trigger_sod_recheck_for_role(tenant_id, role_id).await)?;
 
         Ok(())
     }
@@ -991,6 +991,12 @@ impl RoleHierarchyService {
     }
 }
 
+/// SoD re-check after hierarchy mutations must fail closed. Swallowing
+/// query errors would skip identifying affected users.
+fn sod_recheck_recorded<T, E>(result: std::result::Result<T, E>) -> std::result::Result<T, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
     #[allow(unused_imports)]
@@ -1055,6 +1061,28 @@ mod tests {
             production.matches("self.log_audit(").count() >= 6
                 && production.contains("AdminAuditLog::create(&self.pool, entry).await?"),
             "role hierarchy mutations must fail when admin audit cannot be written"
+        );
+    }
+
+    #[test]
+    fn sod_recheck_recorded_propagates_errors() {
+        assert!(sod_recheck_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(sod_recheck_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn role_hierarchy_mutations_do_not_swallow_sod_recheck() {
+        let src = include_str!("role_hierarchy_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("sod_recheck_recorded(")
+                && production.matches("trigger_sod_recheck_for_role").count() >= 6
+                && production.matches("sod_recheck_recorded(").count() >= 5,
+            "SoD re-check after hierarchy mutations must fail closed"
+        );
+        assert!(
+            !production.contains("let _ = self.trigger_sod_recheck_for_role"),
+            "must not skip SoD re-check when the lookup fails"
         );
     }
 }
