@@ -154,18 +154,11 @@ impl FailedOperationService {
         for operation in operations {
             result.processed += 1;
 
-            // Mark as retrying
-            if let Err(e) =
+            // Mark as retrying. Persist errors must not skip the retry.
+            failed_op_persist_recorded(
                 GovLifecycleFailedOperation::mark_retrying(&self.pool, tenant_id, operation.id)
-                    .await
-            {
-                warn!(
-                    operation_id = %operation.id,
-                    error = %e,
-                    "Failed to mark operation as retrying"
-                );
-                continue;
-            }
+                    .await,
+            )?;
 
             // Attempt to execute the operation
             let retry_success = match operation.operation_type {
@@ -189,45 +182,34 @@ impl FailedOperationService {
             };
 
             if retry_success {
-                // Mark as succeeded
-                if let Err(e) =
-                    GovLifecycleFailedOperation::mark_succeeded(&self.pool, tenant_id, operation.id)
-                        .await
-                {
-                    error!(
-                        operation_id = %operation.id,
-                        error = %e,
-                        "Failed to mark operation as succeeded"
-                    );
-                }
+                // Mark as succeeded. Persist errors must not count a fake success.
+                failed_op_persist_recorded(
+                    GovLifecycleFailedOperation::mark_succeeded(
+                        &self.pool,
+                        tenant_id,
+                        operation.id,
+                    )
+                    .await,
+                )?;
                 result.succeeded += 1;
             } else {
                 // Schedule next retry or move to dead letter
-                match GovLifecycleFailedOperation::schedule_next_retry(
-                    &self.pool,
-                    tenant_id,
-                    operation.id,
-                )
-                .await
-                {
-                    Ok(has_more_retries) => {
-                        if has_more_retries {
-                            result.rescheduled += 1;
-                        } else {
-                            result.dead_letter += 1;
-                            warn!(
-                                operation_id = %operation.id,
-                                "Operation moved to dead letter queue after max retries"
-                            );
-                        }
-                    }
-                    Err(e) => {
-                        error!(
-                            operation_id = %operation.id,
-                            error = %e,
-                            "Failed to schedule next retry"
-                        );
-                    }
+                let has_more_retries = failed_op_persist_recorded(
+                    GovLifecycleFailedOperation::schedule_next_retry(
+                        &self.pool,
+                        tenant_id,
+                        operation.id,
+                    )
+                    .await,
+                )?;
+                if has_more_retries {
+                    result.rescheduled += 1;
+                } else {
+                    result.dead_letter += 1;
+                    warn!(
+                        operation_id = %operation.id,
+                        "Operation moved to dead letter queue after max retries"
+                    );
                 }
             }
         }
@@ -508,5 +490,53 @@ impl FailedOperationService {
     /// Count dead letter operations for a tenant.
     pub async fn count_dead_letter_operations(&self, tenant_id: Uuid) -> Result<i64> {
         Ok(GovLifecycleFailedOperation::count_dead_letter(&self.pool, tenant_id).await?)
+    }
+}
+
+/// Retry-queue persist must fail closed. Swallowing mark_succeeded would
+/// count a fake success while the operation stays retrying.
+fn failed_op_persist_recorded<T, E>(
+    result: std::result::Result<T, E>,
+) -> std::result::Result<T, E> {
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn failed_op_persist_recorded_propagates_errors() {
+        assert!(failed_op_persist_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(failed_op_persist_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn process_retries_does_not_swallow_persist_or_count_fake_success() {
+        let src = include_str!("failed_operation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let process = production
+            .split("pub async fn process_retries")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn process_all_retries").next())
+            .expect("process_retries");
+        assert!(
+            process.contains("failed_op_persist_recorded(")
+                && process.contains("mark_retrying")
+                && process.contains("mark_succeeded")
+                && process.contains("schedule_next_retry"),
+            "retry-queue persist must fail closed"
+        );
+        assert!(
+            !process.contains("Failed to mark operation as succeeded")
+                && !process.contains("Failed to mark operation as retrying")
+                && !process.contains("Failed to schedule next retry"),
+            "must not swallow retry persist or count a fake success"
+        );
+        assert!(
+            process.contains("failed_op_persist_recorded(")
+                && process.contains("result.succeeded += 1"),
+            "succeeded count must increment only after mark_succeeded persist"
+        );
     }
 }

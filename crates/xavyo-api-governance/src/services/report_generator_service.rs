@@ -83,10 +83,11 @@ impl ReportGeneratorService {
         match data_result {
             Ok(data) => {
                 // Update progress to 50%
-                let _ = self
-                    .report_service
-                    .update_progress(tenant_id, report_id, 50)
-                    .await;
+                report_progress_recorded(
+                    self.report_service
+                        .update_progress(tenant_id, report_id, 50)
+                        .await,
+                )?;
 
                 // Export to requested format
                 let export_result = self.export_service.export(&data, report.output_format);
@@ -94,10 +95,11 @@ impl ReportGeneratorService {
                 match export_result {
                     Ok(exported) => {
                         // Update progress to 90%
-                        let _ = self
-                            .report_service
-                            .update_progress(tenant_id, report_id, 90)
-                            .await;
+                        report_progress_recorded(
+                            self.report_service
+                                .update_progress(tenant_id, report_id, 90)
+                                .await,
+                        )?;
 
                         // Store as inline data (for small reports)
                         let output = serde_json::json!({
@@ -153,7 +155,37 @@ impl ReportDataService {
     }
 }
 
+/// Persist report generation progress. Errors must not leave the job at 0%.
+fn report_progress_recorded<T, E>(result: std::result::Result<T, E>) -> std::result::Result<T, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
-    // Integration tests would go here, but require a real database
+    use super::*;
+
+    #[test]
+    fn report_progress_recorded_propagates_errors() {
+        assert!(report_progress_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(report_progress_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn execute_generation_does_not_swallow_progress_persist() {
+        let src = include_str!("report_generator_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let execute = production
+            .split("pub async fn execute_generation")
+            .nth(1)
+            .expect("execute_generation");
+        assert!(
+            execute.contains("report_progress_recorded("),
+            "report progress persist must fail closed"
+        );
+        assert!(
+            !execute.contains("let _ = self\n                    .report_service")
+                && !execute.contains("let _ = self.report_service"),
+            "must not swallow report progress persist"
+        );
+    }
 }

@@ -781,17 +781,21 @@ impl OutlierScoringService {
                     .map_err(GovernanceError::Database)?;
             }
 
-            // Update progress
+            // Update progress. Persist errors must not leave the analysis
+            // looking complete while progress stays at 0.
             let progress = ((f64::from(users_processed) / total_users as f64) * 100.0) as i32;
-            let _ = GovOutlierAnalysis::update_progress(
-                &self.pool,
-                tenant_id,
-                analysis_id,
-                progress,
-                users_processed,
-                outliers_detected,
-            )
-            .await;
+            outlier_progress_recorded(
+                GovOutlierAnalysis::update_progress(
+                    &self.pool,
+                    tenant_id,
+                    analysis_id,
+                    progress,
+                    users_processed,
+                    outliers_detected,
+                )
+                .await
+                .map_err(GovernanceError::Database),
+            )?;
         }
 
         // Complete the analysis
@@ -1278,6 +1282,11 @@ fn outlier_analysis_fail_recorded<T, E>(
     result
 }
 
+/// Persist outlier analysis progress. Errors must not leave it stuck at 0%.
+fn outlier_progress_recorded<T, E>(result: std::result::Result<T, E>) -> std::result::Result<T, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1689,6 +1698,31 @@ mod tests {
         assert!(
             !execute.contains("let _ = GovOutlierAnalysis::fail"),
             "must not swallow outlier analysis fail persist"
+        );
+    }
+
+    #[test]
+    fn outlier_progress_recorded_propagates_errors() {
+        assert!(outlier_progress_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(outlier_progress_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn execute_analysis_does_not_swallow_progress_persist() {
+        let src = include_str!("outlier_scoring_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let execute = production
+            .split("pub async fn execute_analysis")
+            .nth(1)
+            .and_then(|s| s.split("async fn load_peer_group_stats").next())
+            .expect("execute_analysis");
+        assert!(
+            execute.contains("outlier_progress_recorded("),
+            "progress persist errors must fail closed"
+        );
+        assert!(
+            !execute.contains("let _ = GovOutlierAnalysis::update_progress"),
+            "must not swallow outlier analysis progress persist"
         );
     }
 }
