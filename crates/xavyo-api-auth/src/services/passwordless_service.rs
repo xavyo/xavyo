@@ -256,19 +256,21 @@ impl PasswordlessService {
             .await
             .map_err(|e| ApiAuthError::Internal(format!("Failed to create token: {e}")))?;
 
-            // Send email with raw token
-            if let Err(e) = self
-                .email_sender
-                .send_magic_link(email, &raw_token, tid)
-                .await
-            {
+            // Send email with raw token. Errors must not report the request as sent.
+            passwordless_email_sent(
+                self.email_sender
+                    .send_magic_link(email, &raw_token, tid)
+                    .await,
+            )
+            .map_err(|e| {
                 tracing::error!(
                     tenant_id = %tenant_id,
                     email = email,
                     error = %e,
                     "Failed to send magic link email"
                 );
-            }
+                ApiAuthError::Internal(format!("Failed to send magic link email: {e}"))
+            })?;
         }
 
         Ok(expiry_minutes)
@@ -418,19 +420,22 @@ impl PasswordlessService {
             .await
             .map_err(|e| ApiAuthError::Internal(format!("Failed to create token: {e}")))?;
 
-            // Send OTP code via email (not the token)
-            if let Err(e) = self
-                .email_sender
-                .send_email_otp(email, &otp_code, tid)
-                .await
-            {
+            // Send OTP code via email (not the token). Errors must not report
+            // the request as sent.
+            passwordless_email_sent(
+                self.email_sender
+                    .send_email_otp(email, &otp_code, tid)
+                    .await,
+            )
+            .map_err(|e| {
                 tracing::error!(
                     tenant_id = %tenant_id,
                     email = email,
                     error = %e,
                     "Failed to send email OTP"
                 );
-            }
+                ApiAuthError::Internal(format!("Failed to send email OTP: {e}"))
+            })?;
 
             // Drop raw_token — user doesn't need it for OTP flow
             let _ = raw_token;
@@ -729,6 +734,12 @@ struct UserBasic {
     pub is_active: bool,
 }
 
+/// Passwordless request emails must fail closed. Swallowing send errors would
+/// return success when no magic link or OTP was delivered.
+fn passwordless_email_sent<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -932,6 +943,50 @@ mod tests {
         assert!(
             production.contains("enforce_ip_access("),
             "passwordless verify must enforce tenant IP restrictions"
+        );
+    }
+
+    #[test]
+    fn passwordless_email_sent_propagates_errors() {
+        assert!(passwordless_email_sent(Ok::<(), &str>(())).is_ok());
+        assert!(passwordless_email_sent(Err::<(), _>("smtp")).is_err());
+    }
+
+    #[test]
+    fn request_magic_link_does_not_swallow_email_send() {
+        let src = include_str!("passwordless_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let request = production
+            .split("pub async fn request_magic_link")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn verify_magic_link").next())
+            .expect("request_magic_link");
+        assert!(
+            request.contains("passwordless_email_sent(") && request.contains("send_magic_link"),
+            "magic link send errors must fail closed"
+        );
+        assert!(
+            !request.contains("if let Err(e) = self"),
+            "must not report magic link requested when email was not sent"
+        );
+    }
+
+    #[test]
+    fn request_email_otp_does_not_swallow_email_send() {
+        let src = include_str!("passwordless_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let request = production
+            .split("pub async fn request_email_otp")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn verify_email_otp").next())
+            .expect("request_email_otp");
+        assert!(
+            request.contains("passwordless_email_sent(") && request.contains("send_email_otp"),
+            "email OTP send errors must fail closed"
+        );
+        assert!(
+            !request.contains("if let Err(e) = self"),
+            "must not report OTP requested when email was not sent"
         );
     }
 }

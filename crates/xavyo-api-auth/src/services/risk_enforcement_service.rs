@@ -160,17 +160,12 @@ impl RiskEnforcementService {
         context: &LoginRiskContext,
         policy: &GovRiskEnforcementPolicy,
     ) -> Result<EnforcementDecision, RiskEnforcementError> {
-        // 3. Generate risk events from login context
-        if let Err(e) = self
-            .generate_login_risk_events(tenant_id, user_id, context, policy)
-            .await
-        {
-            tracing::warn!(
-                "Risk event generation failed for user {}: {}. Continuing evaluation.",
-                user_id,
-                e
-            );
-        }
+        // 3. Generate risk events from login context. Errors must refuse
+        // login — scoring without these signals would skip MFA/block.
+        login_risk_events_recorded(
+            self.generate_login_risk_events(tenant_id, user_id, context, policy)
+                .await,
+        )?;
 
         // 4. Calculate risk score
         let (total_score, factor_breakdown) = self.calculate_score(tenant_id, user_id).await?;
@@ -191,24 +186,18 @@ impl RiskEnforcementService {
             enforcement_mode: policy.enforcement_mode,
         };
 
-        // 6. Generate security alerts
+        // 6. Generate security alerts. Persist errors must refuse login.
         if action != EnforcementAction::None {
-            if let Err(e) = self
-                .generate_enforcement_alert(
+            login_risk_alert_recorded(
+                self.generate_enforcement_alert(
                     tenant_id,
                     user_id,
                     &decision,
                     context,
                     threshold.as_ref(),
                 )
-                .await
-            {
-                tracing::warn!(
-                    "Alert generation failed for user {}: {}. Non-blocking.",
-                    user_id,
-                    e
-                );
-            }
+                .await,
+            )?;
         }
 
         Ok(decision)
@@ -265,13 +254,11 @@ impl RiskEnforcementService {
         self.generate_dormant_account_event(tenant_id, user_id)
             .await?;
 
-        // Impossible travel event
-        if let Err(e) = self
-            .check_impossible_travel(tenant_id, user_id, context, policy)
-            .await
-        {
-            tracing::warn!("Impossible travel check failed for user {}: {}", user_id, e);
-        }
+        // Impossible travel event. Errors must not drop this factor.
+        login_risk_events_recorded(
+            self.check_impossible_travel(tenant_id, user_id, context, policy)
+                .await,
+        )?;
 
         Ok(())
     }
@@ -677,6 +664,17 @@ pub(crate) fn risk_score_upsert<T>(
     result.map_err(|e| RiskEnforcementError::DatabaseError(e.to_string()))
 }
 
+/// Risk-event writes (new device/location, failed logins, impossible travel)
+/// must fail closed. Scoring without them would skip MFA/block.
+pub(crate) fn login_risk_events_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
+/// Enforcement-alert persist errors must refuse login, not continue as success.
+pub(crate) fn login_risk_alert_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
 /// Tenant `fail_open` used to return [`EnforcementDecision::skip()`], which let
 /// a scoring outage disable MFA/block. Login maps this error to HTTP 503.
 pub fn risk_eval_on_error(
@@ -743,6 +741,65 @@ mod tests {
         assert!(
             !production.contains("proceeding with fail-open"),
             "must not skip enforcement after a risk-eval error"
+        );
+    }
+
+    #[test]
+    fn login_risk_events_recorded_propagates_errors() {
+        assert!(login_risk_events_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(login_risk_events_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn login_risk_alert_recorded_propagates_errors() {
+        assert!(login_risk_alert_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(login_risk_alert_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn evaluate_with_policy_does_not_skip_risk_signals_or_alerts() {
+        let src = include_str!("risk_enforcement_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let evaluate = production
+            .split("async fn evaluate_with_policy")
+            .nth(1)
+            .and_then(|s| s.split("async fn generate_login_risk_events").next())
+            .expect("evaluate_with_policy");
+        assert!(
+            evaluate.contains("login_risk_events_recorded("),
+            "risk event persist must fail closed"
+        );
+        assert!(
+            evaluate.contains("login_risk_alert_recorded("),
+            "enforcement alert persist must fail closed"
+        );
+        assert!(
+            !evaluate.contains("Continuing evaluation"),
+            "must not score without risk events on error"
+        );
+        assert!(
+            !evaluate.contains("Non-blocking"),
+            "must not swallow enforcement alert persist"
+        );
+    }
+
+    #[test]
+    fn generate_login_risk_events_does_not_skip_impossible_travel() {
+        let src = include_str!("risk_enforcement_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let generate = production
+            .split("async fn generate_login_risk_events")
+            .nth(1)
+            .and_then(|s| s.split("async fn create_risk_event").next())
+            .expect("generate_login_risk_events");
+        assert!(
+            generate.contains("login_risk_events_recorded(")
+                && generate.contains("check_impossible_travel"),
+            "impossible travel errors must fail closed"
+        );
+        assert!(
+            !generate.contains("Impossible travel check failed"),
+            "must not swallow impossible travel errors"
         );
     }
 
