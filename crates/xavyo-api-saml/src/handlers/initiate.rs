@@ -184,15 +184,8 @@ async fn initiate_sso_inner(
             + chrono::Duration::seconds(i64::from(sp.assertion_validity_seconds).max(28800)),
         revoked_at: None,
     };
-    if let Err(e) = state.sp_session_store.record(sp_session).await {
-        tracing::warn!(
-            tenant_id = %tenant_id,
-            user_id = %user.id,
-            sp_id = %sp.id,
-            error = %e,
-            "Failed to record SP session for SLO (non-fatal)"
-        );
-    }
+    crate::session::slo_session_recorded(state.sp_session_store.record(sp_session).await)
+        .map_err(|e| SamlError::SpSessionError(e.to_string()))?;
 
     tracing::info!(
         tenant_id = %tenant_id,
@@ -221,6 +214,10 @@ mod tests {
         assert!(
             production.contains("load_groups_for_assertion") && production.contains(".await?"),
             "IdP-initiated SSO must propagate group-load errors"
+        );
+        assert!(
+            production.contains("slo_session_recorded(") && !production.contains("non-fatal"),
+            "IdP-initiated SSO must not issue an assertion when SLO session persist fails"
         );
     }
 }

@@ -136,8 +136,8 @@ impl AssignmentService {
         // F064: Create manual provisioning task if application is semi-manual
         // Only for user assignments (not group assignments)
         if target_type == GovAssignmentTargetType::User {
-            if let Err(e) = self
-                .create_manual_task_if_needed(
+            manual_task_recorded(
+                self.create_manual_task_if_needed(
                     tenant_id,
                     assignment.id,
                     entitlement.application_id,
@@ -145,16 +145,8 @@ impl AssignmentService {
                     entitlement.id,
                     ManualTaskOperation::Grant,
                 )
-                .await
-            {
-                // Log error but don't fail the assignment - task creation is best-effort
-                tracing::warn!(
-                    tenant_id = %tenant_id,
-                    assignment_id = %assignment.id,
-                    error = %e,
-                    "Failed to create manual provisioning task for semi-manual resource"
-                );
-            }
+                .await,
+            )?;
         }
 
         Ok(assignment)
@@ -185,10 +177,13 @@ impl AssignmentService {
 
         // Calculate SLA deadline from default policy if available
         let sla_deadline = if let Some(sla_policy_id) = application.sla_policy_id {
-            match GovSlaPolicy::find_by_id(&self.pool, tenant_id, sla_policy_id).await {
-                Ok(Some(policy)) if policy.is_active => Some(policy.deadline_from(Utc::now())),
-                _ => None,
-            }
+            sla_policy_lookup(
+                GovSlaPolicy::find_by_id(&self.pool, tenant_id, sla_policy_id)
+                    .await
+                    .map_err(GovernanceError::Database),
+            )?
+            .filter(|p| p.is_active)
+            .map(|p| p.deadline_from(Utc::now()))
         } else {
             None
         };
@@ -396,8 +391,8 @@ impl AssignmentService {
                     // F064: Create manual provisioning task if application is semi-manual
                     // Only for user assignments
                     if request.target_type == GovAssignmentTargetType::User {
-                        if let Err(e) = self
-                            .create_manual_task_if_needed(
+                        if let Err(e) = manual_task_recorded(
+                            self.create_manual_task_if_needed(
                                 tenant_id,
                                 assignment.id,
                                 entitlement.application_id,
@@ -405,14 +400,13 @@ impl AssignmentService {
                                 entitlement.id,
                                 ManualTaskOperation::Grant,
                             )
-                            .await
-                        {
-                            tracing::warn!(
-                                tenant_id = %tenant_id,
-                                assignment_id = %assignment.id,
-                                error = %e,
-                                "Failed to create manual provisioning task in bulk assignment"
-                            );
+                            .await,
+                        ) {
+                            failed.push(BulkAssignmentFailure {
+                                target_id,
+                                reason: e.to_string(),
+                            });
+                            continue;
                         }
                     }
                     successful.push(assignment.id);
@@ -610,6 +604,22 @@ pub(crate) fn entitlement_for_manual_task<T>(lookup: Option<T>) -> Option<T> {
     lookup
 }
 
+/// Manual-task persist after an assignment mutation. Errors must not report
+/// the assignment as complete when F064 did not create the task.
+pub(crate) fn manual_task_recorded<T, E>(
+    result: std::result::Result<T, E>,
+) -> std::result::Result<T, E> {
+    result
+}
+
+/// SLA policy lookup for a semi-manual task. Database errors must not drop
+/// the deadline and create the task as if no SLA applied.
+pub(crate) fn sla_policy_lookup<T, E>(
+    result: std::result::Result<Option<T>, E>,
+) -> std::result::Result<Option<T>, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -642,5 +652,49 @@ mod tests {
             !production.contains("Failed to create revocation task for semi-manual resource"),
             "must not swallow deprovision task creation"
         );
+    }
+
+    #[test]
+    fn grant_paths_do_not_swallow_manual_task_persist() {
+        let src = include_str!("assignment_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("manual_task_recorded("),
+            "grant paths must fail closed on manual-task persist"
+        );
+        assert!(
+            !production.contains("don't fail the assignment")
+                && !production.contains("Failed to create manual provisioning task"),
+            "must not swallow grant-path task creation"
+        );
+    }
+
+    #[test]
+    fn sla_policy_lookup_does_not_drop_errors() {
+        assert!(sla_policy_lookup(Ok::<Option<u8>, &str>(Some(1)))
+            .unwrap()
+            .is_some());
+        assert!(sla_policy_lookup(Ok::<Option<u8>, &str>(None))
+            .unwrap()
+            .is_none());
+        assert!(sla_policy_lookup::<u8, &str>(Err("db")).is_err());
+
+        let src = include_str!("assignment_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let window = production
+            .split("async fn create_manual_task_if_needed")
+            .nth(1)
+            .and_then(|s| s.split("async fn check_sod_for_user").next())
+            .expect("create_manual_task_if_needed");
+        assert!(
+            window.contains("sla_policy_lookup(") && !window.contains("_ => None"),
+            "SLA lookup errors must not create a task with no deadline"
+        );
+    }
+
+    #[test]
+    fn manual_task_recorded_propagates() {
+        assert!(manual_task_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(manual_task_recorded::<(), &str>(Err("persist")).is_err());
     }
 }

@@ -10,11 +10,13 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use xavyo_db::{
-    CreateManualTask, GovApplication, GovEntitlement, GovEntitlementAssignment,
-    GovManualProvisioningTask, GovSlaPolicy, ManualTaskOperation,
+    CreateManualTask, CreateManualTaskAuditEvent, GovApplication, GovEntitlement,
+    GovEntitlementAssignment, GovManualProvisioningTask, GovManualTaskAuditEvent, GovSlaPolicy,
+    ManualTaskEventType, ManualTaskOperation,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
+use crate::jobs::ticket_retry_job::TicketRetryJob;
 use crate::services::ticketing::TicketingService;
 
 /// Service for orchestrating semi-manual provisioning after approval.
@@ -114,40 +116,23 @@ impl SemiManualProvisioningService {
                     );
                 }
                 Err(e) => {
-                    // Log the error but don't fail - the retry mechanism will handle it
                     tracing::warn!(
                         tenant_id = %tenant_id,
                         task_id = %task.id,
                         error = %e,
-                        "Failed to create ticket, will be retried"
+                        "Failed to create ticket; scheduling retry"
                     );
-
-                    // Create audit event for the failure
-                    let details = serde_json::json!({
-                        "error": e.to_string(),
-                        "retry_scheduled": true,
-                        "application_id": application.id,
-                        "entitlement_id": entitlement.id,
-                    });
-                    if let Err(audit_err) = xavyo_db::GovManualTaskAuditEvent::create(
+                    ticket_retry_scheduled(
                         &self.pool,
                         tenant_id,
-                        xavyo_db::CreateManualTaskAuditEvent {
-                            task_id: task.id,
-                            event_type: xavyo_db::ManualTaskEventType::TicketCreationFailed,
-                            actor_id: None,
-                            details: Some(details),
-                        },
+                        task.id,
+                        &e.to_string(),
+                        serde_json::json!({
+                            "application_id": application.id,
+                            "entitlement_id": entitlement.id,
+                        }),
                     )
-                    .await
-                    {
-                        tracing::error!(
-                            tenant_id = %tenant_id,
-                            task_id = %task.id,
-                            error = %audit_err,
-                            "Failed to create audit event for ticket creation failure"
-                        );
-                    }
+                    .await?;
                 }
             }
         }
@@ -300,41 +285,24 @@ impl SemiManualProvisioningService {
                     );
                 }
                 Err(e) => {
-                    // Log the error but don't fail - the retry mechanism will handle it
                     tracing::warn!(
                         tenant_id = %tenant_id,
                         task_id = %task.id,
                         error = %e,
-                        "Failed to create ticket for revocation, will be retried"
+                        "Failed to create ticket for revocation; scheduling retry"
                     );
-
-                    // Create audit event for the failure
-                    let details = serde_json::json!({
-                        "error": e.to_string(),
-                        "retry_scheduled": true,
-                        "application_id": application.id,
-                        "entitlement_id": entitlement.id,
-                        "operation_type": "revoke",
-                    });
-                    if let Err(audit_err) = xavyo_db::GovManualTaskAuditEvent::create(
+                    ticket_retry_scheduled(
                         &self.pool,
                         tenant_id,
-                        xavyo_db::CreateManualTaskAuditEvent {
-                            task_id: task.id,
-                            event_type: xavyo_db::ManualTaskEventType::TicketCreationFailed,
-                            actor_id: None,
-                            details: Some(details),
-                        },
+                        task.id,
+                        &e.to_string(),
+                        serde_json::json!({
+                            "application_id": application.id,
+                            "entitlement_id": entitlement.id,
+                            "operation_type": "revoke",
+                        }),
                     )
-                    .await
-                    {
-                        tracing::error!(
-                            tenant_id = %tenant_id,
-                            task_id = %task.id,
-                            error = %audit_err,
-                            "Failed to create audit event for revocation ticket creation failure"
-                        );
-                    }
+                    .await?;
                 }
             }
         }
@@ -347,14 +315,75 @@ impl SemiManualProvisioningService {
     }
 }
 
+/// Persist a ticket-creation failure so the retry job can pick it up.
+///
+/// Must not claim `retry_scheduled` unless `next_retry_at` was written.
+pub(crate) async fn ticket_retry_scheduled(
+    pool: &PgPool,
+    tenant_id: Uuid,
+    task_id: Uuid,
+    error: &str,
+    extra: serde_json::Value,
+) -> Result<()> {
+    let next_retry = TicketRetryJob::calculate_next_retry(1);
+    GovManualProvisioningTask::record_ticket_failure(pool, tenant_id, task_id, error, next_retry)
+        .await
+        .map_err(GovernanceError::Database)?
+        .ok_or(GovernanceError::ManualProvisioningTaskNotFound(task_id))?;
+
+    let mut details = extra;
+    if let Some(obj) = details.as_object_mut() {
+        obj.insert("error".to_string(), serde_json::json!(error));
+        obj.insert(
+            "retry_scheduled".to_string(),
+            serde_json::json!(next_retry.is_some()),
+        );
+        if let Some(at) = next_retry {
+            obj.insert("next_retry_at".to_string(), serde_json::json!(at));
+        }
+    }
+
+    GovManualTaskAuditEvent::create(
+        pool,
+        tenant_id,
+        CreateManualTaskAuditEvent {
+            task_id,
+            event_type: ManualTaskEventType::TicketCreationFailed,
+            actor_id: None,
+            details: Some(details),
+        },
+    )
+    .await
+    .map_err(GovernanceError::Database)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    #[allow(unused_imports)]
-    use super::*;
-
     #[test]
     fn test_service_construction() {
         // This test verifies the types compile correctly
         // Actual service tests would require a database connection
+    }
+
+    #[test]
+    fn ticket_failures_schedule_retry_instead_of_lying() {
+        let src = include_str!("semi_manual_provisioning_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("ticket_retry_scheduled(")
+                && production.contains("record_ticket_failure("),
+            "ticket creation failures must persist a retry schedule"
+        );
+        assert!(
+            !production.contains("retry_scheduled\": true")
+                && !production.contains("don't fail - the retry mechanism will handle it"),
+            "must not claim a retry was scheduled unless persist ran"
+        );
+        assert_eq!(
+            production.matches("ticket_retry_scheduled(").count(),
+            3,
+            "grant, revoke, and helper definition"
+        );
     }
 }

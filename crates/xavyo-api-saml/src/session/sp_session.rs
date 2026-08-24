@@ -34,6 +34,12 @@ pub enum SpSessionError {
     StorageError(String),
 }
 
+/// Persist of an SP session used for SLO. Errors must not issue an assertion
+/// that cannot later be logged out.
+pub fn slo_session_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
 /// Trait for SP session storage
 #[async_trait]
 pub trait SpSessionStore: Send + Sync {
@@ -334,6 +340,12 @@ mod tests {
             expires_at: Utc::now() + chrono::Duration::seconds(300),
             revoked_at: None,
         }
+    }
+
+    #[test]
+    fn slo_session_recorded_propagates() {
+        assert!(slo_session_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(slo_session_recorded::<(), &str>(Err("storage")).is_err());
     }
 
     #[tokio::test]

@@ -38,7 +38,8 @@ mod store;
 mod types;
 
 pub use sp_session::{
-    InMemorySpSessionStore, PostgresSpSessionStore, SpSession, SpSessionError, SpSessionStore,
+    slo_session_recorded, InMemorySpSessionStore, PostgresSpSessionStore, SpSession,
+    SpSessionError, SpSessionStore,
 };
 pub use store::{InMemorySessionStore, PostgresSessionStore, SessionStore};
 pub use types::{
