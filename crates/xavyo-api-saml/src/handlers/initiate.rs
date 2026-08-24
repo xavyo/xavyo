@@ -139,16 +139,7 @@ async fn initiate_sso_inner(
 
     let groups =
         GroupService::load_groups_for_assertion(&state.pool, tenant_id, user.id, &group_config)
-            .await
-            .unwrap_or_else(|e| {
-                tracing::warn!(
-                    tenant_id = %tenant_id,
-                    user_id = %user.id,
-                    error = %e,
-                    "Failed to load user groups, continuing without groups"
-                );
-                vec![]
-            });
+            .await?;
 
     let user_attrs = UserAttributes {
         user_id: user.id.to_string(),
@@ -215,4 +206,21 @@ async fn initiate_sso_inner(
     let html = generate_auto_submit_form(acs_url, &output.encoded_response, relay_state);
 
     Ok(Html(html).into_response())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn initiate_sso_does_not_fail_open_on_group_load_errors() {
+        let src = include_str!("initiate.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("continuing without groups"),
+            "IdP-initiated SSO must not issue an assertion with empty groups when group load fails"
+        );
+        assert!(
+            production.contains("load_groups_for_assertion") && production.contains(".await?"),
+            "IdP-initiated SSO must propagate group-load errors"
+        );
+    }
 }

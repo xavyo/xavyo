@@ -103,8 +103,7 @@ impl xavyo_events::consumer::EventHandler<UserCreated> for ScimUserCreatedHandle
 
             let mappings =
                 ScimTargetAttributeMapping::list_by_target(&self.pool, tenant_id, target.id, None)
-                    .await
-                    .unwrap_or_default();
+                    .await?;
 
             if let Err(e) = self
                 .provisioner
@@ -234,8 +233,7 @@ impl xavyo_events::consumer::EventHandler<UserUpdated> for ScimUserUpdatedHandle
 
             let mappings =
                 ScimTargetAttributeMapping::list_by_target(&self.pool, tenant_id, target.id, None)
-                    .await
-                    .unwrap_or_default();
+                    .await?;
 
             if let Err(e) = self
                 .provisioner
