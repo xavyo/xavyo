@@ -298,13 +298,15 @@ impl StateTransitionService {
                 error_message: Some(failure_msg.clone()),
             };
 
-            let _ = GovStateTransitionRequest::update(
-                &self.pool,
-                tenant_id,
-                transition_request.id,
-                &update,
-            )
-            .await; // best-effort; we still want to return 501 below if this fails
+            transition_cancel_recorded(
+                GovStateTransitionRequest::update(
+                    &self.pool,
+                    tenant_id,
+                    transition_request.id,
+                    &update,
+                )
+                .await,
+            )?;
 
             return Err(GovernanceError::NotImplemented(failure_msg));
         }
@@ -442,30 +444,24 @@ impl StateTransitionService {
 
                     let error_message = access_result.errors.join("; ");
 
-                    if let Err(e) = failed_op_service
-                        .queue_failed_operation(
-                            tenant_id,
-                            FailedOperationType::EntitlementAction,
-                            Some(request.id),
-                            request.object_id,
-                            request.object_type,
-                            serde_json::to_value(&payload).unwrap_or_default(),
-                            error_message.clone(),
-                        )
-                        .await
-                    {
-                        warn!(
-                            request_id = %request.id,
-                            error = %e,
-                            "Failed to queue entitlement action for retry"
-                        );
-                    } else {
-                        info!(
-                            request_id = %request.id,
-                            failed_count = failed_count,
-                            "Queued failed entitlement actions for retry"
-                        );
-                    }
+                    failed_op_queue_recorded(
+                        failed_op_service
+                            .queue_failed_operation(
+                                tenant_id,
+                                FailedOperationType::EntitlementAction,
+                                Some(request.id),
+                                request.object_id,
+                                request.object_type,
+                                serde_json::to_value(&payload).unwrap_or_default(),
+                                error_message.clone(),
+                            )
+                            .await,
+                    )?;
+                    info!(
+                        request_id = %request.id,
+                        failed_count = failed_count,
+                        "Queued failed entitlement actions for retry"
+                    );
                 }
             }
         }
@@ -1608,6 +1604,20 @@ impl StateTransitionService {
     }
 }
 
+/// Persist Cancelled when approval is unimplemented. Errors must not leave
+/// the request pending while the caller receives 501.
+fn transition_cancel_recorded<T, E>(
+    result: std::result::Result<T, E>,
+) -> std::result::Result<T, E> {
+    result
+}
+
+/// Queue failed entitlement actions for retry. Errors must not look like
+/// the transition fully applied those actions.
+fn failed_op_queue_recorded<T, E>(result: std::result::Result<T, E>) -> std::result::Result<T, E> {
+    result
+}
+
 /// Escape a string value for CSV output.
 fn escape_csv(value: &str) -> String {
     if value.contains(',') || value.contains('"') || value.contains('\n') {
@@ -1630,6 +1640,52 @@ mod tests {
         assert!(
             production.contains("GovLifecycleState::find_by_id") && production.contains(".await?"),
             "lifecycle state lookup errors must fail grace-period expiration"
+        );
+    }
+
+    #[test]
+    fn transition_cancel_recorded_propagates_errors() {
+        assert!(super::transition_cancel_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(super::transition_cancel_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn approval_unimplemented_does_not_swallow_cancel_persist() {
+        let src = include_str!("state_transition_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("transition_cancel_recorded("),
+            "Cancelled persist must fail closed"
+        );
+        assert!(
+            !production.contains("let _ = GovStateTransitionRequest::update"),
+            "must not leave the request pending after a 501"
+        );
+    }
+
+    #[test]
+    fn failed_op_queue_recorded_propagates_errors() {
+        assert!(super::failed_op_queue_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(super::failed_op_queue_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn entitlement_action_retry_queue_does_not_swallow_persist() {
+        let src = include_str!("state_transition_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let perform = production
+            .split("async fn perform_transition")
+            .nth(1)
+            .and_then(|s| s.split("async fn get_object_current_state_id").next())
+            .expect("perform_transition");
+        assert!(
+            perform.contains("failed_op_queue_recorded(")
+                && perform.contains("FailedOperationType::EntitlementAction"),
+            "entitlement retry queue persist must fail closed"
+        );
+        assert!(
+            !perform.contains("Failed to queue entitlement action for retry"),
+            "must not swallow entitlement retry queue persist"
         );
     }
 }
