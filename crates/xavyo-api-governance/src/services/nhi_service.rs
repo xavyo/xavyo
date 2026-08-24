@@ -1337,7 +1337,7 @@ impl NhiService {
             let backup_is_active = if let Some(backup_id) = backup_owner_id {
                 User::exists_in_tenant(&self.pool, tenant_id, backup_id)
                     .await
-                    .unwrap_or(false)
+                    .map_err(GovernanceError::Database)?
             } else {
                 false
             };
@@ -1436,6 +1436,26 @@ mod tests {
         assert_eq!(
             summary.total,
             summary.active + summary.expired + summary.suspended
+        );
+    }
+
+    #[test]
+    fn detect_orphaned_does_not_fail_open_on_backup_owner_lookup() {
+        let src = include_str!("nhi_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let detect = production
+            .split("pub async fn detect_orphaned")
+            .nth(1)
+            .and_then(|s| s.split("    pub async fn ").next())
+            .expect("detect_orphaned");
+        assert!(
+            !detect.contains("unwrap_or(false)"),
+            "orphaned NHI detection must not treat backup-owner lookup errors as inactive"
+        );
+        assert!(
+            detect.contains("exists_in_tenant")
+                && detect.contains("map_err(GovernanceError::Database)?"),
+            "orphaned NHI detection must propagate backup-owner lookup errors"
         );
     }
 
