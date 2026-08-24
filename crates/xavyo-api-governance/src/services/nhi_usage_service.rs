@@ -87,9 +87,12 @@ impl NhiUsageService {
             .await
             .map_err(GovernanceError::Database)?;
 
-        // Update NHI's last_used_at if this was a successful event
+        // Update NHI's last_used_at if this was a successful event.
+        // Persist errors must not look like usage was recorded for inactivity.
         if request.outcome == NhiUsageOutcome::Success {
-            let _ = GovServiceAccount::update_last_used(&self.pool, tenant_id, nhi_id).await;
+            nhi_last_used_recorded(
+                GovServiceAccount::update_last_used(&self.pool, tenant_id, nhi_id).await,
+            )?;
         }
 
         tracing::debug!(
@@ -327,10 +330,44 @@ impl NhiUsageService {
     }
 }
 
+/// Persist last_used_at after successful NHI usage. Errors must not skip
+/// inactivity tracking.
+fn nhi_last_used_recorded<T, E>(result: std::result::Result<T, E>) -> std::result::Result<T, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn test_service_construction() {
         // Basic test to ensure module compiles
+    }
+
+    #[test]
+    fn nhi_last_used_recorded_propagates_errors() {
+        assert!(nhi_last_used_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(nhi_last_used_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn record_usage_does_not_swallow_last_used_persist() {
+        let src = include_str!("nhi_usage_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let record = production
+            .split("pub async fn record_usage")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn record_usage_batch").next())
+            .expect("record_usage");
+        assert!(
+            record.contains("nhi_last_used_recorded(")
+                && record.contains("GovServiceAccount::update_last_used"),
+            "last_used persist must fail closed"
+        );
+        assert!(
+            !record.contains("let _ = GovServiceAccount::update_last_used"),
+            "must not swallow last_used persist after successful usage"
+        );
     }
 }
