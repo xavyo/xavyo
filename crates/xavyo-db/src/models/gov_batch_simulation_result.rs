@@ -156,7 +156,7 @@ impl GovBatchSimulationResult {
         let mut query = String::from(
             r"
             SELECT r.* FROM gov_batch_simulation_results r
-            INNER JOIN gov_batch_simulations s ON s.id = r.simulation_id
+            INNER JOIN gov_batch_simulations s ON s.id = r.simulation_id AND s.tenant_id = $2
             WHERE r.simulation_id = $1 AND s.tenant_id = $2
             ",
         );
@@ -199,7 +199,7 @@ impl GovBatchSimulationResult {
         let mut query = String::from(
             r"
             SELECT COUNT(*) FROM gov_batch_simulation_results r
-            INNER JOIN gov_batch_simulations s ON s.id = r.simulation_id
+            INNER JOIN gov_batch_simulations s ON s.id = r.simulation_id AND s.tenant_id = $2
             WHERE r.simulation_id = $1 AND s.tenant_id = $2
             ",
         );
@@ -309,12 +309,14 @@ mod tests {
         let src = include_str!("gov_batch_simulation_result.rs");
         let production = src.split("mod tests").next().expect("production source");
         assert!(
-            production.contains("INNER JOIN gov_batch_simulations s ON s.id = r.simulation_id"),
-            "batch result lookups must join parent simulations"
+            production.contains(
+                "INNER JOIN gov_batch_simulations s ON s.id = r.simulation_id AND s.tenant_id = $2"
+            ),
+            "batch result lookups must join parent simulations on tenant_id"
         );
         assert!(
-            production.contains("AND s.tenant_id = $2"),
-            "batch result lookups must filter parent tenant_id"
+            !production.contains("INNER JOIN gov_batch_simulations s ON s.id = r.simulation_id\n"),
+            "must not join batch simulations by id alone"
         );
         assert!(
             !production.contains(

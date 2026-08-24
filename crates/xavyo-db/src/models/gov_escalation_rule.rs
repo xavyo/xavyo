@@ -120,6 +120,7 @@ impl GovEscalationRule {
             r"
             SELECT r.* FROM gov_escalation_rules r
             JOIN gov_approval_steps s ON s.id = r.step_id
+            JOIN gov_approval_workflows w ON w.id = s.workflow_id AND w.tenant_id = r.tenant_id
             WHERE r.tenant_id = $1 AND s.workflow_id = $2
             ORDER BY s.step_order
             ",
@@ -376,6 +377,22 @@ mod tests {
         assert!(
             upsert.contains("ON CONFLICT (step_id) DO UPDATE SET"),
             "upsert must still update timeout fields on conflict"
+        );
+    }
+
+    #[test]
+    fn workflow_rule_lookups_join_workflow_tenant() {
+        let src = include_str!("gov_escalation_rule.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains(
+                "JOIN gov_approval_workflows w ON w.id = s.workflow_id AND w.tenant_id = r.tenant_id"
+            ),
+            "workflow rule lookups must join approval workflows on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN gov_approval_steps s ON s.id = r.step_id\n            WHERE r.tenant_id = $1 AND s.workflow_id = $2"),
+            "must not join steps by id alone without the parent workflow tenant"
         );
     }
 }

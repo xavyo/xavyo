@@ -188,7 +188,7 @@ impl ArchetypePolicyBinding {
                     anc.depth,
                     ROW_NUMBER() OVER (PARTITION BY pb.policy_type ORDER BY anc.depth ASC) as rn
                 FROM ancestry anc
-                JOIN archetype_policy_bindings pb ON pb.archetype_id = anc.id
+                JOIN archetype_policy_bindings pb ON pb.archetype_id = anc.id AND pb.tenant_id = $2
                 WHERE pb.tenant_id = $2
             )
             SELECT
@@ -236,7 +236,7 @@ impl ArchetypePolicyBinding {
                 anc.id as source_archetype_id,
                 anc.name as source_archetype_name
             FROM ancestry anc
-            JOIN archetype_policy_bindings pb ON pb.archetype_id = anc.id
+            JOIN archetype_policy_bindings pb ON pb.archetype_id = anc.id AND pb.tenant_id = $2
             WHERE pb.tenant_id = $2 AND pb.policy_type = $3
             ORDER BY anc.depth ASC
             LIMIT 1
@@ -297,5 +297,24 @@ mod tests {
         let json = serde_json::to_string(&policy).unwrap();
         assert!(json.contains("mfa"));
         assert!(json.contains("Employee"));
+    }
+
+    #[test]
+    fn effective_policy_lookups_join_bindings_on_tenant_id() {
+        let src = include_str!("archetype_policy_binding.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let joined = production
+            .matches(
+                "JOIN archetype_policy_bindings pb ON pb.archetype_id = anc.id AND pb.tenant_id = $2",
+            )
+            .count();
+        assert!(
+            joined >= 2,
+            "effective policy lookups must join bindings on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN archetype_policy_bindings pb ON pb.archetype_id = anc.id\n"),
+            "must not join policy bindings by archetype_id alone"
+        );
     }
 }

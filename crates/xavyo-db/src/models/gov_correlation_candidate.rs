@@ -133,7 +133,7 @@ impl GovCorrelationCandidate {
         sqlx::query_as(
             r"
             SELECT cand.* FROM gov_correlation_candidates cand
-            INNER JOIN gov_correlation_cases c ON c.id = cand.case_id
+            INNER JOIN gov_correlation_cases c ON c.id = cand.case_id AND c.tenant_id = $2
             WHERE cand.case_id = $1 AND c.tenant_id = $2
             ORDER BY cand.aggregate_confidence DESC
             ",
@@ -153,7 +153,7 @@ impl GovCorrelationCandidate {
         sqlx::query_as(
             r"
             SELECT cand.* FROM gov_correlation_candidates cand
-            INNER JOIN gov_correlation_cases c ON c.id = cand.case_id
+            INNER JOIN gov_correlation_cases c ON c.id = cand.case_id AND c.tenant_id = $2
             WHERE cand.id = $1 AND c.tenant_id = $2
             ",
         )
@@ -228,12 +228,14 @@ mod tests {
         let src = include_str!("gov_correlation_candidate.rs");
         let production = src.split("mod tests").next().expect("production source");
         assert!(
-            production.contains("INNER JOIN gov_correlation_cases c ON c.id = cand.case_id"),
-            "candidate lookups must join correlation cases"
+            production.contains(
+                "INNER JOIN gov_correlation_cases c ON c.id = cand.case_id AND c.tenant_id = $2"
+            ),
+            "candidate lookups must join correlation cases on tenant_id"
         );
         assert!(
-            production.contains("AND c.tenant_id = $2"),
-            "candidate lookups must filter case tenant_id"
+            !production.contains("INNER JOIN gov_correlation_cases c ON c.id = cand.case_id\n"),
+            "must not join correlation cases by id alone"
         );
         assert!(
             !production.contains("FROM gov_correlation_candidates\n            WHERE case_id = $1"),
