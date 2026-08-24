@@ -488,7 +488,7 @@ impl OrgSecurityPolicy {
                 -- Walk up the tree
                 SELECT g.id, g.parent_id, g.display_name, h.depth + 1
                 FROM groups g
-                JOIN org_hierarchy h ON g.id = h.parent_id
+                JOIN org_hierarchy h ON g.id = h.parent_id AND g.tenant_id = $2
                 WHERE g.tenant_id = $2 AND h.depth < 10
             )
             SELECT
@@ -535,7 +535,7 @@ impl OrgSecurityPolicy {
                 -- Walk up the tree
                 SELECT g.id, g.parent_id, g.display_name, h.depth + 1
                 FROM groups g
-                JOIN org_hierarchy h ON g.id = h.parent_id
+                JOIN org_hierarchy h ON g.id = h.parent_id AND g.tenant_id = $2
                 WHERE g.tenant_id = $2 AND h.depth < 10
             )
             SELECT
@@ -581,12 +581,12 @@ impl OrgSecurityPolicy {
                 -- Walk down the tree
                 SELECT g.id, g.display_name, d.depth + 1
                 FROM groups g
-                JOIN org_descendants d ON g.parent_id = d.id
-                WHERE d.depth < 10
+                JOIN org_descendants d ON g.parent_id = d.id AND g.tenant_id = $2
+                WHERE g.tenant_id = $2 AND d.depth < 10
             )
             SELECT p.*
             FROM org_security_policies p
-            JOIN org_descendants d ON p.group_id = d.id
+            JOIN org_descendants d ON p.group_id = d.id AND p.tenant_id = $2
             WHERE p.tenant_id = $2
                 AND p.policy_type = $3
                 AND p.is_active = true
@@ -662,5 +662,32 @@ mod tests {
         let tenant = PolicySource::TenantDefault;
         let json = serde_json::to_string(&tenant).unwrap();
         assert!(json.contains("\"type\":\"tenant_default\""));
+    }
+
+    #[test]
+    fn hierarchy_walks_join_groups_on_tenant_id() {
+        let src = include_str!("org_security_policy.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let joined = production
+            .matches("JOIN org_hierarchy h ON g.id = h.parent_id AND g.tenant_id = $2")
+            .count();
+        assert!(joined >= 2, "ancestor walks must join groups on tenant_id");
+        assert!(
+            production
+                .contains("JOIN org_descendants d ON g.parent_id = d.id AND g.tenant_id = $2"),
+            "descendant walks must join groups on tenant_id"
+        );
+        assert!(
+            production.contains("WHERE g.tenant_id = $2 AND d.depth < 10"),
+            "descendant walks must filter group tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN org_hierarchy h ON g.id = h.parent_id\n"),
+            "must not join hierarchy groups by id alone"
+        );
+        assert!(
+            !production.contains("JOIN org_descendants d ON g.parent_id = d.id\n"),
+            "must not join descendant groups by parent_id alone"
+        );
     }
 }

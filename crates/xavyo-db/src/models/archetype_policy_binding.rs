@@ -176,7 +176,7 @@ impl ArchetypePolicyBinding {
                 -- Walk up the parent chain
                 SELECT a.id, a.name, a.parent_archetype_id, anc.depth + 1
                 FROM identity_archetypes a
-                JOIN ancestry anc ON a.id = anc.parent_archetype_id
+                JOIN ancestry anc ON a.id = anc.parent_archetype_id AND a.tenant_id = $2
                 WHERE a.tenant_id = $2
             ),
             ranked_policies AS (
@@ -227,7 +227,7 @@ impl ArchetypePolicyBinding {
                 -- Walk up the parent chain
                 SELECT a.id, a.name, a.parent_archetype_id, anc.depth + 1
                 FROM identity_archetypes a
-                JOIN ancestry anc ON a.id = anc.parent_archetype_id
+                JOIN ancestry anc ON a.id = anc.parent_archetype_id AND a.tenant_id = $2
                 WHERE a.tenant_id = $2
             )
             SELECT
@@ -315,6 +315,16 @@ mod tests {
         assert!(
             !production.contains("JOIN archetype_policy_bindings pb ON pb.archetype_id = anc.id\n"),
             "must not join policy bindings by archetype_id alone"
+        );
+        assert!(
+            production.contains(
+                "JOIN ancestry anc ON a.id = anc.parent_archetype_id AND a.tenant_id = $2"
+            ),
+            "effective policy ancestry walks must join archetypes on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN ancestry anc ON a.id = anc.parent_archetype_id\n"),
+            "must not join archetype ancestry by id alone"
         );
     }
 }

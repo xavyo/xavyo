@@ -320,7 +320,7 @@ impl IdentityArchetype {
                 -- Walk up the parent chain
                 SELECT a.id, a.parent_archetype_id
                 FROM identity_archetypes a
-                JOIN ancestry anc ON a.id = anc.parent_archetype_id
+                JOIN ancestry anc ON a.id = anc.parent_archetype_id AND a.tenant_id = $2
                 WHERE a.tenant_id = $2
             )
             SELECT EXISTS(
@@ -357,7 +357,7 @@ impl IdentityArchetype {
                 -- Walk up the parent chain
                 SELECT a.id, a.name, a.parent_archetype_id, anc.depth + 1
                 FROM identity_archetypes a
-                JOIN ancestry anc ON a.id = anc.parent_archetype_id
+                JOIN ancestry anc ON a.id = anc.parent_archetype_id AND a.tenant_id = $2
                 WHERE a.tenant_id = $2
             )
             SELECT id, name, depth
@@ -414,6 +414,23 @@ mod tests {
             .schema_extensions
             .unwrap_or_else(|| serde_json::json!({"attributes": []}));
         assert!(default_schema.get("attributes").is_some());
+    }
+
+    #[test]
+    fn ancestry_walks_join_archetypes_on_tenant_id() {
+        let src = include_str!("identity_archetype.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let joined = production
+            .matches("JOIN ancestry anc ON a.id = anc.parent_archetype_id AND a.tenant_id = $2")
+            .count();
+        assert!(
+            joined >= 2,
+            "archetype ancestry walks must join on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN ancestry anc ON a.id = anc.parent_archetype_id\n"),
+            "must not join archetype ancestry by id alone"
+        );
     }
 
     #[test]

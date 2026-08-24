@@ -582,7 +582,7 @@ impl GovRole {
 
                 -- Recursive case: parents of parents
                 SELECT r.* FROM gov_roles r
-                INNER JOIN ancestors a ON r.id = a.parent_role_id
+                INNER JOIN ancestors a ON r.id = a.parent_role_id AND r.tenant_id = $2
                 WHERE r.tenant_id = $2
             )
             SELECT * FROM ancestors
@@ -612,7 +612,7 @@ impl GovRole {
 
                 -- Recursive case: children of children
                 SELECT r.* FROM gov_roles r
-                INNER JOIN descendants d ON r.parent_role_id = d.id
+                INNER JOIN descendants d ON r.parent_role_id = d.id AND r.tenant_id = $2
                 WHERE r.tenant_id = $2
             )
             SELECT * FROM descendants
@@ -646,7 +646,7 @@ impl GovRole {
                 UNION ALL
 
                 SELECT r.id FROM gov_roles r
-                INNER JOIN descendants d ON r.parent_role_id = d.id
+                INNER JOIN descendants d ON r.parent_role_id = d.id AND r.tenant_id = $3
                 WHERE r.tenant_id = $3
             )
             SELECT EXISTS(SELECT 1 FROM descendants WHERE id = $2)
@@ -692,7 +692,7 @@ impl GovRole {
 
                 SELECT r.id, r.hierarchy_depth, s.relative_depth + 1
                 FROM gov_roles r
-                INNER JOIN subtree s ON r.parent_role_id = s.id
+                INNER JOIN subtree s ON r.parent_role_id = s.id AND r.tenant_id = $2
                 WHERE r.tenant_id = $2
             )
             UPDATE gov_roles SET
@@ -777,7 +777,7 @@ impl GovRole {
                 UNION ALL
 
                 SELECT r.id, r.hierarchy_depth FROM gov_roles r
-                INNER JOIN descendants d ON r.parent_role_id = d.id
+                INNER JOIN descendants d ON r.parent_role_id = d.id AND r.tenant_id = $2
                 WHERE r.tenant_id = $2
             )
             SELECT MAX(hierarchy_depth) FROM descendants
@@ -915,5 +915,36 @@ mod tests {
 
         let json = serde_json::to_string(&role).unwrap();
         assert!(json.contains("Developer"));
+    }
+
+    #[test]
+    fn hierarchy_walks_join_roles_on_tenant_id() {
+        let src = include_str!("gov_role.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production
+                .contains("INNER JOIN ancestors a ON r.id = a.parent_role_id AND r.tenant_id = $2"),
+            "ancestor walks must join roles on tenant_id"
+        );
+        assert!(
+            production.contains(
+                "INNER JOIN descendants d ON r.parent_role_id = d.id AND r.tenant_id = $2"
+            ),
+            "descendant walks must join roles on tenant_id"
+        );
+        assert!(
+            production.contains(
+                "INNER JOIN descendants d ON r.parent_role_id = d.id AND r.tenant_id = $3"
+            ),
+            "cycle checks must join roles on tenant_id"
+        );
+        assert!(
+            !production.contains("INNER JOIN ancestors a ON r.id = a.parent_role_id\n"),
+            "must not join ancestor roles by id alone"
+        );
+        assert!(
+            !production.contains("INNER JOIN descendants d ON r.parent_role_id = d.id\n"),
+            "must not join descendant roles by parent_role_id alone"
+        );
     }
 }
