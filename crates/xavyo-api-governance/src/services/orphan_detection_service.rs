@@ -739,7 +739,7 @@ impl OrphanDetectionService {
                 rs.score as risk_score,
                 COALESCE(
                     (SELECT COUNT(*) FROM gov_entitlement_assignments ea
-                     JOIN gov_entitlements e ON ea.entitlement_id = e.id
+                     JOIN gov_entitlements e ON ea.entitlement_id = e.id AND e.tenant_id = ea.tenant_id
                      WHERE ea.target_id = od.user_id AND ea.target_type = 'user' AND ea.tenant_id = od.tenant_id
                      AND e.risk_level = 'high'),
                     0
@@ -1063,5 +1063,21 @@ mod tests {
         assert_eq!(response.succeeded, 0);
         assert_eq!(response.failed, 3);
         assert_eq!(response.errors.len(), 3);
+    }
+
+    #[test]
+    fn sensitive_entitlement_counts_join_tenant_on_entitlements() {
+        let src = include_str!("orphan_detection_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains(
+                "JOIN gov_entitlements e ON ea.entitlement_id = e.id AND e.tenant_id = ea.tenant_id"
+            ),
+            "sensitive entitlement counts must join entitlements on tenant_id"
+        );
+        assert!(
+            !production.contains("JOIN gov_entitlements e ON ea.entitlement_id = e.id\n"),
+            "must not join entitlements by id alone"
+        );
     }
 }

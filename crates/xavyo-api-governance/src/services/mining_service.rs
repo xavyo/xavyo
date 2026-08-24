@@ -509,6 +509,7 @@ impl MiningService {
                 array_agg(DISTINCT ea.entitlement_id) as entitlement_ids
             FROM groups g
             INNER JOIN gov_entitlement_assignments ea ON ea.target_id = g.id
+                AND ea.tenant_id = g.tenant_id
                 AND ea.target_type = 'group'
                 AND ea.status = 'active'
             WHERE g.tenant_id = $1
@@ -1305,5 +1306,21 @@ mod tests {
         assert!(MiningJobStatus::Cancelled.is_terminal());
         assert!(!MiningJobStatus::Pending.is_terminal());
         assert!(!MiningJobStatus::Running.is_terminal());
+    }
+
+    #[test]
+    fn role_entitlement_lookups_join_tenant_on_assignments() {
+        let src = include_str!("mining_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("AND ea.tenant_id = g.tenant_id"),
+            "group role entitlements must join assignments on tenant_id"
+        );
+        assert!(
+            !production.contains(
+                "INNER JOIN gov_entitlement_assignments ea ON ea.target_id = g.id\n                AND ea.target_type = 'group'"
+            ),
+            "must not join group assignments by target_id alone"
+        );
     }
 }
