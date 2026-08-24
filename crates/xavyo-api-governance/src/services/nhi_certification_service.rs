@@ -435,9 +435,8 @@ impl NhiCertificationService {
         );
 
         // Check if campaign is complete
-        let _ = self
-            .check_and_complete_campaign(tenant_id, item.campaign_id)
-            .await;
+        self.check_and_complete_campaign(tenant_id, item.campaign_id)
+            .await?;
 
         #[cfg(feature = "kafka")]
         self.emit_decision_event(tenant_id, &item, &nhi, decision, decided_by)
@@ -1598,6 +1597,26 @@ mod tests {
         assert!(
             production.contains(".map_err(GovernanceError::Database)?"),
             "campaign summary must propagate database errors"
+        );
+    }
+
+    #[test]
+    fn decide_does_not_swallow_campaign_complete() {
+        let src = include_str!("nhi_certification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let decide = production
+            .split("pub async fn decide(")
+            .nth(1)
+            .and_then(|s| s.split("    /// Delegate a certification").next())
+            .expect("decide");
+        assert!(
+            !decide.contains("let _ = self.check_and_complete_campaign")
+                && !decide.contains("let _ = self\n            .check_and_complete_campaign"),
+            "NHI cert decide must not swallow campaign completion"
+        );
+        assert!(
+            decide.contains("check_and_complete_campaign") && decide.contains(".await?;"),
+            "NHI cert decide must fail when campaign completion cannot be written"
         );
     }
 }

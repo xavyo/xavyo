@@ -205,10 +205,10 @@ pub async fn decide_item(
         .await?;
 
     // Check if campaign should be marked as completed
-    let _ = state
+    state
         .certification_campaign_service
         .check_and_complete_campaign(tenant_id, item.campaign_id)
-        .await;
+        .await?;
 
     Ok(Json(ItemWithDecisionResponse {
         item: updated_item.into(),
@@ -363,6 +363,24 @@ mod tests {
         assert!(
             !production.contains("get_decision(id)"),
             "must not look up certification decisions without tenant_id"
+        );
+    }
+
+    #[test]
+    fn decide_does_not_swallow_campaign_complete() {
+        let src = include_str!("certification_items.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let decide = production
+            .split("check_and_complete_campaign")
+            .nth(1)
+            .expect("check_and_complete_campaign");
+        assert!(
+            !production.contains("let _ = state\n        .certification_campaign_service\n        .check_and_complete_campaign"),
+            "certification decide must not swallow campaign completion"
+        );
+        assert!(
+            decide.contains(".await?;"),
+            "certification decide must fail when campaign completion cannot be written"
         );
     }
 }
