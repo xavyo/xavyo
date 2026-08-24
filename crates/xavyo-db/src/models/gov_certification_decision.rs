@@ -71,7 +71,7 @@ impl GovCertificationDecision {
         sqlx::query_as(
             r"
             SELECT d.* FROM gov_certification_decisions d
-            INNER JOIN gov_certification_items i ON i.id = d.item_id
+            INNER JOIN gov_certification_items i ON i.id = d.item_id AND i.tenant_id = $2
             WHERE d.id = $1 AND i.tenant_id = $2
             ",
         )
@@ -90,7 +90,7 @@ impl GovCertificationDecision {
         sqlx::query_as(
             r"
             SELECT d.* FROM gov_certification_decisions d
-            INNER JOIN gov_certification_items i ON i.id = d.item_id
+            INNER JOIN gov_certification_items i ON i.id = d.item_id AND i.tenant_id = $2
             WHERE d.item_id = $1 AND i.tenant_id = $2
             ",
         )
@@ -109,7 +109,7 @@ impl GovCertificationDecision {
         let count: i64 = sqlx::query_scalar(
             r"
             SELECT COUNT(*) FROM gov_certification_decisions d
-            INNER JOIN gov_certification_items i ON i.id = d.item_id
+            INNER JOIN gov_certification_items i ON i.id = d.item_id AND i.tenant_id = $2
             WHERE d.item_id = $1 AND i.tenant_id = $2
             ",
         )
@@ -132,7 +132,7 @@ impl GovCertificationDecision {
         sqlx::query_as(
             r"
             SELECT d.* FROM gov_certification_decisions d
-            JOIN gov_certification_items i ON d.item_id = i.id
+            JOIN gov_certification_items i ON d.item_id = i.id AND i.tenant_id = $1
             WHERE i.tenant_id = $1 AND i.campaign_id = $2
             ORDER BY d.decided_at DESC
             LIMIT $3 OFFSET $4
@@ -157,7 +157,7 @@ impl GovCertificationDecision {
         sqlx::query_as(
             r"
             SELECT d.* FROM gov_certification_decisions d
-            INNER JOIN gov_certification_items i ON i.id = d.item_id
+            INNER JOIN gov_certification_items i ON i.id = d.item_id AND i.tenant_id = $2
             WHERE d.decided_by = $1 AND i.tenant_id = $2
             ORDER BY d.decided_at DESC
             LIMIT $3 OFFSET $4
@@ -180,7 +180,7 @@ impl GovCertificationDecision {
         sqlx::query_scalar(
             r"
             SELECT COUNT(*) FROM gov_certification_decisions d
-            JOIN gov_certification_items i ON d.item_id = i.id
+            JOIN gov_certification_items i ON d.item_id = i.id AND i.tenant_id = $1
             WHERE i.tenant_id = $1 AND i.campaign_id = $2
             ",
         )
@@ -199,7 +199,7 @@ impl GovCertificationDecision {
         sqlx::query_scalar(
             r"
             SELECT COUNT(*) FROM gov_certification_decisions d
-            JOIN gov_certification_items i ON d.item_id = i.id
+            JOIN gov_certification_items i ON d.item_id = i.id AND i.tenant_id = $1
             WHERE i.tenant_id = $1 AND i.campaign_id = $2 AND d.decision_type = 'revoked'
             ",
         )
@@ -277,12 +277,24 @@ mod tests {
         let src = include_str!("gov_certification_decision.rs");
         let production = src.split("mod tests").next().expect("production source");
         assert!(
-            production.contains("INNER JOIN gov_certification_items i ON i.id = d.item_id"),
-            "decision lookups must join certification items"
+            production.contains(
+                "INNER JOIN gov_certification_items i ON i.id = d.item_id AND i.tenant_id = $2"
+            ),
+            "decision lookups must join certification items on tenant_id"
         );
         assert!(
-            production.contains("AND i.tenant_id = $2"),
-            "decision lookups must filter item tenant_id"
+            production.contains(
+                "JOIN gov_certification_items i ON d.item_id = i.id AND i.tenant_id = $1"
+            ),
+            "campaign lookups must join certification items on tenant_id"
+        );
+        assert!(
+            !production.contains("INNER JOIN gov_certification_items i ON i.id = d.item_id\n"),
+            "must not join certification items by id alone"
+        );
+        assert!(
+            !production.contains("JOIN gov_certification_items i ON d.item_id = i.id\n"),
+            "must not join campaign items by id alone"
         );
         assert!(
             !production

@@ -73,7 +73,7 @@ impl GovApprovalStep {
             SELECT s.id, s.workflow_id, s.step_order, s.approver_type,
                    s.specific_approvers, s.created_at, s.escalation_enabled
             FROM gov_approval_steps s
-            INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id
+            INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id AND w.tenant_id = $2
             WHERE s.id = $1 AND w.tenant_id = $2
             ",
         )
@@ -94,7 +94,7 @@ impl GovApprovalStep {
             SELECT s.id, s.workflow_id, s.step_order, s.approver_type,
                    s.specific_approvers, s.created_at, s.escalation_enabled
             FROM gov_approval_steps s
-            INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id
+            INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id AND w.tenant_id = $2
             WHERE s.workflow_id = $1 AND w.tenant_id = $2
             ORDER BY s.step_order ASC
             ",
@@ -117,7 +117,7 @@ impl GovApprovalStep {
             SELECT s.id, s.workflow_id, s.step_order, s.approver_type,
                    s.specific_approvers, s.created_at, s.escalation_enabled
             FROM gov_approval_steps s
-            INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id
+            INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id AND w.tenant_id = $3
             WHERE s.workflow_id = $1 AND s.step_order = $2 AND w.tenant_id = $3
             ",
         )
@@ -137,7 +137,7 @@ impl GovApprovalStep {
         sqlx::query_scalar(
             r"
             SELECT COUNT(*) FROM gov_approval_steps s
-            INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id
+            INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id AND w.tenant_id = $2
             WHERE s.workflow_id = $1 AND w.tenant_id = $2
             ",
         )
@@ -193,7 +193,7 @@ impl GovApprovalStep {
             r"
             DELETE FROM gov_approval_steps s
             USING gov_approval_workflows w
-            WHERE s.workflow_id = w.id AND s.workflow_id = $1 AND w.tenant_id = $2
+            WHERE s.workflow_id = w.id AND w.tenant_id = $2 AND s.workflow_id = $1
             ",
         )
         .bind(workflow_id)
@@ -214,7 +214,7 @@ impl GovApprovalStep {
             r"
             DELETE FROM gov_approval_steps s
             USING gov_approval_workflows w
-            WHERE s.workflow_id = w.id AND s.id = $1 AND w.tenant_id = $2
+            WHERE s.workflow_id = w.id AND w.tenant_id = $2 AND s.id = $1
             ",
         )
         .bind(id)
@@ -235,7 +235,7 @@ impl GovApprovalStep {
         let max_order: Option<i32> = sqlx::query_scalar(
             r"
             SELECT MAX(s.step_order) FROM gov_approval_steps s
-            INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id
+            INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id AND w.tenant_id = $2
             WHERE s.workflow_id = $1 AND w.tenant_id = $2
             ",
         )
@@ -276,8 +276,14 @@ mod tests {
             .next()
             .expect("find_by_id body");
         assert!(
-            lookup.contains("AND w.tenant_id = $2"),
+            lookup.contains(
+                "INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id AND w.tenant_id = $2"
+            ),
             "approval step lookup must join workflow tenant_id"
+        );
+        assert!(
+            !lookup.contains("INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id\n"),
+            "must not join workflows by id alone"
         );
         assert!(
             !lookup.contains("FROM gov_approval_steps\n            WHERE id = $1"),
@@ -290,15 +296,25 @@ mod tests {
         let src = include_str!("gov_approval_step.rs");
         let production = src.split("mod tests").next().expect("production source");
         assert!(
+            production.contains(
+                "INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id AND w.tenant_id = $2"
+            ),
+            "workflow-scoped step queries must join tenant_id"
+        );
+        assert!(
             production.contains("WHERE s.workflow_id = $1 AND w.tenant_id = $2"),
             "workflow-scoped step queries must filter tenant_id"
+        );
+        assert!(
+            !production.contains("INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id\n"),
+            "must not join workflows by id alone"
         );
         assert!(
             !production.contains("FROM gov_approval_steps\n            WHERE workflow_id = $1"),
             "must not query approval steps by workflow_id alone"
         );
         assert!(
-            production.contains("AND s.workflow_id = $1 AND w.tenant_id = $2"),
+            production.contains("AND w.tenant_id = $2 AND s.workflow_id = $1"),
             "step deletes must filter tenant_id via parent workflow"
         );
     }
