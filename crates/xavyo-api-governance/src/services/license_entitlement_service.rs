@@ -400,17 +400,14 @@ impl LicenseEntitlementService {
                 GovLicenseAssignment::release(&self.pool, tenant_id, assignment.id).await?;
 
             if released.is_some() {
-                // Decrement pool count
-                let _ = GovLicensePool::decrement_allocated(
+                GovLicensePool::decrement_allocated(
                     &self.pool,
                     tenant_id,
                     assignment.license_pool_id,
                 )
-                .await;
+                .await?;
 
-                // Log audit event
-                let _ = self
-                    .audit_service
+                self.audit_service
                     .log_license_deallocated(
                         tenant_id,
                         assignment.license_pool_id,
@@ -418,7 +415,7 @@ impl LicenseEntitlementService {
                         user_id,
                         user_id, // System-driven
                     )
-                    .await;
+                    .await?;
 
                 released_count += 1;
             }
@@ -920,5 +917,27 @@ mod tests {
         assert!(json.contains("\"priority\":1"));
         assert!(json.contains("\"enabled\":true"));
         assert!(json.contains("\"pool_name\":\"Test Pool\""));
+    }
+
+    #[test]
+    fn release_for_entitlement_does_not_swallow_decrement_or_audit() {
+        let src = include_str!("license_entitlement_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let release = production
+            .split("pub async fn release_for_entitlement")
+            .nth(1)
+            .and_then(|s| s.split("    pub async fn ").next())
+            .expect("release_for_entitlement");
+        assert!(
+            !release.contains("let _ = GovLicensePool::decrement_allocated")
+                && !release.contains("let _ = self"),
+            "entitlement release must not swallow pool decrement or audit writes"
+        );
+        assert!(
+            release.contains("decrement_allocated")
+                && release.contains("log_license_deallocated")
+                && release.contains(".await?;"),
+            "entitlement release must fail when decrement or audit cannot be written"
+        );
     }
 }

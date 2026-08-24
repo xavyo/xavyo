@@ -295,10 +295,9 @@ impl PersonaExpirationService {
                         .await?;
 
                     // Log audit event
-                    let _ = self
-                        .audit_service
+                    self.audit_service
                         .log_persona_expired(tenant_id, persona.id, persona.id, Utc::now())
-                        .await;
+                        .await?;
 
                     results.push(PersonaExpirationCheckResult {
                         persona_id: persona.id,
@@ -461,8 +460,7 @@ impl PersonaExpirationService {
         }
 
         // Log audit event
-        let _ = self
-            .audit_service
+        self.audit_service
             .log_persona_extended(
                 tenant_id,
                 actor_id,
@@ -470,7 +468,7 @@ impl PersonaExpirationService {
                 persona.valid_until,
                 Some(new_valid_until),
             )
-            .await;
+            .await?;
 
         info!(
             persona_id = %persona_id,
@@ -668,6 +666,22 @@ mod tests {
         assert!(
             production.contains("expiration_notification_sent()"),
             "must not claim a notification that was not sent"
+        );
+    }
+
+    #[test]
+    fn persona_expiration_mutations_do_not_swallow_audit_writes() {
+        let src = include_str!("persona_expiration_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("let _ = self.audit_service"),
+            "persona expiration mutations must not swallow audit writes"
+        );
+        assert!(
+            production.contains("log_persona_expired")
+                && production.contains("log_persona_extended")
+                && production.contains(".await?;"),
+            "persona expiration mutations must fail when audit rows cannot be written"
         );
     }
 }
