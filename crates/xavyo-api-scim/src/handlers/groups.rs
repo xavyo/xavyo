@@ -117,7 +117,7 @@ pub async fn list_groups(
                     i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
-                .await;
+                .await?;
         }
     }
 
@@ -183,7 +183,7 @@ pub async fn create_group(
                     i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
-                .await;
+                .await?;
         }
     }
 
@@ -265,7 +265,7 @@ pub async fn get_group(
                     i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
-                .await;
+                .await?;
         }
     }
 
@@ -337,7 +337,7 @@ pub async fn replace_group(
                     i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
-                .await;
+                .await?;
         }
     }
 
@@ -423,7 +423,7 @@ pub async fn update_group(
                     i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
-                .await;
+                .await?;
         }
     }
 
@@ -506,7 +506,7 @@ pub async fn delete_group(
                     i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
-                .await;
+                .await?;
         }
     }
 
@@ -546,6 +546,23 @@ mod tests {
         assert!(
             production.matches(".await?;").count() >= 6 && production.contains("audit_service"),
             "SCIM group success audits must fail closed when the audit row cannot be written"
+        );
+    }
+
+    #[test]
+    fn group_error_audits_do_not_swallow_write_errors() {
+        let src = include_str!("groups.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.matches("log_error(").count() >= 6,
+            "SCIM group handlers must audit error paths"
+        );
+        assert!(
+            production
+                .split(".log_error(")
+                .skip(1)
+                .all(|chunk| chunk.contains(".await?;")),
+            "SCIM group error audits must fail closed when the audit row cannot be written"
         );
     }
 }
