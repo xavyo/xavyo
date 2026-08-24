@@ -566,8 +566,7 @@ impl ParameterService {
                 // Get the parameter definitions to enrich the values
                 let param_defs = self
                     .list_parameters(tenant_id, assignment.entitlement_id)
-                    .await
-                    .unwrap_or_default();
+                    .await?;
 
                 // Build parameter context
                 let parameters: Vec<EffectiveParameterValue> = param_values
@@ -629,8 +628,7 @@ impl ParameterService {
         // Get parameter definitions
         let param_defs = self
             .list_parameters(tenant_id, assignment.entitlement_id)
-            .await
-            .unwrap_or_default();
+            .await?;
 
         // Build context map with parameter names as keys
         let mut context = HashMap::new();
@@ -780,5 +778,30 @@ mod tests {
             flag.contains("map_err(GovernanceError::Database)"),
             "schema-violation scan must not treat query errors as no assignments"
         );
+    }
+
+    #[test]
+    fn parameter_definition_lookups_do_not_fail_open_on_query_errors() {
+        let src = include_str!("parameter_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for fn_name in [
+            "get_effective_entitlements_with_params",
+            "get_provisioning_context",
+        ] {
+            let window = production
+                .split(&format!("pub async fn {fn_name}"))
+                .nth(1)
+                .and_then(|s| s.split("pub async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                !window.contains("unwrap_or_default()"),
+                "{fn_name} must not hide parameter-definition errors as empty defs"
+            );
+            assert!(
+                window.contains("list_parameters(tenant_id, assignment.entitlement_id)")
+                    && window.contains(".await?"),
+                "{fn_name} must propagate parameter-definition load errors"
+            );
+        }
     }
 }

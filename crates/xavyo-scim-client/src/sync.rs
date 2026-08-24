@@ -197,9 +197,8 @@ impl SyncEngine {
         let provisioner = Provisioner::new(pool.clone(), retry_policy);
 
         // ── 7. Load attribute mappings for the target ────────────────────
-        let mappings = ScimTargetAttributeMapping::list_by_target(pool, tenant_id, target_id, None)
-            .await
-            .unwrap_or_default();
+        let mappings =
+            ScimTargetAttributeMapping::list_by_target(pool, tenant_id, target_id, None).await?;
 
         // ── 8. Execute the sync (users then groups) ──────────────────────
         let result = execute_sync(
@@ -670,5 +669,32 @@ mod tests {
         let _constants = (SYNC_PAGE_SIZE, PROGRESS_FLUSH_INTERVAL);
         assert_eq!(SYNC_PAGE_SIZE, 100);
         assert_eq!(PROGRESS_FLUSH_INTERVAL, 25);
+    }
+
+    #[test]
+    fn attribute_mapping_lookups_do_not_fail_open_on_query_errors() {
+        let production = include_str!("sync.rs")
+            .split("mod tests")
+            .next()
+            .expect("production source");
+        assert!(
+            !production.contains("unwrap_or_default()"),
+            "full sync must not provision with empty mappings when mapping load fails"
+        );
+        assert!(
+            production.contains("list_by_target(pool, tenant_id, target_id, None)")
+                && production.contains(".await?"),
+            "full sync must propagate attribute-mapping load errors"
+        );
+
+        let consumer = include_str!("consumer.rs");
+        assert!(
+            !consumer.contains("unwrap_or_default()"),
+            "SCIM consumers must not provision with empty mappings when mapping load fails"
+        );
+        assert!(
+            consumer.matches("list_by_target").count() >= 2 && consumer.contains(".await?"),
+            "SCIM consumers must propagate attribute-mapping load errors"
+        );
     }
 }

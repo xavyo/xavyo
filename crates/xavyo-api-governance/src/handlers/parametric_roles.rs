@@ -742,8 +742,7 @@ pub async fn list_user_parametric_assignments(
         let params = state
             .parameter_service
             .get_assignment_parameters(tenant_id, assignment.id)
-            .await
-            .unwrap_or_default();
+            .await?;
 
         let params_response: Vec<AssignmentParameterResponse> = params
             .into_iter()
@@ -1006,5 +1005,28 @@ fn convert_validation_result(result: ValidationResult) -> ValidateParametersResp
             })
             .collect(),
         errors: result.errors,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn list_user_parametric_assignments_does_not_fail_open_on_parameter_errors() {
+        let src = include_str!("parametric_roles.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_user_parametric_assignments")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_user_parametric_assignments");
+        assert!(
+            !list.contains("unwrap_or_default()"),
+            "listing parametric assignments must not hide parameter-load errors as empty params"
+        );
+        assert!(
+            list.contains("get_assignment_parameters(tenant_id, assignment.id)")
+                && list.contains(".await?"),
+            "listing parametric assignments must propagate parameter-load errors"
+        );
     }
 }
