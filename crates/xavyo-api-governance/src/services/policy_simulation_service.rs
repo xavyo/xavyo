@@ -305,15 +305,20 @@ impl PolicySimulationService {
 
         let results = GovPolicySimulationResult::list_by_simulation(
             &self.pool,
+            tenant_id,
             simulation_id,
             &filter,
             limit,
             offset,
         )
         .await?;
-        let total =
-            GovPolicySimulationResult::count_by_simulation(&self.pool, simulation_id, &filter)
-                .await?;
+        let total = GovPolicySimulationResult::count_by_simulation(
+            &self.pool,
+            tenant_id,
+            simulation_id,
+            &filter,
+        )
+        .await?;
 
         Ok((results, total))
     }
@@ -330,7 +335,8 @@ impl PolicySimulationService {
     /// Delete a simulation (only draft or cancelled).
     pub async fn delete(&self, tenant_id: Uuid, simulation_id: Uuid) -> Result<bool> {
         // Also delete results
-        GovPolicySimulationResult::delete_by_simulation(&self.pool, simulation_id).await?;
+        GovPolicySimulationResult::delete_by_simulation(&self.pool, tenant_id, simulation_id)
+            .await?;
 
         let deleted = GovPolicySimulation::delete(&self.pool, tenant_id, simulation_id).await?;
 
@@ -882,6 +888,32 @@ impl PolicySimulationService {
 mod tests {
     use super::*;
     use chrono::{Duration, Utc};
+
+    #[test]
+    fn result_queries_pass_tenant_id() {
+        let src = include_str!("policy_simulation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production
+                .contains("list_by_simulation(\n            &self.pool,\n            tenant_id,"),
+            "policy result list must pass tenant_id"
+        );
+        assert!(
+            production
+                .contains("count_by_simulation(\n            &self.pool,\n            tenant_id,"),
+            "policy result count must pass tenant_id"
+        );
+        assert!(
+            production.contains("delete_by_simulation(&self.pool, tenant_id, simulation_id)"),
+            "policy result delete must pass tenant_id"
+        );
+        assert!(
+            !production.contains(
+                "list_by_simulation(\n            &self.pool,\n            simulation_id,"
+            ),
+            "must not list policy results by simulation_id alone"
+        );
+    }
 
     // Standalone version of evaluate_conditions for testing (doesn't need self)
     fn evaluate_conditions_test(

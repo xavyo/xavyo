@@ -471,7 +471,7 @@ impl SimulationComparisonService {
     /// Load impacts from a simulation into a user->impact map.
     async fn load_simulation_impacts(
         &self,
-        _tenant_id: Uuid,
+        tenant_id: Uuid,
         simulation_id: Uuid,
         simulation_type: &str,
     ) -> Result<HashMap<Uuid, serde_json::Value>> {
@@ -483,6 +483,7 @@ impl SimulationComparisonService {
                 let filter = PolicySimulationResultFilter::default();
                 let results = GovPolicySimulationResult::list_by_simulation(
                     &self.pool,
+                    tenant_id,
                     simulation_id,
                     &filter,
                     10000,
@@ -505,6 +506,7 @@ impl SimulationComparisonService {
                 let filter = BatchSimulationResultFilter::default();
                 let results = GovBatchSimulationResult::list_by_simulation(
                     &self.pool,
+                    tenant_id,
                     simulation_id,
                     &filter,
                     10000,
@@ -543,6 +545,20 @@ mod tests {
     // ========================================================================
     // T058: Unit test for simulation-vs-simulation comparison
     // ========================================================================
+
+    #[test]
+    fn load_impacts_passes_tenant_id() {
+        let src = include_str!("simulation_comparison_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("list_by_simulation(\n                    &self.pool,\n                    tenant_id,"),
+            "comparison impact load must pass tenant_id"
+        );
+        assert!(
+            !production.contains("list_by_simulation(\n                    &self.pool,\n                    simulation_id,"),
+            "must not load simulation results by simulation_id alone"
+        );
+    }
 
     #[test]
     fn test_simulation_vs_simulation_comparison_logic() {
