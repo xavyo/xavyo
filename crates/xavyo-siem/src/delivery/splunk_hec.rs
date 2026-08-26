@@ -20,7 +20,6 @@ pub struct SplunkHecWorker {
 }
 
 impl SplunkHecWorker {
-    #[must_use]
     pub fn new(
         host: String,
         port: u16,
@@ -28,13 +27,15 @@ impl SplunkHecWorker {
         source: String,
         sourcetype: String,
         index: Option<String>,
-    ) -> Self {
+    ) -> Result<Self, DeliveryError> {
         let client = reqwest::Client::builder()
             .timeout(HEC_TIMEOUT)
             .build()
-            .unwrap_or_default();
+            .map_err(|e| {
+                DeliveryError::ConnectionFailed(format!("Failed to build HTTP client: {e}"))
+            })?;
 
-        Self {
+        Ok(Self {
             host,
             port,
             token,
@@ -42,7 +43,7 @@ impl SplunkHecWorker {
             sourcetype,
             index,
             client,
-        }
+        })
     }
 
     /// Build the HEC endpoint URL.
@@ -73,10 +74,10 @@ impl SplunkHecWorker {
         });
 
         if let Some(ref index) = self.index {
-            payload
-                .as_object_mut()
-                .unwrap()
-                .insert("index".to_string(), json!(index));
+            let map = payload.as_object_mut().ok_or_else(|| {
+                DeliveryError::SendFailed("HEC payload is not a JSON object".to_string())
+            })?;
+            map.insert("index".to_string(), json!(index));
         }
 
         serde_json::to_string(&payload)
@@ -138,10 +139,18 @@ mod tests {
             "xavyo".to_string(),
             "xavyo:identity:events".to_string(),
             Some("identity_events".to_string()),
-        );
+        )
+        .unwrap();
         assert_eq!(worker.host, "splunk.example.com");
         assert_eq!(worker.port, 8088);
         assert_eq!(worker.token, "my-token");
+
+        let src = include_str!("splunk_hec.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or_default()"),
+            "Splunk HEC HTTP client build must fail closed, not use Client::default()"
+        );
     }
 
     #[test]
@@ -153,7 +162,8 @@ mod tests {
             "src".to_string(),
             "st".to_string(),
             None,
-        );
+        )
+        .unwrap();
         assert_eq!(
             worker.endpoint_url(),
             "https://splunk.example.com:8088/services/collector/event"
@@ -169,7 +179,8 @@ mod tests {
             "xavyo".to_string(),
             "xavyo:identity:events".to_string(),
             Some("identity_events".to_string()),
-        );
+        )
+        .unwrap();
 
         let event = r#"{"timestamp":"2026-01-27T14:30:00.000Z","event_type":"authentication.failure","severity":6}"#;
         let payload = worker.build_hec_payload(event).unwrap();
@@ -192,13 +203,21 @@ mod tests {
             "xavyo".to_string(),
             "xavyo:identity:events".to_string(),
             None,
-        );
+        )
+        .unwrap();
 
         let event = r#"{"event_type":"test"}"#;
         let payload = worker.build_hec_payload(event).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&payload).unwrap();
 
         assert!(parsed.get("index").is_none());
+
+        let src = include_str!("splunk_hec.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("as_object_mut().unwrap()"),
+            "Splunk HEC payload builder must not panic if payload is not an object"
+        );
     }
 
     #[tokio::test]

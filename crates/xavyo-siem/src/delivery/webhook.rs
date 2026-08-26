@@ -37,7 +37,9 @@ impl WebhookWorker {
         let client = reqwest::Client::builder()
             .timeout(WEBHOOK_TIMEOUT)
             .build()
-            .unwrap_or_default();
+            .map_err(|e| {
+                DeliveryError::ConnectionFailed(format!("Failed to build HTTP client: {e}"))
+            })?;
 
         Ok(Self {
             url,
@@ -120,6 +122,17 @@ mod tests {
             WebhookWorker::new("https://siem.example.com/webhook".to_string(), headers).unwrap();
         assert_eq!(worker.url, "https://siem.example.com/webhook");
         assert_eq!(worker.headers.len(), 1);
+
+        let src = include_str!("webhook.rs");
+        let production_new = src
+            .split("pub fn new(")
+            .nth(1)
+            .and_then(|s| s.split("pub fn new_unchecked").next())
+            .expect("WebhookWorker::new");
+        assert!(
+            !production_new.contains("unwrap_or_default()"),
+            "webhook HTTP client build must fail closed, not use Client::default()"
+        );
     }
 
     #[test]

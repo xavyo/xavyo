@@ -18,9 +18,11 @@ impl DestinationRateLimiter {
     /// Burst capacity is 2x the rate.
     #[must_use]
     pub fn new(rate_per_second: u32) -> Self {
-        let rate = NonZeroU32::new(rate_per_second).unwrap_or(NonZeroU32::new(1000).unwrap());
-        let burst = NonZeroU32::new(rate_per_second.saturating_mul(2).max(1))
-            .unwrap_or(NonZeroU32::new(2000).unwrap());
+        // rate_per_second == 0 is invalid; fail closed to 1 event/sec, not 1000.
+        let rate_per_second = rate_per_second.max(1);
+        let rate = NonZeroU32::new(rate_per_second).unwrap_or(NonZeroU32::MIN);
+        let burst =
+            NonZeroU32::new(rate_per_second.saturating_mul(2).max(1)).unwrap_or(NonZeroU32::MIN);
 
         let quota = Quota::per_second(rate).allow_burst(burst);
         let limiter = RateLimiter::direct(quota);
@@ -83,5 +85,17 @@ mod tests {
         let limiter = DestinationRateLimiter::new(1000);
         // Should complete nearly instantly within burst
         limiter.wait().await;
+    }
+
+    #[test]
+    fn zero_rate_does_not_fail_open_to_1000() {
+        let limiter = DestinationRateLimiter::new(0);
+        assert_eq!(limiter.rate_per_second(), 1);
+        let src = include_str!("rate_limiter.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(NonZeroU32::new(1000).unwrap())"),
+            "rate_per_second=0 must not fail-open to 1000 events/sec"
+        );
     }
 }
