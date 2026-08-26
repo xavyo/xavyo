@@ -363,8 +363,15 @@ impl SyncPipeline {
                             format!("Missing required attributes: {:?}", result.unmapped),
                         );
                     }
-                    change.attributes =
-                        serde_json::to_value(&result.attributes).unwrap_or(change.attributes);
+                    change.attributes = match mapped_attrs_json(&result.attributes) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            return ProcessedChange::failed(
+                                &change,
+                                format!("Failed to serialize mapped attributes: {e}"),
+                            );
+                        }
+                    };
                 }
                 Err(e) => {
                     return ProcessedChange::failed(&change, e.to_string());
@@ -884,6 +891,13 @@ impl SyncPipelineBuilder {
     }
 }
 
+/// Mapped inbound attributes persist. Serialization errors must not keep unmapped attrs.
+fn mapped_attrs_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, serde_json::Error> {
+    serde_json::to_value(value)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -972,6 +986,19 @@ mod tests {
         assert!(
             situation.contains("map_err(|e| SyncError::Internal"),
             "shadow and collision lookups must propagate query errors"
+        );
+    }
+
+    #[test]
+    fn mapped_attrs_json_does_not_keep_old_attrs_on_serialize() {
+        let v = mapped_attrs_json(&serde_json::json!({"mail": "a@b.c"})).unwrap();
+        assert_eq!(v["mail"], "a@b.c");
+        let src = include_str!("pipeline.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("mapped_attrs_json(")
+                && !production.contains("unwrap_or(change.attributes)"),
+            "inbound mapping persist must fail closed on JSON serialize"
         );
     }
 
