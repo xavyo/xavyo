@@ -212,6 +212,12 @@ fn pending_confirmation_for_risk<T, E: std::fmt::Display>(
     }
 }
 
+/// High-risk admin notification. Errors must refuse approval, not claim
+/// administrators were notified.
+fn high_risk_admins_notified<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
 /// Request a device authorization code.
 ///
 /// POST /oauth/device/code
@@ -719,12 +725,19 @@ pub async fn device_authorize_handler(
                             "HIGH RISK device code approval - MFA and admin notification required"
                         );
 
-                        // Notify admins of high-risk attempt
-                        if let Err(e) = risk_service
-                            .notify_admins(tenant_id, user_id, &assessment, device_code_info.id)
-                            .await
-                        {
+                        // Notify admins of high-risk attempt. Fail closed so
+                        // the UI cannot claim administrators were notified.
+                        if let Err(e) = high_risk_admins_notified(
+                            risk_service
+                                .notify_admins(tenant_id, user_id, &assessment, device_code_info.id)
+                                .await,
+                        ) {
                             tracing::error!(error = %e, "Failed to notify admins of high-risk approval");
+                            return Html(render_result_page(
+                                false,
+                                "Unable to notify administrators of this high-risk request. Please try again.",
+                            ))
+                            .into_response();
                         }
 
                         // TODO: Implement MFA verification flow for high-risk approvals
@@ -2188,6 +2201,25 @@ mod tests {
                 .is_some()
         );
         assert!(pending_confirmation_for_risk(Err::<Option<u8>, _>("db down")).is_err());
+    }
+
+    #[test]
+    fn high_risk_admins_notified_does_not_swallow_errors() {
+        assert!(high_risk_admins_notified(Ok::<(), &str>(())).is_ok());
+        assert!(high_risk_admins_notified::<(), &str>(Err("smtp")).is_err());
+
+        let src = include_str!("device.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let window = production
+            .split("RiskAction::RequireMfaAndNotify")
+            .nth(1)
+            .and_then(|s| s.split("After successful approval").next())
+            .expect("RequireMfaAndNotify");
+        assert!(
+            window.contains("high_risk_admins_notified(")
+                && window.contains("Unable to notify administrators"),
+            "high-risk notify errors must refuse approval"
+        );
     }
 
     #[test]

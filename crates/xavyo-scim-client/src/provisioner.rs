@@ -114,8 +114,7 @@ impl Provisioner {
         match result {
             Ok(created_user) => {
                 // Extract the SCIM-assigned ID.
-                let external_resource_id =
-                    created_user.id.map(|id| id.to_string()).unwrap_or_default();
+                let external_resource_id = scim_external_resource_id(created_user.id)?;
 
                 // 5. Update provisioning state.
                 ScimProvisioningState::update_synced(
@@ -147,7 +146,7 @@ impl Provisioner {
                     started.elapsed(),
                     None,
                 )
-                .await;
+                .await?;
 
                 Ok(())
             }
@@ -192,7 +191,7 @@ impl Provisioner {
                     Some(error_msg.clone()),
                     new_retry_count,
                 )
-                .await;
+                .await?;
 
                 error!(
                     tenant_id = %tenant_id,
@@ -233,7 +232,7 @@ impl Provisioner {
             .await?;
 
         if let Some(found_user) = existing {
-            let external_resource_id = found_user.id.map(|id| id.to_string()).unwrap_or_default();
+            let external_resource_id = scim_external_resource_id(found_user.id)?;
 
             // Link the existing resource by updating state.
             ScimProvisioningState::update_synced(
@@ -289,7 +288,7 @@ impl Provisioner {
                 started.elapsed(),
                 None,
             )
-            .await;
+            .await?;
 
             Ok(())
         } else {
@@ -322,7 +321,7 @@ impl Provisioner {
                 Some(error_msg.clone()),
                 new_retry_count,
             )
-            .await;
+            .await?;
 
             error!(
                 tenant_id = %tenant_id,
@@ -519,7 +518,7 @@ impl Provisioner {
                     started.elapsed(),
                     None,
                 )
-                .await;
+                .await?;
 
                 Ok(())
             }
@@ -549,7 +548,7 @@ impl Provisioner {
                     Some(error_msg.clone()),
                     new_retry_count,
                 )
-                .await;
+                .await?;
 
                 error!(
                     tenant_id = %tenant_id,
@@ -640,7 +639,7 @@ impl Provisioner {
                         Some(error_msg),
                         new_retry_count,
                     )
-                    .await;
+                    .await?;
 
                     return Err(e);
                 }
@@ -683,7 +682,7 @@ impl Provisioner {
                         Some(error_msg),
                         new_retry_count,
                     )
-                    .await;
+                    .await?;
 
                     return Err(e);
                 }
@@ -715,7 +714,7 @@ impl Provisioner {
             started.elapsed(),
             None,
         )
-        .await;
+        .await?;
 
         Ok(())
     }
@@ -774,10 +773,7 @@ impl Provisioner {
 
         match result {
             Ok(created_group) => {
-                let external_resource_id = created_group
-                    .id
-                    .map(|id| id.to_string())
-                    .unwrap_or_default();
+                let external_resource_id = scim_external_resource_id(created_group.id)?;
 
                 ScimProvisioningState::update_synced(
                     &self.pool,
@@ -807,7 +803,7 @@ impl Provisioner {
                     started.elapsed(),
                     None,
                 )
-                .await;
+                .await?;
 
                 Ok(())
             }
@@ -830,8 +826,7 @@ impl Provisioner {
                     .await?;
 
                 if let Some(found_group) = existing {
-                    let external_resource_id =
-                        found_group.id.map(|id| id.to_string()).unwrap_or_default();
+                    let external_resource_id = scim_external_resource_id(found_group.id)?;
 
                     ScimProvisioningState::update_synced(
                         &self.pool,
@@ -861,7 +856,7 @@ impl Provisioner {
                         started.elapsed(),
                         None,
                     )
-                    .await;
+                    .await?;
 
                     Ok(())
                 } else {
@@ -891,7 +886,7 @@ impl Provisioner {
                         started.elapsed(),
                         Some(error_msg.clone()),
                     )
-                    .await;
+                    .await?;
 
                     Err(ScimClientError::Conflict(error_msg))
                 }
@@ -921,7 +916,7 @@ impl Provisioner {
                     started.elapsed(),
                     Some(error_msg.clone()),
                 )
-                .await;
+                .await?;
 
                 error!(
                     tenant_id = %tenant_id,
@@ -1008,7 +1003,7 @@ impl Provisioner {
                     started.elapsed(),
                     None,
                 )
-                .await;
+                .await?;
 
                 Ok(())
             }
@@ -1037,7 +1032,7 @@ impl Provisioner {
                     started.elapsed(),
                     Some(error_msg.clone()),
                 )
-                .await;
+                .await?;
 
                 error!(
                     tenant_id = %tenant_id,
@@ -1128,7 +1123,7 @@ impl Provisioner {
                     started.elapsed(),
                     None,
                 )
-                .await;
+                .await?;
 
                 Ok(())
             }
@@ -1157,7 +1152,7 @@ impl Provisioner {
                     started.elapsed(),
                     Some(error_msg.clone()),
                 )
-                .await;
+                .await?;
 
                 error!(
                     tenant_id = %tenant_id,
@@ -1247,7 +1242,7 @@ impl Provisioner {
                     started.elapsed(),
                     None,
                 )
-                .await;
+                .await?;
 
                 Ok(())
             }
@@ -1276,7 +1271,7 @@ impl Provisioner {
                     started.elapsed(),
                     Some(error_msg.clone()),
                 )
-                .await;
+                .await?;
 
                 error!(
                     tenant_id = %tenant_id,
@@ -1293,9 +1288,8 @@ impl Provisioner {
 
     /// Log a provisioning operation to the immutable audit log.
     ///
-    /// Errors during logging are recorded via `tracing` but do not fail the
-    /// provisioning operation itself -- the SCIM operation has already
-    /// completed at this point.
+    /// Persist errors must not report the SCIM operation as complete when the
+    /// audit row was not written.
     #[allow(clippy::too_many_arguments)]
     async fn log_operation(
         &self,
@@ -1309,7 +1303,7 @@ impl Provisioner {
         http_status: Option<i32>,
         duration: std::time::Duration,
         error_message: Option<String>,
-    ) {
+    ) -> ScimClientResult<()> {
         self.log_operation_with_retry_count(
             tenant_id,
             target_id,
@@ -1323,7 +1317,7 @@ impl Provisioner {
             error_message,
             0,
         )
-        .await;
+        .await
     }
 
     /// Log a provisioning operation with an explicit retry count.
@@ -1341,7 +1335,7 @@ impl Provisioner {
         duration: std::time::Duration,
         error_message: Option<String>,
         retry_count: i32,
-    ) {
+    ) -> ScimClientResult<()> {
         // Clamp duration_ms to avoid i32 overflow for very long operations.
         let duration_ms = duration.as_millis().min(i32::MAX as u128) as i32;
 
@@ -1362,16 +1356,22 @@ impl Provisioner {
             error_message,
         };
 
-        if let Err(e) = ScimProvisioningLog::insert(&self.pool, log_entry).await {
-            warn!(
-                tenant_id = %tenant_id,
-                target_id = %target_id,
-                operation_type = %operation_type,
-                error = %e,
-                "Failed to write SCIM provisioning log entry"
-            );
-        }
+        scim_provisioning_log_recorded(ScimProvisioningLog::insert(&self.pool, log_entry).await)?;
+        Ok(())
     }
+}
+
+/// SCIM create/lookup must yield a resource id. An empty id must not be stored
+/// as a successful sync.
+pub(crate) fn scim_external_resource_id(id: Option<Uuid>) -> ScimClientResult<String> {
+    id.map(|id| id.to_string())
+        .ok_or_else(|| ScimClientError::ParseError("SCIM response missing resource id".to_string()))
+}
+
+/// Provisioning audit persist. Errors must not report the SCIM operation as
+/// complete when the log row was not written.
+pub(crate) fn scim_provisioning_log_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
 }
 
 #[cfg(test)]
@@ -1385,5 +1385,44 @@ mod tests {
         let retry_policy = RetryPolicy::new(3, 1);
         assert_eq!(retry_policy.max_retries, 3);
         assert_eq!(retry_policy.base_delay_secs, 1);
+    }
+
+    #[test]
+    fn scim_create_does_not_sync_empty_resource_id() {
+        assert_eq!(
+            scim_external_resource_id(Some(Uuid::nil())).unwrap(),
+            Uuid::nil().to_string()
+        );
+        assert!(scim_external_resource_id(None).is_err());
+
+        let src = include_str!("provisioner.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert_eq!(
+            production.matches("scim_external_resource_id(").count(),
+            5,
+            "user create, user conflict, group create, group conflict, helper"
+        );
+        assert!(
+            !production.contains("unwrap_or_default()"),
+            "must not store an empty external resource id as synced"
+        );
+    }
+
+    #[test]
+    fn scim_provisioning_log_does_not_swallow_insert() {
+        assert!(scim_provisioning_log_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(scim_provisioning_log_recorded::<(), &str>(Err("db")).is_err());
+
+        let src = include_str!("provisioner.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("scim_provisioning_log_recorded(")
+                && production.contains(".await?;"),
+            "provisioning log persist must fail closed"
+        );
+        assert!(
+            !production.contains("Failed to write SCIM provisioning log entry"),
+            "must not report SCIM success when the audit row was not written"
+        );
     }
 }

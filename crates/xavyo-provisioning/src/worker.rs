@@ -269,19 +269,22 @@ async fn process_operation<P: OperationProcessor>(
                 "Operation completed successfully"
             );
 
-            // Mark as complete
-            if let Err(e) = queue
-                .complete(tenant_id, operation_id, result_uid.as_deref())
-                .await
-            {
+            // Mark as complete. Persist errors must not update shadow as
+            // success while the operation is still queued.
+            if let Err(e) = queue_complete_recorded(
+                queue
+                    .complete(tenant_id, operation_id, result_uid.as_deref())
+                    .await,
+            ) {
                 error!(error = %e, "Failed to mark operation as complete");
+                return;
             }
 
             // Update or create shadow
             let uid = result_uid
                 .or(target_uid)
                 .unwrap_or_else(|| format!("unknown-{operation_id}"));
-            update_shadow_success(
+            if let Err(e) = update_shadow_success(
                 &shadow_repo,
                 tenant_id,
                 connector_id,
@@ -290,7 +293,11 @@ async fn process_operation<P: OperationProcessor>(
                 &uid,
                 &operation.payload,
             )
-            .await;
+            .await
+            {
+                error!(error = %e, "Failed to persist shadow after success");
+                return;
+            }
         }
         Err(e) => {
             let error_msg = e.to_string();
@@ -306,19 +313,31 @@ async fn process_operation<P: OperationProcessor>(
 
             if can_retry {
                 // Schedule retry (transient error)
-                if let Err(re) = queue.fail(tenant_id, operation_id, &error_msg, true).await {
+                if let Err(re) =
+                    queue_fail_recorded(queue.fail(tenant_id, operation_id, &error_msg, true).await)
+                {
                     error!(error = %re, "Failed to schedule retry");
+                    return;
                 }
             } else {
                 // Move to dead letter queue (permanent failure)
-                if let Err(re) = queue.fail(tenant_id, operation_id, &error_msg, false).await {
+                if let Err(re) = queue_fail_recorded(
+                    queue.fail(tenant_id, operation_id, &error_msg, false).await,
+                ) {
                     error!(error = %re, "Failed to move to dead letter");
+                    return;
                 }
             }
 
             // Update shadow with error
             if let Some(ref uid) = target_uid {
-                update_shadow_failure(&shadow_repo, tenant_id, connector_id, uid, &error_msg).await;
+                if let Err(se) =
+                    update_shadow_failure(&shadow_repo, tenant_id, connector_id, uid, &error_msg)
+                        .await
+                {
+                    error!(error = %se, "Failed to persist shadow after failure");
+                    return;
+                }
             }
         }
     }
@@ -333,7 +352,7 @@ async fn update_shadow_success(
     object_class: &str,
     target_uid: &str,
     attributes: &serde_json::Value,
-) {
+) -> crate::shadow::ShadowResult<()> {
     match shadow_repo
         .find_by_target_uid(tenant_id, connector_id, target_uid)
         .await
@@ -342,9 +361,8 @@ async fn update_shadow_success(
             shadow.operation_completed(true, None);
             shadow.update_attributes(attributes.clone());
             shadow.link_to_user(user_id);
-            if let Err(e) = shadow_repo.upsert(&shadow).await {
-                error!(error = %e, "Failed to update shadow");
-            }
+            shadow_recorded(shadow_repo.upsert(&shadow).await)?;
+            Ok(())
         }
         Ok(None) => {
             // Create new shadow
@@ -356,12 +374,12 @@ async fn update_shadow_success(
                 target_uid.to_string(),
                 attributes.clone(),
             );
-            if let Err(e) = shadow_repo.upsert(&shadow).await {
-                error!(error = %e, "Failed to create shadow");
-            }
+            shadow_recorded(shadow_repo.upsert(&shadow).await)?;
+            Ok(())
         }
         Err(e) => {
             error!(error = %e, "Failed to lookup shadow");
+            Err(e)
         }
     }
 }
@@ -373,24 +391,42 @@ async fn update_shadow_failure(
     connector_id: Uuid,
     target_uid: &str,
     error: &str,
-) {
+) -> crate::shadow::ShadowResult<()> {
     match shadow_repo
         .find_by_target_uid(tenant_id, connector_id, target_uid)
         .await
     {
         Ok(Some(mut shadow)) => {
             shadow.operation_completed(false, Some(error.to_string()));
-            if let Err(e) = shadow_repo.upsert(&shadow).await {
-                error!(error = %e, "Failed to update shadow after failure");
-            }
+            shadow_recorded(shadow_repo.upsert(&shadow).await)?;
+            Ok(())
         }
         Ok(None) => {
             // No shadow to update
+            Ok(())
         }
         Err(e) => {
             error!(error = %e, "Failed to lookup shadow for failure update");
+            Err(e)
         }
     }
+}
+
+/// Queue complete persist. Errors must not update shadow as success while
+/// the operation is still queued.
+pub(crate) fn queue_complete_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
+/// Queue fail persist. Errors must not drop retry/DLQ while the operation
+/// is still in progress.
+pub(crate) fn queue_fail_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
+/// Shadow persist. Errors must not look like the account link was written.
+pub(crate) fn shadow_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
 }
 
 /// Check if an error is retryable.
@@ -454,6 +490,46 @@ mod tests {
         assert!(
             process.contains("Failed to load shadow before processing"),
             "shadow lookup errors must fail the queued operation"
+        );
+    }
+
+    #[test]
+    fn queue_and_shadow_persist_do_not_swallow_errors() {
+        assert!(queue_complete_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(queue_complete_recorded::<(), &str>(Err("db")).is_err());
+        assert!(queue_fail_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(queue_fail_recorded::<(), &str>(Err("db")).is_err());
+        assert!(shadow_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(shadow_recorded::<(), &str>(Err("db")).is_err());
+
+        let src = include_str!("worker.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let process = production
+            .split("async fn process_operation")
+            .nth(1)
+            .and_then(|s| s.split("async fn ").next())
+            .expect("process_operation");
+        assert!(
+            process.contains("queue_complete_recorded(")
+                && process.contains("queue_fail_recorded("),
+            "queue complete/fail persist must fail closed"
+        );
+        let success_arm = process
+            .split("Ok(result_uid) =>")
+            .nth(1)
+            .and_then(|s| s.split("Err(e) =>").next())
+            .expect("success arm");
+        assert!(
+            success_arm.contains("queue_complete_recorded(") && success_arm.contains("return;"),
+            "complete persist errors must not update shadow as success"
+        );
+        assert!(
+            process.contains("if let Err(e) = update_shadow_success"),
+            "shadow success persist must fail closed"
+        );
+        assert!(
+            process.contains("update_shadow_failure(") && process.contains("if let Err(se)"),
+            "shadow failure persist must fail closed"
         );
     }
 
