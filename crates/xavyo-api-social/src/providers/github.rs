@@ -5,7 +5,7 @@ use reqwest::Client;
 use serde::Deserialize;
 use tracing::warn;
 
-use super::{SocialProvider, SocialUserInfo, TokenResponse};
+use super::{social_claims_json, SocialProvider, SocialUserInfo, TokenResponse};
 use crate::error::{ProviderType, SocialError, SocialResult};
 
 /// GitHub `OAuth2` endpoints.
@@ -210,7 +210,7 @@ impl SocialProvider for GithubProvider {
         }
 
         let user_info: GithubUserInfo = response.json().await?;
-        let raw_claims = serde_json::to_value(&user_info).unwrap_or_default();
+        let raw_claims = social_claims_json(&user_info)?;
 
         // F116: Always fetch from emails endpoint to get actual verification status.
         // The email in the profile may not be verified, so we can't assume it is.
@@ -280,5 +280,18 @@ mod tests {
     fn test_provider_type() {
         let provider = GithubProvider::new("client-id".to_string(), "client-secret".to_string());
         assert_eq!(provider.provider_type(), ProviderType::Github);
+    }
+
+    #[test]
+    fn github_raw_claims_do_not_store_empty_on_serialize() {
+        let v = social_claims_json(&serde_json::json!({"login": "octocat"})).unwrap();
+        assert_eq!(v["login"], "octocat");
+        let src = include_str!("github.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("social_claims_json(")
+                && !production.contains("to_value(&user_info).unwrap_or_default()"),
+            "GitHub userinfo persist must fail closed on JSON serialize"
+        );
     }
 }

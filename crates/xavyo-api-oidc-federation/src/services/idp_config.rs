@@ -228,7 +228,9 @@ impl IdpConfigService {
             .claim_mapping
             .unwrap_or_else(ClaimMappingConfig::default_mapping);
         crate::services::ClaimsService::new().validate_mapping(&claim_mapping_config)?;
-        let claim_mapping = claim_mapping_config.to_json();
+        let claim_mapping = claim_mapping_config
+            .to_json()
+            .map_err(|e| FederationError::InvalidConfiguration(e.to_string()))?;
 
         // Create the identity provider
         let input = CreateIdentityProvider {
@@ -300,7 +302,10 @@ impl IdpConfigService {
         let claim_mapping = match req.claim_mapping {
             Some(c) => {
                 crate::services::ClaimsService::new().validate_mapping(&c)?;
-                Some(c.to_json())
+                Some(
+                    c.to_json()
+                        .map_err(|e| FederationError::InvalidConfiguration(e.to_string()))?,
+                )
             }
             None => None,
         };
@@ -540,6 +545,27 @@ mod tests {
         assert!(
             !production.contains("let _ = IdentityProviderDomain::create("),
             "must not swallow domain create on IdP create"
+        );
+    }
+
+    #[test]
+    fn claim_mapping_persist_does_not_store_empty_on_serialize() {
+        let mapping = ClaimMappingConfig::default_mapping();
+        let v = mapping.to_json().unwrap();
+        assert!(v.is_object() || v.is_array() || v.get("mappings").is_some());
+        let src = include_str!("idp_config.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("to_json()")
+                && production.contains("InvalidConfiguration")
+                && !production.contains("to_json();"),
+            "IdP claim mapping persist must fail closed on JSON serialize"
+        );
+        let req_src = include_str!("../models/requests.rs");
+        let req_prod = req_src.split("mod tests").next().unwrap_or(req_src);
+        assert!(
+            !req_prod.contains("unwrap_or_default()"),
+            "ClaimMappingConfig::to_json must not return empty mapping"
         );
     }
 }

@@ -567,12 +567,12 @@ impl GovPersona {
             return Ok(None);
         };
 
-        let mut attrs: PersonaAttributes =
-            serde_json::from_value(current.attributes).unwrap_or_default();
+        let mut attrs: PersonaAttributes = serde_json::from_value(current.attributes)
+            .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
         attrs.inherited = inherited;
         attrs.last_propagation_at = Some(Utc::now());
 
-        let new_attrs = serde_json::to_value(&attrs).unwrap_or_default();
+        let new_attrs = persona_json(&attrs)?;
 
         sqlx::query_as(
             r"
@@ -736,6 +736,13 @@ impl GovPersona {
     }
 }
 
+/// Persona JSON persist. Serialization errors must not store empty attributes.
+pub(crate) fn persona_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -791,5 +798,17 @@ mod tests {
         assert!(filter.physical_user_id.is_none());
         assert!(filter.status.is_none());
         assert!(filter.expiring_within_days.is_none());
+    }
+
+    #[test]
+    fn persona_json_does_not_store_empty_on_serialize() {
+        let v = persona_json(&serde_json::json!({"inherited": {"a": 1}})).unwrap();
+        assert_eq!(v["inherited"]["a"], 1);
+        let src = include_str!("gov_persona.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("persona_json(") && !production.contains("unwrap_or_default()"),
+            "persona attribute persist must fail closed on JSON serialize"
+        );
     }
 }

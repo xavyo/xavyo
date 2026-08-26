@@ -144,9 +144,10 @@ impl GovTemplateMergePolicy {
         input: CreateGovTemplateMergePolicy,
     ) -> Result<Self, sqlx::Error> {
         let null_handling = input.null_handling.unwrap_or_default();
-        let source_precedence = input
-            .source_precedence
-            .map(|sp| serde_json::to_value(sp).unwrap_or(serde_json::Value::Null));
+        let source_precedence = match input.source_precedence {
+            Some(sp) => Some(merge_policy_json(&sp)?),
+            None => None,
+        };
 
         sqlx::query_as(
             r"
@@ -207,8 +208,7 @@ impl GovTemplateMergePolicy {
             q = q.bind(strategy);
         }
         if let Some(ref source_precedence) = input.source_precedence {
-            let json_value =
-                serde_json::to_value(source_precedence).unwrap_or(serde_json::Value::Null);
+            let json_value = merge_policy_json(source_precedence)?;
             q = q.bind(json_value);
         }
         if let Some(null_handling) = input.null_handling {
@@ -315,6 +315,13 @@ impl GovTemplateMergePolicy {
     }
 }
 
+/// Merge policy JSON persist. Serialization errors must not store null precedence.
+pub(crate) fn merge_policy_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -356,5 +363,18 @@ mod tests {
     #[test]
     fn test_null_handling_default() {
         assert_eq!(TemplateNullHandling::default(), TemplateNullHandling::Merge);
+    }
+
+    #[test]
+    fn merge_policy_json_does_not_store_null_on_serialize() {
+        let v = merge_policy_json(&vec!["hr_system".to_string()]).unwrap();
+        assert!(v.is_array());
+        let src = include_str!("gov_template_merge_policy.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("merge_policy_json(")
+                && !production.contains("unwrap_or(serde_json::Value::Null)"),
+            "template merge policy persist must fail closed on JSON serialize"
+        );
     }
 }

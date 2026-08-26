@@ -4,7 +4,7 @@ use super::async_trait;
 use reqwest::Client;
 use serde::Deserialize;
 
-use super::{SocialProvider, SocialUserInfo, TokenResponse};
+use super::{social_claims_json, SocialProvider, SocialUserInfo, TokenResponse};
 use crate::error::{ProviderType, SocialError, SocialResult};
 
 /// Default Azure tenant (allows all Microsoft accounts).
@@ -199,7 +199,7 @@ impl SocialProvider for MicrosoftProvider {
         }
 
         let user_info: MicrosoftUserInfo = response.json().await?;
-        let raw_claims = serde_json::to_value(&user_info).unwrap_or_default();
+        let raw_claims = social_claims_json(&user_info)?;
 
         // Use preferred_username as email fallback only with strict validation.
         // When falling back to preferred_username, always mark email_verified = false
@@ -370,5 +370,18 @@ mod tests {
             MicrosoftProvider::new("client-id".to_string(), "client-secret".to_string(), None)
                 .unwrap();
         assert_eq!(provider.provider_type(), ProviderType::Microsoft);
+    }
+
+    #[test]
+    fn microsoft_raw_claims_do_not_store_empty_on_serialize() {
+        let v = social_claims_json(&serde_json::json!({"sub": "oid"})).unwrap();
+        assert_eq!(v["sub"], "oid");
+        let src = include_str!("microsoft.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("social_claims_json(")
+                && !production.contains("to_value(&user_info).unwrap_or_default()"),
+            "Microsoft userinfo persist must fail closed on JSON serialize"
+        );
     }
 }
