@@ -153,7 +153,7 @@ impl TemplateRuleService {
             template_id,
             TemplateEventType::RuleAdded,
             actor_id,
-            Some(serde_json::to_value(&rule).unwrap_or_default()),
+            Some(template_rule_json(&rule)?),
         )
         .await?;
 
@@ -289,7 +289,7 @@ impl TemplateRuleService {
             template_id,
             TemplateEventType::RuleRemoved,
             actor_id,
-            Some(serde_json::to_value(&rule).unwrap_or_default()),
+            Some(template_rule_json(&rule)?),
         )
         .await?;
 
@@ -541,6 +541,11 @@ impl TemplateRuleService {
     }
 }
 
+/// Template rule JSON persist. Serialization errors must not store empty rules.
+pub(crate) fn template_rule_json<T: serde::Serialize>(value: &T) -> Result<serde_json::Value> {
+    serde_json::to_value(value).map_err(|e| GovernanceError::Validation(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -565,5 +570,18 @@ mod tests {
         // Test that role attributes are available
         assert!(ROLE_ATTRIBUTES.contains(&"name"));
         assert!(ROLE_ATTRIBUTES.contains(&"description"));
+    }
+
+    #[test]
+    fn template_rule_json_does_not_store_empty_on_serialize() {
+        let v = template_rule_json(&serde_json::json!({"target_attribute": "email"})).unwrap();
+        assert_eq!(v["target_attribute"], "email");
+        let src = include_str!("template_rule_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("template_rule_json(")
+                && !production.contains("to_value(&rule).unwrap_or_default()"),
+            "template rule persist must fail closed on JSON serialize"
+        );
     }
 }

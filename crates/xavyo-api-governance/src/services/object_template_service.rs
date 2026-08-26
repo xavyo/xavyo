@@ -158,7 +158,7 @@ impl ObjectTemplateService {
             template.id,
             TemplateEventType::Created,
             Some(actor_id),
-            Some(serde_json::to_value(&template).unwrap_or_default()),
+            Some(object_template_json(&template)?),
         )
         .await?;
 
@@ -351,7 +351,7 @@ impl ObjectTemplateService {
             .map_err(GovernanceError::Database)?;
 
         // Record audit event before deletion
-        let template_json = serde_json::to_value(&template).unwrap_or_default();
+        let template_json = object_template_json(&template)?;
         self.record_event(
             tenant_id,
             id,
@@ -400,8 +400,8 @@ impl ObjectTemplateService {
             .await
             .map_err(GovernanceError::Database)?;
 
-        let rules_snapshot = serde_json::to_value(&rules).unwrap_or_default();
-        let scopes_snapshot = serde_json::to_value(&scopes).unwrap_or_default();
+        let rules_snapshot = object_template_json(&rules)?;
+        let scopes_snapshot = object_template_json(&scopes)?;
 
         let version = GovTemplateVersion::create_next_version(
             &self.pool,
@@ -605,6 +605,11 @@ impl ObjectTemplateService {
     }
 }
 
+/// Object template JSON persist. Serialization errors must not store empty snapshots.
+pub(crate) fn object_template_json<T: serde::Serialize>(value: &T) -> Result<serde_json::Value> {
+    serde_json::to_value(value).map_err(|e| GovernanceError::Validation(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -614,5 +619,18 @@ mod tests {
         // Just verify the struct and impl are correctly defined
         // Database tests would require a test database
         let _ = std::mem::size_of::<ObjectTemplateService>();
+    }
+
+    #[test]
+    fn object_template_json_does_not_store_empty_on_serialize() {
+        let v = object_template_json(&serde_json::json!({"name": "tmpl"})).unwrap();
+        assert_eq!(v["name"], "tmpl");
+        let src = include_str!("object_template_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("object_template_json(")
+                && !production.contains("unwrap_or_default()"),
+            "object template persist must fail closed on JSON serialize"
+        );
     }
 }

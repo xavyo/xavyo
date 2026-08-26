@@ -126,7 +126,7 @@ impl MetaRoleService {
         }
 
         // Record audit event
-        let meta_role_json = serde_json::to_value(&meta_role).unwrap_or_default();
+        let meta_role_json = gov_meta_role_json(&meta_role)?;
         GovMetaRoleEvent::record_created(
             &self.pool,
             tenant_id,
@@ -175,8 +175,8 @@ impl MetaRoleService {
             .ok_or_else(|| GovernanceError::MetaRoleNotFound(id))?;
 
         // Record audit event
-        let before_json = serde_json::to_value(&before).unwrap_or_default();
-        let after_json = serde_json::to_value(&after).unwrap_or_default();
+        let before_json = gov_meta_role_json(&before)?;
+        let after_json = gov_meta_role_json(&after)?;
         GovMetaRoleEvent::record_updated(
             &self.pool,
             tenant_id,
@@ -325,7 +325,7 @@ impl MetaRoleService {
             .map_err(GovernanceError::Database)?;
 
         // Record audit event before deletion
-        let meta_role_json = serde_json::to_value(&meta_role).unwrap_or_default();
+        let meta_role_json = gov_meta_role_json(&meta_role)?;
         GovMetaRoleEvent::record_deleted(
             &self.pool,
             tenant_id,
@@ -640,6 +640,11 @@ impl MetaRoleService {
     }
 }
 
+/// Meta-role audit persist. Serialization errors must not store empty payloads.
+pub(crate) fn gov_meta_role_json<T: serde::Serialize>(value: &T) -> Result<serde_json::Value> {
+    serde_json::to_value(value).map_err(|e| GovernanceError::Validation(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -845,5 +850,20 @@ mod tests {
 
         assert_eq!(filter.priority_min, Some(1));
         assert_eq!(filter.priority_max, Some(50));
+    }
+
+    #[test]
+    fn gov_meta_role_json_does_not_store_empty_on_serialize() {
+        let v = gov_meta_role_json(&serde_json::json!({"name": "admin"})).unwrap();
+        assert_eq!(v["name"], "admin");
+        let src = include_str!("meta_role_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("gov_meta_role_json(")
+                && !production.contains("to_value(&meta_role).unwrap_or_default()")
+                && !production.contains("to_value(&before).unwrap_or_default()")
+                && !production.contains("to_value(&after).unwrap_or_default()"),
+            "meta-role audit persist must fail closed on JSON serialize"
+        );
     }
 }

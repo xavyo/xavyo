@@ -206,13 +206,12 @@ impl ParameterService {
                 .await?;
 
         // Record audit event
-        let values_json = serde_json::to_value(
-            values
+        let values_json = parameter_json(
+            &values
                 .iter()
                 .map(|v| (v.parameter_id.to_string(), &v.value))
                 .collect::<HashMap<_, _>>(),
-        )
-        .unwrap_or_default();
+        )?;
 
         GovParameterAuditEvent::record_parameters_set(
             &self.pool,
@@ -261,7 +260,7 @@ impl ParameterService {
         let old_values = self
             .get_assignment_parameters_map(tenant_id, assignment_id)
             .await?;
-        let old_values_json = serde_json::to_value(&old_values).unwrap_or_default();
+        let old_values_json = parameter_json(&old_values)?;
 
         // Update each parameter
         let mut results = Vec::new();
@@ -280,13 +279,12 @@ impl ParameterService {
         }
 
         // Record audit event
-        let new_values_json = serde_json::to_value(
-            values
+        let new_values_json = parameter_json(
+            &values
                 .iter()
                 .map(|v| (v.parameter_id.to_string(), &v.value))
                 .collect::<HashMap<_, _>>(),
-        )
-        .unwrap_or_default();
+        )?;
 
         GovParameterAuditEvent::record_parameters_updated(
             &self.pool,
@@ -447,15 +445,14 @@ impl ParameterService {
 
             if !violations.is_empty() {
                 // Record schema violation event
-                let violations_json = serde_json::to_value(
-                    violations
+                let violations_json = parameter_json(
+                    &violations
                         .iter()
                         .map(|v| (&v.parameter_name, &v.details))
                         .collect::<HashMap<_, _>>(),
-                )
-                .unwrap_or_default();
+                )?;
 
-                let values_json = serde_json::to_value(&values).unwrap_or_default();
+                let values_json = parameter_json(&values)?;
 
                 GovParameterAuditEvent::record_schema_violation(
                     &self.pool,
@@ -729,6 +726,13 @@ impl ParameterService {
     }
 }
 
+/// Parameter audit persist. Serialization errors must not store empty values.
+pub(crate) fn parameter_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, GovernanceError> {
+    serde_json::to_value(value).map_err(|e| GovernanceError::Validation(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -803,5 +807,17 @@ mod tests {
                 "{fn_name} must propagate parameter-definition load errors"
             );
         }
+    }
+
+    #[test]
+    fn parameter_json_does_not_store_empty_on_serialize() {
+        let v = parameter_json(&serde_json::json!({"port": 5432})).unwrap();
+        assert_eq!(v["port"], 5432);
+        let src = include_str!("parameter_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parameter_json(") && !production.contains("unwrap_or_default()"),
+            "parameter audit persist must fail closed on JSON serialize"
+        );
     }
 }

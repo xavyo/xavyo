@@ -374,10 +374,10 @@ impl IdentityMergeService {
                 .attribute_selections
                 .clone()
                 .unwrap_or_else(|| json!({})),
-            entitlement_selections: request
-                .entitlement_selections
-                .as_ref()
-                .map(|v| serde_json::to_value(v).unwrap_or_default()),
+            entitlement_selections: match request.entitlement_selections.as_ref() {
+                Some(v) => Some(merge_identity_json(v)?),
+                None => None,
+            },
             operator_id,
         };
 
@@ -508,7 +508,7 @@ impl IdentityMergeService {
             tenant_id,
             request.source_identity_id,
             operation.id,
-            serde_json::to_value(&source_summary).unwrap_or_default(),
+            merge_identity_json(&source_summary)?,
             external_references.clone(),
         )
         .await
@@ -525,9 +525,9 @@ impl IdentityMergeService {
             &mut *tx,
             tenant_id,
             operation.id,
-            serde_json::to_value(&source_summary).unwrap_or_default(),
-            serde_json::to_value(&target_summary).unwrap_or_default(),
-            serde_json::to_value(&merged_preview).unwrap_or_default(),
+            merge_identity_json(&source_summary)?,
+            merge_identity_json(&target_summary)?,
+            merge_identity_json(&merged_preview)?,
             request
                 .attribute_selections
                 .clone()
@@ -1429,6 +1429,11 @@ impl IdentityMergeService {
     }
 }
 
+/// Identity merge JSON persist. Serialization errors must not store empty snapshots.
+pub(crate) fn merge_identity_json<T: serde::Serialize>(value: &T) -> Result<serde_json::Value> {
+    serde_json::to_value(value).map_err(|e| GovernanceError::Validation(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1510,6 +1515,22 @@ mod tests {
         assert!(
             !production.contains("if let Ok(res) = app_result"),
             "must not swallow ownership transfer"
+        );
+    }
+
+    #[test]
+    fn merge_identity_json_does_not_store_empty_on_serialize() {
+        let v = super::merge_identity_json(&json!({"email": "a@b.c"})).unwrap();
+        assert_eq!(v["email"], "a@b.c");
+        let src = include_str!("identity_merge_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("merge_identity_json(")
+                && !production.contains("to_value(v).unwrap_or_default()")
+                && !production.contains("to_value(&source_summary).unwrap_or_default()")
+                && !production.contains("to_value(&target_summary).unwrap_or_default()")
+                && !production.contains("to_value(&merged_preview).unwrap_or_default()"),
+            "identity merge persist must fail closed on JSON serialize"
         );
     }
 }
