@@ -231,7 +231,10 @@ impl GovRoleParameter {
     ) -> Result<Self, sqlx::Error> {
         let is_required = input.is_required.unwrap_or(false);
         let display_order = input.display_order.unwrap_or(0);
-        let constraints_json = input.constraints.and_then(|c| serde_json::to_value(c).ok());
+        let constraints_json = match input.constraints {
+            Some(c) => Some(role_param_json(&c)?),
+            None => None,
+        };
 
         sqlx::query_as(
             r"
@@ -317,7 +320,7 @@ impl GovRoleParameter {
             q = q.bind(default_value);
         }
         if let Some(ref constraints) = input.constraints {
-            let constraints_json = serde_json::to_value(constraints).ok();
+            let constraints_json = role_param_json(constraints)?;
             q = q.bind(constraints_json);
         }
         if let Some(display_order) = input.display_order {
@@ -376,6 +379,13 @@ impl GovRoleParameter {
     }
 }
 
+/// Role parameter constraint persist. Serialization errors must not drop constraints.
+pub(crate) fn role_param_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -416,5 +426,19 @@ mod tests {
         assert_eq!(parsed.min_length, Some(1));
         assert_eq!(parsed.max_length, Some(100));
         assert_eq!(parsed.pattern, Some("^[a-z]+$".to_string()));
+    }
+
+    #[test]
+    fn role_param_json_does_not_drop_constraints_on_serialize() {
+        let v = role_param_json(&serde_json::json!({"min_length": 1})).unwrap();
+        assert_eq!(v["min_length"], 1);
+        let src = include_str!("gov_role_parameter.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("role_param_json(")
+                && !production.contains("to_value(c).ok()")
+                && !production.contains("to_value(constraints).ok()"),
+            "role parameter persist must fail closed on JSON serialize"
+        );
     }
 }

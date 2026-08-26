@@ -67,8 +67,17 @@ impl AttributeValidationService {
         let mut errors = Vec::new();
 
         // Check total size limit
-        let serialized = serde_json::to_string(attributes).unwrap_or_default();
-        if serialized.len() > MAX_ATTRIBUTES_SIZE {
+        let serialized = match serde_json::to_string(attributes) {
+            Ok(s) => s,
+            Err(e) => {
+                errors.push(AttributeFieldError {
+                    attribute: "*".to_string(),
+                    error: format!("Custom attributes could not be serialized: {e}"),
+                });
+                String::new()
+            }
+        };
+        if !serialized.is_empty() && serialized.len() > MAX_ATTRIBUTES_SIZE {
             errors.push(AttributeFieldError {
                 attribute: "*".to_string(),
                 error: format!(
@@ -619,5 +628,16 @@ mod tests {
         let attrs = json!("not an object");
         let result = AttributeValidationService::validate_attributes(&defs, &attrs, false);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn custom_attributes_size_check_does_not_skip_on_serialize_error() {
+        let src = include_str!("attribute_validation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("serde_json::to_string(attributes)")
+                && !production.contains("to_string(attributes).unwrap_or_default()"),
+            "attribute size limit must fail closed when serialize fails"
+        );
     }
 }

@@ -232,8 +232,7 @@ impl GovArchivedIdentity {
         tenant_id: Uuid,
         input: CreateGovArchivedIdentity,
     ) -> Result<Self, sqlx::Error> {
-        let external_references = serde_json::to_value(&input.external_references)
-            .unwrap_or_else(|_| serde_json::json!({}));
+        let external_references = archived_refs_json(&input.external_references)?;
 
         sqlx::query_as(
             r"
@@ -310,6 +309,13 @@ impl GovArchivedIdentity {
     }
 }
 
+/// Archived identity persist. Serialization errors must not store empty references.
+pub(crate) fn archived_refs_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -365,5 +371,18 @@ mod tests {
         };
 
         assert!(input.snapshot.get("email").is_some());
+    }
+
+    #[test]
+    fn archived_refs_json_does_not_store_empty_on_serialize() {
+        let v = archived_refs_json(&serde_json::json!({"scim_id": "x"})).unwrap();
+        assert_eq!(v["scim_id"], "x");
+        let src = include_str!("gov_archived_identity.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("archived_refs_json(")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!({})"),
+            "archived identity persist must fail closed on JSON serialize"
+        );
     }
 }
