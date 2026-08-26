@@ -70,12 +70,9 @@ impl GovBatchSimulationResult {
         pool: &sqlx::PgPool,
         input: CreateBatchSimulationResult,
     ) -> Result<Self, sqlx::Error> {
-        let access_gained =
-            serde_json::to_value(&input.access_gained).unwrap_or_else(|_| serde_json::json!([]));
-        let access_lost =
-            serde_json::to_value(&input.access_lost).unwrap_or_else(|_| serde_json::json!([]));
-        let warnings =
-            serde_json::to_value(&input.warnings).unwrap_or_else(|_| serde_json::json!([]));
+        let access_gained = batch_sim_json(&input.access_gained)?;
+        let access_lost = batch_sim_json(&input.access_lost)?;
+        let warnings = batch_sim_json(&input.warnings)?;
 
         sqlx::query_as(
             r"
@@ -125,12 +122,9 @@ impl GovBatchSimulationResult {
 
         let mut q = sqlx::query(&query);
         for result in results {
-            let access_gained = serde_json::to_value(&result.access_gained)
-                .unwrap_or_else(|_| serde_json::json!([]));
-            let access_lost =
-                serde_json::to_value(&result.access_lost).unwrap_or_else(|_| serde_json::json!([]));
-            let warnings =
-                serde_json::to_value(&result.warnings).unwrap_or_else(|_| serde_json::json!([]));
+            let access_gained = batch_sim_json(&result.access_gained)?;
+            let access_lost = batch_sim_json(&result.access_lost)?;
+            let warnings = batch_sim_json(&result.warnings)?;
 
             q = q
                 .bind(result.simulation_id)
@@ -278,6 +272,13 @@ impl GovBatchSimulationResult {
     }
 }
 
+/// Batch simulation JSON persist. Serialization errors must not store empty access.
+pub(crate) fn batch_sim_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -374,5 +375,18 @@ mod tests {
 
         assert!(result_with_changes.has_changes());
         assert!(result_with_changes.has_warnings());
+    }
+
+    #[test]
+    fn batch_sim_json_does_not_store_empty_on_serialize() {
+        let v = batch_sim_json(&vec!["w".to_string()]).unwrap();
+        assert!(v.is_array());
+        let src = include_str!("gov_batch_simulation_result.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("batch_sim_json(")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!([])"),
+            "batch simulation result persist must fail closed on JSON serialize"
+        );
     }
 }

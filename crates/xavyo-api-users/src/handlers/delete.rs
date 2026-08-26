@@ -57,21 +57,15 @@ pub async fn delete_user_handler(
         .deactivate_user(tenant_id, user_id, caller_uuid)
         .await?;
 
-    // M-1/L-6: Fire audit event in background task to avoid blocking the response
-    {
-        let svc = user_service.clone();
-        let tid = tenant_id;
-        tokio::spawn(async move {
-            svc.record_audit_event(
-                tid,
-                caller_uuid,
-                "user.deactivated",
-                user_uuid,
-                serde_json::json!({}),
-            )
-            .await;
-        });
-    }
+    user_service
+        .record_audit_event(
+            tenant_id,
+            caller_uuid,
+            "user.deactivated",
+            user_uuid,
+            serde_json::json!({}),
+        )
+        .await?;
 
     // F085: Publish user.deleted webhook event
     if let Some(Extension(publisher)) = publisher {
@@ -94,6 +88,17 @@ pub async fn delete_user_handler(
 
 #[cfg(test)]
 mod tests {
-    // Handler tests require integration test setup with database
-    // See crates/xavyo-api-users/tests/delete_user_test.rs
+    #[test]
+    fn delete_awaits_admin_audit() {
+        let src = include_str!("delete.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("record_audit_event(") && production.contains(".await?;"),
+            "user delete must fail closed when admin audit persist errors"
+        );
+        assert!(
+            !production.contains("tokio::spawn"),
+            "must not fire-and-forget user.deactivated audit"
+        );
+    }
 }

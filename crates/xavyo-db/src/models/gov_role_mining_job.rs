@@ -307,8 +307,7 @@ impl GovRoleMiningJob {
         tenant_id: Uuid,
         input: CreateMiningJob,
     ) -> Result<Self, sqlx::Error> {
-        let parameters =
-            serde_json::to_value(&input.parameters).unwrap_or_else(|_| serde_json::json!({}));
+        let parameters = mining_params_json(&input.parameters)?;
 
         sqlx::query_as(
             r"
@@ -491,6 +490,13 @@ impl GovRoleMiningJob {
     }
 }
 
+/// Mining job parameter JSON persist. Serialization errors must not store empty parameters.
+pub(crate) fn mining_params_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -551,5 +557,18 @@ mod tests {
         assert!(params.include_excessive_privilege);
         assert!(params.include_consolidation);
         assert_eq!(params.peer_group_attribute, Some("department".to_string()));
+    }
+
+    #[test]
+    fn mining_params_json_does_not_store_empty_on_serialize() {
+        let v = mining_params_json(&serde_json::json!({"min_users": 1})).unwrap();
+        assert_eq!(v["min_users"], 1);
+        let src = include_str!("gov_role_mining_job.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("mining_params_json(")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!({})"),
+            "mining job persist must fail closed on JSON serialize"
+        );
     }
 }

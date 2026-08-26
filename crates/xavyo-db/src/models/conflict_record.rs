@@ -337,8 +337,7 @@ impl ConflictRecord {
         tenant_id: Uuid,
         input: &CreateConflictRecord,
     ) -> Result<Self, sqlx::Error> {
-        let affected_attrs =
-            serde_json::to_value(&input.affected_attributes).unwrap_or(serde_json::json!([]));
+        let affected_attrs = conflict_attrs_json(&input.affected_attributes)?;
 
         sqlx::query_as(
             r"
@@ -395,6 +394,13 @@ impl ConflictRecord {
         self.resolution_outcome.is_none()
             || matches!(self.resolution_outcome, Some(ResolutionOutcome::Pending))
     }
+}
+
+/// Conflict attribute JSON persist. Serialization errors must not store an empty set.
+pub(crate) fn conflict_attrs_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
 }
 
 #[cfg(test)]
@@ -468,5 +474,18 @@ mod tests {
         let filter = ConflictFilter::default();
         assert!(filter.operation_id.is_none());
         assert!(!filter.pending_only);
+    }
+
+    #[test]
+    fn conflict_attrs_json_does_not_store_empty_on_serialize() {
+        let v = conflict_attrs_json(&vec!["email".to_string()]).unwrap();
+        assert!(v.is_array());
+        let src = include_str!("conflict_record.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("conflict_attrs_json(")
+                && !production.contains("unwrap_or(serde_json::json!([])"),
+            "conflict create must fail closed on JSON serialize"
+        );
     }
 }

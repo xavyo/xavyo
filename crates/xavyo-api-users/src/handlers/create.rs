@@ -45,20 +45,19 @@ pub async fn create_user_handler(
         .create_user(tenant_id, &request, &claims.roles)
         .await?;
 
-    // M-1/L-6: Fire audit event in background task to avoid blocking the response
-    if let Ok(actor_id) = uuid::Uuid::parse_str(&claims.sub) {
-        let svc = user_service.clone();
-        let tid = tenant_id;
-        let rid = response.id;
-        let details = serde_json::json!({
-            "email": response.email,
-            "roles": response.roles,
-        });
-        tokio::spawn(async move {
-            svc.record_audit_event(tid, actor_id, "user.created", rid, details)
-                .await;
-        });
-    }
+    let actor_id = uuid::Uuid::parse_str(&claims.sub).map_err(|_| ApiUsersError::Unauthorized)?;
+    user_service
+        .record_audit_event(
+            tenant_id,
+            actor_id,
+            "user.created",
+            response.id,
+            serde_json::json!({
+                "email": response.email,
+                "roles": response.roles,
+            }),
+        )
+        .await?;
 
     // F085: Publish user.created webhook event
     // L-8: Log when publisher is not configured
@@ -84,6 +83,17 @@ pub async fn create_user_handler(
 
 #[cfg(test)]
 mod tests {
-    // Handler tests require integration test setup with database
-    // See crates/xavyo-api-users/tests/create_user_test.rs
+    #[test]
+    fn create_awaits_admin_audit() {
+        let src = include_str!("create.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("record_audit_event(") && production.contains(".await?;"),
+            "user create must fail closed when admin audit persist errors"
+        );
+        assert!(
+            !production.contains("tokio::spawn"),
+            "must not fire-and-forget user.created audit"
+        );
+    }
 }
