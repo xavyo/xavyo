@@ -313,8 +313,8 @@ impl DatabaseConnector {
     }
 
     /// Convert `AttributeValue` to SQL string for insertion.
-    fn attribute_value_to_sql_string(value: &AttributeValue) -> String {
-        match value {
+    fn attribute_value_to_sql_string(value: &AttributeValue) -> ConnectorResult<String> {
+        Ok(match value {
             AttributeValue::String(s) => s.clone(),
             AttributeValue::Integer(i) => i.to_string(),
             AttributeValue::Boolean(b) => if *b { "true" } else { "false" }.to_string(),
@@ -324,14 +324,17 @@ impl DatabaseConnector {
                 format!("\\x{}", hex::encode(b))
             }
             AttributeValue::Array(arr) => {
-                // Convert to JSON array
-                serde_json::to_string(arr).unwrap_or_else(|_| "[]".to_string())
+                serde_json::to_string(arr).map_err(|e| ConnectorError::InvalidData {
+                    message: format!("Failed to serialize array attribute: {e}"),
+                })?
             }
             AttributeValue::Object(obj) => {
-                serde_json::to_string(obj).unwrap_or_else(|_| "{}".to_string())
+                serde_json::to_string(obj).map_err(|e| ConnectorError::InvalidData {
+                    message: format!("Failed to serialize object attribute: {e}"),
+                })?
             }
             AttributeValue::Null => String::new(), // Will be bound as NULL
-        }
+        })
     }
 }
 
@@ -625,7 +628,7 @@ impl CreateOp for DatabaseConnector {
             param_idx += 1;
             columns.push(format!("\"{}\"", Self::escape_identifier(name)));
             placeholders.push(format!("${param_idx}"));
-            values.push(Self::attribute_value_to_sql_string(value));
+            values.push(Self::attribute_value_to_sql_string(value)?);
         }
 
         if columns.is_empty() {
@@ -697,7 +700,7 @@ impl UpdateOp for DatabaseConnector {
                 Self::escape_identifier(name),
                 param_idx
             ));
-            values.push(Self::attribute_value_to_sql_string(value));
+            values.push(Self::attribute_value_to_sql_string(value)?);
         }
 
         // Handle add operations (for simple columns, treat as replace)
@@ -708,7 +711,7 @@ impl UpdateOp for DatabaseConnector {
                 Self::escape_identifier(name),
                 param_idx
             ));
-            values.push(Self::attribute_value_to_sql_string(value));
+            values.push(Self::attribute_value_to_sql_string(value)?);
         }
 
         // Handle clear operations (set to NULL)
@@ -1119,24 +1122,34 @@ mod tests {
         assert_eq!(
             DatabaseConnector::attribute_value_to_sql_string(&AttributeValue::String(
                 "test".to_string()
-            )),
+            ))
+            .unwrap(),
             "test"
         );
         assert_eq!(
-            DatabaseConnector::attribute_value_to_sql_string(&AttributeValue::Integer(42)),
+            DatabaseConnector::attribute_value_to_sql_string(&AttributeValue::Integer(42)).unwrap(),
             "42"
         );
         assert_eq!(
-            DatabaseConnector::attribute_value_to_sql_string(&AttributeValue::Boolean(true)),
+            DatabaseConnector::attribute_value_to_sql_string(&AttributeValue::Boolean(true))
+                .unwrap(),
             "true"
         );
         assert_eq!(
-            DatabaseConnector::attribute_value_to_sql_string(&AttributeValue::Float(3.15)),
+            DatabaseConnector::attribute_value_to_sql_string(&AttributeValue::Float(3.15)).unwrap(),
             "3.15"
         );
         assert_eq!(
-            DatabaseConnector::attribute_value_to_sql_string(&AttributeValue::Null),
+            DatabaseConnector::attribute_value_to_sql_string(&AttributeValue::Null).unwrap(),
             ""
+        );
+
+        let src = include_str!("connector.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or_else(|_| \"[]\".to_string())")
+                && !production.contains("unwrap_or_else(|_| \"{}\".to_string())"),
+            "database provision must fail closed when array/object attributes cannot serialize"
         );
     }
 

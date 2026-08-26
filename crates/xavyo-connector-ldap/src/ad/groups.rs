@@ -297,7 +297,7 @@ pub fn build_group_sync_result(
     change_type: SyncChangeType,
     new_checkpoint: Option<UsnCheckpoint>,
     has_more: bool,
-) -> SyncResult {
+) -> Result<SyncResult, serde_json::Error> {
     info!(
         group_count = groups.len(),
         ?change_type,
@@ -311,14 +311,14 @@ pub fn build_group_sync_result(
     let mut result = SyncResult::with_changes(changes);
 
     if let Some(checkpoint) = new_checkpoint {
-        result = result.with_token(checkpoint.to_token());
+        result = result.with_token(checkpoint.to_token()?);
     }
 
     if has_more {
         result = result.with_more();
     }
 
-    result
+    Ok(result)
 }
 
 /// Compute the highest uSNChanged value from a batch of mapped groups.
@@ -868,7 +868,8 @@ mod tests {
 
         let checkpoint = UsnCheckpoint::new("999", "dc01.example.com");
         let result =
-            build_group_sync_result(groups, SyncChangeType::Create, Some(checkpoint), false);
+            build_group_sync_result(groups, SyncChangeType::Create, Some(checkpoint), false)
+                .unwrap();
 
         assert_eq!(result.changes.len(), 1);
         assert!(!result.has_more);

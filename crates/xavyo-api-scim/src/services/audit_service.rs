@@ -182,7 +182,15 @@ fn scim_audit_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
 
 /// Truncate a JSON value to a maximum size.
 fn truncate_json(value: serde_json::Value, max_chars: usize) -> serde_json::Value {
-    let json_str = serde_json::to_string(&value).unwrap_or_default();
+    let json_str = match serde_json::to_string(&value) {
+        Ok(s) => s,
+        Err(_) => {
+            return serde_json::json!({
+                "_truncated": true,
+                "_error": "could not serialize for size check"
+            });
+        }
+    };
     if json_str.len() <= max_chars {
         value
     } else {
@@ -239,6 +247,17 @@ mod tests {
     fn scim_audit_recorded_propagates_errors() {
         assert!(scim_audit_recorded(Ok::<(), &str>(())).is_ok());
         assert!(scim_audit_recorded(Err::<(), _>("db")).is_err());
+    }
+
+    #[test]
+    fn truncate_json_does_not_skip_size_check_on_serialize_error() {
+        let src = include_str!("audit_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("serde_json::to_string(&value)")
+                && !production.contains("to_string(&value).unwrap_or_default()"),
+            "SCIM audit truncate must fail closed when serialize fails"
+        );
     }
 
     #[test]
