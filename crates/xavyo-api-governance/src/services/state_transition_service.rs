@@ -452,7 +452,7 @@ impl StateTransitionService {
                                 Some(request.id),
                                 request.object_id,
                                 request.object_type,
-                                serde_json::to_value(&payload).unwrap_or_default(),
+                                transition_json(&payload)?,
                                 error_message.clone(),
                             )
                             .await,
@@ -488,10 +488,8 @@ impl StateTransitionService {
                 .ok_or(GovernanceError::StateTransitionRequestNotFound(request.id))?;
 
         // 6. Create audit record with entitlement snapshots
-        let entitlements_before =
-            serde_json::to_value(&entitlements_before_snapshot).unwrap_or_else(|_| json!([]));
-        let entitlements_after =
-            serde_json::to_value(&entitlements_after_snapshot).unwrap_or_else(|_| json!([]));
+        let entitlements_before = transition_json(&entitlements_before_snapshot)?;
+        let entitlements_after = transition_json(&entitlements_after_snapshot)?;
 
         // Include access rule results in metadata
         let metadata = if !access_result.paused.is_empty()
@@ -1022,10 +1020,8 @@ impl StateTransitionService {
                 .ok_or(GovernanceError::StateTransitionRequestNotFound(request_id))?;
 
         // 9. Create rollback audit record
-        let entitlements_before =
-            serde_json::to_value(&entitlements_before_snapshot).unwrap_or_else(|_| json!([]));
-        let entitlements_after =
-            serde_json::to_value(&entitlements_after_snapshot).unwrap_or_else(|_| json!([]));
+        let entitlements_before = transition_json(&entitlements_before_snapshot)?;
+        let entitlements_after = transition_json(&entitlements_after_snapshot)?;
 
         // Save the reason for event emission before moving into audit_metadata
         #[cfg(feature = "kafka")]
@@ -1618,6 +1614,11 @@ fn failed_op_queue_recorded<T, E>(result: std::result::Result<T, E>) -> std::res
     result
 }
 
+/// State transition JSON persist. Serialization errors must not store empty snapshots.
+pub(crate) fn transition_json<T: serde::Serialize>(value: &T) -> Result<serde_json::Value> {
+    serde_json::to_value(value).map_err(|e| GovernanceError::Validation(e.to_string()))
+}
+
 /// Escape a string value for CSV output.
 fn escape_csv(value: &str) -> String {
     if value.contains(',') || value.contains('"') || value.contains('\n') {
@@ -1686,6 +1687,20 @@ mod tests {
         assert!(
             !perform.contains("Failed to queue entitlement action for retry"),
             "must not swallow entitlement retry queue persist"
+        );
+    }
+
+    #[test]
+    fn transition_json_does_not_store_empty_on_serialize() {
+        let v = super::transition_json(&serde_json::json!([{"id": 1}])).unwrap();
+        assert!(v.is_array());
+        let src = include_str!("state_transition_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("transition_json(")
+                && !production.contains("unwrap_or_else(|_| json!([])")
+                && !production.contains("to_value(&payload).unwrap_or_default()"),
+            "state transition persist must fail closed on JSON serialize"
         );
     }
 }

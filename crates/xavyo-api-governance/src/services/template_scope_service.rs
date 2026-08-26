@@ -82,7 +82,7 @@ impl TemplateScopeService {
             template_id,
             TemplateEventType::ScopeAdded,
             actor_id,
-            Some(serde_json::to_value(&scope).unwrap_or_default()),
+            Some(template_scope_json(&scope)?),
         )
         .await?;
 
@@ -120,7 +120,7 @@ impl TemplateScopeService {
             template_id,
             TemplateEventType::ScopeRemoved,
             actor_id,
-            Some(serde_json::to_value(&scope).unwrap_or_default()),
+            Some(template_scope_json(&scope)?),
         )
         .await?;
 
@@ -466,6 +466,11 @@ impl TemplateScopeService {
     }
 }
 
+/// Template scope JSON persist. Serialization errors must not store empty scopes.
+pub(crate) fn template_scope_json<T: serde::Serialize>(value: &T) -> Result<serde_json::Value> {
+    serde_json::to_value(value).map_err(|e| GovernanceError::Validation(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -757,5 +762,18 @@ mod tests {
             condition: None,
         };
         assert!(matcher.validate_scope(&invalid).is_err());
+    }
+
+    #[test]
+    fn template_scope_json_does_not_store_empty_on_serialize() {
+        let v = template_scope_json(&json!({"scope_type": "global"})).unwrap();
+        assert_eq!(v["scope_type"], "global");
+        let src = include_str!("template_scope_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("template_scope_json(")
+                && !production.contains("to_value(&scope).unwrap_or_default()"),
+            "template scope persist must fail closed on JSON serialize"
+        );
     }
 }

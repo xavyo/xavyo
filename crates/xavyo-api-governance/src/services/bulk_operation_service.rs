@@ -4,7 +4,6 @@
 
 use std::sync::Arc;
 
-use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -268,7 +267,7 @@ impl BulkOperationService {
         }
 
         // Mark operation as completed or failed
-        let results_json = serde_json::to_value(&results).unwrap_or(json!([]));
+        let results_json = bulk_results_json(&results)?;
 
         if failure_count > 0 && success_count == 0 {
             // All failed
@@ -365,6 +364,11 @@ pub struct ProcessingStats {
     pub errors: Vec<String>,
 }
 
+/// Bulk operation result persist. Serialization errors must not store empty results.
+pub(crate) fn bulk_results_json<T: serde::Serialize>(value: &T) -> Result<serde_json::Value> {
+    serde_json::to_value(value).map_err(|e| GovernanceError::Validation(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -402,6 +406,19 @@ mod tests {
                 "GovBulkStateOperation::mark_failed(&self.pool, operation_id, results_json)"
             ),
             "must not mark operations failed by id alone"
+        );
+    }
+
+    #[test]
+    fn bulk_results_json_does_not_store_empty_on_serialize() {
+        let v = super::bulk_results_json(&serde_json::json!([{"ok": true}])).unwrap();
+        assert!(v.is_array());
+        let src = include_str!("bulk_operation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("bulk_results_json(")
+                && !production.contains("unwrap_or(json!([])"),
+            "bulk operation persist must fail closed on JSON serialize"
         );
     }
 }
