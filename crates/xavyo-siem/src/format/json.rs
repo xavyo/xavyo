@@ -29,7 +29,9 @@ impl EventFormatter for JsonFormatter {
             "product_version": PRODUCT_VERSION,
         });
 
-        let map = obj.as_object_mut().unwrap();
+        let map = obj.as_object_mut().ok_or_else(|| {
+            FormatError::FormatFailed("JSON event payload is not an object".to_string())
+        })?;
 
         if let Some(ref actor_id) = event.actor_id {
             map.insert("actor_id".to_string(), json!(actor_id.to_string()));
@@ -180,6 +182,13 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
 
         assert!(parsed.get("actor_id").is_none());
+
+        let src = include_str!("json.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("as_object_mut().unwrap()"),
+            "JSON SIEM formatter must not panic if payload is not an object"
+        );
         assert!(parsed.get("source_ip").is_none());
         assert!(parsed.get("reason").is_none());
         assert!(parsed.get("session_id").is_none());

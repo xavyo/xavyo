@@ -176,25 +176,45 @@ pub fn create_worker(
             syslog_udp::SyslogUdpWorker::new(host.to_string(), port),
         )),
         crate::models::DestinationType::Webhook => {
-            let raw_headers: HashMap<String, String> = auth_config
-                .and_then(|c| serde_json::from_str(c).ok())
-                .unwrap_or_default();
-            let headers = sanitize_headers(raw_headers);
+            let headers = match auth_config {
+                None => HashMap::new(),
+                Some(c) => {
+                    let raw_headers: HashMap<String, String> =
+                        serde_json::from_str(c).map_err(|e| {
+                            DeliveryError::SendFailed(format!(
+                                "Invalid webhook auth_config JSON: {e}"
+                            ))
+                        })?;
+                    sanitize_headers(raw_headers)
+                }
+            };
             // SECURITY: WebhookWorker::new validates URL against SSRF attacks
             let worker = webhook::WebhookWorker::new(format!("https://{host}:{port}"), headers)?;
             Ok(Box::new(worker))
         }
         crate::models::DestinationType::SplunkHec => {
-            let token = auth_config
-                .and_then(|c| {
-                    serde_json::from_str::<serde_json::Value>(c)
-                        .ok()
-                        .and_then(|v| {
-                            v.get("hec_token")
-                                .and_then(|t| t.as_str().map(String::from))
-                        })
-                })
-                .unwrap_or_default();
+            let token = match auth_config {
+                Some(c) => {
+                    let v: serde_json::Value = serde_json::from_str(c).map_err(|e| {
+                        DeliveryError::SendFailed(format!(
+                            "Invalid Splunk HEC auth_config JSON: {e}"
+                        ))
+                    })?;
+                    v.get("hec_token")
+                        .and_then(|t| t.as_str())
+                        .map(str::to_string)
+                        .ok_or_else(|| {
+                            DeliveryError::SendFailed(
+                                "Splunk HEC auth_config must include hec_token".to_string(),
+                            )
+                        })?
+                }
+                None => {
+                    return Err(DeliveryError::SendFailed(
+                        "Splunk HEC requires auth_config with hec_token".to_string(),
+                    ));
+                }
+            };
             Ok(Box::new(splunk_hec::SplunkHecWorker::new(
                 host.to_string(),
                 port,
@@ -204,7 +224,7 @@ pub fn create_worker(
                     .unwrap_or("xavyo:identity:events")
                     .to_string(),
                 splunk_index.map(String::from),
-            )))
+            )?))
         }
     }
 }
@@ -279,5 +299,63 @@ mod tests {
         assert!(sanitized.contains_key("X-Custom"));
         assert!(!sanitized.contains_key("Host"));
         assert!(!sanitized.contains_key("Transfer-Encoding"));
+    }
+
+    #[test]
+    fn webhook_auth_config_does_not_fail_open_on_invalid_json() {
+        let result = create_worker(
+            &DestinationType::Webhook,
+            "siem.example.com",
+            443,
+            true,
+            Some("not-json"),
+            None,
+            None,
+            None,
+        );
+        assert!(result.is_err());
+        let src = include_str!("mod.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("from_str(c).ok()") && !production.contains("unwrap_or_default()"),
+            "SIEM webhook auth_config must fail closed on JSON parse"
+        );
+    }
+
+    #[test]
+    fn splunk_hec_does_not_fail_open_without_token() {
+        let missing = create_worker(
+            &DestinationType::SplunkHec,
+            "splunk.example.com",
+            8088,
+            true,
+            None,
+            None,
+            None,
+            None,
+        );
+        assert!(missing.is_err());
+        let invalid = create_worker(
+            &DestinationType::SplunkHec,
+            "splunk.example.com",
+            8088,
+            true,
+            Some("{}"),
+            None,
+            None,
+            None,
+        );
+        assert!(invalid.is_err());
+        let ok = create_worker(
+            &DestinationType::SplunkHec,
+            "splunk.example.com",
+            8088,
+            true,
+            Some(r#"{"hec_token":"t"}"#),
+            None,
+            None,
+            None,
+        );
+        assert!(ok.is_ok());
     }
 }
