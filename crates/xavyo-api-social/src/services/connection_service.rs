@@ -146,7 +146,7 @@ impl ConnectionService {
 
         let token_expires_at = expires_in.map(|secs| Utc::now() + Duration::seconds(secs));
 
-        let raw_claims = serde_json::to_value(&user_info.raw_claims).ok();
+        let raw_claims = serde_json::to_value(&user_info.raw_claims)?;
 
         // SECURITY: Set RLS context for defense-in-depth (query already has tenant_id filter)
         let mut conn = self.pool.acquire().await?;
@@ -434,4 +434,23 @@ struct ConnectionRow {
     display_name: Option<String>,
     is_private_email: bool,
     created_at: DateTime<Utc>,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn raw_claims_persist_does_not_drop_on_serialize() {
+        let src = include_str!("connection_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let create = production
+            .split("pub async fn create_connection")
+            .nth(1)
+            .and_then(|s| s.split("    pub async fn ").next())
+            .expect("create_connection");
+        assert!(
+            create.contains("serde_json::to_value(&user_info.raw_claims)?")
+                && !create.contains("to_value(&user_info.raw_claims).ok()"),
+            "social connection persist must fail closed on raw_claims serialize"
+        );
+    }
 }

@@ -127,7 +127,15 @@ impl TenantUserUpdateSettingsRequest {
                 }
 
                 // Check total size
-                let serialized = serde_json::to_string(attrs).unwrap_or_default();
+                let serialized = match serde_json::to_string(attrs) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        return Some((
+                            "custom_attributes".to_string(),
+                            format!("custom_attributes could not be serialized: {e}"),
+                        ));
+                    }
+                };
                 if serialized.len() > Self::MAX_CUSTOM_ATTRIBUTES_SIZE {
                     return Some((
                         "custom_attributes".to_string(),
@@ -577,5 +585,16 @@ mod tests {
         });
         let result = check_restricted_fields(&value);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn custom_attributes_size_check_does_not_skip_on_serialize_error() {
+        let src = include_str!("settings.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("serde_json::to_string(attrs)")
+                && !production.contains("to_string(attrs).unwrap_or_default()"),
+            "custom_attributes size limit must fail closed when serialize fails"
+        );
     }
 }

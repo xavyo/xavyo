@@ -203,7 +203,7 @@ impl ScimTargetService {
             .await
         {
             Ok(config) => {
-                let spc_json = serde_json::to_value(&config).ok();
+                let spc_json = Some(service_provider_config_json(&config)?);
                 ("active".to_string(), spc_json)
             }
             Err(e) => {
@@ -392,7 +392,7 @@ impl ScimTargetService {
                 .await
             {
                 Ok(config) => {
-                    let spc_json = serde_json::to_value(&config).ok();
+                    let spc_json = Some(service_provider_config_json(&config)?);
                     (Some("active".to_string()), spc_json)
                 }
                 Err(e) => {
@@ -473,10 +473,10 @@ impl ScimTargetService {
         let result = client.health_check().await;
 
         // Update target with health check results.
-        let spc_json = result
-            .service_provider_config
-            .as_ref()
-            .and_then(|c| serde_json::to_value(c).ok());
+        let spc_json = match result.service_provider_config.as_ref() {
+            Some(c) => Some(service_provider_config_json(c)?),
+            None => None,
+        };
         let new_status = if result.healthy {
             "active"
         } else {
@@ -610,5 +610,24 @@ impl ScimTargetService {
             .discover_service_provider_config()
             .await
             .map_err(|e| e.to_string())
+    }
+}
+
+fn service_provider_config_json(config: &ServiceProviderConfig) -> Result<serde_json::Value> {
+    serde_json::to_value(config).map_err(|e| ConnectorApiError::Validation(e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn service_provider_config_persist_does_not_drop_on_serialize() {
+        let src = include_str!("scim_target_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("service_provider_config_json(")
+                && !production.contains("to_value(&config).ok()")
+                && !production.contains("to_value(c).ok()"),
+            "SCIM target persist must fail closed on service provider config serialize"
+        );
     }
 }

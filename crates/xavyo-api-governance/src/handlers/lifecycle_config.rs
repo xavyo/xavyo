@@ -661,19 +661,8 @@ pub async fn get_state_actions(
         )));
     }
 
-    // Parse entry actions
-    let entry_actions: Vec<LifecycleAction> = lifecycle_state
-        .entry_actions
-        .as_ref()
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
-        .unwrap_or_default();
-
-    // Parse exit actions
-    let exit_actions: Vec<LifecycleAction> = lifecycle_state
-        .exit_actions
-        .as_ref()
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
-        .unwrap_or_default();
+    let entry_actions = parse_state_actions(lifecycle_state.entry_actions.as_ref())?;
+    let exit_actions = parse_state_actions(lifecycle_state.exit_actions.as_ref())?;
 
     Ok(Json(GetStateActionsResponse {
         state_id,
@@ -735,16 +724,14 @@ pub async fn update_state_actions(
         )));
     }
 
-    // Prepare the actions as JSON values
-    let entry_actions_json = request
-        .entry_actions
-        .as_ref()
-        .and_then(|actions| serde_json::to_value(actions).ok());
-
-    let exit_actions_json = request
-        .exit_actions
-        .as_ref()
-        .and_then(|actions| serde_json::to_value(actions).ok());
+    let entry_actions_json = match request.entry_actions.as_ref() {
+        Some(actions) => Some(serialize_state_actions(actions)?),
+        None => None,
+    };
+    let exit_actions_json = match request.exit_actions.as_ref() {
+        Some(actions) => Some(serialize_state_actions(actions)?),
+        None => None,
+    };
 
     // Update the state with new actions
     let updated_state = GovLifecycleState::update_actions(
@@ -760,18 +747,8 @@ pub async fn update_state_actions(
         state_id
     )))?;
 
-    // Parse the updated actions
-    let entry_actions: Vec<LifecycleAction> = updated_state
-        .entry_actions
-        .as_ref()
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
-        .unwrap_or_default();
-
-    let exit_actions: Vec<LifecycleAction> = updated_state
-        .exit_actions
-        .as_ref()
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
-        .unwrap_or_default();
+    let entry_actions = parse_state_actions(updated_state.entry_actions.as_ref())?;
+    let exit_actions = parse_state_actions(updated_state.exit_actions.as_ref())?;
 
     Ok(Json(GetStateActionsResponse {
         state_id,
@@ -911,11 +888,7 @@ pub async fn get_user_lifecycle_status(
         let condition_evaluator = ConditionEvaluator::new(pool.clone());
 
         for transition in transitions {
-            let conditions: Vec<TransitionCondition> = transition
-                .conditions
-                .as_ref()
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .unwrap_or_default();
+            let conditions = parse_transition_conditions(transition.conditions.as_ref())?;
 
             let to_state = GovLifecycleState::find_by_id(pool, tenant_id, transition.to_state_id)
                 .await
@@ -967,4 +940,70 @@ pub async fn get_user_lifecycle_status(
         active_rollback,
         lifecycle_model,
     }))
+}
+
+fn parse_state_actions(
+    value: Option<&serde_json::Value>,
+) -> Result<Vec<LifecycleAction>, crate::error::ApiGovernanceError> {
+    match value {
+        None => Ok(Vec::new()),
+        Some(v) => serde_json::from_value(v.clone()).map_err(|e| {
+            crate::error::ApiGovernanceError::Validation(format!(
+                "Invalid lifecycle actions JSON: {e}"
+            ))
+        }),
+    }
+}
+
+fn serialize_state_actions(
+    actions: &[LifecycleAction],
+) -> Result<serde_json::Value, crate::error::ApiGovernanceError> {
+    serde_json::to_value(actions).map_err(|e| {
+        crate::error::ApiGovernanceError::Validation(format!(
+            "Failed to serialize lifecycle actions: {e}"
+        ))
+    })
+}
+
+fn parse_transition_conditions(
+    value: Option<&serde_json::Value>,
+) -> Result<Vec<TransitionCondition>, crate::error::ApiGovernanceError> {
+    match value {
+        None => Ok(Vec::new()),
+        Some(v) => serde_json::from_value(v.clone()).map_err(|e| {
+            crate::error::ApiGovernanceError::Validation(format!(
+                "Invalid transition conditions JSON: {e}"
+            ))
+        }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn state_actions_json_does_not_drop_on_serialize_or_parse() {
+        let actions = vec![];
+        let v = serialize_state_actions(&actions).unwrap();
+        assert!(v.is_array());
+        assert!(parse_state_actions(None).unwrap().is_empty());
+        assert!(parse_state_actions(Some(&v)).unwrap().is_empty());
+        assert!(parse_state_actions(Some(&serde_json::json!({"not": "an array"}))).is_err());
+        assert!(parse_transition_conditions(None).unwrap().is_empty());
+        assert!(
+            parse_transition_conditions(Some(&serde_json::json!({"not": "an array"}))).is_err()
+        );
+
+        let src = include_str!("lifecycle_config.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("serialize_state_actions(")
+                && production.contains("parse_state_actions(")
+                && production.contains("parse_transition_conditions(")
+                && !production.contains("to_value(actions).ok()")
+                && !production.contains("from_value(v.clone()).ok()"),
+            "lifecycle state actions and conditions must fail closed on JSON serialize/parse"
+        );
+    }
 }
