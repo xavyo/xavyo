@@ -309,19 +309,15 @@ impl GovMergeAudit {
         tenant_id: Uuid,
         input: CreateGovMergeAudit,
     ) -> Result<Self, sqlx::Error> {
-        let source_snapshot =
-            serde_json::to_value(&input.source_snapshot).unwrap_or_else(|_| serde_json::json!({}));
-        let target_snapshot =
-            serde_json::to_value(&input.target_snapshot).unwrap_or_else(|_| serde_json::json!({}));
-        let merged_snapshot =
-            serde_json::to_value(&input.merged_snapshot).unwrap_or_else(|_| serde_json::json!({}));
-        let attribute_decisions = serde_json::to_value(&input.attribute_decisions)
-            .unwrap_or_else(|_| serde_json::json!([]));
-        let entitlement_decisions = serde_json::to_value(&input.entitlement_decisions)
-            .unwrap_or_else(|_| serde_json::json!({}));
-        let sod_violations = input
-            .sod_violations
-            .map(|v| serde_json::to_value(v).unwrap_or_else(|_| serde_json::json!([])));
+        let source_snapshot = merge_audit_json(&input.source_snapshot)?;
+        let target_snapshot = merge_audit_json(&input.target_snapshot)?;
+        let merged_snapshot = merge_audit_json(&input.merged_snapshot)?;
+        let attribute_decisions = merge_audit_json(&input.attribute_decisions)?;
+        let entitlement_decisions = merge_audit_json(&input.entitlement_decisions)?;
+        let sod_violations = match input.sod_violations {
+            Some(v) => Some(merge_audit_json(&v)?),
+            None => None,
+        };
 
         sqlx::query_as(
             r"
@@ -428,6 +424,13 @@ impl GovMergeAudit {
     }
 }
 
+/// Merge audit JSON persist. Serialization errors must not store empty snapshots.
+pub(crate) fn merge_audit_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -488,6 +491,20 @@ mod tests {
         assert!(
             !production.contains("JOIN gov_merge_operations o ON a.operation_id = o.id\n"),
             "must not join merge operations by id alone"
+        );
+    }
+
+    #[test]
+    fn merge_audit_json_does_not_store_empty_on_serialize() {
+        let v = merge_audit_json(&serde_json::json!({"email": "a@b.c"})).unwrap();
+        assert_eq!(v["email"], "a@b.c");
+        let src = include_str!("gov_merge_audit.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("merge_audit_json(")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!({})")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!([])"),
+            "merge audit persist must fail closed on JSON serialize"
         );
     }
 }

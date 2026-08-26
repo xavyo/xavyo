@@ -11,7 +11,7 @@ pub mod microsoft;
 pub use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{ProviderType, SocialResult};
+use crate::error::{ProviderType, SocialError, SocialResult};
 
 /// Token response from a social provider.
 #[derive(Clone)]
@@ -79,6 +79,13 @@ impl SocialUserInfo {
             .or_else(|| self.email.clone())
             .unwrap_or_else(|| self.provider_user_id.clone())
     }
+}
+
+/// Persist social userinfo claims. Serialization errors must not store empty claims.
+pub(crate) fn social_claims_json<T: serde::Serialize>(
+    value: &T,
+) -> SocialResult<serde_json::Value> {
+    serde_json::to_value(value).map_err(SocialError::from)
 }
 
 /// Trait for social provider implementations.

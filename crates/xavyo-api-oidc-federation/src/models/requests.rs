@@ -149,10 +149,9 @@ pub struct CallbackParams {
 }
 
 impl ClaimMappingConfig {
-    /// Convert to JSON value.
-    #[must_use]
-    pub fn to_json(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
+    /// Convert to JSON value. Serialization errors must not persist an empty mapping.
+    pub fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
+        serde_json::to_value(self)
     }
 
     /// Create default claim mapping.

@@ -4,7 +4,7 @@ use super::async_trait;
 use reqwest::Client;
 use serde::Deserialize;
 
-use super::{SocialProvider, SocialUserInfo, TokenResponse};
+use super::{social_claims_json, SocialProvider, SocialUserInfo, TokenResponse};
 use crate::error::{ProviderType, SocialError, SocialResult};
 
 /// Google `OAuth2` endpoints.
@@ -149,7 +149,7 @@ impl SocialProvider for GoogleProvider {
         }
 
         let user_info: GoogleUserInfo = response.json().await?;
-        let raw_claims = serde_json::to_value(&user_info).unwrap_or_default();
+        let raw_claims = social_claims_json(&user_info)?;
 
         Ok(SocialUserInfo {
             provider_user_id: user_info.sub,
@@ -226,5 +226,18 @@ mod tests {
     fn test_provider_type() {
         let provider = GoogleProvider::new("client-id".to_string(), "client-secret".to_string());
         assert_eq!(provider.provider_type(), ProviderType::Google);
+    }
+
+    #[test]
+    fn google_raw_claims_do_not_store_empty_on_serialize() {
+        let v = social_claims_json(&serde_json::json!({"email": "a@b.c"})).unwrap();
+        assert_eq!(v["email"], "a@b.c");
+        let src = include_str!("google.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("social_claims_json(")
+                && !production.contains("to_value(&user_info).unwrap_or_default()"),
+            "Google userinfo persist must fail closed on JSON serialize"
+        );
     }
 }

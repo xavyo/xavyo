@@ -217,7 +217,7 @@ impl PersonaService {
             physical_user_id,
             persona_name: persona_name.clone(),
             display_name,
-            attributes: serde_json::to_value(&attributes).unwrap_or(json!({})),
+            attributes: persona_attrs_json(&attributes)?,
             valid_from: Some(valid_from),
             valid_until: Some(valid_until),
         };
@@ -811,6 +811,11 @@ pub fn render_persona_template(
     Ok(result)
 }
 
+/// Persona attribute persist. Serialization errors must not store empty attributes.
+pub(crate) fn persona_attrs_json<T: serde::Serialize>(value: &T) -> Result<serde_json::Value> {
+    serde_json::to_value(value).map_err(|e| GovernanceError::Validation(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -841,5 +846,18 @@ mod tests {
         let result =
             render_persona_template("{given_name} {surname}", &inherited, &overrides).unwrap();
         assert_eq!(result, "John Smith");
+    }
+
+    #[test]
+    fn persona_attrs_json_does_not_store_empty_on_serialize() {
+        let v = persona_attrs_json(&json!({"department": "eng"})).unwrap();
+        assert_eq!(v["department"], "eng");
+        let src = include_str!("persona_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("persona_attrs_json(")
+                && !production.contains("unwrap_or(json!({}))"),
+            "persona create must fail closed on attribute JSON serialize"
+        );
     }
 }
