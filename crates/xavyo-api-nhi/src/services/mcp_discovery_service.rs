@@ -633,9 +633,8 @@ impl McpDiscoveryService {
         }
 
         // Validate input_schema size
-        let schema_size = serde_json::to_string(&tool.input_schema)
-            .map(|s| s.len())
-            .unwrap_or(0);
+        let schema_json = mcp_schema_json(&tool.input_schema)?;
+        let schema_size = schema_json.len();
         if schema_size > MAX_SCHEMA_SIZE_BYTES {
             return Err(McpDiscoveryError::Protocol(format!(
                 "Tool '{}' input_schema exceeds maximum size ({schema_size} > {MAX_SCHEMA_SIZE_BYTES} bytes)",
@@ -681,7 +680,6 @@ impl McpDiscoveryService {
         })?;
 
         // Compute checksum of the input_schema for freshness tracking
-        let schema_json = serde_json::to_string(&tool.input_schema).unwrap_or_default();
         let checksum = schema_checksum(schema_json.as_bytes());
 
         // Build discovery_source from gateway/server info
@@ -880,7 +878,7 @@ impl McpDiscoveryService {
         let mut new_tools = Vec::new();
 
         for tool in &discovery.tools {
-            let schema_json = serde_json::to_string(&tool.input_schema).unwrap_or_default();
+            let schema_json = mcp_schema_json(&tool.input_schema)?;
             let new_checksum = schema_checksum(schema_json.as_bytes());
 
             if let Some((nhi_id, old_checksum)) = existing_map.remove(&tool.name) {
@@ -909,6 +907,12 @@ impl McpDiscoveryService {
             removed,
         })
     }
+}
+
+/// Serialize a tool schema for checksums. Serialization errors must not
+/// store or compare an empty schema as a successful discovery.
+pub(crate) fn mcp_schema_json(schema: &serde_json::Value) -> Result<String, McpDiscoveryError> {
+    serde_json::to_string(schema).map_err(McpDiscoveryError::Json)
 }
 
 /// Compute a SHA-256 hex digest for schema checksum comparison.
@@ -1069,6 +1073,37 @@ fn is_private_ip(ip: &IpAddr) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mcp_schema_json_does_not_use_empty_checksum() {
+        let schema = serde_json::json!({"type": "object"});
+        assert!(mcp_schema_json(&schema).is_ok());
+
+        let src = include_str!("mcp_discovery_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("mcp_schema_json("),
+            "import and freshness checks must fail closed on schema serialize"
+        );
+        assert!(
+            !production.contains("unwrap_or_default()"),
+            "must not checksum an empty schema when serialize fails"
+        );
+        let import = production
+            .split("pub async fn import_tool")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn").next())
+            .expect("import_tool");
+        assert!(
+            import.contains("mcp_schema_json(") && !import.contains("unwrap_or(0)"),
+            "import must not treat serialize failure as a zero-length schema"
+        );
+        assert_eq!(
+            production.matches("mcp_schema_json(").count(),
+            3,
+            "import size, import checksum, and freshness compare"
+        );
+    }
 
     #[test]
     fn test_extract_server_name() {
