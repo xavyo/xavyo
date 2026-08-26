@@ -144,18 +144,24 @@ pub struct BulkActionDetailResponse {
 
 impl BulkActionDetailResponse {
     /// Create detail response from a bulk action.
-    pub fn from_action(action: GovBulkAction) -> Self {
+    pub fn from_action(action: GovBulkAction) -> Result<Self, crate::error::ApiGovernanceError> {
         let progress = action.get_progress();
-        let results = action
-            .results
-            .clone()
-            .map(|r| serde_json::from_value::<Vec<BulkActionResultItem>>(r).unwrap_or_default());
+        let results = match action.results.clone() {
+            None => None,
+            Some(r) => Some(
+                serde_json::from_value::<Vec<BulkActionResultItem>>(r).map_err(|e| {
+                    crate::error::ApiGovernanceError::Validation(format!(
+                        "Invalid bulk action results JSON: {e}"
+                    ))
+                })?,
+            ),
+        };
 
-        Self {
+        Ok(Self {
             bulk_action: BulkActionResponse::from(action),
             results,
             progress_percent: i32::from(progress.progress_percent),
-        }
+        })
     }
 }
 
@@ -375,6 +381,16 @@ mod tests {
             ..valid.clone()
         };
         assert!(invalid_justification.validate().is_err());
+    }
+
+    #[test]
+    fn bulk_action_results_do_not_default_on_invalid_json() {
+        let src = include_str!("bulk_action.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("from_value::<Vec<BulkActionResultItem>>(r).unwrap_or_default()"),
+            "bulk action results GET must fail closed on JSON parse"
+        );
     }
 
     #[test]

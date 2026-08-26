@@ -564,15 +564,13 @@ impl CatalogItem {
     }
 
     /// Parse requestability rules from JSONB.
-    #[must_use]
-    pub fn get_requestability_rules(&self) -> RequestabilityRules {
-        serde_json::from_value(self.requestability_rules.clone()).unwrap_or_default()
+    pub fn get_requestability_rules(&self) -> Result<RequestabilityRules, serde_json::Error> {
+        serde_json::from_value(self.requestability_rules.clone())
     }
 
     /// Parse form fields from JSONB.
-    #[must_use]
-    pub fn get_form_fields(&self) -> Vec<FormField> {
-        serde_json::from_value(self.form_fields.clone()).unwrap_or_default()
+    pub fn get_form_fields(&self) -> Result<Vec<FormField>, serde_json::Error> {
+        serde_json::from_value(self.form_fields.clone())
     }
 
     /// List all enabled items for browsing.
@@ -694,5 +692,17 @@ mod tests {
 
         assert_eq!(request.name, "Developer Access");
         assert_eq!(request.item_type, CatalogItemType::Role);
+    }
+
+    #[test]
+    fn requestability_and_form_fields_do_not_default_on_invalid_json() {
+        let src = include_str!("catalog_item.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production
+                .contains("from_value(self.requestability_rules.clone()).unwrap_or_default()")
+                && !production.contains("from_value(self.form_fields.clone()).unwrap_or_default()"),
+            "catalog requestability rules and form fields must fail closed on JSON parse"
+        );
     }
 }

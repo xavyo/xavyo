@@ -410,11 +410,16 @@ fn default_limit() -> i64 {
 // Conversions
 // ============================================================================
 
-impl From<xavyo_db::GovRoleMiningJob> for MiningJobResponse {
-    fn from(j: xavyo_db::GovRoleMiningJob) -> Self {
-        // Parse parameters before moving any fields
-        let parameters = j.parse_parameters();
-        Self {
+impl TryFrom<xavyo_db::GovRoleMiningJob> for MiningJobResponse {
+    type Error = crate::error::ApiGovernanceError;
+
+    fn try_from(j: xavyo_db::GovRoleMiningJob) -> Result<Self, Self::Error> {
+        let parameters = j.parse_parameters().map_err(|e| {
+            crate::error::ApiGovernanceError::Validation(format!(
+                "Invalid mining job parameters JSON: {e}"
+            ))
+        })?;
+        Ok(Self {
             id: j.id,
             tenant_id: j.tenant_id,
             name: j.name,
@@ -430,7 +435,7 @@ impl From<xavyo_db::GovRoleMiningJob> for MiningJobResponse {
             created_by: j.created_by,
             created_at: j.created_at,
             updated_at: j.updated_at,
-        }
+        })
     }
 }
 

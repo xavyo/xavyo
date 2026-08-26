@@ -259,11 +259,16 @@ fn default_limit() -> i64 {
 // Conversions
 // ============================================================================
 
-impl From<xavyo_db::models::GovReportTemplate> for ReportTemplateResponse {
-    fn from(t: xavyo_db::models::GovReportTemplate) -> Self {
-        // Parse definition before moving fields
-        let definition = t.parse_definition();
-        Self {
+impl TryFrom<xavyo_db::models::GovReportTemplate> for ReportTemplateResponse {
+    type Error = crate::error::ApiGovernanceError;
+
+    fn try_from(t: xavyo_db::models::GovReportTemplate) -> Result<Self, Self::Error> {
+        let definition = t.parse_definition().map_err(|e| {
+            crate::error::ApiGovernanceError::Validation(format!(
+                "Invalid report template definition JSON: {e}"
+            ))
+        })?;
+        Ok(Self {
             id: t.id,
             tenant_id: t.tenant_id,
             name: t.name,
@@ -277,7 +282,7 @@ impl From<xavyo_db::models::GovReportTemplate> for ReportTemplateResponse {
             created_by: t.created_by,
             created_at: t.created_at,
             updated_at: t.updated_at,
-        }
+        })
     }
 }
 

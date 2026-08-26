@@ -7,6 +7,7 @@ use uuid::Uuid;
 use xavyo_db::models::{IdentityProviderDomain, TenantIdentityProvider};
 
 use super::requests::ClaimMappingConfig;
+use crate::error::FederationResult;
 
 /// Response for realm discovery.
 ///
@@ -54,11 +55,15 @@ impl IdentityProviderResponse {
         idp: TenantIdentityProvider,
         domains: Vec<IdentityProviderDomain>,
         linked_users_count: i64,
-    ) -> Self {
-        let claim_mapping: ClaimMappingConfig =
-            serde_json::from_value(idp.claim_mapping.clone()).unwrap_or_default();
+    ) -> FederationResult<Self> {
+        let claim_mapping: ClaimMappingConfig = serde_json::from_value(idp.claim_mapping.clone())
+            .map_err(|e| {
+            crate::error::FederationError::InvalidClaimMapping(format!(
+                "Failed to parse claim mapping: {e}"
+            ))
+        })?;
 
-        Self {
+        Ok(Self {
             id: idp.id,
             tenant_id: idp.tenant_id,
             name: idp.name,
@@ -75,7 +80,7 @@ impl IdentityProviderResponse {
             linked_users_count,
             created_at: idp.created_at,
             updated_at: idp.updated_at,
-        }
+        })
     }
 }
 
@@ -161,4 +166,18 @@ pub struct ErrorResponse {
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub details: Option<serde_json::Value>,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn idp_response_does_not_drop_claim_mapping_on_parse() {
+        let src = include_str!("responses.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("from_value(idp.claim_mapping.clone())")
+                && !production.contains("unwrap_or_default()"),
+            "IdP claim mapping GET must fail closed on JSON parse"
+        );
+    }
 }

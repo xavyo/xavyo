@@ -69,7 +69,9 @@ impl ReportGeneratorService {
             .await?;
 
         // Generate data
-        let definition = template.parse_definition();
+        let definition = template.parse_definition().map_err(|e| {
+            GovernanceError::Validation(format!("Invalid report template definition JSON: {e}"))
+        })?;
         let data_result = self
             .data_service
             .generate_data(

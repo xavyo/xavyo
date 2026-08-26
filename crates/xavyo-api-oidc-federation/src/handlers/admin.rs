@@ -56,7 +56,7 @@ pub async fn list_identity_providers(
             idp,
             domains,
             linked_users_count,
-        ));
+        )?);
     }
 
     Ok(Json(IdentityProviderListResponse {
@@ -99,7 +99,7 @@ pub async fn create_identity_provider(
 
     let idp = state.idp_config.create(tenant_id, req).await?;
     let domains = state.idp_config.get_domains(tenant_id, idp.id).await?;
-    let response = IdentityProviderResponse::from_model(idp, domains, 0);
+    let response = IdentityProviderResponse::from_model(idp, domains, 0)?;
 
     Ok((StatusCode::CREATED, Json(response)))
 }
@@ -138,7 +138,7 @@ pub async fn get_identity_provider(
         idp,
         domains,
         linked_users_count,
-    )))
+    )?))
 }
 
 /// Update an identity provider.
@@ -186,7 +186,7 @@ pub async fn update_identity_provider(
         idp,
         domains,
         linked_users_count,
-    )))
+    )?))
 }
 
 /// Delete an identity provider.
@@ -309,7 +309,7 @@ pub async fn toggle_identity_provider(
         idp,
         domains,
         linked_users_count,
-    )))
+    )?))
 }
 
 /// List domains for an identity provider.

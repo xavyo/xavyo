@@ -115,7 +115,9 @@ async fn initiate_sso_inner(
     let display_name = user.email.split('@').next().map(String::from);
 
     // Load user groups with SP-specific configuration
-    let sp_group_config = sp.get_group_config();
+    let sp_group_config = sp.get_group_config().map_err(|e| {
+        SamlError::AssertionGenerationFailed(format!("Invalid SP group filter JSON: {e}"))
+    })?;
     let group_config = GroupAttributeConfig {
         attribute_name: sp_group_config.attribute_name,
         value_format: crate::models::group_config::GroupValueFormat::parse(

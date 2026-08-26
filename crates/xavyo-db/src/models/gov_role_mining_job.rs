@@ -484,9 +484,8 @@ impl GovRoleMiningJob {
     }
 
     /// Parse the job parameters.
-    #[must_use]
-    pub fn parse_parameters(&self) -> MiningJobParameters {
-        serde_json::from_value(self.parameters.clone()).unwrap_or_default()
+    pub fn parse_parameters(&self) -> Result<MiningJobParameters, serde_json::Error> {
+        serde_json::from_value(self.parameters.clone())
     }
 }
 
@@ -537,6 +536,17 @@ mod tests {
         assert!((params.confidence_threshold - 0.6).abs() < f64::EPSILON);
         assert!(!params.include_excessive_privilege);
         assert!(!params.include_consolidation);
+    }
+
+    #[test]
+    fn parse_parameters_does_not_default_on_invalid_json() {
+        let src = include_str!("gov_role_mining_job.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("from_value(self.parameters.clone())")
+                && !production.contains("from_value(self.parameters.clone()).unwrap_or_default()"),
+            "mining job parameters must fail closed on JSON parse"
+        );
     }
 
     #[test]

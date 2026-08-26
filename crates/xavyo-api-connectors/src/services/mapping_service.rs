@@ -463,7 +463,9 @@ impl MappingService {
         // Parse correlation rules
         let correlation_rules: Vec<CorrelationRule> = if let Some(ref cr) = mapping.correlation_rule
         {
-            serde_json::from_value(cr.clone()).unwrap_or_default()
+            serde_json::from_value(cr.clone()).map_err(|e| {
+                ConnectorApiError::Validation(format!("Invalid correlation_rule JSON: {e}"))
+            })?
         } else {
             vec![]
         };
