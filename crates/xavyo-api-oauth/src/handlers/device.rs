@@ -218,6 +218,12 @@ fn high_risk_admins_notified<T, E>(result: Result<T, E>) -> Result<T, E> {
     result
 }
 
+/// Known-IP persist after device approval. Errors must refuse approval so
+/// later risk scoring is not fail-open.
+fn user_ip_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
 /// Request a device authorization code.
 ///
 /// POST /oauth/device/code
@@ -804,13 +810,20 @@ pub async fn device_authorize_handler(
                     }
                 }
 
-                // After successful approval, record the user's IP for future risk assessments
+                // After successful approval, record the user's IP for future risk assessments.
+                // Persist errors must not approve while the known-IP baseline is missing.
                 if let Some(ip) = &approver_ip {
-                    if let Err(e) = risk_service
-                        .record_user_ip(tenant_id, user_id, ip, Some(&approver_country))
-                        .await
-                    {
+                    if let Err(e) = user_ip_recorded(
+                        risk_service
+                            .record_user_ip(tenant_id, user_id, ip, Some(&approver_country))
+                            .await,
+                    ) {
                         tracing::error!(error = %e, "Failed to record user IP after approval");
+                        return Html(render_result_page(
+                            false,
+                            "Unable to complete authorization. Please try again.",
+                        ))
+                        .into_response();
                     }
                 }
             }
@@ -2201,6 +2214,25 @@ mod tests {
                 .is_some()
         );
         assert!(pending_confirmation_for_risk(Err::<Option<u8>, _>("db down")).is_err());
+    }
+
+    #[test]
+    fn user_ip_recorded_does_not_swallow_errors() {
+        assert!(user_ip_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(user_ip_recorded::<(), &str>(Err("db")).is_err());
+
+        let src = include_str!("device.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let window = production
+            .split("After successful approval, record the user's IP")
+            .nth(1)
+            .and_then(|s| s.split("Proceed with approval").next())
+            .expect("record_user_ip");
+        assert!(
+            window.contains("user_ip_recorded(")
+                && window.contains("Unable to complete authorization"),
+            "device approval must fail closed when known-IP persist errors"
+        );
     }
 
     #[test]

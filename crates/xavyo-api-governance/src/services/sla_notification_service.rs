@@ -208,6 +208,7 @@ impl SlaNotificationService {
             }
         }
 
+        sla_channels_recorded(&result)?;
         Ok(result)
     }
 
@@ -262,6 +263,7 @@ impl SlaNotificationService {
             }
         }
 
+        sla_channels_recorded(&result)?;
         Ok(result)
     }
 
@@ -339,6 +341,7 @@ This is an automated notification from xavyo. Do not reply to this email.
                             error = %e,
                             "Failed to send SLA warning email"
                         );
+                        return Err(SlaNotificationError::SendFailed(e.to_string()));
                     }
                 }
             }
@@ -438,6 +441,7 @@ This is an automated notification from xavyo. Do not reply to this email.
                             error = %e,
                             "Failed to send SLA breach email"
                         );
+                        return Err(SlaNotificationError::SendFailed(e.to_string()));
                     }
                 }
             }
@@ -572,6 +576,22 @@ impl NotificationSendResult {
     }
 }
 
+/// Channel send persist. Errors must not look like the warning or breach
+/// was delivered.
+pub(crate) fn sla_channels_recorded(result: &NotificationSendResult) -> SlaNotificationResult<()> {
+    if result.is_success() {
+        Ok(())
+    } else {
+        Err(SlaNotificationError::SendFailed(
+            result
+                .email_error
+                .clone()
+                .or_else(|| result.webhook_error.clone())
+                .unwrap_or_else(|| "SLA notification channel failed".to_string()),
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -612,6 +632,43 @@ mod tests {
         };
         assert!(!result_with_error.is_success());
         assert!(!result_with_error.any_sent());
+        assert!(sla_channels_recorded(&result).is_ok());
+        assert!(sla_channels_recorded(&result_with_error).is_err());
+    }
+
+    #[test]
+    fn sla_email_sends_do_not_swallow_errors() {
+        let src = include_str!("sla_notification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert_eq!(
+            production
+                .matches("return Err(SlaNotificationError::SendFailed")
+                .count(),
+            4,
+            "warning/breach email and webhook sends must fail closed"
+        );
+        assert!(
+            production.contains("sla_channels_recorded("),
+            "warning and breach notification results must fail closed"
+        );
+        let warning_email = production
+            .split("async fn send_warning_email")
+            .nth(1)
+            .and_then(|s| s.split("async fn send_breach_email").next())
+            .expect("send_warning_email");
+        assert!(
+            warning_email.contains("return Err(SlaNotificationError::SendFailed"),
+            "warning email send errors must not continue"
+        );
+        let breach_email = production
+            .split("async fn send_breach_email")
+            .nth(1)
+            .and_then(|s| s.split("async fn send_warning_webhook").next())
+            .expect("send_breach_email");
+        assert!(
+            breach_email.contains("return Err(SlaNotificationError::SendFailed"),
+            "breach email send errors must not continue"
+        );
     }
 
     #[test]

@@ -197,17 +197,12 @@ impl SchemaSchedulerJob {
                                     recipient_email: email.clone(),
                                 };
 
-                                if let Err(e) = self
-                                    .notification_service
-                                    .send_schema_change_notification(&notification)
-                                    .await
-                                {
-                                    warn!(
-                                        connector_id = %schedule.connector_id,
-                                        error = %e,
-                                        "Failed to send schema change notification"
-                                    );
-                                }
+                                schema_change_notified(
+                                    self.notification_service
+                                        .send_schema_change_notification(&notification)
+                                        .await,
+                                )
+                                .map_err(|e| SchedulerError::MarkFailed(e.to_string()))?;
                             }
                         }
                     }
@@ -259,6 +254,12 @@ pub enum SchedulerError {
     ConnectorNotFound(String),
 }
 
+/// Schema-change notification persist. Errors must not mark the schedule
+/// executed when notify_on_changes was requested and the email was not sent.
+pub(crate) fn schema_change_notified<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -271,5 +272,27 @@ mod tests {
     #[test]
     fn test_default_batch_size() {
         assert_eq!(DEFAULT_BATCH_SIZE, 10);
+    }
+
+    #[test]
+    fn schema_change_notify_does_not_mark_success_when_send_fails() {
+        assert!(schema_change_notified(Ok::<(), &str>(())).is_ok());
+        assert!(schema_change_notified::<(), &str>(Err("smtp")).is_err());
+
+        let src = include_str!("schema_scheduler.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let window = production
+            .split("if schedule.notify_on_changes")
+            .nth(1)
+            .and_then(|s| s.split("Mark as executed successfully").next())
+            .expect("notify_on_changes");
+        assert!(
+            window.contains("schema_change_notified("),
+            "schema change notify must fail closed"
+        );
+        assert!(
+            !window.contains("Failed to send schema change notification"),
+            "must not mark the schedule executed when notify persist fails"
+        );
     }
 }

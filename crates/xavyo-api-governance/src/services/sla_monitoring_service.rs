@@ -280,7 +280,52 @@ impl SlaMonitoringService {
 
     /// Mark a task as SLA breached.
     async fn mark_breach(&self, tenant_id: Uuid, task_id: Uuid, task: &TaskWithSla) -> Result<()> {
-        // Update the task
+        // Notify first so a failed send does not mark the breach as delivered.
+        if let Some(deadline) = task.sla_deadline {
+            let overdue_minutes = (Utc::now() - deadline).num_minutes();
+
+            let escalation_emails = self.extract_escalation_emails(&task.escalation_contacts);
+
+            let full_task = GovManualProvisioningTask::find_by_id(&self.pool, tenant_id, task_id)
+                .await?
+                .ok_or(GovernanceError::ManualProvisioningTaskNotFound(task_id))?;
+            let (app_name, ent_name) = self
+                .get_task_names(
+                    tenant_id,
+                    full_task.application_id,
+                    full_task.entitlement_id,
+                )
+                .await?;
+
+            let assignee_email = match full_task.assignee_id {
+                Some(assignee_id) => self.get_user_email(tenant_id, assignee_id).await?,
+                None => None,
+            };
+
+            let user_display_name = self
+                .get_user_display_name(tenant_id, full_task.user_id)
+                .await?;
+
+            let notification = SlaBreachNotification {
+                tenant_id,
+                task_id,
+                application_name: app_name,
+                entitlement_name: ent_name,
+                user_display_name,
+                sla_deadline: deadline,
+                overdue_minutes,
+                policy_name: task.policy_name.clone().unwrap_or_default(),
+                escalation_emails,
+                assignee_email,
+            };
+
+            sla_breach_notified(
+                self.notification_service
+                    .send_breach_notification(&notification)
+                    .await,
+            )?;
+        }
+
         sqlx::query(
             r"
             UPDATE gov_manual_provisioning_tasks
@@ -294,7 +339,6 @@ impl SlaMonitoringService {
         .await
         .map_err(GovernanceError::Database)?;
 
-        // Log the breach event
         let details = serde_json::json!({
             "sla_deadline": task.sla_deadline,
             "policy_name": task.policy_name,
@@ -321,62 +365,6 @@ impl SlaMonitoringService {
             policy = ?task.policy_name,
             "SLA breach detected"
         );
-
-        // Send breach notifications
-        if let Some(deadline) = task.sla_deadline {
-            let overdue_minutes = (Utc::now() - deadline).num_minutes();
-
-            // Extract escalation emails from contacts JSON
-            let escalation_emails = self.extract_escalation_emails(&task.escalation_contacts);
-
-            // Get task details for notification
-            let full_task = GovManualProvisioningTask::find_by_id(&self.pool, tenant_id, task_id)
-                .await?
-                .ok_or(GovernanceError::ManualProvisioningTaskNotFound(task_id))?;
-            let (app_name, ent_name) = self
-                .get_task_names(
-                    tenant_id,
-                    full_task.application_id,
-                    full_task.entitlement_id,
-                )
-                .await?;
-
-            // Lookup assignee email if task is assigned
-            let assignee_email = match full_task.assignee_id {
-                Some(assignee_id) => self.get_user_email(tenant_id, assignee_id).await?,
-                None => None,
-            };
-
-            // Get user display name for the user receiving access
-            let user_display_name = self
-                .get_user_display_name(tenant_id, full_task.user_id)
-                .await?;
-
-            let notification = SlaBreachNotification {
-                tenant_id,
-                task_id,
-                application_name: app_name,
-                entitlement_name: ent_name,
-                user_display_name,
-                sla_deadline: deadline,
-                overdue_minutes,
-                policy_name: task.policy_name.clone().unwrap_or_default(),
-                escalation_emails,
-                assignee_email,
-            };
-
-            if let Err(e) = self
-                .notification_service
-                .send_breach_notification(&notification)
-                .await
-            {
-                tracing::error!(
-                    task_id = %task_id,
-                    error = %e,
-                    "Failed to send breach notification"
-                );
-            }
-        }
 
         Ok(())
     }
@@ -452,7 +440,51 @@ impl SlaMonitoringService {
         task: &TaskWithSla,
         deadline: DateTime<Utc>,
     ) -> Result<()> {
-        // Update the task
+        let time_remaining = deadline - Utc::now();
+
+        // Notify first so a failed send does not mark the warning as sent.
+        let full_task = GovManualProvisioningTask::find_by_id(&self.pool, tenant_id, task_id)
+            .await?
+            .ok_or(GovernanceError::ManualProvisioningTaskNotFound(task_id))?;
+        let (app_name, ent_name) = self
+            .get_task_names(
+                tenant_id,
+                full_task.application_id,
+                full_task.entitlement_id,
+            )
+            .await?;
+
+        let recipient_emails = self.extract_escalation_emails(&task.escalation_contacts);
+
+        let assignee_email = match full_task.assignee_id {
+            Some(assignee_id) => self.get_user_email(tenant_id, assignee_id).await?,
+            None => None,
+        };
+
+        let user_display_name = self
+            .get_user_display_name(tenant_id, full_task.user_id)
+            .await?;
+
+        let notification = SlaWarningNotification {
+            tenant_id,
+            task_id,
+            application_name: app_name,
+            entitlement_name: ent_name,
+            user_display_name,
+            sla_deadline: deadline,
+            time_remaining_minutes: time_remaining.num_minutes(),
+            warning_threshold_percent: task.warning_threshold_percent.unwrap_or(75),
+            policy_name: task.policy_name.clone().unwrap_or_default(),
+            recipient_emails,
+            assignee_email,
+        };
+
+        sla_warning_notified(
+            self.notification_service
+                .send_warning_notification(&notification)
+                .await,
+        )?;
+
         sqlx::query(
             r"
             UPDATE gov_manual_provisioning_tasks
@@ -466,8 +498,6 @@ impl SlaMonitoringService {
         .await
         .map_err(GovernanceError::Database)?;
 
-        // Log the warning event
-        let time_remaining = deadline - Utc::now();
         let details = serde_json::json!({
             "sla_deadline": deadline,
             "time_remaining_minutes": time_remaining.num_minutes(),
@@ -495,58 +525,6 @@ impl SlaMonitoringService {
             time_remaining_minutes = time_remaining.num_minutes(),
             "SLA warning sent"
         );
-
-        // Send warning notifications
-        let full_task = GovManualProvisioningTask::find_by_id(&self.pool, tenant_id, task_id)
-            .await?
-            .ok_or(GovernanceError::ManualProvisioningTaskNotFound(task_id))?;
-        let (app_name, ent_name) = self
-            .get_task_names(
-                tenant_id,
-                full_task.application_id,
-                full_task.entitlement_id,
-            )
-            .await?;
-
-        // Extract recipient emails from escalation contacts
-        let recipient_emails = self.extract_escalation_emails(&task.escalation_contacts);
-
-        // Lookup assignee email if task is assigned
-        let assignee_email = match full_task.assignee_id {
-            Some(assignee_id) => self.get_user_email(tenant_id, assignee_id).await?,
-            None => None,
-        };
-
-        // Get user display name for the user receiving access
-        let user_display_name = self
-            .get_user_display_name(tenant_id, full_task.user_id)
-            .await?;
-
-        let notification = SlaWarningNotification {
-            tenant_id,
-            task_id,
-            application_name: app_name,
-            entitlement_name: ent_name,
-            user_display_name,
-            sla_deadline: deadline,
-            time_remaining_minutes: time_remaining.num_minutes(),
-            warning_threshold_percent: task.warning_threshold_percent.unwrap_or(75),
-            policy_name: task.policy_name.clone().unwrap_or_default(),
-            recipient_emails,
-            assignee_email,
-        };
-
-        if let Err(e) = self
-            .notification_service
-            .send_warning_notification(&notification)
-            .await
-        {
-            tracing::error!(
-                task_id = %task_id,
-                error = %e,
-                "Failed to send warning notification"
-            );
-        }
 
         Ok(())
     }
@@ -756,6 +734,20 @@ pub struct SlaComplianceSummary {
     pub compliance_rate: f64,
 }
 
+/// Warning notification persist. Errors must not mark `sla_warning_sent`.
+pub(crate) fn sla_warning_notified<T, E: std::fmt::Display>(
+    result: std::result::Result<T, E>,
+) -> Result<T> {
+    result.map_err(|e| GovernanceError::Validation(e.to_string()))
+}
+
+/// Breach notification persist. Errors must not mark `sla_breached`.
+pub(crate) fn sla_breach_notified<T, E: std::fmt::Display>(
+    result: std::result::Result<T, E>,
+) -> Result<T> {
+    result.map_err(|e| GovernanceError::Validation(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -819,6 +811,47 @@ mod tests {
                 "{fn_name} must fail when the task cannot be loaded for notification"
             );
         }
+    }
+
+    #[test]
+    fn sla_warning_and_breach_do_not_mark_sent_when_notify_fails() {
+        assert!(sla_warning_notified(Ok::<(), &str>(())).is_ok());
+        assert!(sla_warning_notified::<(), &str>(Err("smtp")).is_err());
+        assert!(sla_breach_notified(Ok::<(), &str>(())).is_ok());
+        assert!(sla_breach_notified::<(), &str>(Err("smtp")).is_err());
+
+        let src = include_str!("sla_monitoring_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let warning = production
+            .split("fn send_warning")
+            .nth(1)
+            .and_then(|s| s.split("    async fn ").next())
+            .expect("send_warning");
+        assert!(
+            warning.contains("sla_warning_notified(")
+                && warning.find("sla_warning_notified(").unwrap()
+                    < warning.find("SET sla_warning_sent = true").unwrap(),
+            "warning must notify before marking sla_warning_sent"
+        );
+        assert!(
+            !warning.contains("Failed to send warning notification"),
+            "must not mark warning sent when notify persist fails"
+        );
+        let breach = production
+            .split("fn mark_breach")
+            .nth(1)
+            .and_then(|s| s.split("    async fn ").next())
+            .expect("mark_breach");
+        assert!(
+            breach.contains("sla_breach_notified(")
+                && breach.find("sla_breach_notified(").unwrap()
+                    < breach.find("SET sla_breached = true").unwrap(),
+            "breach must notify before marking sla_breached"
+        );
+        assert!(
+            !breach.contains("Failed to send breach notification"),
+            "must not mark breach delivered when notify persist fails"
+        );
     }
 
     #[test]
