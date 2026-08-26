@@ -757,9 +757,10 @@ impl NhiCertificationService {
             NhiCertReviewerType::OwnerManager => "owner_manager",
         };
 
-        let reviewers_json = specific_reviewers
-            .as_ref()
-            .and_then(|r| serde_json::to_value(r).ok());
+        let reviewers_json = match specific_reviewers.as_ref() {
+            Some(r) => Some(serialize_reviewers(r)?),
+            None => None,
+        };
 
         sqlx::query(
             r"
@@ -1537,6 +1538,10 @@ impl NhiCertificationService {
     }
 }
 
+fn serialize_reviewers(reviewers: &[Uuid]) -> Result<serde_json::Value> {
+    serde_json::to_value(reviewers).map_err(|e| GovernanceError::Validation(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1617,6 +1622,26 @@ mod tests {
         assert!(
             decide.contains("check_and_complete_campaign") && decide.contains(".await?;"),
             "NHI cert decide must fail when campaign completion cannot be written"
+        );
+    }
+
+    #[test]
+    fn campaign_reviewers_json_does_not_drop_on_serialize() {
+        let id = Uuid::new_v4();
+        let v = serialize_reviewers(&[id]).unwrap();
+        assert_eq!(v.as_array().map(|a| a.len()), Some(1));
+        let src = include_str!("nhi_certification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let create = production
+            .split("async fn create_campaign_record")
+            .nth(1)
+            .and_then(|s| s.split("    async fn ").next())
+            .expect("create_campaign_record");
+        assert!(
+            create.contains("serialize_reviewers(")
+                && !create.contains("to_value(r).ok()")
+                && !create.contains("to_value(reviewers).ok()"),
+            "NHI campaign persist must fail closed on reviewer JSON serialize"
         );
     }
 }

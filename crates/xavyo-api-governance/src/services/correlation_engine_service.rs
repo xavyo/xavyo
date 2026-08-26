@@ -441,19 +441,25 @@ impl CorrelationEngineService {
                 "timestamp": Utc::now().to_rfc3339(),
             });
 
-            if let Err(e) = producer
-                .publish_raw(
-                    event_topic,
-                    &serde_json::to_vec(&payload).unwrap_or_default(),
-                )
-                .await
-            {
-                tracing::warn!(
-                    error = %e,
-                    event = event_topic,
-                    account_id = %account_id,
-                    "Failed to emit correlation Kafka event"
-                );
+            match serde_json::to_vec(&payload) {
+                Ok(bytes) => {
+                    if let Err(e) = producer.publish_raw(event_topic, &bytes).await {
+                        tracing::warn!(
+                            error = %e,
+                            event = event_topic,
+                            account_id = %account_id,
+                            "Failed to emit correlation Kafka event"
+                        );
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        event = event_topic,
+                        account_id = %account_id,
+                        "Failed to serialize correlation Kafka event"
+                    );
+                }
             }
         }
 
@@ -1692,6 +1698,11 @@ mod tests {
         assert!(
             evaluate.contains("map_err(GovernanceError::Database)?"),
             "pending-case lookup errors must fail the evaluation"
+        );
+        assert!(
+            !evaluate.contains("to_vec(&payload).unwrap_or_default()")
+                && evaluate.contains("serde_json::to_vec(&payload)"),
+            "correlation Kafka emit must not publish empty payload on serialize failure"
         );
     }
 

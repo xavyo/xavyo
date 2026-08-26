@@ -345,8 +345,8 @@ impl StateAccessRuleService {
         before_snapshot: &[EntitlementSnapshot],
         after_snapshot: &[EntitlementSnapshot],
     ) -> Result<()> {
-        let before_json = serde_json::to_value(before_snapshot).ok();
-        let after_json = serde_json::to_value(after_snapshot).ok();
+        let before_json = Some(snapshot_json(before_snapshot)?);
+        let after_json = Some(snapshot_json(after_snapshot)?);
 
         let update = UpdateGovStateTransitionAudit {
             entitlements_before: before_json,
@@ -448,6 +448,10 @@ pub struct AffectedEntitlement {
     pub new_status: String,
 }
 
+fn snapshot_json(snapshot: &[EntitlementSnapshot]) -> Result<serde_json::Value> {
+    serde_json::to_value(snapshot).map_err(|e| GovernanceError::Validation(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -466,6 +470,25 @@ mod tests {
         assert!(
             restore.contains("GovernanceError::Database(e)"),
             "assignment lookup errors must fail restore"
+        );
+    }
+
+    #[test]
+    fn audit_snapshots_json_does_not_drop_on_serialize() {
+        let v = super::snapshot_json(&[]).unwrap();
+        assert!(v.is_array());
+        let src = include_str!("state_access_rule_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let store = production
+            .split("pub async fn store_audit_snapshots")
+            .nth(1)
+            .and_then(|s| s.split("    pub async fn ").next())
+            .expect("store_audit_snapshots");
+        assert!(
+            store.contains("snapshot_json(")
+                && !store.contains("to_value(before_snapshot).ok()")
+                && !store.contains("to_value(after_snapshot).ok()"),
+            "state transition audit snapshots must fail closed on JSON serialize"
         );
     }
 }
