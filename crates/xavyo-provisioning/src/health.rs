@@ -9,7 +9,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use thiserror::Error;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 /// Errors that can occur during health operations.
@@ -492,12 +492,15 @@ impl HealthMonitor {
                     continue;
                 }
 
-                // Resume awaiting operations for this connector
-                match self
-                    .queue
-                    .resume_awaiting_operations(tenant_id, health_info.connector_id)
-                    .await
-                {
+                // Resume awaiting operations for this connector.
+                // Persist errors must not leave the connector marked online
+                // while work stays awaiting_system.
+                match operations_resumed_recorded(
+                    self.queue
+                        .resume_awaiting_operations(tenant_id, health_info.connector_id)
+                        .await
+                        .map_err(|e| HealthError::CheckFailed(e.to_string())),
+                ) {
                     Ok(count) => {
                         if count > 0 {
                             info!(
@@ -509,11 +512,19 @@ impl HealthMonitor {
                         }
                     }
                     Err(e) => {
-                        warn!(
+                        error!(
                             connector_id = %health_info.connector_id,
                             error = %e,
                             "Failed to resume awaiting operations"
                         );
+                        self.health_service
+                            .mark_connector_offline(
+                                tenant_id,
+                                health_info.connector_id,
+                                Some("resume awaiting operations failed"),
+                            )
+                            .await?;
+                        return Err(e);
                     }
                 }
             }
@@ -521,6 +532,12 @@ impl HealthMonitor {
 
         Ok(resumed_count)
     }
+}
+
+/// Resume awaiting operations. Errors must not leave the connector marked
+/// online while work stays in `awaiting_system`.
+pub(crate) fn operations_resumed_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
 }
 
 /// Internal row type for health queries.
@@ -550,6 +567,34 @@ mod tests {
         assert!(
             !production.contains("resume_awaiting_operations(health_info.connector_id)"),
             "must not resume awaiting operations by connector_id alone"
+        );
+    }
+
+    #[test]
+    fn resume_awaiting_does_not_swallow_persist_or_leave_online() {
+        assert!(operations_resumed_recorded(Ok::<u64, &str>(1)).is_ok());
+        assert!(operations_resumed_recorded::<u64, &str>(Err("db")).is_err());
+
+        let src = include_str!("health.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let window = production
+            .split("async fn check_offline_connectors")
+            .nth(1)
+            .and_then(|s| s.split("/// Internal row type").next())
+            .expect("check_offline_connectors");
+        assert!(
+            window.contains("operations_resumed_recorded(")
+                && window.contains("mark_connector_offline(")
+                && window.contains("return Err(e)"),
+            "resume persist errors must revert online and fail closed"
+        );
+        let resume_err = window
+            .split("Failed to resume awaiting operations")
+            .nth(1)
+            .unwrap_or("");
+        assert!(
+            resume_err.contains("mark_connector_offline(") && resume_err.contains("return Err(e)"),
+            "must not leave the connector online when resume persist fails"
         );
     }
 

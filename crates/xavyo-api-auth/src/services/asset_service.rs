@@ -7,7 +7,7 @@ use crate::models::AssetResponse;
 use crate::services::{asset_storage::AssetStorage, image_validator};
 use sqlx::PgPool;
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::info;
 use uuid::Uuid;
 use xavyo_core::TenantId;
 use xavyo_db::models::{AssetListFilter, AssetType, BrandingAsset, CreateBrandingAsset};
@@ -135,15 +135,9 @@ impl AssetService {
             )));
         }
 
-        // Delete from storage
-        if let Err(e) = self.storage.delete(&asset.storage_path).await {
-            warn!(
-                tenant_id = %tenant_id,
-                asset_id = %asset_id,
-                error = %e,
-                "Failed to delete asset from storage, continuing with database deletion"
-            );
-        }
+        // Delete from storage. Errors must not report the asset deleted
+        // while the file is still present.
+        storage_deleted(self.storage.delete(&asset.storage_path).await)?;
 
         // Delete from database
         BrandingAsset::delete_by_tenant(&self.pool, asset_id, tenant_id)
@@ -238,6 +232,12 @@ impl AssetService {
     }
 }
 
+/// Storage delete persist. Errors must not report the asset deleted while
+/// the file is still present.
+pub(crate) fn storage_deleted<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -269,6 +269,28 @@ mod tests {
         assert!(
             production.contains("is_referenced(&self.pool, tenant_id, &asset.storage_path)"),
             "branding reference check must pass tenant_id"
+        );
+    }
+
+    #[test]
+    fn delete_asset_does_not_report_success_when_storage_delete_fails() {
+        assert!(super::storage_deleted(Ok::<(), &str>(())).is_ok());
+        assert!(super::storage_deleted::<(), &str>(Err("io")).is_err());
+
+        let src = include_str!("asset_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let window = production
+            .split("pub async fn delete_asset")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn list_assets").next())
+            .expect("delete_asset");
+        assert!(
+            window.contains("storage_deleted(") && window.contains("self.storage.delete("),
+            "storage delete must fail closed"
+        );
+        assert!(
+            !window.contains("continuing with database deletion"),
+            "must not report the asset deleted while the file is still present"
         );
     }
 }
