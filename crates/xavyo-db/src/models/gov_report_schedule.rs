@@ -307,8 +307,7 @@ impl GovReportSchedule {
         input: CreateReportSchedule,
     ) -> Result<Self, sqlx::Error> {
         let parameters = input.parameters.unwrap_or_else(|| serde_json::json!({}));
-        let recipients =
-            serde_json::to_value(&input.recipients).unwrap_or_else(|_| serde_json::json!([]));
+        let recipients = schedule_json(&input.recipients)?;
         let next_run_at = calculate_next_run(
             input.frequency,
             input.schedule_hour,
@@ -433,8 +432,7 @@ impl GovReportSchedule {
             q = q.bind(parameters);
         }
         if let Some(ref recipients) = input.recipients {
-            let recipients_json =
-                serde_json::to_value(recipients).unwrap_or_else(|_| serde_json::json!([]));
+            let recipients_json = schedule_json(recipients)?;
             q = q.bind(recipients_json);
         }
         if let Some(output_format) = input.output_format {
@@ -628,6 +626,13 @@ impl GovReportSchedule {
     }
 }
 
+/// Report schedule JSON persist. Serialization errors must not store empty recipients.
+pub(crate) fn schedule_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
+}
+
 /// Calculate the next run time for a schedule.
 fn calculate_next_run(
     frequency: ScheduleFrequency,
@@ -812,6 +817,19 @@ mod tests {
         assert!(
             !list_due.contains("WHERE status = 'active' AND next_run_at"),
             "must not list due schedules across all tenants"
+        );
+    }
+
+    #[test]
+    fn schedule_json_does_not_store_empty_on_serialize() {
+        let v = schedule_json(&vec!["ops@example.com".to_string()]).unwrap();
+        assert!(v.is_array());
+        let src = include_str!("gov_report_schedule.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("schedule_json(")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!([])"),
+            "report schedule persist must fail closed on JSON serialize"
         );
     }
 }

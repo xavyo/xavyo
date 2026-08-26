@@ -241,8 +241,7 @@ impl GovPolicySimulation {
         affected_users: Vec<Uuid>,
         impact_summary: ImpactSummary,
     ) -> Result<Option<Self>, sqlx::Error> {
-        let summary_json =
-            serde_json::to_value(&impact_summary).unwrap_or_else(|_| serde_json::json!({}));
+        let summary_json = policy_sim_json(&impact_summary)?;
 
         sqlx::query_as(
             r"
@@ -424,6 +423,13 @@ impl GovPolicySimulation {
     }
 }
 
+/// Policy simulation JSON persist. Serialization errors must not store empty impact.
+pub(crate) fn policy_sim_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -509,6 +515,19 @@ mod tests {
         assert!(
             !production.contains("WHERE id = $1 AND updated_at > $2"),
             "must not look up policies by id alone"
+        );
+    }
+
+    #[test]
+    fn policy_sim_json_does_not_store_empty_on_serialize() {
+        let v = policy_sim_json(&serde_json::json!({"affected_users": 2})).unwrap();
+        assert_eq!(v["affected_users"], 2);
+        let src = include_str!("gov_policy_simulation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("policy_sim_json(")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!({})"),
+            "policy simulation persist must fail closed on JSON serialize"
         );
     }
 }

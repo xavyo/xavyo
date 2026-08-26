@@ -292,8 +292,7 @@ impl GovRoleSimulation {
         tenant_id: Uuid,
         input: CreateRoleSimulation,
     ) -> Result<Self, sqlx::Error> {
-        let changes =
-            serde_json::to_value(&input.changes).unwrap_or_else(|_| serde_json::json!({}));
+        let changes = role_sim_json(&input.changes)?;
 
         sqlx::query_as(
             r"
@@ -422,6 +421,13 @@ impl GovRoleSimulation {
     }
 }
 
+/// Role simulation JSON persist. Serialization errors must not store empty changes.
+pub(crate) fn role_sim_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -483,5 +489,18 @@ mod tests {
         assert_eq!(changes.change_type, Some("add_entitlement".to_string()));
         assert!(changes.role_id.is_some());
         assert!(changes.entitlement_id.is_some());
+    }
+
+    #[test]
+    fn role_sim_json_does_not_store_empty_on_serialize() {
+        let v = role_sim_json(&serde_json::json!({"type": "add_entitlement"})).unwrap();
+        assert_eq!(v["type"], "add_entitlement");
+        let src = include_str!("gov_role_simulation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("role_sim_json(")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!({})"),
+            "role simulation persist must fail closed on JSON serialize"
+        );
     }
 }
