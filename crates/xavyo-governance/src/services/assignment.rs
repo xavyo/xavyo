@@ -346,7 +346,7 @@ impl AssignmentService {
                 user_id: Some(input.user_id),
                 action: EntitlementAuditAction::Assigned,
                 actor_id: input.assigned_by,
-                after_state: Some(serde_json::to_value(&assignment).unwrap_or_default()),
+                after_state: Some(assignment_json(&assignment)?),
                 ..Default::default()
             })
             .await?;
@@ -383,7 +383,7 @@ impl AssignmentService {
                     user_id: Some(before.target_id),
                     action: EntitlementAuditAction::Revoked,
                     actor_id,
-                    before_state: Some(serde_json::to_value(&before).unwrap_or_default()),
+                    before_state: Some(assignment_json(&before)?),
                     ..Default::default()
                 })
                 .await?;
@@ -407,6 +407,11 @@ impl AssignmentService {
     pub async fn get(&self, tenant_id: Uuid, id: Uuid) -> Result<Option<EntitlementAssignment>> {
         self.assignment_store.get(tenant_id, id).await
     }
+}
+
+/// Assignment audit persist. Serialization errors must not store empty state.
+pub(crate) fn assignment_json<T: serde::Serialize>(value: &T) -> Result<serde_json::Value> {
+    serde_json::to_value(value).map_err(|e| GovernanceError::Validation(e.to_string()))
 }
 
 // ============================================================================
@@ -699,5 +704,19 @@ mod tests {
             result,
             Err(GovernanceError::InvalidExpirationDate)
         ));
+    }
+
+    #[test]
+    fn assignment_json_does_not_store_empty_on_serialize() {
+        let v = assignment_json(&serde_json::json!({"status": "active"})).unwrap();
+        assert_eq!(v["status"], "active");
+        let src = include_str!("assignment.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("assignment_json(")
+                && !production.contains("to_value(&assignment).unwrap_or_default()")
+                && !production.contains("to_value(&before).unwrap_or_default()"),
+            "assignment audit persist must fail closed on JSON serialize"
+        );
     }
 }

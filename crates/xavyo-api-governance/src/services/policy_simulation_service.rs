@@ -466,7 +466,7 @@ impl PolicySimulationService {
                 simulation_id: simulation.id,
                 user_id: *user_id,
                 impact_type: ImpactType::Violation,
-                details: serde_json::to_value(&details).unwrap_or_default(),
+                details: sim_details_json(&details)?,
                 severity: Some(severity.clone()),
             });
 
@@ -681,7 +681,7 @@ impl PolicySimulationService {
                         simulation_id: simulation.id,
                         user_id,
                         impact_type,
-                        details: serde_json::to_value(&details).unwrap_or_default(),
+                        details: sim_details_json(&details)?,
                         severity: Some(severity.to_string()),
                     });
                 }
@@ -882,6 +882,11 @@ impl PolicySimulationService {
 
         Ok(result)
     }
+}
+
+/// Policy simulation details persist. Serialization errors must not store empty details.
+pub(crate) fn sim_details_json<T: serde::Serialize>(value: &T) -> Result<serde_json::Value> {
+    serde_json::to_value(value).map_err(|e| GovernanceError::Validation(e.to_string()))
 }
 
 #[cfg(test)]
@@ -1916,5 +1921,18 @@ mod tests {
 
         let total_processed: usize = chunks.iter().map(|c| c.len()).sum();
         assert_eq!(total_processed, 8);
+    }
+
+    #[test]
+    fn sim_details_json_does_not_store_empty_on_serialize() {
+        let v = sim_details_json(&serde_json::json!({"rule_name": "sod"})).unwrap();
+        assert_eq!(v["rule_name"], "sod");
+        let src = include_str!("policy_simulation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("sim_details_json(")
+                && !production.contains("to_value(&details).unwrap_or_default()"),
+            "policy simulation details persist must fail closed on JSON serialize"
+        );
     }
 }

@@ -434,7 +434,7 @@ impl EntitlementService {
                 entitlement_id: Some(entitlement.id.into_inner()),
                 action: EntitlementAuditAction::Created,
                 actor_id,
-                after_state: Some(serde_json::to_value(&entitlement).unwrap_or_default()),
+                after_state: Some(entitlement_json(&entitlement)?),
                 ..Default::default()
             })
             .await?;
@@ -488,8 +488,8 @@ impl EntitlementService {
                 entitlement_id: Some(id),
                 action: EntitlementAuditAction::Updated,
                 actor_id,
-                before_state: Some(serde_json::to_value(&before).unwrap_or_default()),
-                after_state: Some(serde_json::to_value(&updated).unwrap_or_default()),
+                before_state: Some(entitlement_json(&before)?),
+                after_state: Some(entitlement_json(&updated)?),
                 ..Default::default()
             })
             .await?;
@@ -522,7 +522,7 @@ impl EntitlementService {
                     entitlement_id: Some(id),
                     action: EntitlementAuditAction::Deleted,
                     actor_id,
-                    before_state: Some(serde_json::to_value(&before).unwrap_or_default()),
+                    before_state: Some(entitlement_json(&before)?),
                     ..Default::default()
                 })
                 .await?;
@@ -545,6 +545,11 @@ impl EntitlementService {
     pub async fn count(&self, tenant_id: Uuid, filter: &EntitlementFilter) -> Result<i64> {
         self.store.count(tenant_id, filter).await
     }
+}
+
+/// Entitlement audit persist. Serialization errors must not store empty state.
+pub(crate) fn entitlement_json<T: serde::Serialize>(value: &T) -> Result<serde_json::Value> {
+    serde_json::to_value(value).map_err(|e| GovernanceError::Validation(e.to_string()))
 }
 
 // ============================================================================
@@ -1448,5 +1453,20 @@ mod tests {
 
         assert_eq!(updated.name, "Keep This Name");
         assert_eq!(updated.description, Some("Updated description".to_string()));
+    }
+
+    #[test]
+    fn entitlement_json_does_not_store_empty_on_serialize() {
+        let v = entitlement_json(&serde_json::json!({"name": "Admin Access"})).unwrap();
+        assert_eq!(v["name"], "Admin Access");
+        let src = include_str!("entitlement.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("entitlement_json(")
+                && !production.contains("to_value(&entitlement).unwrap_or_default()")
+                && !production.contains("to_value(&before).unwrap_or_default()")
+                && !production.contains("to_value(&updated).unwrap_or_default()"),
+            "entitlement audit persist must fail closed on JSON serialize"
+        );
     }
 }

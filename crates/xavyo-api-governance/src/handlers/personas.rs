@@ -516,7 +516,9 @@ pub async fn create_persona(
         .await?;
 
     // Log audit event
-    let attrs = persona.parse_attributes().unwrap_or_default();
+    let attrs = persona
+        .parse_attributes()
+        .map_err(|e| ApiGovernanceError::Validation(e.to_string()))?;
     state
         .persona_audit_service
         .log_persona_created(
@@ -526,7 +528,7 @@ pub async fn create_persona(
             persona.archetype_id,
             persona.physical_user_id,
             &persona.persona_name,
-            serde_json::to_value(&attrs).unwrap_or_default(),
+            persona_handler_json(&attrs)?,
             persona.valid_from,
             persona.valid_until,
         )
@@ -564,7 +566,9 @@ pub async fn get_persona(
     let persona = state.persona_service.get(tenant_id, id).await?;
 
     // Parse attributes
-    let attrs = persona.parse_attributes().unwrap_or_default();
+    let attrs = persona
+        .parse_attributes()
+        .map_err(|e| ApiGovernanceError::Validation(e.to_string()))?;
 
     let response = PersonaDetailResponse {
         base: PersonaResponse::from(persona),
@@ -1303,4 +1307,28 @@ pub async fn get_expiring_personas(
             .collect(),
         generated_at: report.generated_at,
     }))
+}
+
+/// Persona handler persist. Serialization errors must not store empty attributes.
+pub(crate) fn persona_handler_json<T: serde::Serialize>(value: &T) -> ApiResult<serde_json::Value> {
+    serde_json::to_value(value).map_err(|e| ApiGovernanceError::Validation(e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn persona_handler_json_does_not_store_empty_on_serialize() {
+        let v = persona_handler_json(&serde_json::json!({"inherited": {"a": 1}})).unwrap();
+        assert_eq!(v["inherited"]["a"], 1);
+        let src = include_str!("personas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("persona_handler_json(")
+                && !production.contains("to_value(&attrs).unwrap_or_default()")
+                && !production.contains("parse_attributes().unwrap_or_default()"),
+            "persona create/get must fail closed on attribute JSON"
+        );
+    }
 }

@@ -338,7 +338,7 @@ impl SodService {
                 tenant_id,
                 action: EntitlementAuditAction::Created,
                 actor_id: input.created_by,
-                after_state: Some(serde_json::to_value(&rule).unwrap_or_default()),
+                after_state: Some(sod_rule_json(&rule)?),
                 metadata: Some(serde_json::json!({"sod_rule_id": rule.id.to_string()})),
                 ..Default::default()
             })
@@ -384,8 +384,8 @@ impl SodService {
                 tenant_id,
                 action: EntitlementAuditAction::Updated,
                 actor_id,
-                before_state: Some(serde_json::to_value(&before).unwrap_or_default()),
-                after_state: Some(serde_json::to_value(&updated).unwrap_or_default()),
+                before_state: Some(sod_rule_json(&before)?),
+                after_state: Some(sod_rule_json(&updated)?),
                 metadata: Some(serde_json::json!({"sod_rule_id": id.to_string()})),
                 ..Default::default()
             })
@@ -417,7 +417,7 @@ impl SodService {
                     tenant_id,
                     action: EntitlementAuditAction::Deleted,
                     actor_id,
-                    before_state: Some(serde_json::to_value(&before).unwrap_or_default()),
+                    before_state: Some(sod_rule_json(&before)?),
                     metadata: Some(serde_json::json!({"sod_rule_id": id.to_string()})),
                     ..Default::default()
                 })
@@ -426,6 +426,11 @@ impl SodService {
 
         Ok(deleted)
     }
+}
+
+/// SoD rule audit persist. Serialization errors must not store empty state.
+pub(crate) fn sod_rule_json<T: serde::Serialize>(value: &T) -> Result<serde_json::Value> {
+    serde_json::to_value(value).map_err(|e| GovernanceError::Validation(e.to_string()))
 }
 
 // ============================================================================
@@ -747,5 +752,20 @@ mod tests {
         // Rule should now be inactive and orphaned
         let rules = rule_store.list_active(tenant_id).await.unwrap();
         assert!(rules.is_empty());
+    }
+
+    #[test]
+    fn sod_rule_json_does_not_store_empty_on_serialize() {
+        let v = sod_rule_json(&serde_json::json!({"name": "AP Segregation"})).unwrap();
+        assert_eq!(v["name"], "AP Segregation");
+        let src = include_str!("sod.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("sod_rule_json(")
+                && !production.contains("to_value(&rule).unwrap_or_default()")
+                && !production.contains("to_value(&before).unwrap_or_default()")
+                && !production.contains("to_value(&updated).unwrap_or_default()"),
+            "SoD rule audit persist must fail closed on JSON serialize"
+        );
     }
 }
