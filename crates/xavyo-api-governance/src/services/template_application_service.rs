@@ -722,7 +722,7 @@ impl TemplateApplicationService {
         let validation_errors = if result.validation_errors.is_empty() {
             None
         } else {
-            Some(serde_json::to_value(&result.validation_errors).unwrap_or_default())
+            Some(template_app_json(&result.validation_errors)?)
         };
 
         GovTemplateApplicationEvent::create(
@@ -777,6 +777,11 @@ impl TemplateApplicationService {
     }
 }
 
+/// Template application event persist. Serialization errors must not store empty errors.
+pub(crate) fn template_app_json<T: serde::Serialize>(value: &T) -> Result<serde_json::Value> {
+    serde_json::to_value(value).map_err(|e| GovernanceError::Validation(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -808,5 +813,18 @@ mod tests {
 
         assert_eq!(error.attribute, "email");
         assert!(!error.message.is_empty());
+    }
+
+    #[test]
+    fn template_app_json_does_not_store_empty_on_serialize() {
+        let v = template_app_json(&json!([{"attribute": "email"}])).unwrap();
+        assert!(v.is_array());
+        let src = include_str!("template_application_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("template_app_json(")
+                && !production.contains("to_value(&result.validation_errors).unwrap_or_default()"),
+            "template application persist must fail closed on JSON serialize"
+        );
     }
 }

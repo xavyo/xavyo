@@ -380,7 +380,7 @@ impl SodExemptionService {
                 tenant_id,
                 action: EntitlementAuditAction::Created,
                 actor_id: input.granted_by,
-                after_state: Some(serde_json::to_value(&exemption).unwrap_or_default()),
+                after_state: Some(sod_exemption_json(&exemption)?),
                 metadata: Some(serde_json::json!({
                     "sod_exemption_id": exemption.id.to_string(),
                     "rule_id": input.rule_id.to_string(),
@@ -419,8 +419,8 @@ impl SodExemptionService {
                 tenant_id,
                 action: EntitlementAuditAction::Deleted,
                 actor_id: revoked_by,
-                before_state: Some(serde_json::to_value(&before).unwrap_or_default()),
-                after_state: Some(serde_json::to_value(&revoked).unwrap_or_default()),
+                before_state: Some(sod_exemption_json(&before)?),
+                after_state: Some(sod_exemption_json(&revoked)?),
                 metadata: Some(serde_json::json!({
                     "sod_exemption_id": id.to_string(),
                     "action": "revoked",
@@ -480,6 +480,11 @@ impl SodExemptionService {
     pub async fn expire_stale_exemptions(&self, tenant_id: Uuid) -> Result<u64> {
         self.exemption_store.expire_stale(tenant_id).await
     }
+}
+
+/// SoD exemption audit persist. Serialization errors must not store empty state.
+pub(crate) fn sod_exemption_json<T: serde::Serialize>(value: &T) -> Result<serde_json::Value> {
+    serde_json::to_value(value).map_err(|e| GovernanceError::Validation(e.to_string()))
 }
 
 // ============================================================================
@@ -864,5 +869,20 @@ mod tests {
             .await
             .unwrap();
         assert!(is_exempted);
+    }
+
+    #[test]
+    fn sod_exemption_json_does_not_store_empty_on_serialize() {
+        let v = sod_exemption_json(&serde_json::json!({"justification": "need"})).unwrap();
+        assert_eq!(v["justification"], "need");
+        let src = include_str!("sod_exemption.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("sod_exemption_json(")
+                && !production.contains("to_value(&exemption).unwrap_or_default()")
+                && !production.contains("to_value(&before).unwrap_or_default()")
+                && !production.contains("to_value(&revoked).unwrap_or_default()"),
+            "SoD exemption audit persist must fail closed on JSON serialize"
+        );
     }
 }

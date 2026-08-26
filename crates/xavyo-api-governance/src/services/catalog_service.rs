@@ -1175,7 +1175,7 @@ impl CatalogService {
                     // Check for SoD violations for this specific item
                     let has_sod_warning = !validation.sod_violations.is_empty();
                     let sod_violations_json = if has_sod_warning {
-                        Some(serde_json::to_value(&validation.sod_violations).unwrap_or_default())
+                        Some(catalog_sod_json(&validation.sod_violations)?)
                     } else {
                         None
                     };
@@ -1419,6 +1419,11 @@ impl CatalogService {
     }
 }
 
+/// Catalog SoD persist. Serialization errors must not store empty violations.
+pub(crate) fn catalog_sod_json<T: serde::Serialize>(value: &T) -> Result<serde_json::Value> {
+    serde_json::to_value(value).map_err(|e| GovernanceError::Validation(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1493,5 +1498,18 @@ mod tests {
         let result = RequestabilityResult::denied("Not allowed");
         assert!(!result.can_request);
         assert_eq!(result.reason, Some("Not allowed".to_string()));
+    }
+
+    #[test]
+    fn catalog_sod_json_does_not_store_empty_on_serialize() {
+        let v = catalog_sod_json(&serde_json::json!([{"rule": "sod"}])).unwrap();
+        assert!(v.is_array());
+        let src = include_str!("catalog_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("catalog_sod_json(")
+                && !production.contains("to_value(&validation.sod_violations).unwrap_or_default()"),
+            "catalog SoD persist must fail closed on JSON serialize"
+        );
     }
 }
