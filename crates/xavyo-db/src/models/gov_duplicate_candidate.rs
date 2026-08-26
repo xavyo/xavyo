@@ -279,8 +279,7 @@ impl GovDuplicateCandidate {
         input: CreateGovDuplicateCandidate,
     ) -> Result<Self, sqlx::Error> {
         let (id_a, id_b) = Self::canonical_order(input.identity_a_id, input.identity_b_id);
-        let rule_matches_json =
-            serde_json::to_value(&input.rule_matches).unwrap_or_else(|_| serde_json::json!({}));
+        let rule_matches_json = duplicate_rules_json(&input.rule_matches)?;
 
         sqlx::query_as(
             r"
@@ -418,6 +417,13 @@ impl GovDuplicateCandidate {
     }
 }
 
+/// Duplicate candidate JSON persist. Serialization errors must not store empty matches.
+pub(crate) fn duplicate_rules_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -461,5 +467,18 @@ mod tests {
         let json = serde_json::to_string(&matches).unwrap();
         assert!(json.contains("Email Match"));
         assert!(json.contains("50.0"));
+    }
+
+    #[test]
+    fn duplicate_rules_json_does_not_store_empty_on_serialize() {
+        let v = duplicate_rules_json(&serde_json::json!({"total_confidence": 50.0})).unwrap();
+        assert_eq!(v["total_confidence"], 50.0);
+        let src = include_str!("gov_duplicate_candidate.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("duplicate_rules_json(")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!({})"),
+            "duplicate candidate persist must fail closed on JSON serialize"
+        );
     }
 }

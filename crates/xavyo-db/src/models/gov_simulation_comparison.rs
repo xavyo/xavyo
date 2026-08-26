@@ -206,10 +206,8 @@ impl GovSimulationComparison {
         summary_stats: ComparisonSummary,
         delta_results: DeltaResults,
     ) -> Result<Self, sqlx::Error> {
-        let summary_json =
-            serde_json::to_value(&summary_stats).unwrap_or_else(|_| serde_json::json!({}));
-        let delta_json =
-            serde_json::to_value(&delta_results).unwrap_or_else(|_| serde_json::json!({}));
+        let summary_json = comparison_json(&summary_stats)?;
+        let delta_json = comparison_json(&delta_results)?;
 
         sqlx::query_as(
             r"
@@ -317,6 +315,13 @@ impl GovSimulationComparison {
     }
 }
 
+/// Simulation comparison JSON persist. Serialization errors must not store empty stats.
+pub(crate) fn comparison_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -407,5 +412,18 @@ mod tests {
         assert_eq!(stats.users_in_both, 100);
         assert_eq!(stats.users_only_in_a, 10);
         assert_eq!(stats.total_additions, 15);
+    }
+
+    #[test]
+    fn comparison_json_does_not_store_empty_on_serialize() {
+        let v = comparison_json(&serde_json::json!({"users_in_both": 1})).unwrap();
+        assert_eq!(v["users_in_both"], 1);
+        let src = include_str!("gov_simulation_comparison.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("comparison_json(")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!({})"),
+            "simulation comparison persist must fail closed on JSON serialize"
+        );
     }
 }

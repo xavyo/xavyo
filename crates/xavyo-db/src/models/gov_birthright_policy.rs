@@ -431,8 +431,7 @@ impl GovBirthrightPolicy {
         tenant_id: Uuid,
         input: CreateBirthrightPolicy,
     ) -> Result<Self, sqlx::Error> {
-        let conditions =
-            serde_json::to_value(&input.conditions).unwrap_or_else(|_| serde_json::json!([]));
+        let conditions = birthright_json(&input.conditions)?;
 
         sqlx::query_as(
             r"
@@ -512,8 +511,7 @@ impl GovBirthrightPolicy {
             q = q.bind(description);
         }
         if let Some(ref conditions) = input.conditions {
-            let conditions_json =
-                serde_json::to_value(conditions).unwrap_or_else(|_| serde_json::json!([]));
+            let conditions_json = birthright_json(conditions)?;
             q = q.bind(conditions_json);
         }
         if let Some(ref entitlement_ids) = input.entitlement_ids {
@@ -613,6 +611,13 @@ impl GovBirthrightPolicy {
 
         conditions.iter().all(|c| c.evaluate(user_attrs))
     }
+}
+
+/// Birthright policy JSON persist. Serialization errors must not store empty conditions.
+pub(crate) fn birthright_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
 }
 
 #[cfg(test)]
@@ -913,5 +918,18 @@ mod tests {
 
         // Bare "department" should use the top-level value, not custom_attributes
         assert!(condition.evaluate(&user_attrs));
+    }
+
+    #[test]
+    fn birthright_json_does_not_store_empty_on_serialize() {
+        let v = birthright_json(&vec![serde_json::json!({"attribute": "department"})]).unwrap();
+        assert!(v.is_array());
+        let src = include_str!("gov_birthright_policy.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("birthright_json(")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!([])"),
+            "birthright policy persist must fail closed on JSON serialize"
+        );
     }
 }

@@ -318,8 +318,7 @@ impl GovReportTemplate {
         tenant_id: Uuid,
         input: CreateReportTemplate,
     ) -> Result<Self, sqlx::Error> {
-        let definition =
-            serde_json::to_value(&input.definition).unwrap_or_else(|_| serde_json::json!({}));
+        let definition = report_def_json(&input.definition)?;
 
         sqlx::query_as(
             r"
@@ -416,8 +415,7 @@ impl GovReportTemplate {
             q = q.bind(description);
         }
         if let Some(ref definition) = input.definition {
-            let definition_json =
-                serde_json::to_value(definition).unwrap_or_else(|_| serde_json::json!({}));
+            let definition_json = report_def_json(definition)?;
             q = q.bind(definition_json);
         }
 
@@ -474,6 +472,13 @@ impl GovReportTemplate {
     pub fn can_modify(&self) -> bool {
         !self.is_system && self.status.is_active()
     }
+}
+
+/// Report template JSON persist. Serialization errors must not store empty definitions.
+pub(crate) fn report_def_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
 }
 
 #[cfg(test)]
@@ -555,5 +560,18 @@ mod tests {
         assert_eq!(filter.filter_type, "select");
         assert!(!filter.required);
         assert!(filter.options.is_none());
+    }
+
+    #[test]
+    fn report_def_json_does_not_store_empty_on_serialize() {
+        let v = report_def_json(&serde_json::json!({"data_sources": ["users"]})).unwrap();
+        assert_eq!(v["data_sources"][0], "users");
+        let src = include_str!("gov_report_template.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("report_def_json(")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!({})"),
+            "report template persist must fail closed on JSON serialize"
+        );
     }
 }

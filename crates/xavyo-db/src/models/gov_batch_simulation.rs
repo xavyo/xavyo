@@ -228,10 +228,8 @@ impl GovBatchSimulation {
         tenant_id: Uuid,
         input: CreateBatchSimulation,
     ) -> Result<Self, sqlx::Error> {
-        let filter_criteria =
-            serde_json::to_value(&input.filter_criteria).unwrap_or_else(|_| serde_json::json!({}));
-        let change_spec =
-            serde_json::to_value(&input.change_spec).unwrap_or_else(|_| serde_json::json!({}));
+        let filter_criteria = batch_run_json(&input.filter_criteria)?;
+        let change_spec = batch_run_json(&input.change_spec)?;
 
         sqlx::query_as(
             r"
@@ -287,8 +285,7 @@ impl GovBatchSimulation {
         total_users: i32,
         impact_summary: BatchImpactSummary,
     ) -> Result<Option<Self>, sqlx::Error> {
-        let summary_json =
-            serde_json::to_value(&impact_summary).unwrap_or_else(|_| serde_json::json!({}));
+        let summary_json = batch_run_json(&impact_summary)?;
 
         sqlx::query_as(
             r"
@@ -462,6 +459,13 @@ impl GovBatchSimulation {
     }
 }
 
+/// Batch simulation JSON persist. Serialization errors must not store empty criteria.
+pub(crate) fn batch_run_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -550,5 +554,18 @@ mod tests {
         };
 
         assert!(!simulation.has_scope_warning());
+    }
+
+    #[test]
+    fn batch_run_json_does_not_store_empty_on_serialize() {
+        let v = batch_run_json(&serde_json::json!({"department": "eng"})).unwrap();
+        assert_eq!(v["department"], "eng");
+        let src = include_str!("gov_batch_simulation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("batch_run_json(")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!({})"),
+            "batch simulation persist must fail closed on JSON serialize"
+        );
     }
 }
