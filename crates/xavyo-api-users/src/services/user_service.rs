@@ -1157,8 +1157,8 @@ impl UserService {
 
     /// Record an admin audit event for user CRUD operations (A6).
     ///
-    /// Best-effort: logs a warning and continues if the INSERT fails, so that
-    /// audit failures never block the primary operation.
+    /// Persist errors must not report the user mutation as complete without
+    /// an audit row.
     pub async fn record_audit_event(
         &self,
         tenant_id: TenantId,
@@ -1166,32 +1166,30 @@ impl UserService {
         action: &str,
         resource_id: uuid::Uuid,
         details: serde_json::Value,
-    ) {
-        let result = sqlx::query(
-            r"
+    ) -> Result<(), ApiUsersError> {
+        admin_audit_recorded(
+            sqlx::query(
+                r"
             INSERT INTO admin_audit_events (tenant_id, actor_id, action, resource_type, resource_id, details)
             VALUES ($1, $2, $3, 'user', $4, $5)
             ",
-        )
-        .bind(tenant_id.as_uuid())
-        .bind(actor_id)
-        .bind(action)
-        .bind(resource_id)
-        .bind(&details)
-        .execute(&self.pool)
-        .await;
-
-        if let Err(e) = result {
-            tracing::warn!(
-                tenant_id = %tenant_id,
-                actor_id = %actor_id,
-                action = action,
-                resource_id = %resource_id,
-                error = %e,
-                "Failed to record admin audit event"
-            );
-        }
+            )
+            .bind(tenant_id.as_uuid())
+            .bind(actor_id)
+            .bind(action)
+            .bind(resource_id)
+            .bind(&details)
+            .execute(&self.pool)
+            .await,
+        )?;
+        Ok(())
     }
+}
+
+/// Admin audit persist. Errors must not report the user mutation complete
+/// without an audit row.
+pub(crate) fn admin_audit_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
 }
 
 // ── Custom attribute filter helpers (US3) ──
@@ -1475,6 +1473,28 @@ mod tests {
                 && !production.contains("Failed to fetch lifecycle state for user")
                 && !production.contains(".ok()\n            .flatten()"),
             "must not hide lifecycle lookup errors as missing state"
+        );
+    }
+
+    #[test]
+    fn admin_audit_recorded_does_not_skip_on_error() {
+        assert!(admin_audit_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(admin_audit_recorded::<(), &str>(Err("db")).is_err());
+
+        let src = include_str!("user_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let window = production
+            .split("pub async fn record_audit_event")
+            .nth(1)
+            .and_then(|s| s.split("Custom attribute filter helpers").next())
+            .expect("record_audit_event");
+        assert!(
+            window.contains("admin_audit_recorded("),
+            "admin audit persist must fail closed"
+        );
+        assert!(
+            !window.contains("Failed to record admin audit event"),
+            "must not swallow admin audit persist errors"
         );
     }
 }

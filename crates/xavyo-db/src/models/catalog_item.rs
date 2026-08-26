@@ -397,10 +397,8 @@ impl CatalogItem {
         tenant_id: Uuid,
         input: CreateCatalogItem,
     ) -> Result<Self, sqlx::Error> {
-        let rules_json = serde_json::to_value(&input.requestability_rules)
-            .unwrap_or_else(|_| serde_json::json!({}));
-        let fields_json =
-            serde_json::to_value(&input.form_fields).unwrap_or_else(|_| serde_json::json!([]));
+        let rules_json = catalog_json(&input.requestability_rules)?;
+        let fields_json = catalog_json(&input.form_fields)?;
 
         sqlx::query_as(
             r"
@@ -484,13 +482,10 @@ impl CatalogItem {
             q = q.bind(description);
         }
         if let Some(ref rules) = input.requestability_rules {
-            let rules_json = serde_json::to_value(rules).unwrap_or_else(|_| serde_json::json!({}));
-            q = q.bind(rules_json);
+            q = q.bind(catalog_json(rules)?);
         }
         if let Some(ref fields) = input.form_fields {
-            let fields_json =
-                serde_json::to_value(fields).unwrap_or_else(|_| serde_json::json!([]));
-            q = q.bind(fields_json);
+            q = q.bind(catalog_json(fields)?);
         }
         if let Some(ref tags) = input.tags {
             q = q.bind(tags);
@@ -603,6 +598,13 @@ impl CatalogItem {
     }
 }
 
+/// Catalog JSON persist. Serialization errors must not store empty rules or fields.
+pub(crate) fn catalog_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -626,6 +628,23 @@ mod tests {
         assert!(!rules.manager_request);
         assert!(rules.department_restriction.is_empty());
         assert!(rules.prerequisite_roles.is_empty());
+    }
+
+    #[test]
+    fn catalog_json_does_not_store_empty_on_serialize() {
+        let v = catalog_json(&serde_json::json!({"a": 1})).unwrap();
+        assert_eq!(v["a"], 1);
+        let src = include_str!("catalog_item.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("catalog_json("),
+            "catalog create/update must fail closed on JSON serialize"
+        );
+        assert!(
+            !production.contains("unwrap_or_else(|_| serde_json::json!({})")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!([])"),
+            "must not persist empty catalog rules or fields"
+        );
     }
 
     #[test]

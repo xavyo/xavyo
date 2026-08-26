@@ -477,12 +477,11 @@ impl RoleConstruction {
         created_by: Uuid,
     ) -> Result<Self, sqlx::Error> {
         let id = Uuid::new_v4();
-        let attribute_mappings = serde_json::to_value(&input.attribute_mappings)
-            .unwrap_or_else(|_| serde_json::json!({}));
-        let condition = input
-            .condition
-            .as_ref()
-            .map(|c| serde_json::to_value(c).unwrap_or_default());
+        let attribute_mappings = construction_json(&input.attribute_mappings)?;
+        let condition = match &input.condition {
+            Some(c) => Some(construction_json(c)?),
+            None => None,
+        };
 
         sqlx::query_as(
             r"
@@ -576,13 +575,13 @@ impl RoleConstruction {
             q = q.bind(account_type);
         }
         if let Some(ref attribute_mappings) = input.attribute_mappings {
-            let json = serde_json::to_value(attribute_mappings).unwrap_or_default();
-            q = q.bind(json);
+            q = q.bind(construction_json(attribute_mappings)?);
         }
         if let Some(ref condition_opt) = input.condition {
-            let json: Option<serde_json::Value> = condition_opt
-                .as_ref()
-                .map(|c| serde_json::to_value(c).unwrap_or_default());
+            let json: Option<serde_json::Value> = match condition_opt {
+                Some(c) => Some(construction_json(c)?),
+                None => None,
+            };
             q = q.bind(json);
         }
         if let Some(policy) = input.deprovisioning_policy {
@@ -708,6 +707,13 @@ impl RoleConstruction {
     }
 }
 
+/// Role construction JSON persist. Serialization errors must not store empty mappings.
+pub(crate) fn construction_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -787,5 +793,18 @@ mod tests {
         assert_eq!(input.account_type, "default");
         assert_eq!(input.deprovisioning_policy, DeprovisioningPolicy::Disable);
         assert_eq!(input.priority, 0);
+    }
+
+    #[test]
+    fn construction_json_does_not_store_empty_on_serialize() {
+        let v = construction_json(&serde_json::json!({"k": "v"})).unwrap();
+        assert_eq!(v["k"], "v");
+        let src = include_str!("role_construction.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("construction_json(")
+                && !production.contains("unwrap_or_default()"),
+            "role construction persist must fail closed on JSON serialize"
+        );
     }
 }

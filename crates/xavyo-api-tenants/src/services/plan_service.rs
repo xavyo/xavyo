@@ -417,36 +417,31 @@ impl PlanService {
                 continue;
             }
 
-            // Mark as applied
-            match TenantPlanChange::mark_applied(&self.pool, change.tenant_id, change.id).await {
-                Ok(applied) => {
-                    tracing::info!(
-                        change_id = %change.id,
-                        tenant_id = %change.tenant_id,
-                        old_plan = %change.old_plan,
-                        new_plan = %change.new_plan,
-                        "Applied pending plan change"
-                    );
+            // Mark as applied. Persist errors must not look like the change
+            // is still pending after settings were updated.
+            let applied = plan_applied_recorded(
+                TenantPlanChange::mark_applied(&self.pool, change.tenant_id, change.id).await,
+            )
+            .map_err(|e| TenantError::Database(e.to_string()))?;
 
-                    results.push(PlanChangeResponse {
-                        id: applied.id,
-                        tenant_id: applied.tenant_id,
-                        change_type: applied.change_type,
-                        old_plan: applied.old_plan,
-                        new_plan: applied.new_plan,
-                        effective_at: applied.effective_at,
-                        status: "applied".to_string(),
-                        message: "Scheduled plan change applied".to_string(),
-                    });
-                }
-                Err(e) => {
-                    tracing::error!(
-                        change_id = %change.id,
-                        error = %e,
-                        "Failed to mark change as applied"
-                    );
-                }
-            }
+            tracing::info!(
+                change_id = %change.id,
+                tenant_id = %change.tenant_id,
+                old_plan = %change.old_plan,
+                new_plan = %change.new_plan,
+                "Applied pending plan change"
+            );
+
+            results.push(PlanChangeResponse {
+                id: applied.id,
+                tenant_id: applied.tenant_id,
+                change_type: applied.change_type,
+                old_plan: applied.old_plan,
+                new_plan: applied.new_plan,
+                effective_at: applied.effective_at,
+                status: "applied".to_string(),
+                message: "Scheduled plan change applied".to_string(),
+            });
         }
 
         Ok(results)
@@ -460,5 +455,34 @@ impl PlanService {
             .and_then(|v| v.as_str())
             .unwrap_or("free")
             .to_string()
+    }
+}
+
+/// Plan-change applied persist. Errors must not leave settings updated while
+/// the change is still pending.
+pub(crate) fn plan_applied_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plan_applied_recorded_does_not_skip_on_error() {
+        assert!(plan_applied_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(plan_applied_recorded::<(), &str>(Err("db")).is_err());
+
+        let src = include_str!("plan_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("plan_applied_recorded(")
+                && production.contains("TenantPlanChange::mark_applied("),
+            "mark_applied persist must fail closed"
+        );
+        assert!(
+            !production.contains("Failed to mark change as applied"),
+            "must not continue after settings were updated when mark_applied fails"
+        );
     }
 }

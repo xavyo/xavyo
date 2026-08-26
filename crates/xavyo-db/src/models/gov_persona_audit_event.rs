@@ -333,7 +333,7 @@ impl GovPersonaAuditEvent {
                 archetype_id: Some(data.archetype_id),
                 event_type: PersonaAuditEventType::PersonaCreated,
                 actor_id,
-                event_data: serde_json::to_value(&data).unwrap_or_default(),
+                event_data: persona_event_json(&data)?,
             },
         )
         .await
@@ -354,7 +354,7 @@ impl GovPersonaAuditEvent {
                 archetype_id: None,
                 event_type: PersonaAuditEventType::ContextSwitched,
                 actor_id,
-                event_data: serde_json::to_value(&data).unwrap_or_default(),
+                event_data: persona_event_json(&data)?,
             },
         )
         .await
@@ -375,7 +375,7 @@ impl GovPersonaAuditEvent {
                 archetype_id: None,
                 event_type: PersonaAuditEventType::ContextSwitchedBack,
                 actor_id,
-                event_data: serde_json::to_value(&data).unwrap_or_default(),
+                event_data: persona_event_json(&data)?,
             },
         )
         .await
@@ -396,7 +396,7 @@ impl GovPersonaAuditEvent {
                 archetype_id: None,
                 event_type: PersonaAuditEventType::AttributesPropagated,
                 actor_id,
-                event_data: serde_json::to_value(&data).unwrap_or_default(),
+                event_data: persona_event_json(&data)?,
             },
         )
         .await
@@ -418,11 +418,18 @@ impl GovPersonaAuditEvent {
                 archetype_id: Some(data.archetype_id),
                 event_type,
                 actor_id,
-                event_data: serde_json::to_value(&data).unwrap_or_default(),
+                event_data: persona_event_json(&data)?,
             },
         )
         .await
     }
+}
+
+/// Persona audit JSON persist. Serialization errors must not store empty event data.
+pub(crate) fn persona_event_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
 }
 
 #[cfg(test)]
@@ -485,5 +492,23 @@ mod tests {
         assert!(filter.actor_id.is_none());
         assert!(filter.from_date.is_none());
         assert!(filter.to_date.is_none());
+    }
+
+    #[test]
+    fn persona_event_json_does_not_store_empty_on_serialize() {
+        let v = persona_event_json(&serde_json::json!({"k": 1})).unwrap();
+        assert_eq!(v["k"], 1);
+        let src = include_str!("gov_persona_audit_event.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("persona_event_json(")
+                && !production.contains("unwrap_or_default()"),
+            "persona audit persist must fail closed on JSON serialize"
+        );
+        assert_eq!(
+            production.matches("persona_event_json(").count(),
+            5,
+            "all five log_* helpers"
+        );
     }
 }
