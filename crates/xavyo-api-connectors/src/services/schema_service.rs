@@ -302,16 +302,16 @@ impl SchemaService {
             let upsert = UpsertConnectorSchema {
                 object_class: oc.name.clone(),
                 native_name: oc.native_name.clone(),
-                attributes: serde_json::to_value(&oc.attributes).unwrap_or_default(),
+                attributes: schema_attributes_json(&oc.attributes)?,
                 supports_create: oc.supports_create,
                 supports_update: oc.supports_update,
                 supports_delete: oc.supports_delete,
                 ttl_seconds: cache_ttl_seconds,
             };
 
-            if let Err(e) = ConnectorSchema::upsert(pool, tenant_id, connector_id, &upsert).await {
-                warn!(error = %e, "Failed to cache schema object class");
-            }
+            schema_cache_recorded(
+                ConnectorSchema::upsert(pool, tenant_id, connector_id, &upsert).await,
+            )?;
         }
 
         // Mark discovery as complete
@@ -477,18 +477,16 @@ impl SchemaService {
             let upsert = UpsertConnectorSchema {
                 object_class: oc.name.clone(),
                 native_name: oc.native_name.clone(),
-                attributes: serde_json::to_value(&oc.attributes).unwrap_or_default(),
+                attributes: schema_attributes_json(&oc.attributes)?,
                 supports_create: oc.supports_create,
                 supports_update: oc.supports_update,
                 supports_delete: oc.supports_delete,
                 ttl_seconds: self.cache_ttl_seconds,
             };
 
-            if let Err(e) =
-                ConnectorSchema::upsert(&self.pool, tenant_id, connector_id, &upsert).await
-            {
-                warn!(error = %e, "Failed to cache schema object class");
-            }
+            schema_cache_recorded(
+                ConnectorSchema::upsert(&self.pool, tenant_id, connector_id, &upsert).await,
+            )?;
         }
 
         info!(
@@ -540,7 +538,7 @@ impl SchemaService {
         let object_classes = cached_schemas
             .into_iter()
             .map(Self::cached_schema_to_response)
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(Some(SchemaResponse {
             connector_id,
@@ -583,7 +581,7 @@ impl SchemaService {
         )
         .await?;
 
-        Ok(cached.map(Self::cached_schema_to_response))
+        cached.map(Self::cached_schema_to_response).transpose()
     }
 
     /// Clear cached schema for a connector.
@@ -692,11 +690,10 @@ impl SchemaService {
         }
     }
 
-    fn cached_schema_to_response(cached: ConnectorSchema) -> ObjectClassResponse {
-        let attributes: Vec<AttributeResponse> =
-            serde_json::from_value(cached.attributes).unwrap_or_default();
+    fn cached_schema_to_response(cached: ConnectorSchema) -> Result<ObjectClassResponse> {
+        let attributes = schema_cached_attributes(cached.attributes)?;
 
-        ObjectClassResponse {
+        Ok(ObjectClassResponse {
             name: cached.object_class,
             native_name: cached.native_name,
             display_name: None,
@@ -708,7 +705,7 @@ impl SchemaService {
             supports_delete: cached.supports_delete,
             object_class_type: None,    // Not stored in cache yet
             parent_classes: Vec::new(), // Not stored in cache yet
-        }
+        })
     }
 
     /// Internal helper to discover schema from a connector type.
@@ -754,6 +751,27 @@ impl SchemaService {
             }
         }
     }
+}
+
+/// Schema cache persist. Errors must not report discovery complete when the
+/// object-class cache was not written.
+pub(crate) fn schema_cache_recorded<T, E>(
+    result: std::result::Result<T, E>,
+) -> std::result::Result<T, E> {
+    result
+}
+
+/// Attribute JSON for the schema cache. Serialization errors must not store
+/// an empty attribute set.
+pub(crate) fn schema_attributes_json<T: serde::Serialize>(attrs: &T) -> Result<serde_json::Value> {
+    serde_json::to_value(attrs).map_err(|e| ConnectorApiError::InvalidConfiguration(e.to_string()))
+}
+
+/// Deserialize cached schema attributes. Corrupt cache must not look like
+/// an object class with no attributes.
+pub(crate) fn schema_cached_attributes(value: serde_json::Value) -> Result<Vec<AttributeResponse>> {
+    serde_json::from_value(value)
+        .map_err(|e| ConnectorApiError::InvalidConfiguration(e.to_string()))
 }
 
 #[cfg(test)]
@@ -904,5 +922,31 @@ mod tests {
 
         let json = serde_json::to_string(&volatile_attr).unwrap();
         assert!(json.contains("\"volatile\":true"));
+    }
+
+    #[test]
+    fn schema_cache_persist_does_not_swallow_upsert_or_empty_attrs() {
+        assert!(schema_cache_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(schema_cache_recorded::<(), &str>(Err("db")).is_err());
+        assert!(schema_attributes_json(&vec!["uid"]).is_ok());
+
+        let src = include_str!("schema_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("schema_cache_recorded(")
+                && production.contains("schema_attributes_json(")
+                && production.contains("schema_cached_attributes("),
+            "schema discovery must fail closed on cache persist"
+        );
+        assert!(
+            !production.contains("Failed to cache schema object class")
+                && !production.contains("unwrap_or_default()"),
+            "must not report discovery complete with an empty or missing cache"
+        );
+        assert_eq!(
+            production.matches("schema_cache_recorded").count(),
+            3,
+            "execute_discovery, discover path, and helper definition"
+        );
     }
 }

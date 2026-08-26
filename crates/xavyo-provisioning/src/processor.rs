@@ -434,17 +434,19 @@ impl DefaultOperationProcessor {
                         .complete_attempt(&self.pool, operation.tenant_id, attempt_id, &completion)
                         .await?;
 
-                    // Record success with health service
-                    if let Some(ref health_service) = self.health_service {
-                        let _ = health_service
-                            .record_success(operation.tenant_id, operation.connector_id)
-                            .await;
-                    }
-
-                    // Complete the operation
+                    // Complete the operation before health persist so a health error
+                    // cannot leave a provisioned target queued for retry.
                     self.queue
                         .complete(operation.tenant_id, operation.id, target_uid.as_deref())
                         .await?;
+
+                    if let Some(ref health_service) = self.health_service {
+                        health_recorded(
+                            health_service
+                                .record_success(operation.tenant_id, operation.connector_id)
+                                .await,
+                        )?;
+                    }
                 }
                 Err(e) => {
                     // Determine error classification
@@ -628,12 +630,6 @@ impl DefaultOperationProcessor {
                             continue;
                         }
 
-                        if let Some(ref health_service) = self.health_service {
-                            let _ = health_service
-                                .record_success(operation.tenant_id, connector_id)
-                                .await;
-                        }
-
                         if let Err(e) = self
                             .queue
                             .complete(operation.tenant_id, operation.id, target_uid.as_deref())
@@ -650,6 +646,26 @@ impl DefaultOperationProcessor {
                                 operation.id, e
                             ));
                             continue;
+                        }
+
+                        if let Some(ref health_service) = self.health_service {
+                            if let Err(e) = health_recorded(
+                                health_service
+                                    .record_success(operation.tenant_id, connector_id)
+                                    .await,
+                            ) {
+                                error!(
+                                    operation_id = %operation.id,
+                                    error = %e,
+                                    "Failed to record connector health after isolated batch success"
+                                );
+                                connector_result.operations_failed += 1;
+                                connector_result.errors.push(format!(
+                                    "Operation {}: health persist failed - {}",
+                                    operation.id, e
+                                ));
+                                continue;
+                            }
                         }
 
                         connector_result.operations_succeeded += 1;
@@ -683,13 +699,59 @@ impl DefaultOperationProcessor {
 
                         if matches!(e, ProcessorError::Connector(_)) {
                             if let Some(ref health_service) = self.health_service {
-                                let _ = health_service
-                                    .record_failure(
-                                        operation.tenant_id,
-                                        connector_id,
-                                        &e.to_string(),
-                                    )
-                                    .await;
+                                match health_recorded(
+                                    health_service
+                                        .record_failure(
+                                            operation.tenant_id,
+                                            connector_id,
+                                            &e.to_string(),
+                                        )
+                                        .await,
+                                ) {
+                                    Ok(went_offline) => {
+                                        if went_offline {
+                                            if let Err(te) = self
+                                                .queue
+                                                .transition_to_awaiting_system(
+                                                    operation.tenant_id,
+                                                    connector_id,
+                                                )
+                                                .await
+                                            {
+                                                error!(
+                                                    operation_id = %operation.id,
+                                                    error = %te,
+                                                    "Failed to transition offline connector after isolated batch failure"
+                                                );
+                                                connector_result.operations_failed += 1;
+                                                connector_result.errors.push(format!(
+                                                    "Operation {}: offline transition failed - {}",
+                                                    operation.id, te
+                                                ));
+                                                continue;
+                                            }
+                                            connector_result.operations_failed += 1;
+                                            connector_result.errors.push(format!(
+                                                "Operation {}: connector went offline",
+                                                operation.id
+                                            ));
+                                            continue;
+                                        }
+                                    }
+                                    Err(he) => {
+                                        error!(
+                                            operation_id = %operation.id,
+                                            error = %he,
+                                            "Failed to record connector health after isolated batch failure"
+                                        );
+                                        connector_result.operations_failed += 1;
+                                        connector_result.errors.push(format!(
+                                            "Operation {}: health persist failed - {}",
+                                            operation.id, he
+                                        ));
+                                        continue;
+                                    }
+                                }
                             }
                         }
 
@@ -1186,6 +1248,12 @@ impl OperationProcessor for DefaultOperationProcessor {
     }
 }
 
+/// Connector health persist. Errors must not leave the circuit breaker
+/// unaware of success or failure.
+pub(crate) fn health_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1256,6 +1324,58 @@ mod tests {
                 && success_arm.contains("operations_succeeded += 1"),
             "isolated success persist errors must not increment succeeded"
         );
+        assert!(
+            !isolated.contains("let _ = health_service"),
+            "isolated batch must not swallow connector health persist"
+        );
+        assert!(
+            isolated.contains("health_recorded(") && isolated.contains("went_offline"),
+            "isolated connector failures must fail-close health persist like the sequential path"
+        );
+        let success_health_idx = success_arm
+            .find("record_success")
+            .expect("isolated success records health");
+        let complete_idx = success_arm
+            .find("queue\n                            .complete")
+            .or_else(|| success_arm.find(".complete("))
+            .expect("isolated success completes the queue");
+        assert!(
+            complete_idx < success_health_idx,
+            "health success persist must run after queue.complete to avoid double-provision"
+        );
+    }
+
+    #[test]
+    fn sequential_health_success_is_after_queue_complete() {
+        let src = include_str!("processor.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let sequential = production
+            .split("pub async fn process_batch(")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn process_batches_isolated").next())
+            .expect("process_batch");
+        assert!(
+            sequential.contains("health_recorded(")
+                && !sequential.contains("let _ = health_service"),
+            "sequential path must not swallow connector health persist"
+        );
+        let success = sequential
+            .split("Ok(target_uid) =>")
+            .nth(1)
+            .and_then(|s| s.split("Err(e) =>").next())
+            .expect("sequential success arm");
+        let health_idx = success.find("record_success").expect("records health");
+        let complete_idx = success.find(".complete(").expect("completes queue");
+        assert!(
+            complete_idx < health_idx,
+            "health success persist must run after queue.complete"
+        );
+    }
+
+    #[test]
+    fn health_recorded_propagates() {
+        assert!(health_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(health_recorded::<(), &str>(Err("persist")).is_err());
     }
 
     #[test]
