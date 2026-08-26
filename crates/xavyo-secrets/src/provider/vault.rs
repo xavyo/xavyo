@@ -344,7 +344,10 @@ impl SecretProvider for VaultSecretProvider {
         let value_str = if let Some(v) = secret_data.get("value").and_then(|v| v.as_str()) {
             v.to_string()
         } else {
-            serde_json::to_string(secret_data).unwrap_or_default()
+            serde_json::to_string(secret_data).map_err(|e| SecretError::InvalidValue {
+                name: name.to_string(),
+                detail: format!("Could not serialize Vault secret data: {e}"),
+            })?
         };
 
         let version = json
@@ -394,5 +397,19 @@ impl SecretProvider for VaultSecretProvider {
 
     fn provider_type(&self) -> &'static str {
         "vault"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn vault_secret_load_does_not_return_empty_on_serialize_error() {
+        let src = include_str!("vault.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("serde_json::to_string(secret_data)")
+                && !production.contains("to_string(secret_data).unwrap_or_default()"),
+            "Vault secret load must fail closed when secret data cannot serialize"
+        );
     }
 }

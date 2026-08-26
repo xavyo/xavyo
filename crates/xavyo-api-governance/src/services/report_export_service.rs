@@ -55,11 +55,14 @@ impl ReportExportService {
 
         // Write data rows
         for row in &data.rows {
-            let row_values: Vec<String> = data
-                .columns
-                .iter()
-                .map(|col| row.get(col).map(escape_csv_value).unwrap_or_default())
-                .collect();
+            let mut row_values = Vec::with_capacity(data.columns.len());
+            for col in &data.columns {
+                let cell = match row.get(col) {
+                    Some(v) => escape_csv_value(v)?,
+                    None => String::new(),
+                };
+                row_values.push(cell);
+            }
             csv_content.push_str(&row_values.join(","));
             csv_content.push('\n');
         }
@@ -90,8 +93,8 @@ pub struct ExportResult {
 }
 
 /// Escape a JSON value for CSV output.
-fn escape_csv_value(value: &serde_json::Value) -> String {
-    match value {
+fn escape_csv_value(value: &serde_json::Value) -> Result<String> {
+    Ok(match value {
         serde_json::Value::Null => String::new(),
         serde_json::Value::Bool(b) => b.to_string(),
         serde_json::Value::Number(n) => n.to_string(),
@@ -104,15 +107,18 @@ fn escape_csv_value(value: &serde_json::Value) -> String {
             }
         }
         serde_json::Value::Array(arr) => {
-            let inner: Vec<String> = arr.iter().map(escape_csv_value).collect();
+            let mut inner = Vec::with_capacity(arr.len());
+            for v in arr {
+                inner.push(escape_csv_value(v)?);
+            }
             format!("\"{}\"", inner.join(";"))
         }
         serde_json::Value::Object(_) => {
-            // For objects, serialize as JSON string
-            let json_str = serde_json::to_string(value).unwrap_or_default();
+            let json_str =
+                serde_json::to_string(value).map_err(GovernanceError::JsonSerialization)?;
             format!("\"{}\"", json_str.replace('"', "\"\""))
         }
-    }
+    })
 }
 
 #[cfg(test)]
@@ -121,21 +127,24 @@ mod tests {
 
     #[test]
     fn test_escape_csv_simple() {
-        assert_eq!(escape_csv_value(&json!("hello")), "hello");
-        assert_eq!(escape_csv_value(&json!(42)), "42");
-        assert_eq!(escape_csv_value(&json!(true)), "true");
-        assert_eq!(escape_csv_value(&json!(null)), "");
+        assert_eq!(escape_csv_value(&json!("hello")).unwrap(), "hello");
+        assert_eq!(escape_csv_value(&json!(42)).unwrap(), "42");
+        assert_eq!(escape_csv_value(&json!(true)).unwrap(), "true");
+        assert_eq!(escape_csv_value(&json!(null)).unwrap(), "");
     }
 
     #[test]
     fn test_escape_csv_with_comma() {
-        assert_eq!(escape_csv_value(&json!("hello, world")), "\"hello, world\"");
+        assert_eq!(
+            escape_csv_value(&json!("hello, world")).unwrap(),
+            "\"hello, world\""
+        );
     }
 
     #[test]
     fn test_escape_csv_with_quotes() {
         assert_eq!(
-            escape_csv_value(&json!("say \"hello\"")),
+            escape_csv_value(&json!("say \"hello\"")).unwrap(),
             "\"say \"\"hello\"\"\""
         );
     }
@@ -175,5 +184,19 @@ mod tests {
         assert_eq!(result.content_type, "text/csv");
         assert!(result.content.starts_with("name,value\n"));
         assert!(result.content.contains("test1,100"));
+    }
+
+    #[test]
+    fn csv_object_cells_do_not_empty_on_serialize_error() {
+        let src = include_str!("report_export_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("serde_json::to_string(value)")
+                && !production.contains("to_string(value).unwrap_or_default()"),
+            "CSV object cells must fail closed when serialize fails"
+        );
+        let obj = json!({"k": "v"});
+        let escaped = escape_csv_value(&obj).unwrap();
+        assert!(escaped.contains("k"));
     }
 }

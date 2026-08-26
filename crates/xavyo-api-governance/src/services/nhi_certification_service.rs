@@ -852,7 +852,7 @@ impl NhiCertificationService {
             _ => NhiCertReviewerType::Owner,
         };
 
-        let specific_reviewers = row.6.and_then(|v| serde_json::from_value(v).ok());
+        let specific_reviewers = parse_reviewers(row.6)?;
 
         Ok(NhiCertificationCampaign {
             id: row.0,
@@ -983,22 +983,22 @@ impl NhiCertificationService {
                     _ => NhiCertReviewerType::Owner,
                 };
 
-                NhiCertificationCampaign {
+                Ok(NhiCertificationCampaign {
                     id: row.0,
                     tenant_id: row.1,
                     name: row.2,
                     description: row.3,
                     status,
                     reviewer_type,
-                    specific_reviewers: row.6.and_then(|v| serde_json::from_value(v).ok()),
+                    specific_reviewers: parse_reviewers(row.6)?,
                     deadline: row.7,
                     created_by: row.8,
                     created_at: row.9,
                     launched_at: row.10,
                     completed_at: row.11,
-                }
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
 
         Ok((campaigns, total))
     }
@@ -1542,6 +1542,15 @@ fn serialize_reviewers(reviewers: &[Uuid]) -> Result<serde_json::Value> {
     serde_json::to_value(reviewers).map_err(|e| GovernanceError::Validation(e.to_string()))
 }
 
+fn parse_reviewers(value: Option<serde_json::Value>) -> Result<Option<Vec<Uuid>>> {
+    match value {
+        None => Ok(None),
+        Some(v) => serde_json::from_value(v)
+            .map(Some)
+            .map_err(|e| GovernanceError::Validation(e.to_string())),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1642,6 +1651,22 @@ mod tests {
                 && !create.contains("to_value(r).ok()")
                 && !create.contains("to_value(reviewers).ok()"),
             "NHI campaign persist must fail closed on reviewer JSON serialize"
+        );
+    }
+
+    #[test]
+    fn campaign_reviewers_json_does_not_drop_on_parse() {
+        let id = Uuid::new_v4();
+        let v = serialize_reviewers(&[id]).unwrap();
+        let parsed = parse_reviewers(Some(v)).unwrap().unwrap();
+        assert_eq!(parsed, vec![id]);
+        assert!(parse_reviewers(None).unwrap().is_none());
+        assert!(parse_reviewers(Some(serde_json::json!({"not": "an array"}))).is_err());
+        let src = include_str!("nhi_certification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_reviewers(") && !production.contains("from_value(v).ok()"),
+            "NHI campaign load must fail closed on reviewer JSON parse"
         );
     }
 }

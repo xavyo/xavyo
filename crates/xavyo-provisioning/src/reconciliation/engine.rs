@@ -268,7 +268,7 @@ impl ReconciliationEngine {
         .await
         .map_err(|e| ReconciliationError::Database(e.to_string()))?;
 
-        Ok(row.map(ReconciliationRunRow::into_info))
+        row.map(ReconciliationRunRow::into_info).transpose()
     }
 
     /// Find a running reconciliation for a connector.
@@ -296,7 +296,7 @@ impl ReconciliationEngine {
         .await
         .map_err(|e| ReconciliationError::Database(e.to_string()))?;
 
-        Ok(row.map(ReconciliationRunRow::into_info))
+        row.map(ReconciliationRunRow::into_info).transpose()
     }
 
     /// Create a new run record.
@@ -328,7 +328,7 @@ impl ReconciliationEngine {
         .await
         .map_err(|e| ReconciliationError::Database(e.to_string()))?;
 
-        Ok(row.into_info())
+        row.into_info()
     }
 
     /// Update run status.
@@ -371,7 +371,7 @@ impl ReconciliationEngine {
         .await
         .map_err(|e| ReconciliationError::Database(e.to_string()))?;
 
-        Ok(row.into_info())
+        row.into_info()
     }
 
     /// Update run statistics.
@@ -481,11 +481,18 @@ struct ReconciliationRunRow {
 }
 
 impl ReconciliationRunRow {
-    fn into_info(self) -> ReconciliationRunInfo {
+    fn into_info(self) -> ReconciliationResult<ReconciliationRunInfo> {
         let mode = self.mode.parse().unwrap_or(ReconciliationMode::Full);
         let status = self.status.parse().unwrap_or(RunStatus::Pending);
-        let checkpoint = self.checkpoint.and_then(|v| serde_json::from_value(v).ok());
-        let statistics: RunStatistics = serde_json::from_value(self.statistics).unwrap_or_default();
+        let checkpoint = match self.checkpoint {
+            Some(v) => Some(
+                serde_json::from_value(v)
+                    .map_err(|e| ReconciliationError::Serialization(e.to_string()))?,
+            ),
+            None => None,
+        };
+        let statistics: RunStatistics = serde_json::from_value(self.statistics)
+            .map_err(|e| ReconciliationError::Serialization(e.to_string()))?;
 
         let mut info = ReconciliationRunInfo {
             id: self.id,
@@ -507,7 +514,7 @@ impl ReconciliationRunRow {
         };
 
         info.progress_percentage = Some(info.calculate_progress());
-        info
+        Ok(info)
     }
 }
 
@@ -616,6 +623,25 @@ mod tests {
         assert!(
             !production.contains("LEFT JOIN users u ON u.id = r.triggered_by\n"),
             "must not join users by id alone"
+        );
+    }
+
+    #[test]
+    fn run_info_does_not_drop_checkpoint_or_stats_on_parse() {
+        let src = include_str!("engine.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let into_info = production
+            .split("fn into_info")
+            .nth(1)
+            .and_then(|s| s.split("    /// ").next())
+            .expect("into_info");
+        assert!(
+            !into_info.contains("from_value(v).ok()") && !into_info.contains("unwrap_or_default()"),
+            "reconciliation run load must fail closed on checkpoint/statistics JSON parse"
+        );
+        assert!(
+            into_info.contains("ReconciliationError::Serialization"),
+            "reconciliation run load must surface JSON parse errors"
         );
     }
 }

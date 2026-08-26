@@ -38,9 +38,8 @@ impl UsnCheckpoint {
     }
 
     /// Serialize to JSON string for storage as sync token.
-    #[must_use]
-    pub fn to_token(&self) -> String {
-        serde_json::to_string(self).unwrap_or_default()
+    pub fn to_token(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
     }
 
     /// Parse from a sync token string.
@@ -263,7 +262,7 @@ pub fn build_sync_result(
     change_type: SyncChangeType,
     new_checkpoint: Option<UsnCheckpoint>,
     has_more: bool,
-) -> SyncResult {
+) -> Result<SyncResult, serde_json::Error> {
     info!(
         user_count = users.len(),
         ?change_type,
@@ -277,14 +276,14 @@ pub fn build_sync_result(
     let mut result = SyncResult::with_changes(changes);
 
     if let Some(checkpoint) = new_checkpoint {
-        result = result.with_token(checkpoint.to_token());
+        result = result.with_token(checkpoint.to_token()?);
     }
 
     if has_more {
         result = result.with_more();
     }
 
-    result
+    Ok(result)
 }
 
 /// Compute the highest uSNChanged value from a batch of mapped users.
@@ -541,9 +540,8 @@ impl AdSyncStatistics {
     }
 
     /// Convert to a `serde_json::Value` for storage in `reconciliation_runs.statistics`.
-    #[must_use]
-    pub fn to_json(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or(serde_json::json!({}))
+    pub fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
+        serde_json::to_value(self)
     }
 }
 
@@ -881,7 +879,7 @@ mod tests {
     #[test]
     fn test_usn_checkpoint_serialization() {
         let cp = UsnCheckpoint::new("123456", "dc01.example.com");
-        let token = cp.to_token();
+        let token = cp.to_token().unwrap();
 
         assert!(token.contains("123456"));
         assert!(token.contains("dc01.example.com"));
@@ -889,6 +887,13 @@ mod tests {
         let parsed = UsnCheckpoint::from_token(&token).unwrap();
         assert_eq!(parsed.usn, "123456");
         assert_eq!(parsed.dc, "dc01.example.com");
+
+        let src = include_str!("sync.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("to_string(self).unwrap_or_default()"),
+            "USN checkpoint persist must fail closed on JSON serialize"
+        );
     }
 
     #[test]
@@ -987,7 +992,8 @@ mod tests {
         }];
 
         let checkpoint = UsnCheckpoint::new("500", "dc01.example.com");
-        let result = build_sync_result(users, SyncChangeType::Create, Some(checkpoint), false);
+        let result =
+            build_sync_result(users, SyncChangeType::Create, Some(checkpoint), false).unwrap();
 
         assert_eq!(result.changes.len(), 1);
         assert!(!result.has_more);
@@ -1000,7 +1006,7 @@ mod tests {
 
     #[test]
     fn test_build_sync_result_has_more() {
-        let result = build_sync_result(vec![], SyncChangeType::Create, None, true);
+        let result = build_sync_result(vec![], SyncChangeType::Create, None, true).unwrap();
         assert!(result.has_more);
         assert!(result.new_token.is_none());
     }
@@ -1389,12 +1395,19 @@ mod tests {
         stats.usn_checkpoint = Some("999999".to_string());
         stats.domain_controller = Some("dc01.example.com".to_string());
 
-        let json = stats.to_json();
+        let json = stats.to_json().unwrap();
         assert!(json.is_object());
         assert_eq!(json["sync_type"], "delta");
         assert_eq!(json["total"], 100);
         assert_eq!(json["processed"], 95);
         assert_eq!(json["usn_checkpoint"], "999999");
+
+        let src = include_str!("sync.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(serde_json::json!({}))"),
+            "AD sync statistics persist must fail closed on JSON serialize"
+        );
     }
 
     #[test]
