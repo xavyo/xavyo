@@ -62,7 +62,10 @@ pub async fn list_mining_jobs(
     let page = if limit > 0 { offset / limit } else { 0 };
 
     Ok(Json(MiningJobListResponse {
-        items: jobs.into_iter().map(Into::into).collect(),
+        items: jobs
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, _>>()?,
         total,
         page,
         page_size: limit,
@@ -97,7 +100,7 @@ pub async fn get_mining_job(
 
     let job = state.mining_service.get(tenant_id, job_id).await?;
 
-    Ok(Json(job.into()))
+    Ok(Json(job.try_into()?))
 }
 
 /// Create a new mining job.
@@ -136,7 +139,7 @@ pub async fn create_mining_job(
         .create_job(tenant_id, request.name, parameters, user_id)
         .await?;
 
-    Ok((StatusCode::CREATED, Json(job.into())))
+    Ok((StatusCode::CREATED, Json(job.try_into()?)))
 }
 
 /// Run a pending mining job.
@@ -167,7 +170,7 @@ pub async fn run_mining_job(
 
     let job = state.mining_service.run_job(tenant_id, job_id).await?;
 
-    Ok(Json(job.into()))
+    Ok(Json(job.try_into()?))
 }
 
 /// Cancel a running mining job.
@@ -198,7 +201,7 @@ pub async fn cancel_mining_job(
 
     let job = state.mining_service.cancel_job(tenant_id, job_id).await?;
 
-    Ok(Json(job.into()))
+    Ok(Json(job.try_into()?))
 }
 
 // ============================================================================

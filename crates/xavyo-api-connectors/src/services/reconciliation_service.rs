@@ -560,8 +560,12 @@ impl ReconciliationService {
         by_resolution.insert("resolved".to_string(), total.saturating_sub(pending));
 
         // Parse statistics from run
-        let stats: ReconciliationStatistics =
-            serde_json::from_value(run.statistics.clone()).unwrap_or_default();
+        let stats: ReconciliationStatistics = serde_json::from_value(run.statistics.clone())
+            .map_err(|e| {
+                ReconciliationServiceError::InvalidParameter(format!(
+                    "Invalid reconciliation statistics JSON: {e}"
+                ))
+            })?;
 
         // Get action counts
         let action_filter = ReconciliationActionFilter::new();

@@ -456,9 +456,8 @@ impl GovReportTemplate {
     }
 
     /// Parse the template definition.
-    #[must_use]
-    pub fn parse_definition(&self) -> TemplateDefinition {
-        serde_json::from_value(self.definition.clone()).unwrap_or_default()
+    pub fn parse_definition(&self) -> Result<TemplateDefinition, serde_json::Error> {
+        serde_json::from_value(self.definition.clone())
     }
 
     /// Check if this is a system template.
@@ -503,6 +502,14 @@ mod tests {
     fn test_template_status_methods() {
         assert!(TemplateStatus::Active.is_active());
         assert!(!TemplateStatus::Archived.is_active());
+
+        let src = include_str!("gov_report_template.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("from_value(self.definition.clone())")
+                && !production.contains("from_value(self.definition.clone()).unwrap_or_default()"),
+            "report template definition must fail closed on JSON parse"
+        );
     }
 
     #[test]

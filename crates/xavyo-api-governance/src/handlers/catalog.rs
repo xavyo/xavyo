@@ -153,12 +153,12 @@ pub async fn list_catalog_items(
     let items: Vec<CatalogItemResponse> = items_with_requestability
         .into_iter()
         .map(|(item, requestability)| {
-            let mut response: CatalogItemResponse = item.into();
+            let mut response: CatalogItemResponse = item.try_into()?;
             response.can_request = Some(requestability.can_request);
             response.cannot_request_reason = requestability.reason;
-            response
+            Ok(response)
         })
-        .collect();
+        .collect::<Result<Vec<_>, ApiGovernanceError>>()?;
 
     Ok(Json(CatalogItemListResponse {
         items,
@@ -208,7 +208,7 @@ pub async fn get_catalog_item(
         .get_item_with_requestability(tenant_id, id, &context)
         .await?;
 
-    let mut response: CatalogItemResponse = item.into();
+    let mut response: CatalogItemResponse = item.try_into()?;
     response.can_request = Some(requestability.can_request);
     response.cannot_request_reason = requestability.reason;
 
@@ -436,7 +436,10 @@ pub async fn admin_list_catalog_items(
         .await?;
 
     Ok(Json(CatalogItemListResponse {
-        items: items.into_iter().map(Into::into).collect(),
+        items: items
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, _>>()?,
         total,
         limit: query.limit,
         offset: query.offset,
@@ -488,7 +491,7 @@ pub async fn create_catalog_item(
 
     let item = state.catalog_service.create_item(tenant_id, input).await?;
 
-    Ok((StatusCode::CREATED, Json(item.into())))
+    Ok((StatusCode::CREATED, Json(item.try_into()?)))
 }
 
 /// Update a catalog item (admin).
@@ -539,7 +542,7 @@ pub async fn update_catalog_item(
         .update_item(tenant_id, id, input)
         .await?;
 
-    Ok(Json(item.into()))
+    Ok(Json(item.try_into()?))
 }
 
 /// Disable a catalog item (admin).
@@ -573,7 +576,7 @@ pub async fn disable_catalog_item(
 
     let item = state.catalog_service.disable_item(tenant_id, id).await?;
 
-    Ok(Json(item.into()))
+    Ok(Json(item.try_into()?))
 }
 
 /// Enable a catalog item (admin).
@@ -607,7 +610,7 @@ pub async fn enable_catalog_item(
 
     let item = state.catalog_service.enable_item(tenant_id, id).await?;
 
-    Ok(Json(item.into()))
+    Ok(Json(item.try_into()?))
 }
 
 /// Delete a catalog item (admin).

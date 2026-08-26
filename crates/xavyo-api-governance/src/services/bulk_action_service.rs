@@ -102,7 +102,7 @@ impl BulkActionService {
             .await?
             .ok_or(ApiGovernanceError::BulkActionNotFound(action_id))?;
 
-        Ok(BulkActionDetailResponse::from_action(action))
+        BulkActionDetailResponse::from_action(action)
     }
 
     /// List bulk actions for a tenant with optional filtering.
@@ -578,7 +578,7 @@ impl BulkActionService {
             .await?
             .ok_or(ApiGovernanceError::BulkActionCannotBeCancelled(action_id))?;
 
-        Ok(BulkActionDetailResponse::from_action(cancelled))
+        BulkActionDetailResponse::from_action(cancelled)
     }
 
     /// Delete a bulk action.

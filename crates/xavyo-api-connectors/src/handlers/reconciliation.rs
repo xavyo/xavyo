@@ -57,12 +57,17 @@ pub struct ReconciliationRunResponse {
 /// Statistics for a reconciliation run.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct ReconciliationStatistics {
+    #[serde(default)]
     pub accounts_total: u32,
+    #[serde(default)]
     pub accounts_processed: u32,
+    #[serde(default)]
     pub discrepancies_found: u32,
     #[serde(default)]
     pub discrepancies_by_type: HashMap<String, u32>,
+    #[serde(default)]
     pub actions_taken: u32,
+    #[serde(default)]
     pub duration_seconds: u64,
 }
 
@@ -434,11 +439,7 @@ pub async fn trigger_reconciliation(
         .await
         .map_err(map_reconciliation_error)?;
 
-    let stats: ReconciliationStatistics = run
-        .statistics
-        .as_object()
-        .map(|_| serde_json::from_value(run.statistics.clone()).unwrap_or_default())
-        .unwrap_or_default();
+    let stats = parse_run_statistics(run.statistics.clone())?;
 
     // F085: Publish reconciliation.completed webhook event (triggered run)
     if let Some(Extension(publisher)) = publisher {
@@ -504,8 +505,7 @@ pub async fn get_reconciliation_run(
         .map_err(map_reconciliation_error)?
         .ok_or_else(|| ApiError::not_found("Reconciliation run not found"))?;
 
-    let stats: ReconciliationStatistics =
-        serde_json::from_value(run.statistics.clone()).unwrap_or_default();
+    let stats = parse_run_statistics(run.statistics.clone())?;
 
     Ok(Json(ReconciliationRunResponse {
         id: run.id,
@@ -560,9 +560,8 @@ pub async fn list_reconciliation_runs(
     let runs: Vec<ReconciliationRunResponse> = runs
         .into_iter()
         .map(|run| {
-            let stats: ReconciliationStatistics =
-                serde_json::from_value(run.statistics.clone()).unwrap_or_default();
-            ReconciliationRunResponse {
+            let stats = parse_run_statistics(run.statistics.clone())?;
+            Ok(ReconciliationRunResponse {
                 id: run.id,
                 connector_id: run.connector_id,
                 mode: run.mode,
@@ -573,9 +572,9 @@ pub async fn list_reconciliation_runs(
                 started_at: run.started_at,
                 completed_at: run.completed_at,
                 created_at: run.created_at,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, ApiError>>()?;
 
     Ok(Json(ListRunsResponse { runs, total }))
 }
@@ -641,8 +640,7 @@ pub async fn resume_reconciliation_run(
         .await
         .map_err(map_reconciliation_error)?;
 
-    let stats: ReconciliationStatistics =
-        serde_json::from_value(run.statistics.clone()).unwrap_or_default();
+    let stats = parse_run_statistics(run.statistics.clone())?;
 
     Ok(Json(ReconciliationRunResponse {
         id: run.id,
@@ -1324,6 +1322,11 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiError> {
 }
 
 /// Map reconciliation service errors to API errors with proper status codes.
+fn parse_run_statistics(value: serde_json::Value) -> Result<ReconciliationStatistics, ApiError> {
+    serde_json::from_value(value)
+        .map_err(|e| ApiError::bad_request(format!("Invalid reconciliation statistics JSON: {e}")))
+}
+
 fn map_reconciliation_error(err: ReconciliationServiceError) -> ApiError {
     match err {
         ReconciliationServiceError::NotFound(msg) => ApiError::not_found(msg),
@@ -1372,5 +1375,17 @@ mod tests {
         let request: ScheduleRequest =
             serde_json::from_str(r#"{"frequency":"weekly","enabled":false}"#).unwrap();
         assert_eq!(request.enabled, Some(false));
+    }
+
+    #[test]
+    fn parse_run_statistics_does_not_default_on_invalid_json() {
+        assert!(parse_run_statistics(serde_json::json!("not-stats")).is_err());
+        assert!(parse_run_statistics(serde_json::json!({})).is_ok());
+        let src = include_str!("reconciliation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("from_value(run.statistics.clone()).unwrap_or_default()"),
+            "reconciliation statistics GET must fail closed on JSON parse"
+        );
     }
 }

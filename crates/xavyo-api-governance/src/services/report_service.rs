@@ -74,8 +74,10 @@ impl ReportService {
         let template = self.get_template(tenant_id, template_id).await?;
 
         // Create template snapshot for audit immutability
-        let template_snapshot = serde_json::to_value(template.parse_definition())
-            .map_err(GovernanceError::JsonSerialization)?;
+        let template_snapshot = serde_json::to_value(template.parse_definition().map_err(|e| {
+            GovernanceError::Validation(format!("Invalid report template definition JSON: {e}"))
+        })?)
+        .map_err(GovernanceError::JsonSerialization)?;
 
         let input = GenerateReportRequest {
             template_id,

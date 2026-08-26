@@ -57,7 +57,10 @@ pub async fn list_templates(
     let page = if limit > 0 { offset / limit } else { 0 };
 
     Ok(Json(ReportTemplateListResponse {
-        items: templates.into_iter().map(Into::into).collect(),
+        items: templates
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, _>>()?,
         total,
         page,
         page_size: limit,
@@ -92,7 +95,7 @@ pub async fn get_template(
 
     let template = state.report_template_service.get(tenant_id, id).await?;
 
-    Ok(Json(template.into()))
+    Ok(Json(template.try_into()?))
 }
 
 /// Create a new custom report template.
@@ -138,7 +141,7 @@ pub async fn create_template(
         )
         .await?;
 
-    Ok((StatusCode::CREATED, Json(template.into())))
+    Ok((StatusCode::CREATED, Json(template.try_into()?)))
 }
 
 /// Clone a report template.
@@ -177,7 +180,7 @@ pub async fn clone_template(
         .clone_template(tenant_id, id, request.name, request.description, user_id)
         .await?;
 
-    Ok((StatusCode::CREATED, Json(template.into())))
+    Ok((StatusCode::CREATED, Json(template.try_into()?)))
 }
 
 /// Update a custom report template.
@@ -226,7 +229,7 @@ pub async fn update_template(
         )
         .await?;
 
-    Ok(Json(template.into()))
+    Ok(Json(template.try_into()?))
 }
 
 /// Archive (soft-delete) a custom report template.
@@ -258,5 +261,5 @@ pub async fn archive_template(
 
     let template = state.report_template_service.archive(tenant_id, id).await?;
 
-    Ok(Json(template.into()))
+    Ok(Json(template.try_into()?))
 }

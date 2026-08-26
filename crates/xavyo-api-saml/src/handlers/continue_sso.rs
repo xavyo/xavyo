@@ -137,7 +137,9 @@ async fn continue_sso_inner(
     // Build user attributes
     let display_name = user.email.split('@').next().map(String::from);
 
-    let sp_group_config = sp.get_group_config();
+    let sp_group_config = sp.get_group_config().map_err(|e| {
+        SamlError::AssertionGenerationFailed(format!("Invalid SP group filter JSON: {e}"))
+    })?;
     let group_config = GroupAttributeConfig {
         attribute_name: sp_group_config.attribute_name,
         value_format: crate::models::group_config::GroupValueFormat::parse(

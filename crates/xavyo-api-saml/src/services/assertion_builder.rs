@@ -59,7 +59,9 @@ impl AssertionBuilder {
         let not_before = now - Duration::minutes(2);
         let not_on_or_after = now + Duration::seconds(i64::from(sp.assertion_validity_seconds));
 
-        let attr_mapping = sp.get_attribute_mapping();
+        let attr_mapping = sp.get_attribute_mapping().map_err(|e| {
+            SamlError::AssertionGenerationFailed(format!("Invalid SP attribute mapping JSON: {e}"))
+        })?;
         let name_id_value = get_nameid_for_format(user, &sp.name_id_format, session_id)
             .ok_or_else(|| {
                 SamlError::AssertionGenerationFailed("Cannot determine NameID".to_string())

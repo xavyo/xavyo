@@ -220,27 +220,26 @@ impl Default for SpGroupConfig {
 
 impl SamlServiceProvider {
     /// Parse attribute mapping from JSONB value
-    #[must_use]
-    pub fn get_attribute_mapping(&self) -> AttributeMapping {
-        serde_json::from_value(self.attribute_mapping.clone()).unwrap_or_default()
+    pub fn get_attribute_mapping(&self) -> Result<AttributeMapping, serde_json::Error> {
+        serde_json::from_value(self.attribute_mapping.clone())
     }
 
     /// Get group configuration for this SP
-    #[must_use]
-    pub fn get_group_config(&self) -> SpGroupConfig {
-        SpGroupConfig {
+    pub fn get_group_config(&self) -> Result<SpGroupConfig, serde_json::Error> {
+        let filter = match self.group_filter.as_ref() {
+            None => None,
+            Some(v) => Some(serde_json::from_value(v.clone())?),
+        };
+        Ok(SpGroupConfig {
             attribute_name: self
                 .group_attribute_name
                 .clone()
                 .unwrap_or_else(|| "groups".to_string()),
             value_format: self.group_value_format.clone(),
-            filter: self
-                .group_filter
-                .as_ref()
-                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            filter,
             include_groups: self.include_groups,
             omit_empty_groups: self.omit_empty_groups,
             dn_base: self.group_dn_base.clone(),
-        }
+        })
     }
 }

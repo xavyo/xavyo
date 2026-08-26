@@ -298,7 +298,9 @@ impl CatalogService {
         item: &CatalogItem,
         context: &RequestContext,
     ) -> Result<RequestabilityResult> {
-        let rules = item.get_requestability_rules();
+        let rules = item.get_requestability_rules().map_err(|e| {
+            GovernanceError::Validation(format!("Invalid catalog requestability rules JSON: {e}"))
+        })?;
 
         // Check self-request permission
         if context.is_self_request() && !rules.self_request {
@@ -1083,7 +1085,7 @@ impl CatalogService {
             }
 
             // Check required form fields
-            let form_field_issues = self.validate_form_fields(&catalog_item, &item.form_values);
+            let form_field_issues = self.validate_form_fields(&catalog_item, &item.form_values)?;
             for issue in form_field_issues {
                 issues.push(CartValidationIssue {
                     cart_item_id: Some(item.id),
@@ -1237,9 +1239,11 @@ impl CatalogService {
         &self,
         catalog_item: &CatalogItem,
         form_values: &serde_json::Value,
-    ) -> Vec<String> {
+    ) -> Result<Vec<String>> {
         let mut issues = Vec::new();
-        let form_fields = catalog_item.get_form_fields();
+        let form_fields = catalog_item.get_form_fields().map_err(|e| {
+            GovernanceError::Validation(format!("Invalid catalog form fields JSON: {e}"))
+        })?;
 
         for field in form_fields {
             if field.required {
@@ -1254,7 +1258,7 @@ impl CatalogService {
             }
         }
 
-        issues
+        Ok(issues)
     }
 
     /// Check SoD violations for a set of proposed entitlements.

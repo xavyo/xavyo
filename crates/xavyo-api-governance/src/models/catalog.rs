@@ -311,11 +311,21 @@ pub struct CatalogItemResponse {
     pub cannot_request_reason: Option<String>,
 }
 
-impl From<CatalogItem> for CatalogItemResponse {
-    fn from(item: CatalogItem) -> Self {
-        let requestability_rules = item.get_requestability_rules();
-        let form_fields = item.get_form_fields();
-        Self {
+impl TryFrom<CatalogItem> for CatalogItemResponse {
+    type Error = crate::error::ApiGovernanceError;
+
+    fn try_from(item: CatalogItem) -> Result<Self, Self::Error> {
+        let requestability_rules = item.get_requestability_rules().map_err(|e| {
+            crate::error::ApiGovernanceError::Validation(format!(
+                "Invalid catalog requestability rules JSON: {e}"
+            ))
+        })?;
+        let form_fields = item.get_form_fields().map_err(|e| {
+            crate::error::ApiGovernanceError::Validation(format!(
+                "Invalid catalog form fields JSON: {e}"
+            ))
+        })?;
+        Ok(Self {
             id: item.id,
             category_id: item.category_id,
             item_type: item.item_type,
@@ -332,7 +342,7 @@ impl From<CatalogItem> for CatalogItemResponse {
             updated_at: item.updated_at,
             can_request: None,
             cannot_request_reason: None,
-        }
+        })
     }
 }
 
@@ -758,7 +768,8 @@ mod tests {
             updated_at: Utc::now(),
         };
 
-        let response = CatalogItemResponse::from(item)
+        let response = CatalogItemResponse::try_from(item)
+            .unwrap()
             .with_requestability(false, Some("Not in eligible department".to_string()));
 
         assert_eq!(response.can_request, Some(false));

@@ -167,7 +167,9 @@ impl MiningService {
         tenant_id: Uuid,
         job: &GovRoleMiningJob,
     ) -> Result<MiningAnalysisCounts> {
-        let params = job.parse_parameters();
+        let params = job.parse_parameters().map_err(|e| {
+            GovernanceError::Validation(format!("Invalid mining job parameters JSON: {e}"))
+        })?;
         let job_id = job.id;
 
         let mut counts = MiningAnalysisCounts {
