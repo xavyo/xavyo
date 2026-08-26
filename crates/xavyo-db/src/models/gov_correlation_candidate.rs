@@ -86,8 +86,7 @@ impl GovCorrelationCandidate {
         pool: &sqlx::PgPool,
         input: CreateGovCorrelationCandidate,
     ) -> Result<Self, sqlx::Error> {
-        let per_attribute_scores_json = serde_json::to_value(&input.per_attribute_scores)
-            .unwrap_or_else(|_| serde_json::json!({}));
+        let per_attribute_scores_json = correlation_scores_json(&input.per_attribute_scores)?;
 
         sqlx::query_as(
             r"
@@ -187,6 +186,13 @@ impl GovCorrelationCandidate {
     pub fn get_per_attribute_scores(&self) -> Result<PerAttributeScores, serde_json::Error> {
         serde_json::from_value(self.per_attribute_scores.clone())
     }
+}
+
+/// Correlation score persist. Serialization errors must not store empty scores.
+pub(crate) fn correlation_scores_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
 }
 
 #[cfg(test)]
@@ -339,5 +345,18 @@ mod tests {
 
         // Verify display name.
         assert_eq!(input.identity_display_name, Some("Test User".to_string()));
+    }
+
+    #[test]
+    fn correlation_scores_json_does_not_store_empty_on_serialize() {
+        let v = correlation_scores_json(&serde_json::json!({"aggregate_confidence": 1})).unwrap();
+        assert_eq!(v["aggregate_confidence"], 1);
+        let src = include_str!("gov_correlation_candidate.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("correlation_scores_json(")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!({})"),
+            "correlation candidate persist must fail closed on JSON serialize"
+        );
     }
 }

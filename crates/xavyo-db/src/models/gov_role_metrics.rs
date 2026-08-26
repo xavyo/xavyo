@@ -286,8 +286,7 @@ impl GovRoleMetrics {
         tenant_id: Uuid,
         input: CreateRoleMetrics,
     ) -> Result<Self, sqlx::Error> {
-        let entitlement_usage = serde_json::to_value(&input.entitlement_usage)
-            .unwrap_or_else(|_| serde_json::json!([]));
+        let entitlement_usage = role_metrics_json(&input.entitlement_usage)?;
 
         sqlx::query_as(
             r"
@@ -363,6 +362,13 @@ impl GovRoleMetrics {
     }
 }
 
+/// Role metrics persist. Serialization errors must not store empty usage.
+pub(crate) fn role_metrics_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -407,5 +413,18 @@ mod tests {
         assert!(filter.trend_direction.is_none());
         assert!(filter.min_utilization.is_none());
         assert!(filter.max_utilization.is_none());
+    }
+
+    #[test]
+    fn role_metrics_json_does_not_store_empty_on_serialize() {
+        let v = role_metrics_json(&serde_json::json!([{"used_by_count": 1}])).unwrap();
+        assert!(v.is_array());
+        let src = include_str!("gov_role_metrics.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("role_metrics_json(")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!([])"),
+            "role metrics persist must fail closed on JSON serialize"
+        );
     }
 }
