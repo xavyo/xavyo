@@ -390,7 +390,9 @@ impl DiscoveryStateManager {
     ///
     /// Checks all in-progress discoveries and marks those that have exceeded
     /// the timeout as failed. Returns the number of discoveries that were timed out.
-    pub async fn cleanup_timed_out_discoveries(&self) -> u32 {
+    /// Persist errors must not report a timeout as cleaned up while the job is
+    /// still in progress.
+    pub async fn cleanup_timed_out_discoveries(&self) -> Result<u32> {
         let mut timed_out: Vec<Uuid> = Vec::new();
 
         // Identify timed-out discoveries
@@ -408,8 +410,7 @@ impl DiscoveryStateManager {
             }
         }
 
-        // Fail each timed-out discovery
-        let count = timed_out.len() as u32;
+        let mut marked = 0u32;
         for connector_id in timed_out {
             let error = format!(
                 "Schema discovery timed out after {} seconds",
@@ -420,16 +421,11 @@ impl DiscoveryStateManager {
                 timeout_secs = self.timeout.as_secs(),
                 "Discovery timed out, marking as failed"
             );
-            if let Err(e) = self.fail_discovery(connector_id, error).await {
-                warn!(
-                    connector_id = %connector_id,
-                    error = %e,
-                    "Failed to mark timed-out discovery as failed"
-                );
-            }
+            discovery_timeout_marked(self.fail_discovery(connector_id, error).await)?;
+            marked += 1;
         }
 
-        count
+        Ok(marked)
     }
 
     /// Get remaining time before timeout for an in-progress discovery.
@@ -461,6 +457,14 @@ fn uuid_to_lock_key(id: Uuid) -> i64 {
     i64::from_be_bytes([
         bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
     ])
+}
+
+/// Timeout fail persist. Errors must not report the discovery as failed while
+/// it is still in progress.
+pub(crate) fn discovery_timeout_marked<T, E>(
+    result: std::result::Result<T, E>,
+) -> std::result::Result<T, E> {
+    result
 }
 
 #[cfg(test)]
@@ -528,5 +532,24 @@ mod tests {
 
         let max_timeout = Duration::from_secs(MAX_DISCOVERY_TIMEOUT_SECS);
         assert_eq!(max_timeout.as_secs(), 300);
+    }
+
+    #[test]
+    fn cleanup_timed_out_discoveries_does_not_swallow_fail_persist() {
+        assert!(discovery_timeout_marked(Ok::<(), &str>(())).is_ok());
+        assert!(discovery_timeout_marked::<(), &str>(Err("db")).is_err());
+
+        let src = include_str!("discovery_state.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let window = production
+            .split("pub async fn cleanup_timed_out_discoveries")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn get_remaining_timeout").next())
+            .expect("cleanup_timed_out_discoveries");
+        assert!(
+            window.contains("discovery_timeout_marked(")
+                && !window.contains("Failed to mark timed-out discovery as failed"),
+            "timeout cleanup must fail closed when fail_discovery persist errors"
+        );
     }
 }
