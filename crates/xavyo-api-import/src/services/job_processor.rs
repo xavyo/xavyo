@@ -127,20 +127,31 @@ pub async fn process_job(
         }
         processed += 1;
 
-        // Update progress periodically
+        // Update progress periodically. Persist errors must not complete the
+        // job with a stale progress snapshot.
         if processed % PROGRESS_BATCH_SIZE == 0 {
-            if let Err(e) = UserImportJob::update_progress(
-                &pool,
-                tenant_id,
-                job_id,
-                processed,
-                success_count,
-                error_count,
-                skip_count,
-            )
-            .await
-            {
+            if let Err(e) = import_progress_recorded(
+                UserImportJob::update_progress(
+                    &pool,
+                    tenant_id,
+                    job_id,
+                    processed,
+                    success_count,
+                    error_count,
+                    skip_count,
+                )
+                .await,
+            ) {
                 tracing::error!(job_id = %job_id, error = %e, "Failed to update progress");
+                fail_job_after_persist_error(
+                    &pool,
+                    tenant_id,
+                    job_id,
+                    &e.to_string(),
+                    &event_publisher,
+                )
+                .await;
+                return;
             }
         }
     }
@@ -363,7 +374,8 @@ async fn process_single_row(
         }
     };
 
-    // Group assignment — find or create groups, then add membership
+    // Group assignment — find or create groups, then add membership.
+    // Failures must not count the row as Created.
     for group_name in &row.groups {
         if let Err(e) = assign_group(pool, tenant_id, user_id, group_name).await {
             tracing::warn!(
@@ -380,10 +392,11 @@ async fn process_single_row(
                 error_message: format!("Failed to assign group '{group_name}': {e}"),
             };
             import_error_recorded(record_error(pool, tenant_id, job_id, &err).await)?;
+            return Ok(RowOutcome::Error);
         }
     }
 
-    // Role validation and assignment — validate roles exist, record errors for unknown
+    // Role validation — unknown or lookup failures must not count as Created.
     for role_name in &row.roles {
         if let Err(e) =
             validate_and_record_role(pool, tenant_id, user_id, job_id, row, role_name).await
@@ -394,6 +407,7 @@ async fn process_single_row(
                 error = %e,
                 "Failed to validate/assign role during import"
             );
+            return Ok(RowOutcome::Error);
         }
     }
 
@@ -517,6 +531,14 @@ pub(crate) fn import_mark_failed_result<T>(
     result
 }
 
+/// Periodic progress persist. Errors must not complete the job with stale
+/// counts.
+pub(crate) fn import_progress_recorded<T>(
+    result: Result<T, sqlx::Error>,
+) -> Result<T, sqlx::Error> {
+    result
+}
+
 /// Row-error persist must fail closed so the job does not complete with a
 /// missing error list or count a fake Created/Skipped outcome.
 pub(crate) fn import_error_recorded<T>(result: Result<T, sqlx::Error>) -> Result<T, sqlx::Error> {
@@ -555,7 +577,8 @@ async fn validate_and_record_role(
             error_type: "role_not_found".to_string(),
             error_message: format!("Role '{role_name}' does not exist"),
         };
-        record_error(pool, tenant_id, job_id, &err).await?;
+        import_error_recorded(record_error(pool, tenant_id, job_id, &err).await)?;
+        return Err(format!("Role '{role_name}' does not exist").into());
     }
 
     // Note: Full role assignment via gov_entitlement_assignments requires an
@@ -690,6 +713,50 @@ mod tests {
                 && process.contains("Failed to create invitation")
                 && process.contains("return Ok(RowOutcome::Error)"),
             "invitation create/send failures must not count as Created"
+        );
+        assert!(
+            process.contains("Failed to assign group during import")
+                && process.contains("return Ok(RowOutcome::Error)"),
+            "group assignment failures must not count as Created"
+        );
+        let groups = process
+            .split("Failed to assign group during import")
+            .nth(1)
+            .and_then(|s| s.split("Role validation").next())
+            .expect("group assign error arm");
+        assert!(
+            groups.contains("return Ok(RowOutcome::Error)"),
+            "must not continue to Created after a group assignment error"
+        );
+        let roles = process
+            .split("Failed to validate/assign role during import")
+            .nth(1)
+            .and_then(|s| s.split("Invitation sending").next())
+            .expect("role assign error arm");
+        assert!(
+            roles.contains("return Ok(RowOutcome::Error)"),
+            "must not continue to Created after a role lookup error"
+        );
+    }
+
+    #[test]
+    fn import_progress_recorded_does_not_skip_on_error() {
+        assert!(import_progress_recorded(Ok::<(), sqlx::Error>(())).is_ok());
+        assert!(
+            import_progress_recorded(Err::<(), _>(sqlx::Error::Protocol("db".into()))).is_err()
+        );
+
+        let src = include_str!("job_processor.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let process_job = production
+            .split("pub async fn process_job")
+            .nth(1)
+            .and_then(|s| s.split("fn publish_import_event").next())
+            .expect("process_job");
+        assert!(
+            process_job.contains("import_progress_recorded(")
+                && process_job.contains("fail_job_after_persist_error("),
+            "progress persist must fail closed"
         );
     }
 

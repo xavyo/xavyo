@@ -429,29 +429,19 @@ impl UserService {
         let lifecycle_states: Vec<(uuid::Uuid, String, bool)> = if lifecycle_state_ids.is_empty() {
             Vec::new()
         } else {
-            // M-3: Log errors instead of silently swallowing via unwrap_or_default
-            match sqlx::query_as(
-                r"
+            lifecycle_lookup_recorded(
+                sqlx::query_as(
+                    r"
                 SELECT id, name, is_terminal
                 FROM gov_lifecycle_states
                 WHERE id = ANY($1) AND tenant_id = $2
                 ",
-            )
-            .bind(&lifecycle_state_ids)
-            .bind(tenant_id.as_uuid())
-            .fetch_all(&mut *conn)
-            .await
-            {
-                Ok(states) => states,
-                Err(e) => {
-                    tracing::warn!(
-                        tenant_id = %tenant_id,
-                        error = %e,
-                        "Failed to fetch lifecycle states for user list — returning users without lifecycle info"
-                    );
-                    Vec::new()
-                }
-            }
+                )
+                .bind(&lifecycle_state_ids)
+                .bind(tenant_id.as_uuid())
+                .fetch_all(&mut *conn)
+                .await,
+            )?
         };
 
         // Release the connection back to the pool
@@ -713,36 +703,27 @@ impl UserService {
         .fetch_all(&self.pool)
         .await?;
 
-        // Fetch lifecycle state with tenant_id filter for tenant isolation
-        // M-3: Log errors instead of silently swallowing
+        // Fetch lifecycle state with tenant_id filter for tenant isolation.
+        // Lookup errors must not look like the user has no lifecycle state.
         let lifecycle_state = if let Some(state_id) = user.lifecycle_state_id {
-            match sqlx::query_as::<_, (uuid::Uuid, String, bool)>(
-                r"
+            lifecycle_lookup_recorded(
+                sqlx::query_as::<_, (uuid::Uuid, String, bool)>(
+                    r"
                 SELECT id, name, is_terminal
                 FROM gov_lifecycle_states
                 WHERE id = $1 AND tenant_id = $2
                 ",
-            )
-            .bind(state_id)
-            .bind(tenant_id.as_uuid())
-            .fetch_optional(&self.pool)
-            .await
-            {
-                Ok(state) => state.map(|(id, name, is_terminal)| LifecycleStateInfo {
-                    id,
-                    name,
-                    is_terminal,
-                }),
-                Err(e) => {
-                    tracing::warn!(
-                        user_id = %user_id,
-                        tenant_id = %tenant_id,
-                        error = %e,
-                        "Failed to fetch lifecycle state for user"
-                    );
-                    None
-                }
-            }
+                )
+                .bind(state_id)
+                .bind(tenant_id.as_uuid())
+                .fetch_optional(&self.pool)
+                .await,
+            )?
+            .map(|(id, name, is_terminal)| LifecycleStateInfo {
+                id,
+                name,
+                is_terminal,
+            })
         } else {
             None
         };
@@ -1021,22 +1002,23 @@ impl UserService {
             user.updated_at = now;
         }
 
-        // M-6: Fetch lifecycle state with tenant_id filter for tenant isolation
+        // Fetch lifecycle state with tenant_id filter for tenant isolation.
+        // Lookup errors must not look like the user has no lifecycle state.
         let lifecycle_state = if let Some(state_id) = user.lifecycle_state_id {
-            let state: Option<(uuid::Uuid, String, bool)> = sqlx::query_as(
-                r"
+            lifecycle_lookup_recorded(
+                sqlx::query_as(
+                    r"
                 SELECT id, name, is_terminal
                 FROM gov_lifecycle_states
                 WHERE id = $1 AND tenant_id = $2
                 ",
-            )
-            .bind(state_id)
-            .bind(tenant_id.as_uuid())
-            .fetch_optional(&self.pool)
-            .await
-            .ok()
-            .flatten();
-            state.map(|(id, name, is_terminal)| LifecycleStateInfo {
+                )
+                .bind(state_id)
+                .bind(tenant_id.as_uuid())
+                .fetch_optional(&self.pool)
+                .await,
+            )?
+            .map(|(id, name, is_terminal)| LifecycleStateInfo {
                 id,
                 name,
                 is_terminal,
@@ -1320,6 +1302,11 @@ pub fn user_to_response(
     }
 }
 
+/// Lifecycle-state lookup. Errors must not look like the user has no state.
+pub(crate) fn lifecycle_lookup_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1468,6 +1455,26 @@ mod tests {
         assert!(
             !production.contains("Failed to revoke refresh tokens on deactivation"),
             "deactivation must not log-and-ignore token revoke errors"
+        );
+    }
+
+    #[test]
+    fn lifecycle_lookups_do_not_fail_open_on_query_errors() {
+        assert!(lifecycle_lookup_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(lifecycle_lookup_recorded::<(), &str>(Err("db")).is_err());
+
+        let src = include_str!("user_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert_eq!(
+            production.matches("lifecycle_lookup_recorded(").count(),
+            3,
+            "list, get, and update lookups"
+        );
+        assert!(
+            !production.contains("returning users without lifecycle info")
+                && !production.contains("Failed to fetch lifecycle state for user")
+                && !production.contains(".ok()\n            .flatten()"),
+            "must not hide lifecycle lookup errors as missing state"
         );
     }
 }
