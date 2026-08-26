@@ -96,18 +96,14 @@ impl SchemaSchedulerJob {
                         error = %e,
                         "Schedule execution failed"
                     );
-                    // Mark as failed with error message
-                    if let Err(mark_err) = self
-                        .schedule_service
-                        .mark_executed(&schedule, false, Some(e.to_string()))
-                        .await
-                    {
-                        error!(
-                            schedule_id = %schedule.id,
-                            error = %mark_err,
-                            "Failed to mark schedule as failed"
-                        );
-                    }
+                    // Mark as failed with error message. Persist errors must not
+                    // leave the schedule looking un-run.
+                    schedule_fail_recorded(
+                        self.schedule_service
+                            .mark_executed(&schedule, false, Some(e.to_string()))
+                            .await,
+                    )
+                    .map_err(|mark_err| SchedulerError::MarkFailed(mark_err.to_string()))?;
                 }
             }
         }
@@ -260,6 +256,11 @@ pub(crate) fn schema_change_notified<T, E>(result: Result<T, E>) -> Result<T, E>
     result
 }
 
+/// Failed-schedule persist. Errors must not leave the schedule looking un-run.
+pub(crate) fn schedule_fail_recorded<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -293,6 +294,19 @@ mod tests {
         assert!(
             !window.contains("Failed to send schema change notification"),
             "must not mark the schedule executed when notify persist fails"
+        );
+    }
+
+    #[test]
+    fn schedule_fail_recorded_does_not_swallow_mark_executed() {
+        assert!(schedule_fail_recorded(Ok::<(), &str>(())).is_ok());
+        assert!(schedule_fail_recorded::<(), &str>(Err("db")).is_err());
+        let src = include_str!("schema_scheduler.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("schedule_fail_recorded(")
+                && !production.contains("if let Err(mark_err) = self"),
+            "failed-schedule persist must fail closed"
         );
     }
 }

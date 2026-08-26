@@ -68,17 +68,18 @@ impl SecurityEventToken {
     /// Build the (unsigned) SET claims. `now` is the `iat`; `jti` is the unique
     /// token id. The `events` claim is the single-entry map
     /// `{ "<type-uri>": { <payload> } }`. No `sub`/`exp` (SSF §4.1.2/§4.1.7).
-    fn claims(&self, now: i64, jti: &str) -> SetClaims {
+    fn claims(&self, now: i64, jti: &str) -> Result<SetClaims, SsfError> {
         let mut events = serde_json::Map::new();
         events.insert(self.event.type_uri().to_string(), self.event.payload());
-        SetClaims {
+        Ok(SetClaims {
             iss: self.issuer.clone(),
             iat: now,
             jti: jti.to_string(),
             aud: self.audience.clone(),
-            sub_id: serde_json::to_value(&self.subject).unwrap_or(serde_json::Value::Null),
+            sub_id: serde_json::to_value(&self.subject)
+                .map_err(|e| SsfError::Signing(format!("subject serialize: {e}")))?,
             events: serde_json::Value::Object(events),
-        }
+        })
     }
 
     /// Sign the SET into a compact JWS (RS256, `typ: secevent+jwt`, `kid`).
@@ -98,7 +99,7 @@ impl SecurityEventToken {
         let mut header = Header::new(Algorithm::RS256);
         header.typ = Some(SET_TYP.to_string());
         header.kid = Some(kid.to_string());
-        encode(&header, &self.claims(now, jti), &key).map_err(|e| SsfError::Signing(e.to_string()))
+        encode(&header, &self.claims(now, jti)?, &key).map_err(|e| SsfError::Signing(e.to_string()))
     }
 }
 
@@ -164,7 +165,7 @@ nwIDAQAB
 
     #[test]
     fn claims_have_no_sub_or_exp_and_carry_sub_id_and_events() {
-        let claims = sample().claims(1_700_000_001, "jti-1");
+        let claims = sample().claims(1_700_000_001, "jti-1").unwrap();
         let v = serde_json::to_value(&claims).unwrap();
         assert!(v.get("sub").is_none(), "SET must not carry `sub`");
         assert!(v.get("exp").is_none(), "SET must not carry `exp`");
@@ -243,5 +244,16 @@ nwIDAQAB
             .sign(b"not a pem", "k", 1, "j")
             .expect_err("must reject bad key");
         assert!(matches!(err, SsfError::InvalidKey(_)));
+    }
+
+    #[test]
+    fn set_claims_do_not_store_null_subject_on_serialize() {
+        let src = include_str!("set.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("map_err(|e| SsfError::Signing")
+                && !production.contains("unwrap_or(serde_json::Value::Null)"),
+            "SET claims must fail closed when subject JSON serialize fails"
+        );
     }
 }

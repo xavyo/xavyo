@@ -390,10 +390,17 @@ where
             }
         };
 
+        let after_state = match rem_json(&attributes) {
+            Ok(v) => v,
+            Err(e) => {
+                return RemediationResult::failure(discrepancy_id, ActionType::Create, e, dry_run);
+            }
+        };
+
         if dry_run {
             // Return success with expected after_state
             return RemediationResult::success(discrepancy_id, ActionType::Create, true)
-                .with_after_state(serde_json::to_value(&attributes).unwrap_or_default());
+                .with_after_state(after_state);
         }
 
         // Get connector with create capability
@@ -441,7 +448,7 @@ where
             identity_id,
             object_class.to_string(),
             uid.value().to_string(),
-            serde_json::to_value(&attributes).unwrap_or_default(),
+            after_state.clone(),
         );
 
         if let Err(e) = self.shadow_repository.upsert(&shadow).await {
@@ -461,7 +468,7 @@ where
         );
 
         RemediationResult::success(discrepancy_id, ActionType::Create, false)
-            .with_after_state(serde_json::to_value(&attributes).unwrap_or_default())
+            .with_after_state(after_state)
     }
 
     /// Execute an update action.
@@ -572,10 +579,18 @@ where
             }
         };
 
+        let after_state = match rem_json(&identity_attrs) {
+            Ok(v) => v,
+            Err(e) => {
+                return RemediationResult::failure(discrepancy_id, ActionType::Update, e, dry_run)
+                    .with_before_state(before_state);
+            }
+        };
+
         if dry_run {
             return RemediationResult::success(discrepancy_id, ActionType::Update, true)
                 .with_before_state(before_state)
-                .with_after_state(serde_json::to_value(&identity_attrs).unwrap_or_default());
+                .with_after_state(after_state);
         }
 
         // Get connector
@@ -629,7 +644,7 @@ where
             .await
         {
             Ok(Some(mut shadow)) => {
-                shadow.update_attributes(serde_json::to_value(&identity_attrs).unwrap_or_default());
+                shadow.update_attributes(after_state.clone());
                 if let Err(e) = self.shadow_repository.upsert(&shadow).await {
                     return RemediationResult::failure(
                         discrepancy_id,
@@ -660,7 +675,7 @@ where
 
         RemediationResult::success(discrepancy_id, ActionType::Update, false)
             .with_before_state(before_state)
-            .with_after_state(serde_json::to_value(&identity_attrs).unwrap_or_default())
+            .with_after_state(after_state)
     }
 
     /// Update xavyo with target system attributes.
@@ -715,10 +730,18 @@ where
             }
         };
 
+        let after_state = match rem_json(&target_attrs) {
+            Ok(v) => v,
+            Err(e) => {
+                return RemediationResult::failure(discrepancy_id, ActionType::Update, e, dry_run)
+                    .with_before_state(before_state);
+            }
+        };
+
         if dry_run {
             return RemediationResult::success(discrepancy_id, ActionType::Update, true)
                 .with_before_state(before_state)
-                .with_after_state(serde_json::to_value(&target_attrs).unwrap_or_default());
+                .with_after_state(after_state);
         }
 
         // Update identity with target attributes
@@ -743,7 +766,7 @@ where
             .await
         {
             Ok(Some(mut shadow)) => {
-                shadow.update_attributes(serde_json::to_value(&target_attrs).unwrap_or_default());
+                shadow.update_attributes(after_state.clone());
                 if let Err(e) = self.shadow_repository.upsert(&shadow).await {
                     return RemediationResult::failure(
                         discrepancy_id,
@@ -774,7 +797,7 @@ where
 
         RemediationResult::success(discrepancy_id, ActionType::Update, false)
             .with_before_state(before_state)
-            .with_after_state(serde_json::to_value(&target_attrs).unwrap_or_default())
+            .with_after_state(after_state)
     }
 
     /// Execute a delete action.
@@ -1218,12 +1241,25 @@ where
             "identity_exists": false,
         });
 
+        let attributes_json = match rem_json(&attributes) {
+            Ok(v) => v,
+            Err(e) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::CreateIdentity,
+                    e,
+                    dry_run,
+                )
+                .with_before_state(before_state.clone());
+            }
+        };
+
         if dry_run {
             // In dry-run mode, we just preview what would happen
             let after_state = serde_json::json!({
                 "identity_exists": true,
                 "identity_id": "would-be-generated",
-                "attributes": serde_json::to_value(&attributes).unwrap_or_default(),
+                "attributes": attributes_json,
             });
 
             return RemediationResult::success(discrepancy_id, ActionType::CreateIdentity, true)
@@ -1252,7 +1288,7 @@ where
         let after_state = serde_json::json!({
             "identity_exists": true,
             "identity_id": identity_id,
-            "attributes": serde_json::to_value(&attributes).unwrap_or_default(),
+            "attributes": attributes_json,
         });
 
         tracing::info!(
@@ -1310,11 +1346,21 @@ where
                 .get_identity_attributes(self.tenant_id, identity_id)
                 .await
             {
-                Ok(attrs) => serde_json::json!({
-                    "identity_id": identity_id,
-                    "exists": true,
-                    "attributes": serde_json::to_value(&attrs).unwrap_or_default(),
-                }),
+                Ok(attrs) => match rem_json(&attrs) {
+                    Ok(v) => serde_json::json!({
+                        "identity_id": identity_id,
+                        "exists": true,
+                        "attributes": v,
+                    }),
+                    Err(e) => {
+                        return RemediationResult::failure(
+                            discrepancy_id,
+                            ActionType::DeleteIdentity,
+                            e,
+                            dry_run,
+                        );
+                    }
+                },
                 Err(_) => serde_json::json!({
                     "identity_id": identity_id,
                     "exists": true,
@@ -1604,6 +1650,11 @@ pub struct RemediationPreviewSummary {
     pub by_action: std::collections::HashMap<String, usize>,
 }
 
+/// Remediation JSON persist. Serialization errors must not store empty attributes.
+fn rem_json<T: serde::Serialize>(value: &T) -> Result<JsonValue, String> {
+    serde_json::to_value(value).map_err(|e| format!("Failed to serialize attributes: {e}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1716,6 +1767,22 @@ mod tests {
                 "{fn_name} must fail remediation when shadow lookup errors"
             );
         }
+    }
+
+    #[test]
+    fn rem_json_does_not_store_empty_on_serialize() {
+        let v = rem_json(&serde_json::json!({"mail": "a@b.c"})).unwrap();
+        assert_eq!(v["mail"], "a@b.c");
+        let src = include_str!("remediation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("rem_json(")
+                && !production.contains("to_value(&attributes).unwrap_or_default()")
+                && !production.contains("to_value(&identity_attrs).unwrap_or_default()")
+                && !production.contains("to_value(&target_attrs).unwrap_or_default()")
+                && !production.contains("to_value(&attrs).unwrap_or_default()"),
+            "remediation persist must fail closed on JSON serialize"
+        );
     }
 
     #[test]
