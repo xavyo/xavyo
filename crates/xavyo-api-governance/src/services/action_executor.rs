@@ -391,24 +391,10 @@ impl ActionExecutor {
         context: &ActionExecutionContext,
         action: &LifecycleAction,
     ) -> Result<(), GovernanceError> {
-        let template = action
-            .config
-            .get("template")
-            .and_then(|v| v.as_str())
-            .unwrap_or("lifecycle_notification");
-
-        let channel = action
-            .config
-            .get("channel")
-            .and_then(|v| v.as_str())
-            .unwrap_or("in_app");
-
-        let recipients = action
-            .config
-            .get("recipients")
-            .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
-            .unwrap_or_else(|| vec!["user"]);
+        let template =
+            notification_config_str(&action.config, "template", "lifecycle_notification")?;
+        let channel = notification_config_str(&action.config, "channel", "in_app")?;
+        let recipients = notification_recipients(&action.config)?;
 
         // For each recipient type, create notification
         for recipient_type in recipients {
@@ -540,6 +526,44 @@ impl ActionExecutor {
         }
 
         Ok(())
+    }
+}
+
+fn notification_config_str<'a>(
+    config: &'a serde_json::Value,
+    field: &str,
+    default: &'a str,
+) -> Result<&'a str, GovernanceError> {
+    match config.get(field) {
+        None => Ok(default),
+        Some(v) => v.as_str().filter(|s| !s.is_empty()).ok_or_else(|| {
+            GovernanceError::ActionExecutionFailed(format!(
+                "lifecycle notification {field} must be a non-empty string"
+            ))
+        }),
+    }
+}
+
+/// Stored notification recipients. Corrupt JSON must not look like "notify the user".
+fn notification_recipients(config: &serde_json::Value) -> Result<Vec<&str>, GovernanceError> {
+    match config.get("recipients") {
+        None => Ok(vec!["user"]),
+        Some(v) => {
+            let arr = v.as_array().ok_or_else(|| {
+                GovernanceError::ActionExecutionFailed(
+                    "lifecycle notification recipients must be a JSON array".to_string(),
+                )
+            })?;
+            arr.iter()
+                .map(|item| {
+                    item.as_str().filter(|s| !s.is_empty()).ok_or_else(|| {
+                        GovernanceError::ActionExecutionFailed(
+                            "lifecycle notification recipients must be strings".to_string(),
+                        )
+                    })
+                })
+                .collect()
+        }
     }
 }
 
@@ -712,14 +736,27 @@ mod tests {
             "recipients": ["user", "manager"]
         });
 
-        let template = config.get("template").and_then(|v| v.as_str());
-        assert_eq!(template, Some("user_terminated"));
-
-        let recipients = config
-            .get("recipients")
-            .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>());
-        assert_eq!(recipients, Some(vec!["user", "manager"]));
+        assert_eq!(
+            notification_config_str(&config, "template", "lifecycle_notification").unwrap(),
+            "user_terminated"
+        );
+        assert_eq!(
+            notification_recipients(&config).unwrap(),
+            vec!["user", "manager"]
+        );
+        assert_eq!(
+            notification_recipients(&serde_json::json!({})).unwrap(),
+            vec!["user"]
+        );
+        assert!(notification_recipients(&serde_json::json!({"recipients": "user"})).is_err());
+        assert!(notification_recipients(&serde_json::json!({"recipients": [1]})).is_err());
+        let src = include_str!("action_executor.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("filter_map(|v| v.as_str())")
+                && !production.contains("unwrap_or_else(|| vec![\"user\"])"),
+            "lifecycle notification must not drop corrupt recipients or invent [user]"
+        );
     }
 
     #[test]

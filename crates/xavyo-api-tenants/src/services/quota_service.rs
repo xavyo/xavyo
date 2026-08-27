@@ -144,7 +144,7 @@ impl QuotaService {
                 TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
             })?;
 
-        let limits = Self::extract_limits(&tenant.settings);
+        let limits = Self::extract_limits(&tenant.settings)?;
 
         // Get current usage
         let usage = self.get_current_usage(tenant_id).await?;
@@ -153,20 +153,25 @@ impl QuotaService {
     }
 
     /// Extract limits from tenant settings JSON.
-    fn extract_limits(settings: &serde_json::Value) -> TenantLimits {
-        let limits_obj = settings.get("limits").cloned().unwrap_or_default();
-
-        TenantLimits {
-            max_mau: limits_obj
-                .get("max_mau")
-                .and_then(serde_json::Value::as_i64),
-            max_api_calls: limits_obj
-                .get("max_api_calls")
-                .and_then(serde_json::Value::as_i64),
-            max_agent_invocations: limits_obj
-                .get("max_agent_invocations")
-                .and_then(serde_json::Value::as_i64),
+    /// Corrupt `limits` must not look like unlimited quotas.
+    fn extract_limits(settings: &serde_json::Value) -> Result<TenantLimits, TenantError> {
+        let Some(limits) = settings.get("limits") else {
+            return Ok(TenantLimits::default());
+        };
+        if limits.is_null() {
+            return Ok(TenantLimits::default());
         }
+        let obj = limits.as_object().ok_or_else(|| {
+            TenantError::Validation("tenant settings.limits must be an object".to_string())
+        })?;
+        Ok(TenantLimits {
+            max_mau: quota_limit_i64(obj.get("max_mau"), "max_mau")?,
+            max_api_calls: quota_limit_i64(obj.get("max_api_calls"), "max_api_calls")?,
+            max_agent_invocations: quota_limit_i64(
+                obj.get("max_agent_invocations"),
+                "max_agent_invocations",
+            )?,
+        })
     }
 
     /// Get current usage from database.
@@ -216,6 +221,21 @@ impl QuotaService {
     }
 }
 
+fn quota_limit_i64(
+    value: Option<&serde_json::Value>,
+    field: &str,
+) -> Result<Option<i64>, TenantError> {
+    match value {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => v
+            .as_i64()
+            .ok_or_else(|| {
+                TenantError::Validation(format!("tenant settings.limits.{field} must be a number"))
+            })
+            .map(Some),
+    }
+}
+
 /// Current usage values.
 #[derive(Debug, Clone, Default)]
 struct CurrentUsage {
@@ -255,7 +275,7 @@ mod tests {
             }
         });
 
-        let limits = QuotaService::extract_limits(&settings);
+        let limits = QuotaService::extract_limits(&settings).unwrap();
         assert_eq!(limits.max_mau, Some(500));
         assert_eq!(limits.max_api_calls, Some(100000));
         assert_eq!(limits.max_agent_invocations, Some(10000));
@@ -265,7 +285,7 @@ mod tests {
     fn test_extract_limits_empty() {
         let settings = serde_json::json!({});
 
-        let limits = QuotaService::extract_limits(&settings);
+        let limits = QuotaService::extract_limits(&settings).unwrap();
         assert_eq!(limits.max_mau, None);
         assert_eq!(limits.max_api_calls, None);
         assert_eq!(limits.max_agent_invocations, None);
@@ -279,10 +299,26 @@ mod tests {
             }
         });
 
-        let limits = QuotaService::extract_limits(&settings);
+        let limits = QuotaService::extract_limits(&settings).unwrap();
         assert_eq!(limits.max_mau, Some(100));
         assert_eq!(limits.max_api_calls, None);
         assert_eq!(limits.max_agent_invocations, None);
+    }
+
+    #[test]
+    fn extract_limits_does_not_treat_corrupt_json_as_unlimited() {
+        assert!(QuotaService::extract_limits(&serde_json::json!({"limits": "nope"})).is_err());
+        assert!(
+            QuotaService::extract_limits(&serde_json::json!({"limits": {"max_mau": "10"}}))
+                .is_err()
+        );
+        let src = include_str!("quota_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or_default()")
+                && !production.contains("and_then(serde_json::Value::as_i64)"),
+            "quota checks must not hide corrupt limits as unlimited"
+        );
     }
 
     #[test]

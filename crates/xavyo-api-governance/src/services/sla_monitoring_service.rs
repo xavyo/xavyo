@@ -284,7 +284,7 @@ impl SlaMonitoringService {
         if let Some(deadline) = task.sla_deadline {
             let overdue_minutes = (Utc::now() - deadline).num_minutes();
 
-            let escalation_emails = self.extract_escalation_emails(&task.escalation_contacts);
+            let escalation_emails = parse_escalation_emails(&task.escalation_contacts)?;
 
             let full_task = GovManualProvisioningTask::find_by_id(&self.pool, tenant_id, task_id)
                 .await?
@@ -369,19 +369,6 @@ impl SlaMonitoringService {
         Ok(())
     }
 
-    /// Extract escalation emails from contacts JSON.
-    fn extract_escalation_emails(&self, contacts: &Option<serde_json::Value>) -> Vec<String> {
-        contacts
-            .as_ref()
-            .and_then(|c| c.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str().map(String::from))
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
     /// Get application and entitlement names for notification.
     async fn get_task_names(
         &self,
@@ -454,7 +441,7 @@ impl SlaMonitoringService {
             )
             .await?;
 
-        let recipient_emails = self.extract_escalation_emails(&task.escalation_contacts);
+        let recipient_emails = parse_escalation_emails(&task.escalation_contacts)?;
 
         let assignee_email = match full_task.assignee_id {
             Some(assignee_id) => self.get_user_email(tenant_id, assignee_id).await?,
@@ -734,6 +721,31 @@ pub struct SlaComplianceSummary {
     pub compliance_rate: f64,
 }
 
+/// Stored SLA contacts. Corrupt JSON must not look like nobody to notify.
+fn parse_escalation_emails(contacts: &Option<serde_json::Value>) -> Result<Vec<String>> {
+    let Some(value) = contacts else {
+        return Ok(Vec::new());
+    };
+    if value.is_null() {
+        return Ok(Vec::new());
+    }
+    let arr = value.as_array().ok_or_else(|| {
+        GovernanceError::Validation("escalation_contacts must be a JSON array".to_string())
+    })?;
+    arr.iter()
+        .map(|v| {
+            v.as_str()
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .ok_or_else(|| {
+                    GovernanceError::Validation(
+                        "escalation_contacts must be email strings".to_string(),
+                    )
+                })
+        })
+        .collect()
+}
+
 /// Warning notification persist. Errors must not mark `sla_warning_sent`.
 pub(crate) fn sla_warning_notified<T, E: std::fmt::Display>(
     result: std::result::Result<T, E>,
@@ -875,6 +887,23 @@ mod tests {
         assert!(
             name.contains("Err(GovernanceError::Database(e))"),
             "user display-name lookup errors must fail SLA notification"
+        );
+    }
+
+    #[test]
+    fn parse_escalation_emails_does_not_drop_corrupt_json() {
+        assert!(parse_escalation_emails(&None).unwrap().is_empty());
+        assert_eq!(
+            parse_escalation_emails(&Some(serde_json::json!(["a@b.com"]))).unwrap(),
+            vec!["a@b.com"]
+        );
+        assert!(parse_escalation_emails(&Some(serde_json::json!("nope"))).is_err());
+        assert!(parse_escalation_emails(&Some(serde_json::json!([1]))).is_err());
+        let src = include_str!("sla_monitoring_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("filter_map(|v| v.as_str().map(String::from))"),
+            "SLA contacts must not hide corrupt emails as nobody to notify"
         );
     }
 }

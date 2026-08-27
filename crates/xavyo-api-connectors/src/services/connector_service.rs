@@ -650,17 +650,7 @@ impl ConnectorService {
                             .get("filter")
                             .and_then(|v| v.as_str())
                             .map(std::string::ToString::to_string),
-                        object_types: base
-                            .get("object_types")
-                            .and_then(|v| v.as_array())
-                            .map(|arr| {
-                                arr.iter()
-                                    .filter_map(|v| {
-                                        v.as_str().map(std::string::ToString::to_string)
-                                    })
-                                    .collect()
-                            })
-                            .unwrap_or_else(|| vec!["all".to_string()]),
+                        object_types: ad_search_base_object_types(base.get("object_types"))?,
                     });
                 }
             }
@@ -816,6 +806,32 @@ impl ConnectorService {
     }
 }
 
+/// AD search-base object types. Corrupt JSON must not look like "all".
+fn ad_search_base_object_types(value: Option<&serde_json::Value>) -> Result<Vec<String>> {
+    match value {
+        None | Some(serde_json::Value::Null) => Ok(vec!["all".to_string()]),
+        Some(v) => {
+            let arr = v.as_array().ok_or_else(|| {
+                ConnectorApiError::InvalidConfiguration(
+                    "search_bases.object_types must be a JSON array".to_string(),
+                )
+            })?;
+            arr.iter()
+                .map(|item| {
+                    item.as_str()
+                        .filter(|s| !s.is_empty())
+                        .map(str::to_string)
+                        .ok_or_else(|| {
+                            ConnectorApiError::InvalidConfiguration(
+                                "search_bases.object_types must be strings".to_string(),
+                            )
+                        })
+                })
+                .collect()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -902,5 +918,26 @@ mod tests {
             "timeout": 30
         });
         assert!(validate_connector_config(&DbConnectorType::Rest, &invalid_config).is_err());
+    }
+
+    #[test]
+    fn ad_search_base_object_types_does_not_drop_or_invent_all() {
+        assert_eq!(
+            ad_search_base_object_types(None).unwrap(),
+            vec!["all".to_string()]
+        );
+        assert_eq!(
+            ad_search_base_object_types(Some(&serde_json::json!(["user", "group"]))).unwrap(),
+            vec!["user".to_string(), "group".to_string()]
+        );
+        assert!(ad_search_base_object_types(Some(&serde_json::json!("all"))).is_err());
+        assert!(ad_search_base_object_types(Some(&serde_json::json!([1]))).is_err());
+        let src = include_str!("connector_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("filter_map(|v|")
+                && !production.contains("unwrap_or_else(|| vec![\"all\".to_string()])"),
+            "AD search_bases.object_types must not drop non-strings or invent [all]"
+        );
     }
 }
