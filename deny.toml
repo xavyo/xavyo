@@ -35,24 +35,16 @@ ignore = [
 
     # (RUSTSEC-2024-0363 sqlx removed 2026-05-25: resolved by the sqlx 0.8.6 upgrade.)
 
-    # rustls-webpki 0.101.7 — three advisories in the legacy webpki used by the
-    # AWS SDK's rustls-0.21 connector:
-    #   RUSTSEC-2026-0104  reachable panic in CRL parsing
-    #   RUSTSEC-2026-0098  name constraints accepted for URI names
-    #   RUSTSEC-2026-0099  name constraints accepted for wildcard-name certs
-    # Affected crate: rustls-webpki 0.101.7 (transitive via xavyo-secrets' OPTIONAL
-    #   `aws-provider` feature). `cargo tree` confirms it is ABSENT from the default
-    #   build graph — no compiled xavyo binary links it; all compiled TLS uses
-    #   rustls 0.23 / rustls-webpki 0.103.13. cargo-deny still flags it because it
-    #   scans the full `cargo metadata` graph (optional deps included), so these
-    #   need explicit exemptions even though the code path is never built.
-    # Reachability: all three require actually validating a server certificate with
-    #   the 0.21 connector, which xavyo never does (aws-provider is off by default).
-    # Deadline: 2026-09-01 — drop once the AWS SDK moves off its rustls-0.21 connector
-    #   (tracked: bumping aws-smithy-http-client past the legacy connector).
-    { id = "RUSTSEC-2026-0104", reason = "rustls-webpki 0.101.7 only via optional aws-provider feature; absent from default build graph, not compiled into any xavyo binary" },
-    { id = "RUSTSEC-2026-0098", reason = "rustls-webpki 0.101.7 only via optional aws-provider feature; absent from default build graph, not compiled into any xavyo binary" },
-    { id = "RUSTSEC-2026-0099", reason = "rustls-webpki 0.101.7 only via optional aws-provider feature; absent from default build graph, not compiled into any xavyo binary" },
+    # rustls-webpki 0.101.7 / h2 0.3.27 — advisories in the legacy AWS SDK
+    # rustls-0.21 / hyper-0.14 connector stack (optional `aws-provider` on
+    # xavyo-secrets and transitive aws-config users). cargo-deny scans with
+    # `--all-features`, so these appear even though no default xavyo binary
+    # links the legacy connector; compiled TLS uses rustls 0.23 / h2 0.4.
+    # Deadline: 2026-09-01 — drop once AWS SDK drops the rustls-0.21 connector.
+    { id = "RUSTSEC-2026-0104", reason = "rustls-webpki 0.101.7 only via optional aws-provider/aws-config; absent from default build graph" },
+    { id = "RUSTSEC-2026-0098", reason = "rustls-webpki 0.101.7 only via optional aws-provider/aws-config; absent from default build graph" },
+    { id = "RUSTSEC-2026-0099", reason = "rustls-webpki 0.101.7 only via optional aws-provider/aws-config; absent from default build graph" },
+    { id = "RUSTSEC-2026-0258", reason = "h2 0.3.27 only via optional aws-config connector; default build uses h2 0.4.19; no 0.3.x patch upstream" },
 
     # RUSTSEC-2026-0097: rand — unsound when a custom `log::Log` implementation calls
     # `rand::rng()` reentrantly from within its own logging path.

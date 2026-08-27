@@ -15,6 +15,7 @@ pub mod router;
 pub mod saml;
 pub mod services;
 pub mod session;
+pub mod xml;
 
 pub use error::{SamlError, SamlResult};
 pub use handlers::metadata::SamlState;

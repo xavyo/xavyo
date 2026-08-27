@@ -324,7 +324,7 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
                     for attr in e.attributes().flatten() {
                         let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                         if let Some(prefix) = key.strip_prefix("xmlns:") {
-                            let value = attr.unescape_value().unwrap_or_default().to_string();
+                            let value = crate::xml::attribute_value(&attr).to_string();
                             // Keep only the latest declaration per prefix
                             ancestor_namespaces.retain(|(p, _)| p != prefix);
                             ancestor_namespaces.push((prefix.to_string(), value));
@@ -340,7 +340,7 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
                     for attr in e.attributes().flatten() {
                         let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                         if key == "URI" {
-                            reference_uri = attr.unescape_value().unwrap_or_default().to_string();
+                            reference_uri = crate::xml::attribute_value(&attr).to_string();
                         }
                     }
                 }
@@ -359,15 +359,14 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
                         let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                         if key == "Algorithm" {
                             signature_algorithm =
-                                Some(attr.unescape_value().unwrap_or_default().to_string());
+                                Some(crate::xml::attribute_value(&attr).to_string());
                         }
                     }
                 } else if local == "DigestMethod" {
                     for attr in e.attributes().flatten() {
                         let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                         if key == "Algorithm" {
-                            digest_algorithm =
-                                Some(attr.unescape_value().unwrap_or_default().to_string());
+                            digest_algorithm = Some(crate::xml::attribute_value(&attr).to_string());
                         }
                     }
                 }
@@ -395,7 +394,7 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
                 }
             }
             Ok(Event::Text(e)) => {
-                let text = e.unescape().unwrap_or_default();
+                let text = e.decode().unwrap_or_default();
                 if in_signed_info {
                     signed_info_content.push_str(&text);
                 } else if in_signature_value {
@@ -524,7 +523,7 @@ fn extract_element_by_id(xml: &str, element_id: &str) -> SamlResult<String> {
                         // Case-insensitive matching would find non-SAML elements with lowercase
                         // "id" attributes, enabling an XSW variant attack.
                         if key == "ID" {
-                            let val = attr.unescape_value().unwrap_or_default();
+                            let val = crate::xml::attribute_value(&attr);
                             if val.as_ref() == element_id {
                                 capturing = true;
                                 depth = 1;
@@ -560,7 +559,7 @@ fn extract_element_by_id(xml: &str, element_id: &str) -> SamlResult<String> {
                 for attr in e.attributes().flatten() {
                     let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                     if key == "ID" {
-                        let val = attr.unescape_value().unwrap_or_default();
+                        let val = crate::xml::attribute_value(&attr);
                         if val.as_ref() == element_id {
                             let end_offset = reader.buffer_position() as usize;
                             return Ok(xml

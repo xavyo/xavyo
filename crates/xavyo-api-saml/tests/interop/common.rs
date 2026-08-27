@@ -425,7 +425,7 @@ pub fn parse_saml_xml(xml: &str) -> Result<ParsedAssertion, String> {
                 }
             }
             Ok(Event::Text(e)) => {
-                let text = e.unescape().unwrap_or_default().to_string();
+                let text = e.decode().unwrap_or_default().to_string();
                 match current_element.as_str() {
                     "Issuer" if parsed.issuer.is_none() => {
                         parsed.issuer = Some(text);

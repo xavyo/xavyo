@@ -65,7 +65,7 @@ async fn json_body(response: axum::response::Response) -> Value {
     let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024)
         .await
         .expect("read body");
-    serde_json::from_slice(&bytes).unwrap_or_else(|_| Value::Null)
+    serde_json::from_slice(&bytes).unwrap_or(Value::Null)
 }
 
 #[tokio::test]

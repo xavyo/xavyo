@@ -18,7 +18,7 @@ urlencoding = "2.1"
 url = "2.5"
 
 # XML parsing
-quick-xml = "0.37"
+quick-xml = "0.41"
 
 # Date/time
 chrono.workspace = true

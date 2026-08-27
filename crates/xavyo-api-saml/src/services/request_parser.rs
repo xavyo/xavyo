@@ -98,7 +98,7 @@ impl RequestParser {
                     }
                 }
                 Ok(Event::Text(e)) if in_issuer => {
-                    let issuer = e.unescape().unwrap_or_default().to_string();
+                    let issuer = e.decode().unwrap_or_default().to_string();
                     if issuer.len() > MAX_ISSUER_LENGTH {
                         return Err(SamlError::InvalidAuthnRequest(
                             "Issuer exceeds maximum length".to_string(),
@@ -210,7 +210,7 @@ impl RequestParser {
                         "AuthnRequest" => {
                             for attr in e.attributes().flatten() {
                                 let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                                let value = attr.unescape_value().unwrap_or_default();
+                                let value = crate::xml::attribute_value(&attr);
 
                                 match key {
                                     "ID" => id = Some(value.to_string()),
@@ -234,7 +234,7 @@ impl RequestParser {
                                 let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                                 if key == "Format" {
                                     name_id_format =
-                                        Some(attr.unescape_value().unwrap_or_default().to_string());
+                                        Some(crate::xml::attribute_value(&attr).to_string());
                                 }
                             }
                         }
@@ -242,7 +242,7 @@ impl RequestParser {
                     }
                 }
                 Ok(Event::Text(e)) if in_issuer => {
-                    issuer = Some(e.unescape().unwrap_or_default().to_string());
+                    issuer = Some(e.decode().unwrap_or_default().to_string());
                 }
                 Ok(Event::End(e)) => {
                     let local_name = e.local_name();

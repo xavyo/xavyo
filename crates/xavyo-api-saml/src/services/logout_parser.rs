@@ -71,7 +71,7 @@ pub fn parse_logout_request_xml(xml: &str) -> SamlResult<ParsedLogoutRequest> {
                 }
             }
             Ok(Event::Text(ref e)) => {
-                let text = e.unescape().unwrap_or_default().to_string();
+                let text = e.decode().unwrap_or_default().to_string();
                 match current_element.as_str() {
                     "Issuer" => issuer = Some(text),
                     "NameID" => name_id = Some(text),
