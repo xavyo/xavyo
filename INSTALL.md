@@ -77,6 +77,8 @@ curl http://localhost:8080/readyz
 
 The pre-built image is published to `ghcr.io/xavyo/xavyo-idp` on every release. The default admin credentials (`admin@xavyo.local` / `Admin@1234`) are the same as above — override with `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
 
+For production operations (secrets, backups, upgrades), see [docs/operations/first-deployment.md](docs/operations/first-deployment.md).
+
 ### Bootstrap Admin User
 
 On first startup, if `ADMIN_EMAIL` and `ADMIN_PASSWORD` are set, a `super_admin` user is created under the system tenant with email pre-verified for immediate login. The operation is idempotent — on subsequent restarts the existing user is left unchanged.
