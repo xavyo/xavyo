@@ -43,16 +43,7 @@ pub struct MappedEntraGroup {
 impl MappedEntraGroup {
     /// Parses a group from the Graph API JSON response.
     pub fn from_json(value: &serde_json::Value) -> EntraResult<Self> {
-        let group_types = value
-            .get("groupTypes")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str())
-                    .map(String::from)
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
+        let group_types = json_string_array(value, "groupTypes")?;
 
         let security_enabled = json_bool(value, "securityEnabled")?;
         let mail_enabled = json_bool(value, "mailEnabled")?;
@@ -99,6 +90,24 @@ impl MappedEntraGroup {
             EntraGroupType::Distribution
         } else {
             EntraGroupType::Unknown
+        }
+    }
+}
+
+fn json_string_array(value: &serde_json::Value, field: &str) -> EntraResult<Vec<String>> {
+    match value.get(field) {
+        None | Some(serde_json::Value::Null) => Ok(Vec::new()),
+        Some(v) => {
+            let arr = v
+                .as_array()
+                .ok_or_else(|| EntraError::Sync(format!("{field} must be a JSON array")))?;
+            arr.iter()
+                .map(|item| {
+                    item.as_str().map(str::to_string).ok_or_else(|| {
+                        EntraError::Sync(format!("{field} must be an array of strings"))
+                    })
+                })
+                .collect()
         }
     }
 }
@@ -304,6 +313,32 @@ mod tests {
         assert!(
             !production.contains("unwrap_or(false)"),
             "Entra group securityEnabled/mailEnabled must not silently become false"
+        );
+    }
+
+    #[test]
+    fn group_types_do_not_drop_non_strings() {
+        let ok = serde_json::json!({
+            "id": "group-123",
+            "displayName": "Group",
+            "securityEnabled": true,
+            "mailEnabled": false,
+            "groupTypes": ["DynamicMembership"]
+        });
+        assert!(MappedEntraGroup::from_json(&ok).unwrap().is_dynamic);
+        let bad = serde_json::json!({
+            "id": "group-123",
+            "displayName": "Group",
+            "securityEnabled": true,
+            "mailEnabled": false,
+            "groupTypes": [1]
+        });
+        assert!(MappedEntraGroup::from_json(&bad).is_err());
+        let src = include_str!("groups.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("filter_map(|v| v.as_str())"),
+            "Entra groupTypes must not drop non-string values"
         );
     }
 }

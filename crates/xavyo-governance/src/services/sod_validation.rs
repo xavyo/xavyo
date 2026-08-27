@@ -571,12 +571,7 @@ impl SodValidationService {
         let rule = match self.rule_store.get(tenant_id, rule_id).await? {
             Some(r) => r,
             None => {
-                return Ok(RuleScanResult {
-                    rule_id,
-                    rule_name: "Unknown".to_string(),
-                    total_violations: 0,
-                    user_violations: vec![],
-                });
+                return Err(crate::error::GovernanceError::SodRuleNotFound(rule_id.0));
             }
         };
 
@@ -982,5 +977,20 @@ mod tests {
         assert_eq!(violation.severity, SodSeverity::High);
         assert_eq!(violation.conflicting_entitlements.len(), 2);
         assert!(violation.message.contains("Test Rule"));
+    }
+
+    #[test]
+    fn scan_rule_does_not_invent_unknown_on_missing_rule() {
+        let src = include_str!("sod_validation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let scan = production
+            .split("pub async fn scan_rule")
+            .nth(1)
+            .and_then(|s| s.split("    pub async fn ").next())
+            .expect("scan_rule");
+        assert!(
+            scan.contains("SodRuleNotFound") && !scan.contains("\"Unknown\""),
+            "SoD scan must not report zero violations for a missing rule"
+        );
     }
 }

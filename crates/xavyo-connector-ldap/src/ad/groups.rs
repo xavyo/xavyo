@@ -89,8 +89,8 @@ pub fn map_ad_group(entry: &AttributeSet) -> Option<MappedGroup> {
         attrs.insert("dn".to_string(), serde_json::Value::String(dn.clone()));
     }
 
-    // Parse groupType bitmask
-    let (is_security, scope) = parse_group_type(entry);
+    // Parse groupType bitmask. Missing/corrupt type must not look like a distribution group.
+    let (is_security, scope) = parse_group_type(entry)?;
     attrs.insert(
         "group_type".to_string(),
         serde_json::Value::String(if is_security {
@@ -105,10 +105,10 @@ pub fn map_ad_group(entry: &AttributeSet) -> Option<MappedGroup> {
     );
 
     // Direct members
-    let direct_member_dns = extract_multi_valued_dns(entry, "member");
+    let direct_member_dns = extract_multi_valued_dns(entry, "member")?;
 
     // memberOf (groups this group belongs to)
-    let member_of_dns = extract_multi_valued_dns(entry, "memberOf");
+    let member_of_dns = extract_multi_valued_dns(entry, "memberOf")?;
     if !member_of_dns.is_empty() {
         let dns: Vec<serde_json::Value> = member_of_dns
             .iter()
@@ -248,8 +248,10 @@ pub fn resolve_nested_members(
 }
 
 /// Build a `SyncChange` from a `MappedGroup`.
-#[must_use]
-pub fn mapped_group_to_sync_change(group: &MappedGroup, change_type: SyncChangeType) -> SyncChange {
+pub fn mapped_group_to_sync_change(
+    group: &MappedGroup,
+    change_type: SyncChangeType,
+) -> Result<SyncChange, serde_json::Error> {
     let mut attrs = AttributeSet::new();
 
     for (key, value) in &group.attributes {
@@ -258,11 +260,10 @@ pub fn mapped_group_to_sync_change(group: &MappedGroup, change_type: SyncChangeT
                 attrs.set(key.clone(), s.clone());
             }
             serde_json::Value::Array(arr) => {
-                let values: Vec<AttributeValue> = arr
-                    .iter()
-                    .filter_map(|v| v.as_str().map(|s| AttributeValue::String(s.to_string())))
-                    .collect();
-                attrs.set(key.clone(), AttributeValue::Array(values));
+                attrs.set(
+                    key.clone(),
+                    AttributeValue::Array(json_array_attr_values(arr)?),
+                );
             }
             serde_json::Value::Bool(b) => {
                 attrs.set(key.clone(), *b);
@@ -283,11 +284,11 @@ pub fn mapped_group_to_sync_change(group: &MappedGroup, change_type: SyncChangeT
 
     let uid = xavyo_connector::operation::Uid::new("objectGUID", &group.external_id);
 
-    match change_type {
+    Ok(match change_type {
         SyncChangeType::Create => SyncChange::created(uid, "group", attrs),
         SyncChangeType::Update => SyncChange::updated(uid, "group", attrs),
         SyncChangeType::Delete => SyncChange::deleted(uid, "group"),
-    }
+    })
 }
 
 /// Build a `SyncResult` from a batch of mapped groups.
@@ -306,7 +307,7 @@ pub fn build_group_sync_result(
     let changes: Vec<SyncChange> = groups
         .iter()
         .map(|g| mapped_group_to_sync_change(g, change_type))
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
     let mut result = SyncResult::with_changes(changes);
 
@@ -393,31 +394,46 @@ fn extract_group_guid(entry: &AttributeSet) -> Option<String> {
     }
 }
 
-fn parse_group_type(entry: &AttributeSet) -> (bool, String) {
+fn parse_group_type(entry: &AttributeSet) -> Option<(bool, String)> {
     let gt_val = match entry.get("groupType") {
         Some(AttributeValue::Integer(i)) => Some(*i as i32),
         Some(AttributeValue::String(s)) => s.parse::<i32>().ok(),
-        _ => None,
+        None => return None,
+        _ => return None,
     };
 
-    match gt_val {
-        Some(gt) => (
+    gt_val.map(|gt| {
+        (
             group_type::is_security_group(gt),
             group_type::scope_name(gt).to_string(),
-        ),
-        None => (false, "unknown".to_string()),
+        )
+    })
+}
+
+fn extract_multi_valued_dns(entry: &AttributeSet, attr_name: &str) -> Option<Vec<String>> {
+    match entry.get(attr_name) {
+        None => Some(Vec::new()),
+        Some(AttributeValue::Array(arr)) => arr
+            .iter()
+            .map(|v| v.as_string().map(str::to_string))
+            .collect(),
+        Some(AttributeValue::String(s)) if !s.is_empty() => Some(vec![s.clone()]),
+        Some(AttributeValue::String(_)) => Some(Vec::new()),
+        _ => None,
     }
 }
 
-fn extract_multi_valued_dns(entry: &AttributeSet, attr_name: &str) -> Vec<String> {
-    match entry.get(attr_name) {
-        Some(AttributeValue::Array(arr)) => arr
-            .iter()
-            .filter_map(|v| v.as_string().map(std::string::ToString::to_string))
-            .collect(),
-        Some(AttributeValue::String(s)) if !s.is_empty() => vec![s.clone()],
-        _ => Vec::new(),
-    }
+/// JSON array attributes. Non-string elements must not be dropped.
+fn json_array_attr_values(
+    arr: &[serde_json::Value],
+) -> Result<Vec<AttributeValue>, serde_json::Error> {
+    arr.iter()
+        .map(|v| {
+            v.as_str()
+                .map(|s| AttributeValue::String(s.to_string()))
+                .ok_or_else(|| serde::de::Error::custom("array attribute values must be strings"))
+        })
+        .collect()
 }
 
 fn set_if_present(attrs: &mut HashMap<String, serde_json::Value>, key: &str, value: Option<&str>) {
@@ -815,17 +831,17 @@ mod tests {
         let mut entry = AttributeSet::new();
         entry.set("objectGUID", AttributeValue::Binary(vec![0x01; 16]));
 
-        let mapped = map_ad_group(&entry).unwrap();
-        assert!(!mapped.external_id.is_empty());
-        assert!(mapped.direct_member_dns.is_empty());
-        assert!(!mapped.is_security_group); // default
-        assert_eq!(mapped.scope, "unknown");
+        assert!(
+            map_ad_group(&entry).is_none(),
+            "missing groupType must not invent a distribution group"
+        );
     }
 
     #[test]
     fn test_map_ad_group_single_member() {
         let mut entry = AttributeSet::new();
         entry.set("objectGUID", AttributeValue::Binary(vec![0x02; 16]));
+        entry.set("groupType", AttributeValue::Integer(-2147483646));
         // Single member as string (not array)
         entry.set("member", "CN=Solo,OU=Users,DC=ex,DC=com");
 
@@ -1025,12 +1041,50 @@ mod tests {
             usn_changed: None,
         };
 
-        let change = mapped_group_to_sync_change(&group, SyncChangeType::Create);
+        let change = mapped_group_to_sync_change(&group, SyncChangeType::Create).unwrap();
         assert_eq!(change.object_class, "group");
         assert!(matches!(change.change_type, SyncChangeType::Create));
 
         let attrs = change.attributes.as_ref().unwrap();
         assert_eq!(attrs.get_string("external_id"), Some("guid-grp"));
         assert_eq!(attrs.get_string("display_name"), Some("TestGroup"));
+    }
+
+    #[test]
+    fn ad_group_json_and_members_do_not_drop_corrupt_values() {
+        let mut group = MappedGroup {
+            external_id: "guid".to_string(),
+            dn: String::new(),
+            attributes: HashMap::new(),
+            direct_member_dns: vec![],
+            is_security_group: true,
+            scope: "global".to_string(),
+            usn_changed: None,
+        };
+        group
+            .attributes
+            .insert("proxy".to_string(), serde_json::json!(["a", 1]));
+        assert!(mapped_group_to_sync_change(&group, SyncChangeType::Create).is_err());
+
+        let mut entry = AttributeSet::new();
+        entry.set("objectGUID", AttributeValue::Binary(vec![0x03; 16]));
+        entry.set("groupType", AttributeValue::Integer(-2147483646));
+        entry.set(
+            "member",
+            AttributeValue::Array(vec![
+                AttributeValue::String("CN=A,DC=ex,DC=com".to_string()),
+                AttributeValue::Integer(1),
+            ]),
+        );
+        assert!(map_ad_group(&entry).is_none());
+
+        let src = include_str!("groups.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("filter_map(|v| v.as_str()")
+                && !production.contains("filter_map(|v| v.as_string()")
+                && !production.contains("\"unknown\".to_string()"),
+            "AD group sync must not drop non-string members or invent unknown groupType"
+        );
     }
 }
