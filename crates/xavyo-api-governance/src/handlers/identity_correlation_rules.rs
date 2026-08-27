@@ -13,7 +13,8 @@ use uuid::Uuid;
 
 use xavyo_auth::JwtClaims;
 use xavyo_db::models::{
-    CorrelationRuleFilter, CreateGovCorrelationRule, GovMatchType, UpdateGovCorrelationRule,
+    CorrelationRuleFilter, CreateGovCorrelationRule, GovCorrelationRule, GovMatchType,
+    UpdateGovCorrelationRule,
 };
 
 use crate::error::{ApiGovernanceError, ApiResult};
@@ -21,6 +22,39 @@ use crate::models::{
     CorrelationRuleResponse, CreateCorrelationRuleRequest, UpdateCorrelationRuleRequest,
 };
 use crate::router::GovernanceState;
+
+fn f64_to_decimal(value: f64, field: &str) -> Result<Decimal, ApiGovernanceError> {
+    Decimal::try_from(value)
+        .map_err(|_| ApiGovernanceError::Validation(format!("Invalid {field} value")))
+}
+
+fn decimal_to_f64(value: Decimal, field: &str) -> Result<f64, ApiGovernanceError> {
+    value
+        .to_string()
+        .parse()
+        .map_err(|_| ApiGovernanceError::Validation(format!("Invalid stored {field} value")))
+}
+
+fn map_correlation_rule(
+    rule: GovCorrelationRule,
+) -> Result<CorrelationRuleResponse, ApiGovernanceError> {
+    Ok(CorrelationRuleResponse {
+        id: rule.id,
+        name: rule.name,
+        attribute: rule.attribute,
+        match_type: rule.match_type,
+        algorithm: rule.algorithm,
+        threshold: rule
+            .threshold
+            .map(|t| decimal_to_f64(t, "threshold"))
+            .transpose()?,
+        weight: decimal_to_f64(rule.weight, "weight")?,
+        is_active: rule.is_active,
+        priority: rule.priority,
+        created_at: rule.created_at,
+        updated_at: rule.updated_at,
+    })
+}
 
 /// Query parameters for listing identity correlation rules.
 #[derive(Debug, Clone, Default, serde::Deserialize, utoipa::IntoParams)]
@@ -93,20 +127,8 @@ pub async fn list_identity_correlation_rules(
 
     let items: Vec<CorrelationRuleResponse> = rules
         .into_iter()
-        .map(|r| CorrelationRuleResponse {
-            id: r.id,
-            name: r.name,
-            attribute: r.attribute,
-            match_type: r.match_type,
-            algorithm: r.algorithm,
-            threshold: r.threshold.map(|t| t.to_string().parse().unwrap_or(0.0)),
-            weight: r.weight.to_string().parse().unwrap_or(1.0),
-            is_active: r.is_active,
-            priority: r.priority,
-            created_at: r.created_at,
-            updated_at: r.updated_at,
-        })
-        .collect();
+        .map(map_correlation_rule)
+        .collect::<Result<Vec<_>, _>>()?;
 
     Ok(Json(IdentityCorrelationRuleListResponse {
         items,
@@ -147,19 +169,7 @@ pub async fn get_identity_correlation_rule(
         .get(tenant_id, id)
         .await?;
 
-    Ok(Json(CorrelationRuleResponse {
-        id: rule.id,
-        name: rule.name,
-        attribute: rule.attribute,
-        match_type: rule.match_type,
-        algorithm: rule.algorithm,
-        threshold: rule.threshold.map(|t| t.to_string().parse().unwrap_or(0.0)),
-        weight: rule.weight.to_string().parse().unwrap_or(1.0),
-        is_active: rule.is_active,
-        priority: rule.priority,
-        created_at: rule.created_at,
-        updated_at: rule.updated_at,
-    }))
+    Ok(Json(map_correlation_rule(rule)?))
 }
 
 /// Create an identity correlation rule.
@@ -196,10 +206,12 @@ pub async fn create_identity_correlation_rule(
         algorithm: request.algorithm,
         threshold: request
             .threshold
-            .map(|t| Decimal::try_from(t).unwrap_or_default()),
+            .map(|t| f64_to_decimal(t, "threshold"))
+            .transpose()?,
         weight: request
             .weight
-            .map(|w| Decimal::try_from(w).unwrap_or_default()),
+            .map(|w| f64_to_decimal(w, "weight"))
+            .transpose()?,
         priority: request.priority,
         connector_id: None,
         source_attribute: None,
@@ -215,22 +227,7 @@ pub async fn create_identity_correlation_rule(
         .create(tenant_id, input)
         .await?;
 
-    Ok((
-        StatusCode::CREATED,
-        Json(CorrelationRuleResponse {
-            id: rule.id,
-            name: rule.name,
-            attribute: rule.attribute,
-            match_type: rule.match_type,
-            algorithm: rule.algorithm,
-            threshold: rule.threshold.map(|t| t.to_string().parse().unwrap_or(0.0)),
-            weight: rule.weight.to_string().parse().unwrap_or(1.0),
-            is_active: rule.is_active,
-            priority: rule.priority,
-            created_at: rule.created_at,
-            updated_at: rule.updated_at,
-        }),
-    ))
+    Ok((StatusCode::CREATED, Json(map_correlation_rule(rule)?)))
 }
 
 /// Update an identity correlation rule.
@@ -270,10 +267,12 @@ pub async fn update_identity_correlation_rule(
         algorithm: request.algorithm,
         threshold: request
             .threshold
-            .map(|t| Decimal::try_from(t).unwrap_or_default()),
+            .map(|t| f64_to_decimal(t, "threshold"))
+            .transpose()?,
         weight: request
             .weight
-            .map(|w| Decimal::try_from(w).unwrap_or_default()),
+            .map(|w| f64_to_decimal(w, "weight"))
+            .transpose()?,
         is_active: request.is_active,
         priority: None,
         source_attribute: None,
@@ -289,19 +288,7 @@ pub async fn update_identity_correlation_rule(
         .update(tenant_id, id, input)
         .await?;
 
-    Ok(Json(CorrelationRuleResponse {
-        id: rule.id,
-        name: rule.name,
-        attribute: rule.attribute,
-        match_type: rule.match_type,
-        algorithm: rule.algorithm,
-        threshold: rule.threshold.map(|t| t.to_string().parse().unwrap_or(0.0)),
-        weight: rule.weight.to_string().parse().unwrap_or(1.0),
-        is_active: rule.is_active,
-        priority: rule.priority,
-        created_at: rule.created_at,
-        updated_at: rule.updated_at,
-    }))
+    Ok(Json(map_correlation_rule(rule)?))
 }
 
 /// Delete an identity correlation rule.
@@ -339,4 +326,27 @@ pub async fn delete_identity_correlation_rule(
         .await?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decimal_helpers_do_not_default() {
+        let d = f64_to_decimal(0.75, "threshold").unwrap();
+        assert_eq!(decimal_to_f64(d, "threshold").unwrap(), 0.75);
+        assert!(f64_to_decimal(f64::NAN, "weight").is_err());
+        assert!(f64_to_decimal(f64::INFINITY, "weight").is_err());
+        let src = include_str!("identity_correlation_rules.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(0.0)") && !production.contains("unwrap_or(1.0)"),
+            "correlation rule decimals must not default on parse failure"
+        );
+        assert!(
+            !production.contains("unwrap_or_default()"),
+            "correlation rule writes must not default invalid decimals"
+        );
+    }
 }

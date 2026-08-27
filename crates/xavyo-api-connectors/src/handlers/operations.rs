@@ -391,7 +391,7 @@ pub async fn resolve_operation(
     if !claims.has_role("admin") {
         return Err(ConnectorApiError::Forbidden);
     }
-    let user_id = Uuid::parse_str(&claims.sub).unwrap_or_else(|_| Uuid::new_v4());
+    let user_id = extract_user_id(&claims)?;
 
     let operation = state
         .operation_service
@@ -573,7 +573,7 @@ pub async fn resolve_conflict(
     if !claims.has_role("admin") {
         return Err(ConnectorApiError::Forbidden);
     }
-    let user_id = Uuid::parse_str(&claims.sub).unwrap_or_else(|_| Uuid::new_v4());
+    let user_id = extract_user_id(&claims)?;
 
     // Ensure conflict service is configured
     let conflict_service = state.conflict_service.as_ref().ok_or_else(|| {
@@ -619,6 +619,13 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid> {
         })
 }
 
+/// JWT `sub` must be a real actor UUID. A random UUID would record the wrong person.
+fn extract_user_id(claims: &JwtClaims) -> Result<Uuid> {
+    Uuid::parse_str(&claims.sub).map_err(|_| ConnectorApiError::Unauthorized {
+        message: "Invalid user ID in claims".to_string(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -636,5 +643,15 @@ mod tests {
     fn test_stats_query_default() {
         let query = StatsQuery::default();
         assert!(query.connector_id.is_none());
+    }
+
+    #[test]
+    fn extract_user_id_does_not_invent_actor() {
+        let src = include_str!("operations.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("extract_user_id(") && !production.contains("Uuid::new_v4()"),
+            "operation/conflict resolve must not invent an actor UUID"
+        );
     }
 }

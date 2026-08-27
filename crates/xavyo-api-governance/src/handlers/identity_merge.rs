@@ -22,6 +22,31 @@ use crate::models::{
 use crate::router::GovernanceState;
 use crate::services::DuplicateDetectionService;
 
+fn f64_to_decimal(value: f64, field: &str) -> Result<Decimal, ApiGovernanceError> {
+    Decimal::try_from(value)
+        .map_err(|_| ApiGovernanceError::Validation(format!("Invalid {field} value")))
+}
+
+fn decimal_to_f64(value: Decimal, field: &str) -> Result<f64, ApiGovernanceError> {
+    value
+        .to_string()
+        .parse()
+        .map_err(|_| ApiGovernanceError::Validation(format!("Invalid stored {field} value")))
+}
+
+fn map_duplicate_candidate(
+    candidate: xavyo_db::models::GovDuplicateCandidate,
+) -> Result<DuplicateCandidateResponse, ApiGovernanceError> {
+    Ok(DuplicateCandidateResponse {
+        id: candidate.id,
+        identity_a_id: candidate.identity_a_id,
+        identity_b_id: candidate.identity_b_id,
+        confidence_score: decimal_to_f64(candidate.confidence_score, "confidence_score")?,
+        status: candidate.status,
+        detected_at: candidate.detected_at,
+    })
+}
+
 // ============================================================================
 // Duplicate Candidate Handlers
 // ============================================================================
@@ -56,10 +81,12 @@ pub async fn list_duplicates(
         status: query.status,
         min_confidence: query
             .min_confidence
-            .map(|v| Decimal::try_from(v).unwrap_or_default()),
+            .map(|v| f64_to_decimal(v, "min_confidence"))
+            .transpose()?,
         max_confidence: query
             .max_confidence
-            .map(|v| Decimal::try_from(v).unwrap_or_default()),
+            .map(|v| f64_to_decimal(v, "max_confidence"))
+            .transpose()?,
         identity_id: query.identity_id,
     };
 
@@ -70,15 +97,8 @@ pub async fn list_duplicates(
 
     let items: Vec<DuplicateCandidateResponse> = candidates
         .into_iter()
-        .map(|c| DuplicateCandidateResponse {
-            id: c.id,
-            identity_a_id: c.identity_a_id,
-            identity_b_id: c.identity_b_id,
-            confidence_score: c.confidence_score.to_string().parse().unwrap_or(0.0),
-            status: c.status,
-            detected_at: c.detected_at,
-        })
-        .collect();
+        .map(map_duplicate_candidate)
+        .collect::<Result<Vec<_>, _>>()?;
 
     Ok(Json(MergePaginatedResponse {
         items,
@@ -157,18 +177,7 @@ pub async fn dismiss_duplicate(
         .dismiss_duplicate(tenant_id, id, user_id, &request.reason)
         .await?;
 
-    Ok(Json(DuplicateCandidateResponse {
-        id: candidate.id,
-        identity_a_id: candidate.identity_a_id,
-        identity_b_id: candidate.identity_b_id,
-        confidence_score: candidate
-            .confidence_score
-            .to_string()
-            .parse()
-            .unwrap_or(0.0),
-        status: candidate.status,
-        detected_at: candidate.detected_at,
-    }))
+    Ok(Json(map_duplicate_candidate(candidate)?))
 }
 
 /// Run a duplicate detection scan.
@@ -761,6 +770,18 @@ mod tests {
         assert!(
             production.contains("merge_audit_summary"),
             "audit list must map operator from the merge operation"
+        );
+    }
+
+    #[test]
+    fn duplicate_decimals_do_not_default_on_parse_error() {
+        assert!(f64_to_decimal(f64::NAN, "min_confidence").is_err());
+        let src = include_str!("identity_merge.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(0.0)")
+                && !production.contains("Decimal::try_from(v).unwrap_or_default()"),
+            "duplicate confidence must not default on parse failure"
         );
     }
 }
