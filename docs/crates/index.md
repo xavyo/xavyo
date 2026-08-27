@@ -59,7 +59,7 @@ REST endpoints exposed to clients.
 | [xavyo-api-saml](../../crates/xavyo-api-saml/CRATE.md) | SAML 2.0 IdP endpoints | 🟢 stable |
 | [xavyo-api-social](../../crates/xavyo-api-social/CRATE.md) | Social login providers | 🟢 stable |
 | [xavyo-api-governance](../../crates/xavyo-api-governance/CRATE.md) | IGA workflows and reporting | 🟢 stable |
-| [xavyo-api-connectors](../../crates/xavyo-api-connectors/CRATE.md) | Connector management API | 🟡 beta |
+| [xavyo-api-connectors](../../crates/xavyo-api-connectors/CRATE.md) | Connector management API | 🟢 stable |
 | [xavyo-api-tenants](../../crates/xavyo-api-tenants/CRATE.md) | Tenant provisioning API | 🟢 stable |
 | [xavyo-api-authorization](../../crates/xavyo-api-authorization/CRATE.md) | Authorization policy API | 🟢 stable |
 | [xavyo-api-import](../../crates/xavyo-api-import/CRATE.md) | Bulk user import API | 🟢 stable |

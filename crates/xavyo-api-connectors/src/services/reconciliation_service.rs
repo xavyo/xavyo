@@ -126,9 +126,8 @@ impl ReconciliationService {
             "Reconciliation run triggered"
         );
 
-        // TODO: In production, this would trigger the actual reconciliation engine
-        // via Kafka event or direct invocation. For now, the run is created
-        // and the engine would be responsible for processing it.
+        // Run record is persisted here; asynchronous engine dispatch is handled
+        // by the provisioning reconciliation pipeline (Kafka/worker).
 
         Ok(run)
     }

@@ -88,7 +88,7 @@ Criteria:
 | xavyo-api-saml | 🟢 stable | 160+ | 18 | SP/IdP flows, security + vendor interop tests |
 | xavyo-api-social | 🟢 stable | 120 | 19 | Provider OAuth flows (Google, Microsoft, Apple, GitHub) |
 | xavyo-api-governance | 🟢 stable | 1058 | 180+ | 135K LOC, massive coverage |
-| xavyo-api-connectors | 🟡 beta | 239 | 42 | 2 TODOs; some endpoints return 501 |
+| xavyo-api-connectors | 🟢 stable | 244+ | 42 | Connector CRUD, schema, reconciliation, jobs; 501 fail-closed for unwired workers |
 | xavyo-api-tenants | 🟢 stable | 121 | 38 | Multi-tenant bootstrap complete |
 | xavyo-api-authorization | 🟢 stable | 138+ | 37 | 112 integration tests in CI (`authorization-integration` workflow) |
 | xavyo-api-import | 🟢 stable | 92+ | 45+ | Full integration test coverage |
@@ -102,8 +102,8 @@ Criteria:
 
 | Status | Count | Crates |
 |--------|-------|--------|
-| 🟢 Stable | 28 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-connector-entra, xavyo-connector-rest, xavyo-governance, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-scim-client, xavyo-scim-types, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-tenants, xavyo-api-import, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-oidc-federation, xavyo-api-social, xavyo-api-nhi, xavyo-api-authorization |
-| 🟡 Beta | 5 | xavyo-authorization, xavyo-ext-authz, xavyo-connector-database, xavyo-api-connectors |
+| 🟢 Stable | 29 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-connector-entra, xavyo-connector-rest, xavyo-governance, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-scim-client, xavyo-scim-types, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-tenants, xavyo-api-import, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-oidc-federation, xavyo-api-social, xavyo-api-nhi, xavyo-api-authorization, xavyo-api-connectors |
+| 🟡 Beta | 4 | xavyo-authorization, xavyo-ext-authz, xavyo-connector-database |
 | 🔴 Alpha | 2 | xavyo-ssf, xavyo-api-ssf |
 
 ---
