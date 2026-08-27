@@ -434,10 +434,7 @@ impl SchemaService {
         // Create connector instance and discover schema
         let schema = match config.connector_type {
             DbConnectorType::Ldap => {
-                let use_ad = full_config
-                    .get("use_ad_features")
-                    .and_then(serde_json::Value::as_bool)
-                    .unwrap_or(false);
+                let use_ad = schema_json_bool(&full_config, "use_ad_features")?;
 
                 if use_ad {
                     let ad_config: xavyo_connector_ldap::config::ActiveDirectoryConfig =
@@ -716,10 +713,7 @@ impl SchemaService {
     ) -> Result<Schema> {
         match connector_type {
             DbConnectorType::Ldap => {
-                let use_ad = full_config
-                    .get("use_ad_features")
-                    .and_then(serde_json::Value::as_bool)
-                    .unwrap_or(false);
+                let use_ad = schema_json_bool(&full_config, "use_ad_features")?;
 
                 if use_ad {
                     let ad_config: xavyo_connector_ldap::config::ActiveDirectoryConfig =
@@ -772,6 +766,15 @@ pub(crate) fn schema_attributes_json<T: serde::Serialize>(attrs: &T) -> Result<s
 pub(crate) fn schema_cached_attributes(value: serde_json::Value) -> Result<Vec<AttributeResponse>> {
     serde_json::from_value(value)
         .map_err(|e| ConnectorApiError::InvalidConfiguration(e.to_string()))
+}
+
+fn schema_json_bool(config: &serde_json::Value, field: &str) -> Result<bool> {
+    match config.get(field) {
+        None | Some(serde_json::Value::Null) => Ok(false),
+        Some(v) => v.as_bool().ok_or_else(|| {
+            ConnectorApiError::InvalidConfiguration(format!("{field} must be a boolean"))
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -947,6 +950,22 @@ mod tests {
             production.matches("schema_cache_recorded").count(),
             3,
             "execute_discovery, discover path, and helper definition"
+        );
+    }
+
+    #[test]
+    fn schema_use_ad_features_does_not_treat_non_bool_as_false() {
+        assert!(!schema_json_bool(&serde_json::json!({}), "use_ad_features").unwrap());
+        assert!(schema_json_bool(
+            &serde_json::json!({"use_ad_features": "yes"}),
+            "use_ad_features"
+        )
+        .is_err());
+        let src = include_str!("schema_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(false)") && production.contains("schema_json_bool("),
+            "schema discovery must not treat a non-bool use_ad_features as LDAP"
         );
     }
 }

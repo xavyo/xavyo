@@ -937,7 +937,7 @@ impl RestConnector {
 
         if let Some(schemas) = schemas {
             for (name, schema) in schemas {
-                if let Some(oc) = self.parse_openapi_schema(name, schema) {
+                if let Some(oc) = self.parse_openapi_schema(name, schema)? {
                     object_classes.push(oc);
                 }
             }
@@ -947,13 +947,15 @@ impl RestConnector {
     }
 
     /// Parse a single `OpenAPI` schema into an `ObjectClass`.
-    fn parse_openapi_schema(&self, name: &str, schema: &Value) -> Option<ObjectClass> {
-        let properties = schema.get("properties")?.as_object()?;
-        let required_props: Vec<&str> = schema
-            .get("required")
-            .and_then(|r| r.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect())
-            .unwrap_or_default();
+    fn parse_openapi_schema(
+        &self,
+        name: &str,
+        schema: &Value,
+    ) -> ConnectorResult<Option<ObjectClass>> {
+        let Some(properties) = schema.get("properties").and_then(|p| p.as_object()) else {
+            return Ok(None);
+        };
+        let required_props = Self::openapi_required_props(schema)?;
 
         let mut oc = ObjectClass::new(name, name);
 
@@ -966,15 +968,20 @@ impl RestConnector {
                 prop_name,
                 prop_schema,
                 required_props.contains(&prop_name.as_str()),
-            );
+            )?;
             oc = oc.with_attribute(attr);
         }
 
-        Some(oc)
+        Ok(Some(oc))
     }
 
     /// Parse an `OpenAPI` property into a `SchemaAttribute` with validations.
-    fn parse_openapi_property(&self, name: &str, prop: &Value, required: bool) -> SchemaAttribute {
+    fn parse_openapi_property(
+        &self,
+        name: &str,
+        prop: &Value,
+        required: bool,
+    ) -> ConnectorResult<SchemaAttribute> {
         // Determine data type from JSON Schema type
         let json_type = prop
             .get("type")
@@ -1010,12 +1017,9 @@ impl RestConnector {
             attr = attr.with_pattern(pattern);
         }
 
-        // enum values
-        if let Some(enum_values) = prop.get("enum").and_then(|e| e.as_array()) {
-            let allowed: Vec<String> = enum_values
-                .iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect();
+        // enum values. Non-string entries must not be dropped from the whitelist.
+        if let Some(enum_values) = prop.get("enum") {
+            let allowed = Self::openapi_enum_strings(enum_values)?;
             if !allowed.is_empty() {
                 attr = attr.with_allowed_values(allowed);
             }
@@ -1027,24 +1031,68 @@ impl RestConnector {
         }
 
         // readOnly
-        if prop
-            .get("readOnly")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false)
-        {
+        if Self::json_schema_bool(prop, "readOnly")? {
             attr = attr.read_only();
         }
 
         // writeOnly (not readable)
-        if prop
-            .get("writeOnly")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false)
-        {
+        if Self::json_schema_bool(prop, "writeOnly")? {
             attr.readable = false;
         }
 
-        attr
+        Ok(attr)
+    }
+
+    fn json_schema_bool(prop: &Value, field: &str) -> ConnectorResult<bool> {
+        match prop.get(field) {
+            None | Some(Value::Null) => Ok(false),
+            Some(v) => v
+                .as_bool()
+                .ok_or_else(|| ConnectorError::InvalidConfiguration {
+                    message: format!("OpenAPI property '{field}' must be a boolean"),
+                }),
+        }
+    }
+
+    /// OpenAPI `required` names. Non-string entries must not drop required fields.
+    fn openapi_required_props(schema: &Value) -> ConnectorResult<Vec<&str>> {
+        match schema.get("required") {
+            None | Some(Value::Null) => Ok(vec![]),
+            Some(v) => {
+                let arr = v
+                    .as_array()
+                    .ok_or_else(|| ConnectorError::InvalidConfiguration {
+                        message: "OpenAPI 'required' must be a JSON array".to_string(),
+                    })?;
+                arr.iter()
+                    .map(|item| {
+                        item.as_str().filter(|s| !s.is_empty()).ok_or_else(|| {
+                            ConnectorError::InvalidConfiguration {
+                                message: "OpenAPI 'required' entries must be strings".to_string(),
+                            }
+                        })
+                    })
+                    .collect()
+            }
+        }
+    }
+
+    /// OpenAPI `enum` values. Non-string entries must not shrink the whitelist.
+    fn openapi_enum_strings(enum_values: &Value) -> ConnectorResult<Vec<String>> {
+        let arr = enum_values
+            .as_array()
+            .ok_or_else(|| ConnectorError::InvalidConfiguration {
+                message: "OpenAPI 'enum' must be a JSON array".to_string(),
+            })?;
+        arr.iter()
+            .map(|v| {
+                v.as_str()
+                    .map(str::to_string)
+                    .ok_or_else(|| ConnectorError::InvalidConfiguration {
+                        message: "OpenAPI enum values must be strings".to_string(),
+                    })
+            })
+            .collect()
     }
 
     /// Convert JSON Schema type to `AttributeDataType`.
@@ -1743,7 +1791,9 @@ mod tests {
             "description": "User's email address"
         });
 
-        let attr = connector.parse_openapi_property("email", &prop, false);
+        let attr = connector
+            .parse_openapi_property("email", &prop, false)
+            .unwrap();
 
         assert_eq!(attr.name, "email");
         assert_eq!(attr.data_type, AttributeDataType::String);
@@ -1760,7 +1810,7 @@ mod tests {
             "type": "string"
         });
 
-        let attr = connector.parse_openapi_property("id", &prop, true);
+        let attr = connector.parse_openapi_property("id", &prop, true).unwrap();
 
         assert!(attr.required);
     }
@@ -1776,7 +1826,9 @@ mod tests {
             "maxLength": 50
         });
 
-        let attr = connector.parse_openapi_property("username", &prop, false);
+        let attr = connector
+            .parse_openapi_property("username", &prop, false)
+            .unwrap();
 
         assert_eq!(attr.min_length, Some(3));
         assert_eq!(attr.max_length, Some(50));
@@ -1792,7 +1844,9 @@ mod tests {
             "pattern": "^[a-zA-Z0-9]+$"
         });
 
-        let attr = connector.parse_openapi_property("code", &prop, false);
+        let attr = connector
+            .parse_openapi_property("code", &prop, false)
+            .unwrap();
 
         assert_eq!(attr.pattern, Some("^[a-zA-Z0-9]+$".to_string()));
     }
@@ -1807,7 +1861,9 @@ mod tests {
             "enum": ["active", "inactive", "pending", "suspended"]
         });
 
-        let attr = connector.parse_openapi_property("status", &prop, false);
+        let attr = connector
+            .parse_openapi_property("status", &prop, false)
+            .unwrap();
 
         assert_eq!(attr.allowed_values.len(), 4);
         assert!(attr.allowed_values.contains(&"active".to_string()));
@@ -1826,7 +1882,9 @@ mod tests {
             "readOnly": true
         });
 
-        let attr = connector.parse_openapi_property("id", &prop, false);
+        let attr = connector
+            .parse_openapi_property("id", &prop, false)
+            .unwrap();
 
         assert!(!attr.writable);
         assert!(attr.readable);
@@ -1842,10 +1900,49 @@ mod tests {
             "writeOnly": true
         });
 
-        let attr = connector.parse_openapi_property("password", &prop, false);
+        let attr = connector
+            .parse_openapi_property("password", &prop, false)
+            .unwrap();
 
         assert!(!attr.readable);
         assert!(attr.writable);
+    }
+
+    #[test]
+    fn parse_openapi_property_does_not_treat_non_bool_flags_as_writable() {
+        let config = RestConfig::new("https://api.example.com");
+        let connector = RestConnector::new(config).unwrap();
+        let prop = serde_json::json!({
+            "type": "string",
+            "readOnly": "true"
+        });
+        assert!(connector
+            .parse_openapi_property("id", &prop, false)
+            .is_err());
+        assert!(connector
+            .parse_openapi_property(
+                "status",
+                &serde_json::json!({"type": "string", "enum": ["a", 1]}),
+                false
+            )
+            .is_err());
+        assert!(RestConnector::openapi_required_props(&serde_json::json!({
+            "required": [1]
+        }))
+        .is_err());
+        let src = include_str!("connector.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(false)")
+                && production.contains("json_schema_bool(")
+                && production.contains("openapi_required_props(")
+                && production.contains("openapi_enum_strings("),
+            "OpenAPI readOnly/writeOnly/required/enum must not drop or fail-open"
+        );
+        assert!(
+            !production.contains("filter_map(|v| v.as_str())"),
+            "OpenAPI required/enum must not drop non-string entries"
+        );
     }
 
     #[test]
@@ -1860,7 +1957,9 @@ mod tests {
             }
         });
 
-        let attr = connector.parse_openapi_property("tags", &prop, false);
+        let attr = connector
+            .parse_openapi_property("tags", &prop, false)
+            .unwrap();
 
         assert!(attr.multi_valued);
     }
@@ -1898,10 +1997,10 @@ mod tests {
             }
         });
 
-        let oc = connector.parse_openapi_schema("User", &schema);
-        assert!(oc.is_some());
-
-        let oc = oc.unwrap();
+        let oc = connector
+            .parse_openapi_schema("User", &schema)
+            .unwrap()
+            .unwrap();
         assert_eq!(oc.name, "User");
         assert_eq!(oc.description, Some("User account".to_string()));
         assert_eq!(oc.attributes.len(), 4);
