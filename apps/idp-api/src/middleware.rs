@@ -8,7 +8,7 @@
 use axum::{
     body::Body,
     extract::MatchedPath,
-    http::{header::HeaderName, HeaderValue},
+    http::{header::HeaderName, HeaderMap, HeaderValue},
     middleware::Next,
     response::Response,
 };
@@ -226,11 +226,25 @@ pub async fn content_type_validation_middleware(
         || method == axum::http::Method::PUT
         || method == axum::http::Method::PATCH
     {
-        let content_type = request
-            .headers()
-            .get(axum::http::header::CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
+        let content_type = match request_content_type(request.headers()) {
+            Ok(Some(ct)) => ct,
+            Ok(None) => "",
+            Err(_) => {
+                let mut response = Response::new(Body::from(
+                    serde_json::json!({
+                        "error": "unsupported_media_type",
+                        "error_description": "Content-Type header is not valid UTF-8"
+                    })
+                    .to_string(),
+                ));
+                *response.status_mut() = axum::http::StatusCode::UNSUPPORTED_MEDIA_TYPE;
+                response.headers_mut().insert(
+                    axum::http::header::CONTENT_TYPE,
+                    HeaderValue::from_static("application/json"),
+                );
+                return response;
+            }
+        };
 
         let is_valid = content_type.starts_with("application/json")
             || content_type.starts_with("application/x-www-form-urlencoded")
@@ -257,6 +271,14 @@ pub async fn content_type_validation_middleware(
     }
 
     next.run(request).await
+}
+
+/// Read Content-Type. Present-but-invalid encoding must not skip media-type checks.
+fn request_content_type(headers: &HeaderMap) -> Result<Option<&str>, ()> {
+    match headers.get(axum::http::header::CONTENT_TYPE) {
+        None => Ok(None),
+        Some(v) => v.to_str().map(Some).map_err(|_| ()),
+    }
 }
 
 // ── Error Sanitization (F082-US9) ─────────────────────────────────────────
@@ -1437,6 +1459,35 @@ mod tests {
         assert_eq!(super::rate_limit_ip_key("UNKNOWN"), None);
         assert_eq!(super::rate_limit_ip_key(""), None);
         assert_eq!(super::rate_limit_ip_key("   "), None);
+    }
+
+    #[test]
+    fn content_type_invalid_encoding_does_not_skip_validation() {
+        let mut headers = HeaderMap::new();
+        assert_eq!(super::request_content_type(&headers), Ok(None));
+        headers.insert(
+            axum::http::header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
+        assert_eq!(
+            super::request_content_type(&headers).unwrap(),
+            Some("application/json")
+        );
+        headers.insert(
+            axum::http::header::CONTENT_TYPE,
+            HeaderValue::from_bytes(&[0xff, 0xfe]).unwrap(),
+        );
+        assert!(super::request_content_type(&headers).is_err());
+        let src = include_str!("middleware.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let window = production
+            .split("async fn content_type_validation_middleware")
+            .nth(1)
+            .expect("content_type_validation_middleware");
+        assert!(
+            window.contains("request_content_type(") && !window.contains("unwrap_or(\"\")"),
+            "invalid Content-Type encoding must not skip media-type validation"
+        );
     }
 
     #[test]

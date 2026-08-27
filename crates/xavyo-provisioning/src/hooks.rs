@@ -215,11 +215,7 @@ impl HookExecutor for ExpressionHookExecutor {
         let start = std::time::Instant::now();
 
         // Get expression from config
-        let expression = definition
-            .config
-            .get("expression")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let expression = required_hook_config_str(&definition.config, "expression")?;
 
         debug!(
             hook_id = %definition.id,
@@ -401,6 +397,18 @@ struct ExpressionResult {
     output_variables: HashMap<String, serde_json::Value>,
 }
 
+/// Required string config field. Missing/empty must not look like a valid hook.
+fn required_hook_config_str<'a>(config: &'a serde_json::Value, key: &str) -> HookResult<&'a str> {
+    config
+        .get(key)
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| HookError::InvalidConfiguration {
+            message: format!("Missing '{key}' in hook configuration"),
+        })
+}
+
 /// Evaluate a simple expression.
 /// Supports basic operations like:
 /// - `set:attributeName=value` - Set an attribute
@@ -419,13 +427,16 @@ fn evaluate_expression(expression: &str, context: &HookContext) -> HookResult<Ex
 
         if let Some(set_expr) = line.strip_prefix("set:") {
             // set:attributeName=value
-            if let Some((attr, value)) = set_expr.split_once('=') {
-                if let Some(obj) = modified_attrs.as_object_mut() {
-                    obj.insert(
-                        attr.trim().to_string(),
-                        serde_json::Value::String(value.trim().to_string()),
-                    );
-                }
+            let Some((attr, value)) = set_expr.split_once('=') else {
+                return Err(HookError::InvalidConfiguration {
+                    message: format!("Malformed set expression: {line}"),
+                });
+            };
+            if let Some(obj) = modified_attrs.as_object_mut() {
+                obj.insert(
+                    attr.trim().to_string(),
+                    serde_json::Value::String(value.trim().to_string()),
+                );
             }
         } else if let Some(remove_expr) = line.strip_prefix("remove:") {
             // remove:attributeName
@@ -453,12 +464,19 @@ fn evaluate_expression(expression: &str, context: &HookContext) -> HookResult<Ex
             );
         } else if let Some(var_expr) = line.strip_prefix("var:") {
             // var:variableName=value
-            if let Some((var_name, value)) = var_expr.split_once('=') {
-                output_vars.insert(
-                    var_name.trim().to_string(),
-                    serde_json::Value::String(value.trim().to_string()),
-                );
-            }
+            let Some((var_name, value)) = var_expr.split_once('=') else {
+                return Err(HookError::InvalidConfiguration {
+                    message: format!("Malformed var expression: {line}"),
+                });
+            };
+            output_vars.insert(
+                var_name.trim().to_string(),
+                serde_json::Value::String(value.trim().to_string()),
+            );
+        } else {
+            return Err(HookError::InvalidConfiguration {
+                message: format!("Unknown hook instruction: {line}"),
+            });
         }
     }
 
@@ -550,11 +568,7 @@ impl HookManager {
         let mut results = Vec::with_capacity(hooks.len());
 
         for hook in hooks {
-            let executor_type = hook
-                .config
-                .get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("expression");
+            let executor_type = required_hook_config_str(&hook.config, "type")?;
 
             let executor = self.executors.get(executor_type).ok_or_else(|| {
                 HookError::InvalidConfiguration {
@@ -840,6 +854,36 @@ mod tests {
             production.contains("parse_webhook_hook_headers(")
                 && !production.contains("from_value(v.clone()).ok()"),
             "webhook hook headers must fail closed on JSON parse"
+        );
+    }
+
+    #[test]
+    fn hook_config_and_expression_do_not_default() {
+        let ctx = HookContext {
+            tenant_id: Uuid::new_v4(),
+            connector_id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            operation_type: OperationType::Create,
+            object_class: "user".to_string(),
+            target_uid: None,
+            attributes: serde_json::json!({}),
+            variables: HashMap::new(),
+            error: None,
+        };
+        assert!(evaluate_expression("nope", &ctx).is_err());
+        assert!(evaluate_expression("set:missing", &ctx).is_err());
+        assert!(required_hook_config_str(&serde_json::json!({}), "expression").is_err());
+        assert_eq!(
+            required_hook_config_str(&serde_json::json!({"type": "webhook"}), "type").unwrap(),
+            "webhook"
+        );
+        let src = include_str!("hooks.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("required_hook_config_str(")
+                && !production.contains("unwrap_or(\"expression\")")
+                && !production.contains(".unwrap_or(\"\")"),
+            "hook type/expression must not default to empty or expression"
         );
     }
 }

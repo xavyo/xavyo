@@ -73,17 +73,7 @@ pub async fn update_provider(
         "Updating social provider configuration"
     );
 
-    // Client secret is required when enabling
-    let client_secret = if request.enabled {
-        request
-            .client_secret
-            .as_deref()
-            .ok_or(SocialError::ConfigurationError {
-                message: "client_secret is required when enabling a provider".to_string(),
-            })?
-    } else {
-        request.client_secret.as_deref().unwrap_or("")
-    };
+    let client_secret = social_update_secret(request.enabled, request.client_secret.as_deref())?;
 
     let response = state
         .tenant_provider_service
@@ -149,4 +139,41 @@ pub async fn disable_provider(
     );
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Secret is required when enabling. Disabling without a secret must keep the stored secret.
+fn social_update_secret(enabled: bool, secret: Option<&str>) -> SocialResult<Option<&str>> {
+    let secret = secret.map(str::trim).filter(|s| !s.is_empty());
+    if enabled && secret.is_none() {
+        return Err(SocialError::ConfigurationError {
+            message: "client_secret is required when enabling a provider".to_string(),
+        });
+    }
+    Ok(secret)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn disable_without_secret_does_not_send_empty() {
+        assert!(social_update_secret(true, None).is_err());
+        assert_eq!(
+            social_update_secret(true, Some("s3cret")).unwrap(),
+            Some("s3cret")
+        );
+        assert_eq!(social_update_secret(false, None).unwrap(), None);
+        assert_eq!(social_update_secret(false, Some("")).unwrap(), None);
+        assert_eq!(
+            social_update_secret(false, Some("keep")).unwrap(),
+            Some("keep")
+        );
+        let src = include_str!("admin.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("social_update_secret(") && !production.contains("unwrap_or(\"\")"),
+            "disabling a social provider must not overwrite the secret with empty"
+        );
+    }
 }

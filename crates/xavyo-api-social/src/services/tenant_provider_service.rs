@@ -251,7 +251,7 @@ impl TenantProviderService {
         provider: ProviderType,
         enabled: bool,
         client_id: &str,
-        client_secret: &str,
+        client_secret: Option<&str>,
         additional_config: Option<serde_json::Value>,
         scopes: Option<Vec<String>>,
     ) -> SocialResult<TenantProviderResponse> {
@@ -261,7 +261,7 @@ impl TenantProviderService {
                 message: "client_id cannot be empty".to_string(),
             });
         }
-        if client_secret.trim().is_empty() {
+        if enabled && client_secret.is_none() {
             return Err(crate::error::SocialError::ConfigurationError {
                 message: "client_secret cannot be empty".to_string(),
             });
@@ -277,7 +277,10 @@ impl TenantProviderService {
             }
         }
 
-        let client_secret_encrypted = self.encryption.encrypt_string(tenant_id, client_secret)?;
+        let client_secret_encrypted = match client_secret {
+            Some(secret) => Some(self.encryption.encrypt_string(tenant_id, secret)?),
+            None => None,
+        };
 
         // R10: Encrypt sensitive fields within additional_config before persisting
         let mut additional_config = additional_config;
@@ -292,33 +295,59 @@ impl TenantProviderService {
             .execute(&mut *conn)
             .await?;
 
-        let row: AdminProviderRow = sqlx::query_as(
-            r"
-            INSERT INTO tenant_social_providers (
-                tenant_id, provider, enabled, client_id, client_secret_encrypted,
-                additional_config, scopes
+        let row: AdminProviderRow = if let Some(ref secret) = client_secret_encrypted {
+            sqlx::query_as(
+                r"
+                INSERT INTO tenant_social_providers (
+                    tenant_id, provider, enabled, client_id, client_secret_encrypted,
+                    additional_config, scopes
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                ON CONFLICT (tenant_id, provider)
+                DO UPDATE SET
+                    enabled = EXCLUDED.enabled,
+                    client_id = EXCLUDED.client_id,
+                    client_secret_encrypted = EXCLUDED.client_secret_encrypted,
+                    additional_config = EXCLUDED.additional_config,
+                    scopes = EXCLUDED.scopes,
+                    updated_at = NOW()
+                RETURNING provider, enabled, client_id, scopes, created_at, updated_at
+                ",
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            ON CONFLICT (tenant_id, provider)
-            DO UPDATE SET
-                enabled = EXCLUDED.enabled,
-                client_id = EXCLUDED.client_id,
-                client_secret_encrypted = EXCLUDED.client_secret_encrypted,
-                additional_config = EXCLUDED.additional_config,
-                scopes = EXCLUDED.scopes,
-                updated_at = NOW()
-            RETURNING provider, enabled, client_id, scopes, created_at, updated_at
-            ",
-        )
-        .bind(tenant_id)
-        .bind(provider.to_string())
-        .bind(enabled)
-        .bind(client_id)
-        .bind(&client_secret_encrypted)
-        .bind(&additional_config)
-        .bind(&scopes)
-        .fetch_one(&mut *conn)
-        .await?;
+            .bind(tenant_id)
+            .bind(provider.to_string())
+            .bind(enabled)
+            .bind(client_id)
+            .bind(secret)
+            .bind(&additional_config)
+            .bind(&scopes)
+            .fetch_one(&mut *conn)
+            .await?
+        } else {
+            sqlx::query_as(
+                r"
+                UPDATE tenant_social_providers
+                SET enabled = $3,
+                    client_id = $4,
+                    additional_config = $5,
+                    scopes = $6,
+                    updated_at = NOW()
+                WHERE tenant_id = $1 AND provider = $2
+                RETURNING provider, enabled, client_id, scopes, created_at, updated_at
+                ",
+            )
+            .bind(tenant_id)
+            .bind(provider.to_string())
+            .bind(enabled)
+            .bind(client_id)
+            .bind(&additional_config)
+            .bind(&scopes)
+            .fetch_optional(&mut *conn)
+            .await?
+            .ok_or_else(|| crate::error::SocialError::ConfigurationError {
+                message: "Provider is not configured".to_string(),
+            })?
+        };
 
         Ok(TenantProviderResponse {
             provider: row.provider,

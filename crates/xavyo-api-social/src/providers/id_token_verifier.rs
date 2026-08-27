@@ -234,7 +234,12 @@ impl IdTokenVerifier {
             });
         }
 
-        let host = url.host_str().unwrap_or("");
+        let host = url.host_str().filter(|h| !h.is_empty()).ok_or_else(|| {
+            SocialError::IdTokenVerificationFailed {
+                provider: ProviderType::Google,
+                reason: "JWKS URI is missing a host".to_string(),
+            }
+        })?;
         if !ALLOWED_JWKS_HOSTS.contains(&host) {
             return Err(SocialError::IdTokenVerificationFailed {
                 provider: ProviderType::Google,
@@ -437,6 +442,19 @@ mod tests {
         assert!(verifier
             .validate_jwks_uri("http://www.googleapis.com/oauth2/v3/certs")
             .is_err()); // HTTP not allowed
+        assert!(verifier
+            .validate_jwks_uri("mailto:keys@example.com")
+            .is_err());
+        let src = include_str!("id_token_verifier.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let jwks = production
+            .split("fn validate_jwks_uri")
+            .nth(1)
+            .expect("validate_jwks_uri");
+        assert!(
+            !jwks.contains("unwrap_or(\"\")"),
+            "JWKS URI must not treat a missing host as empty"
+        );
     }
 
     #[test]

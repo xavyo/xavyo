@@ -130,7 +130,13 @@ pub async fn upload_asset(
         .await
         .map_err(|e| ApiAuthError::Validation(format!("Failed to parse multipart: {e}")))?
     {
-        let name = field.name().unwrap_or_default().to_string();
+        let name = field
+            .name()
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| {
+                ApiAuthError::Validation("multipart field is missing a name".to_string())
+            })?
+            .to_string();
 
         match name.as_str() {
             "asset_type" => {
@@ -278,4 +284,18 @@ pub async fn delete_asset(
     let tenant_uuid = *tenant_id.as_uuid();
     asset_service.delete_asset(tenant_uuid, asset_id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn branding_multipart_field_requires_name() {
+        let src = include_str!("branding_assets.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("field.name().unwrap_or_default()")
+                && production.contains("multipart field is missing a name"),
+            "branding upload must not skip unnamed multipart fields"
+        );
+    }
 }

@@ -120,7 +120,13 @@ pub async fn create_import_job(
         .await
         .map_err(|e| ImportError::Internal(format!("Multipart read error: {e}")))?
     {
-        let name = field.name().unwrap_or("").to_string();
+        let name = field
+            .name()
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| {
+                ImportError::InvalidFileType("multipart field is missing a name".to_string())
+            })?
+            .to_string();
 
         match name.as_str() {
             "file" => {
@@ -407,7 +413,17 @@ mod tests {
         assert!(
             production.contains("parse_optional_import_status(")
                 && !production.contains("params.status.as_deref(), limit, offset"),
-            "invalid import job status must be 400, not an unfiltered list"
+            "invalid import status must not list all jobs"
+        );
+    }
+
+    #[test]
+    fn import_multipart_field_requires_name() {
+        let src = include_str!("import.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("field.name().unwrap_or(\"\")"),
+            "import multipart fields must not skip unnamed parts"
         );
     }
 }
