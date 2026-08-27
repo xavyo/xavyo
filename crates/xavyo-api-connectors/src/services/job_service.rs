@@ -45,10 +45,26 @@ pub enum JobServiceError {
     /// Already replayed.
     #[error("DLQ entry {0} has already been replayed")]
     AlreadyReplayed(Uuid),
+
+    /// Invalid job status filter.
+    #[error("Invalid job status: {0}")]
+    InvalidStatus(String),
 }
 
 /// Result type for job service operations.
 pub type JobServiceResult<T> = Result<T, JobServiceError>;
+
+/// Invalid status filters must not silently list every job.
+pub fn parse_job_status(status: Option<&str>) -> JobServiceResult<Option<OperationStatus>> {
+    match status {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) => s
+            .parse()
+            .map(Some)
+            .map_err(|_| JobServiceError::InvalidStatus(s.to_string())),
+    }
+}
 
 /// Job service for managing background provisioning operations.
 #[derive(Clone)]
@@ -81,7 +97,7 @@ impl JobService {
         let filter = OperationFilter {
             connector_id,
             user_id: None,
-            status: status.and_then(|s| s.parse().ok()),
+            status: parse_job_status(status)?,
             operation_type: None,
             from_date: from,
             to_date: to,
@@ -549,6 +565,24 @@ mod tests {
 
         let err = JobServiceError::AlreadyReplayed(Uuid::new_v4());
         assert!(err.to_string().contains("already been replayed"));
+    }
+
+    #[test]
+    fn invalid_job_status_does_not_list_all_jobs() {
+        assert!(parse_job_status(None).unwrap().is_none());
+        assert!(parse_job_status(Some("")).unwrap().is_none());
+        assert_eq!(
+            parse_job_status(Some("pending")).unwrap(),
+            Some(OperationStatus::Pending)
+        );
+        assert!(parse_job_status(Some("explode")).is_err());
+        let src = include_str!("job_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_job_status(")
+                && !production.contains("status.and_then(|s| s.parse().ok())"),
+            "invalid job status must not silently drop the filter"
+        );
     }
 
     #[test]

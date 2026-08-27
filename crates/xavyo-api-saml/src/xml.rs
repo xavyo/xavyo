@@ -3,10 +3,51 @@
 use std::borrow::Cow;
 
 use quick_xml::events::attributes::Attribute;
+use quick_xml::events::BytesText;
 use quick_xml::XmlVersion;
 
 /// Decode a normalized attribute value for SAML 1.0-compatible documents.
 pub fn attribute_value<'a>(attr: &'a Attribute<'_>) -> Cow<'a, str> {
     attr.normalized_value(XmlVersion::Implicit1_0)
         .unwrap_or_default()
+}
+
+/// Decode XML text. Invalid encoding must not become an empty string.
+pub fn decode_xml_text(e: &BytesText<'_>) -> Result<String, String> {
+    e.decode()
+        .map(|c| c.into_owned())
+        .map_err(|err| format!("invalid XML text encoding: {err}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quick_xml::events::Event;
+    use quick_xml::Reader;
+
+    #[test]
+    fn decode_xml_text_does_not_default_to_empty() {
+        let mut reader = Reader::from_str("<a>hello</a>");
+        reader.config_mut().trim_text(true);
+        loop {
+            match reader.read_event().unwrap() {
+                Event::Text(e) => {
+                    assert_eq!(decode_xml_text(&e).unwrap(), "hello");
+                    break;
+                }
+                Event::Eof => panic!("missing text"),
+                _ => {}
+            }
+        }
+        let src = include_str!("xml.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let decode = production
+            .split("fn decode_xml_text")
+            .nth(1)
+            .expect("decode_xml_text");
+        assert!(
+            !decode.contains("unwrap_or_default()"),
+            "XML text decode must not become empty on error"
+        );
+    }
 }

@@ -116,7 +116,8 @@ pub struct SyncConflictResponse {
     pub conflict_type: String,
     pub status: String,
     pub inbound_value: serde_json::Value,
-    pub outbound_value: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub outbound_value: Option<serde_json::Value>,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -673,7 +674,7 @@ pub async fn list_sync_conflicts(
             conflict_type: c.conflict_type.as_str().to_string(),
             status: c.resolution_strategy.as_str().to_string(),
             inbound_value: c.inbound_value,
-            outbound_value: c.outbound_value.unwrap_or(serde_json::json!({})),
+            outbound_value: c.outbound_value,
             created_at: c.created_at,
         })
         .collect();
@@ -774,4 +775,21 @@ fn extract_tenant_id(claims: &JwtClaims) -> ApiResult<Uuid> {
         .ok_or(ConnectorApiError::Validation(
             "Missing tenant_id in claims".to_string(),
         ))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn conflict_response_does_not_invent_empty_outbound_value() {
+        let src = include_str!("sync.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(serde_json::json!({}))"),
+            "missing outbound_value must not become {{}}"
+        );
+        assert!(
+            production.contains("outbound_value: c.outbound_value"),
+            "conflict list must preserve optional outbound_value"
+        );
+    }
 }
