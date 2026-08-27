@@ -57,16 +57,16 @@ Criteria:
 | Crate | Status | Tests | Public Items | Notes |
 |-------|--------|-------|--------------|-------|
 | xavyo-connector | 🟢 stable | 137 | 79 | Mature framework |
-| xavyo-provisioning | 🟡 beta | 215 | 89 | 11 TODOs in reconciliation |
+| xavyo-provisioning | 🟢 stable | 335 | 89 | Remediation executor + transform engine; `tests/remediation_tests.rs` |
 | xavyo-governance | 🟢 stable | 173+ | 50+ | Complete IGA with integration tests |
 | xavyo-authorization | 🟢 stable | 76 | 16 | Foundation only |
-| xavyo-webhooks | 🟡 beta | 59 | 31 | Needs integration tests |
-| xavyo-siem | 🟡 beta | 115 | 47 | Good coverage, no integration tests |
+| xavyo-webhooks | 🟢 stable | 160+ | 31 | 198 tests with `integration` feature; delivery, retry, DLQ |
+| xavyo-siem | 🟢 stable | 118+ | 47 | 269 tests with `integration` feature; syslog, Splunk HEC |
 | xavyo-ssf | 🔴 alpha | 16 | 24 | CAEP/SSF SET signing + emitter (incl. SSF verification event), no integration tests |
 | xavyo-secrets | 🟢 stable | 51 | 28 | Multi-provider (Vault, AWS) |
 | xavyo-scim-client | 🟢 stable | 150+ | 24 | Full integration test coverage |
 | xavyo-scim-types | 🟢 stable | 9 | 17 | Pure SCIM 2.0 DTOs (RFC 7643/7644); RFC-pinned shape |
-| xavyo-ext-authz | 🟡 beta | 41 | 12 | Envoy ext_authz v3 gRPC for AgentGateway |
+| xavyo-ext-authz | 🟡 beta | 62 | 12 | Envoy ext_authz v3 gRPC; integration stub only |
 
 ### Connector Layer
 
@@ -75,7 +75,7 @@ Criteria:
 | xavyo-connector-ldap | 🟢 stable | 239 | 31 | Most mature connector |
 | xavyo-connector-entra | 🟢 stable | 64 | 42 | Crate/API with rate limiting; no UI form |
 | xavyo-connector-rest | 🟢 stable | 114 | 7 | Matches CRATE.md: CRUD, rate limit, retry, SSRF. Crate/API; not a production UI path |
-| xavyo-connector-database | 🟡 beta | 47 | 4 | Matches CRATE.md: PostgreSQL CRUD + transactions. Crate/API; not a production UI path |
+| xavyo-connector-database | 🟡 beta | 51 | 4 | PostgreSQL CRUD + transactions; needs DB integration tests |
 
 ### API Layer
 
@@ -86,11 +86,11 @@ Criteria:
 | xavyo-api-users | 🟢 stable | 95+ | 34 | Full integration test coverage |
 | xavyo-api-scim | 🟢 stable | 370+ | 27 | SCIM 2.0 compliance + IdP interop integration tests |
 | xavyo-api-saml | 🟢 stable | 160+ | 18 | SP/IdP flows, security + vendor interop tests |
-| xavyo-api-social | 🟡 beta | 27 | 19 | Needs validation tests |
+| xavyo-api-social | 🟢 stable | 120 | 19 | Provider OAuth flows (Google, Microsoft, Apple, GitHub) |
 | xavyo-api-governance | 🟢 stable | 1058 | 180+ | 135K LOC, massive coverage |
-| xavyo-api-connectors | 🟡 beta | 69 | 42 | 6 TODOs |
+| xavyo-api-connectors | 🟡 beta | 239 | 42 | 2 TODOs; some endpoints return 501 |
 | xavyo-api-tenants | 🟢 stable | 121 | 38 | Multi-tenant bootstrap complete |
-| xavyo-api-authorization | 🟡 beta | 36+ | 37 | Integration tests complete |
+| xavyo-api-authorization | 🟡 beta | 112+ | 37 | 112 tests with `integration` feature (requires PostgreSQL) |
 | xavyo-api-import | 🟢 stable | 92+ | 45+ | Full integration test coverage |
 | xavyo-api-oidc-federation | 🟢 stable | 79+ | 16 | IdP interop tests (Auth0, Azure AD, Okta, Google) |
 | xavyo-api-nhi | 🟢 stable | 77 | 33 | Complete with risk scoring, F-047 & F-048 |
@@ -102,8 +102,8 @@ Criteria:
 
 | Status | Count | Crates |
 |--------|-------|--------|
-| 🟢 Stable | 23 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-connector-entra, xavyo-connector-rest, xavyo-governance, xavyo-scim-client, xavyo-scim-types, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-tenants, xavyo-api-import, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-oidc-federation |
-| 🟡 Beta | 10 | xavyo-authorization, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-ext-authz, xavyo-connector-database, xavyo-api-social, xavyo-api-connectors, xavyo-api-nhi, xavyo-api-authorization |
+| 🟢 Stable | 27 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-connector-entra, xavyo-connector-rest, xavyo-governance, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-scim-client, xavyo-scim-types, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-tenants, xavyo-api-import, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-oidc-federation, xavyo-api-social, xavyo-api-nhi |
+| 🟡 Beta | 6 | xavyo-authorization, xavyo-ext-authz, xavyo-connector-database, xavyo-api-connectors, xavyo-api-authorization |
 | 🔴 Alpha | 2 | xavyo-ssf, xavyo-api-ssf |
 
 ---
@@ -141,4 +141,4 @@ Maturity was assessed based on:
 
 ---
 
-*Last updated: 2026-08-23*
+*Last updated: 2026-08-27*
