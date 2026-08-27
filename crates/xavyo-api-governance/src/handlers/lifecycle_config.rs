@@ -26,7 +26,7 @@ use crate::{
     services::condition_evaluator::ConditionEvaluator,
 };
 use xavyo_auth::JwtClaims;
-use xavyo_db::{GovLifecycleState, GovLifecycleTransition};
+use xavyo_db::{GovLifecycleState, GovLifecycleTransition, GovStateTransitionRequest};
 
 /// List lifecycle configurations.
 ///
@@ -774,8 +774,7 @@ pub async fn get_user_lifecycle_status(
 ) -> ApiResult<Json<crate::models::UserLifecycleStatusResponse>> {
     use crate::models::{
         AvailableTransitionWithConditions, LifecycleModelInfo, LifecycleModelSource,
-        LifecycleStateResponse, LifecycleTransitionResponse, RollbackInfo,
-        ScheduledTransitionResponse, UserLifecycleStatusResponse,
+        LifecycleStateResponse, LifecycleTransitionResponse, UserLifecycleStatusResponse,
     };
     use crate::services::ArchetypeLifecycleService;
     use std::sync::Arc;
@@ -848,17 +847,14 @@ pub async fn get_user_lifecycle_status(
                     .await
                     .map_err(crate::error::ApiGovernanceError::Database)?;
 
-            state_record.map(|s| LifecycleStateResponse {
-                id: s.id,
-                name: s.name,
-                description: s.description,
-                is_initial: s.is_initial,
-                is_terminal: s.is_terminal,
-                entitlement_action: s.entitlement_action,
-                position: s.position,
-                object_count: 0,
-                created_at: s.created_at,
-            })
+            if let Some(s) = state_record {
+                let object_count = GovLifecycleState::count_objects_in_state(pool, tenant_id, s.id)
+                    .await
+                    .map_err(crate::error::ApiGovernanceError::Database)?;
+                Some(LifecycleStateResponse::from_model(s, object_count))
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -921,11 +917,11 @@ pub async fn get_user_lifecycle_status(
         }
     }
 
-    // Note: Pending schedules and rollback info require additional queries
-    // that are not part of the core lifecycle status. For now, return empty values.
-    // These can be enhanced in a future iteration.
-    let pending_schedules: Vec<ScheduledTransitionResponse> = Vec::new();
-    let active_rollback: Option<RollbackInfo> = None;
+    let pending_schedules = state
+        .state_transition_service
+        .get_pending_schedules_for_object(tenant_id, user_id)
+        .await?;
+    let active_rollback = active_rollback_for_object(pool, tenant_id, user_id).await?;
 
     Ok(Json(UserLifecycleStatusResponse {
         user_id,
@@ -934,6 +930,44 @@ pub async fn get_user_lifecycle_status(
         pending_schedules,
         active_rollback,
         lifecycle_model,
+    }))
+}
+
+/// Active grace-period rollback for an object. Missing from-state or expiry
+/// must not look like "no rollback" or an empty restore target.
+async fn active_rollback_for_object(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    object_id: Uuid,
+) -> ApiResult<Option<crate::models::RollbackInfo>> {
+    let Some(request) =
+        GovStateTransitionRequest::find_with_active_grace_period(pool, tenant_id, object_id)
+            .await
+            .map_err(crate::error::ApiGovernanceError::Database)?
+    else {
+        return Ok(None);
+    };
+
+    let from_state = GovLifecycleState::find_by_id(pool, tenant_id, request.from_state_id)
+        .await
+        .map_err(crate::error::ApiGovernanceError::Database)?
+        .ok_or_else(|| {
+            crate::error::ApiGovernanceError::NotFound(format!(
+                "Lifecycle state {} not found",
+                request.from_state_id
+            ))
+        })?;
+    let expires_at = request.grace_period_ends_at.ok_or_else(|| {
+        crate::error::ApiGovernanceError::NotFound(format!(
+            "Rollback {} is missing grace_period_ends_at",
+            request.id
+        ))
+    })?;
+
+    Ok(Some(crate::models::RollbackInfo {
+        request_id: request.id,
+        restore_to_state: from_state.name,
+        expires_at,
     }))
 }
 
@@ -1003,6 +1037,31 @@ mod tests {
         assert!(
             !production.contains("to_state.map(|s| s.name).unwrap_or_default()"),
             "user lifecycle status must not hide a missing to-state as an empty name"
+        );
+    }
+
+    #[test]
+    fn user_lifecycle_status_reports_real_schedules_rollback_and_object_count() {
+        let src = include_str!("lifecycle_config.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let status = production
+            .split("pub async fn get_user_lifecycle_status")
+            .nth(1)
+            .and_then(|s| s.split("async fn active_rollback_for_object").next())
+            .expect("get_user_lifecycle_status");
+        assert!(
+            status.contains("count_objects_in_state(") && !status.contains("object_count: 0,"),
+            "user lifecycle status must report the real object count for the current state"
+        );
+        assert!(
+            status.contains("get_pending_schedules_for_object(")
+                && !status.contains("pending_schedules: Vec::new()"),
+            "user lifecycle status must return pending scheduled transitions"
+        );
+        assert!(
+            status.contains("active_rollback_for_object(")
+                && !status.contains("active_rollback: Option<RollbackInfo> = None"),
+            "user lifecycle status must return an active rollback window when one exists"
         );
     }
 

@@ -11,6 +11,8 @@ use axum::{Extension, Json};
 use http::HeaderMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use uuid::Uuid;
+use xavyo_auth::JwtClaims;
 use xavyo_core::{TenantId, UserId};
 use xavyo_db::UserDevice;
 
@@ -81,14 +83,18 @@ pub async fn get_me_sessions(
     Extension(session_service): Extension<Arc<SessionService>>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(user_id): Extension<UserId>,
-    _headers: HeaderMap,
+    Extension(claims): Extension<JwtClaims>,
 ) -> Result<Json<SessionListResponse>, ApiAuthError> {
-    // Try to get current session ID from authorization header
-    // This would require extracting the session ID from the JWT claims
-    let current_session_id: Option<uuid::Uuid> = None; // Simplified for now
+    // Current session is identified by JWT jti, matching GET /users/me/sessions.
+    let current_session_id =
+        Uuid::parse_str(&claims.jti).map_err(|_| ApiAuthError::Unauthorized)?;
 
     let sessions = session_service
-        .get_user_sessions(*user_id.as_uuid(), *tenant_id.as_uuid(), current_session_id)
+        .get_user_sessions(
+            *user_id.as_uuid(),
+            *tenant_id.as_uuid(),
+            Some(current_session_id),
+        )
         .await?;
 
     // Convert to response format
@@ -171,5 +177,26 @@ mod tests {
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("\"device_name\":\"Work Laptop\""));
         assert!(json.contains("\"is_trusted\":true"));
+    }
+
+    #[test]
+    fn me_sessions_marks_current_session_from_jwt_jti() {
+        let src = include_str!("shortcuts.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let sessions = production
+            .split("pub async fn get_me_sessions")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_me_sessions");
+        assert!(
+            sessions.contains("Uuid::parse_str(&claims.jti)")
+                && sessions.contains("Some(current_session_id)")
+                && !sessions.contains("current_session_id: Option<uuid::Uuid> = None"),
+            "GET /me/sessions must mark the current session from JWT jti"
+        );
+        assert!(
+            !sessions.contains("Uuid::parse_str(&claims.jti).ok()"),
+            "GET /me/sessions must refuse a malformed JWT jti"
+        );
     }
 }

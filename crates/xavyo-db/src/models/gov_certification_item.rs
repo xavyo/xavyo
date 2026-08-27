@@ -331,6 +331,30 @@ impl GovCertificationItem {
         .await
     }
 
+    /// Pending certification items for a reviewer, grouped by campaign.
+    pub async fn list_reviewer_pending_by_campaign(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        reviewer_id: Uuid,
+    ) -> Result<Vec<(Uuid, String, DateTime<Utc>, bool, i64)>, sqlx::Error> {
+        sqlx::query_as(
+            r"
+            SELECT c.id, c.name, c.deadline, (c.deadline < NOW()) AS is_overdue,
+                   COUNT(*)::bigint AS pending_count
+            FROM gov_certification_items i
+            INNER JOIN gov_certification_campaigns c
+                ON c.id = i.campaign_id AND c.tenant_id = i.tenant_id
+            WHERE i.tenant_id = $1 AND i.reviewer_id = $2 AND i.status = 'pending'
+            GROUP BY c.id, c.name, c.deadline
+            ORDER BY c.deadline ASC
+            ",
+        )
+        .bind(tenant_id)
+        .bind(reviewer_id)
+        .fetch_all(pool)
+        .await
+    }
+
     /// Create a new certification item.
     pub async fn create(
         pool: &sqlx::PgPool,
