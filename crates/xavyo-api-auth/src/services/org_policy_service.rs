@@ -272,7 +272,7 @@ impl OrgPolicyService {
                     parent.group_id.unwrap_or(Uuid::nil()),
                     &parent.group_name.clone().unwrap_or_default(),
                     true, // is_parent
-                ) {
+                )? {
                     warnings.push(warning);
                 }
             }
@@ -291,7 +291,7 @@ impl OrgPolicyService {
                 child.group_id,
                 "",    // We don't have group name in the child result
                 false, // is_parent
-            ) {
+            )? {
                 warnings.push(warning);
             }
         }
@@ -557,15 +557,20 @@ impl OrgPolicyService {
         related_org_id: Uuid,
         related_org_name: &str,
         is_parent: bool,
-    ) -> Option<PolicyConflictWarning> {
+    ) -> Result<Option<PolicyConflictWarning>, OrgPolicyError> {
         match policy_type {
             OrgPolicyType::Password => {
-                let new: PasswordPolicyConfig = serde_json::from_value(new_config.clone()).ok()?;
+                let new: PasswordPolicyConfig = serde_json::from_value(new_config.clone())
+                    .map_err(|e| {
+                        OrgPolicyError::InvalidConfig(format!("Invalid password policy JSON: {e}"))
+                    })?;
                 let existing: PasswordPolicyConfig =
-                    serde_json::from_value(existing_config.clone()).ok()?;
+                    serde_json::from_value(existing_config.clone()).map_err(|e| {
+                        OrgPolicyError::InvalidConfig(format!("Invalid password policy JSON: {e}"))
+                    })?;
 
                 if is_parent && !new.is_more_restrictive_than(&existing) {
-                    return Some(PolicyConflictWarning {
+                    return Ok(Some(PolicyConflictWarning {
                         severity: "warning".to_string(),
                         message: format!(
                             "This policy is less restrictive than parent organization '{}'",
@@ -574,17 +579,22 @@ impl OrgPolicyService {
                         related_org_id,
                         related_org_name: related_org_name.to_string(),
                         field: None,
-                    });
+                    }));
                 }
-                None
+                Ok(None)
             }
             OrgPolicyType::Mfa => {
-                let new: MfaPolicyConfig = serde_json::from_value(new_config.clone()).ok()?;
-                let existing: MfaPolicyConfig =
-                    serde_json::from_value(existing_config.clone()).ok()?;
+                let new: MfaPolicyConfig =
+                    serde_json::from_value(new_config.clone()).map_err(|e| {
+                        OrgPolicyError::InvalidConfig(format!("Invalid MFA policy JSON: {e}"))
+                    })?;
+                let existing: MfaPolicyConfig = serde_json::from_value(existing_config.clone())
+                    .map_err(|e| {
+                        OrgPolicyError::InvalidConfig(format!("Invalid MFA policy JSON: {e}"))
+                    })?;
 
                 if is_parent && existing.required && !new.required {
-                    return Some(PolicyConflictWarning {
+                    return Ok(Some(PolicyConflictWarning {
                         severity: "warning".to_string(),
                         message: format!(
                             "Parent organization '{}' requires MFA, but this policy does not",
@@ -593,17 +603,22 @@ impl OrgPolicyService {
                         related_org_id,
                         related_org_name: related_org_name.to_string(),
                         field: Some("required".to_string()),
-                    });
+                    }));
                 }
-                None
+                Ok(None)
             }
             OrgPolicyType::Session => {
-                let new: SessionPolicyConfig = serde_json::from_value(new_config.clone()).ok()?;
-                let existing: SessionPolicyConfig =
-                    serde_json::from_value(existing_config.clone()).ok()?;
+                let new: SessionPolicyConfig =
+                    serde_json::from_value(new_config.clone()).map_err(|e| {
+                        OrgPolicyError::InvalidConfig(format!("Invalid session policy JSON: {e}"))
+                    })?;
+                let existing: SessionPolicyConfig = serde_json::from_value(existing_config.clone())
+                    .map_err(|e| {
+                        OrgPolicyError::InvalidConfig(format!("Invalid session policy JSON: {e}"))
+                    })?;
 
                 if is_parent && new.max_duration_hours > existing.max_duration_hours {
-                    return Some(PolicyConflictWarning {
+                    return Ok(Some(PolicyConflictWarning {
                         severity: "warning".to_string(),
                         message: format!(
                             "Session duration ({} hours) exceeds parent organization '{}' limit ({} hours)",
@@ -612,13 +627,13 @@ impl OrgPolicyService {
                         related_org_id,
                         related_org_name: related_org_name.to_string(),
                         field: Some("max_duration_hours".to_string()),
-                    });
+                    }));
                 }
-                None
+                Ok(None)
             }
             OrgPolicyType::IpRestriction => {
                 // IP restrictions don't have simple less/more restrictive comparison
-                None
+                Ok(None)
             }
         }
     }
@@ -690,6 +705,26 @@ mod tests {
         assert!(
             !window.contains(".ok()"),
             "must not treat MFA lookup errors as MFA not required"
+        );
+    }
+
+    #[test]
+    fn check_conflict_does_not_skip_on_invalid_json() {
+        let src = include_str!("org_policy_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let idx = production
+            .find("fn check_conflict")
+            .expect("check_conflict");
+        let window = &production[idx..];
+        assert!(
+            window.contains("Invalid password policy JSON")
+                && window.contains("Invalid MFA policy JSON")
+                && window.contains("Invalid session policy JSON"),
+            "org policy conflict checks must fail closed on JSON parse"
+        );
+        assert!(
+            !window.contains(".ok()?"),
+            "must not treat corrupt policy JSON as no conflict"
         );
     }
 }
