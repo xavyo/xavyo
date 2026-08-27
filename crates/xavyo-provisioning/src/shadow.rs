@@ -27,6 +27,10 @@ pub enum ShadowError {
     /// Serialization error.
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
+
+    /// Stored shadow situation or state is not a known enum value.
+    #[error("Invalid stored shadow: {0}")]
+    InvalidData(String),
 }
 
 /// Result type for shadow operations.
@@ -375,7 +379,7 @@ impl ShadowRepository {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(|r| self.row_to_shadow(&r)))
+        row.map(|r| self.row_to_shadow(&r)).transpose()
     }
 
     /// Find all shadows for a user.
@@ -396,7 +400,7 @@ impl ShadowRepository {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.iter().map(|r| self.row_to_shadow(r)).collect())
+        rows.iter().map(|r| self.row_to_shadow(r)).collect()
     }
 
     /// Find shadows with pending operations.
@@ -442,7 +446,7 @@ impl ShadowRepository {
             .await?
         };
 
-        Ok(rows.iter().map(|r| self.row_to_shadow(r)).collect())
+        rows.iter().map(|r| self.row_to_shadow(r)).collect()
     }
 
     /// Find unlinked shadows (orphans).
@@ -470,7 +474,7 @@ impl ShadowRepository {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.iter().map(|r| self.row_to_shadow(r)).collect())
+        rows.iter().map(|r| self.row_to_shadow(r)).collect()
     }
 
     /// Count how many distinct users are linked to shadows with the same `target_uid`.
@@ -527,7 +531,7 @@ impl ShadowRepository {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.iter().map(|r| self.row_to_shadow(r)).collect())
+        rows.iter().map(|r| self.row_to_shadow(r)).collect()
     }
 
     /// Delete old dead shadows.
@@ -546,8 +550,10 @@ impl ShadowRepository {
         Ok(result.rows_affected())
     }
 
-    fn row_to_shadow(&self, row: &sqlx::postgres::PgRow) -> Shadow {
-        Shadow {
+    fn row_to_shadow(&self, row: &sqlx::postgres::PgRow) -> ShadowResult<Shadow> {
+        let situation_str: String = row.get("sync_situation");
+        let state_str: String = row.get("state");
+        Ok(Shadow {
             id: row.get("id"),
             tenant_id: row.get("tenant_id"),
             connector_id: row.get("connector_id"),
@@ -556,20 +562,14 @@ impl ShadowRepository {
             target_uid: row.get("target_uid"),
             attributes: row.get("attributes"),
             expected_attributes: row.get("expected_attributes"),
-            sync_situation: row
-                .get::<String, _>("sync_situation")
-                .parse()
-                .unwrap_or(SyncSituation::Unlinked),
-            state: row
-                .get::<String, _>("state")
-                .parse()
-                .unwrap_or(ShadowState::Unknown),
+            sync_situation: situation_str.parse().map_err(ShadowError::InvalidData)?,
+            state: state_str.parse().map_err(ShadowError::InvalidData)?,
             pending_operation_count: row.get("pending_operation_count"),
             last_sync_at: row.get("last_sync_at"),
             last_error: row.get("last_error"),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
-        }
+        })
     }
 }
 
@@ -636,6 +636,19 @@ mod tests {
         assert_eq!(shadow.sync_situation, SyncSituation::Unlinked);
         assert_eq!(shadow.state, ShadowState::Unknown);
         assert!(shadow.user_id.is_none());
+    }
+
+    #[test]
+    fn row_to_shadow_does_not_default_unknown_situation_or_state() {
+        let src = include_str!("shadow.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(SyncSituation::Unlinked)")
+                && !production.contains("unwrap_or(ShadowState::Unknown)"),
+            "unknown stored shadow situation/state must not silently default"
+        );
+        assert!("nope".parse::<SyncSituation>().is_err());
+        assert!("bogus".parse::<ShadowState>().is_err());
     }
 
     #[test]

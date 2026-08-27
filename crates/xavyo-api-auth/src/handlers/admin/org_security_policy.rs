@@ -47,6 +47,15 @@ fn str_to_policy_type_dto(s: &str) -> Option<OrgPolicyTypeDto> {
     }
 }
 
+/// Stored policy type must be a known DTO. Unknown values must not become Password.
+fn require_policy_type_dto(s: &str) -> Result<OrgPolicyTypeDto, ApiAuthError> {
+    str_to_policy_type_dto(s).ok_or_else(|| {
+        ApiAuthError::InvalidPolicyType(format!(
+            "Unknown stored policy type: {s}. Must be one of: password, mfa, session, ip_restriction"
+        ))
+    })
+}
+
 /// Convert DTO to OrgPolicyType.
 fn from_policy_type_dto(dto: &OrgPolicyTypeDto) -> OrgPolicyType {
     match dto {
@@ -222,23 +231,25 @@ pub async fn list_org_policies(
 
     let total = filtered.len();
 
-    let items: Vec<OrgSecurityPolicyResponse> = filtered
+    let items: Result<Vec<OrgSecurityPolicyResponse>, ApiAuthError> = filtered
         .drain(..)
-        .map(|p| OrgSecurityPolicyResponse {
-            id: p.id,
-            tenant_id: p.tenant_id,
-            group_id: p.group_id,
-            group_name: Some(group.display_name.clone()),
-            policy_type: str_to_policy_type_dto(&p.policy_type)
-                .unwrap_or(OrgPolicyTypeDto::Password),
-            config: p.config,
-            is_active: p.is_active,
-            created_at: p.created_at,
-            updated_at: p.updated_at,
-            created_by: p.created_by,
-            updated_by: p.updated_by,
+        .map(|p| {
+            Ok(OrgSecurityPolicyResponse {
+                id: p.id,
+                tenant_id: p.tenant_id,
+                group_id: p.group_id,
+                group_name: Some(group.display_name.clone()),
+                policy_type: require_policy_type_dto(&p.policy_type)?,
+                config: p.config,
+                is_active: p.is_active,
+                created_at: p.created_at,
+                updated_at: p.updated_at,
+                created_by: p.created_by,
+                updated_by: p.updated_by,
+            })
         })
         .collect();
+    let items = items?;
 
     Ok((
         StatusCode::OK,
@@ -325,8 +336,7 @@ pub async fn create_org_policy(
             tenant_id: policy.tenant_id,
             group_id: policy.group_id,
             group_name: Some(group.display_name),
-            policy_type: str_to_policy_type_dto(&policy.policy_type)
-                .unwrap_or(OrgPolicyTypeDto::Password),
+            policy_type: require_policy_type_dto(&policy.policy_type)?,
             config: policy.config,
             is_active: policy.is_active,
             created_at: policy.created_at,
@@ -387,8 +397,7 @@ pub async fn get_org_policy(
             tenant_id: policy.tenant_id,
             group_id: policy.group_id,
             group_name: Some(group.display_name),
-            policy_type: str_to_policy_type_dto(&policy.policy_type)
-                .unwrap_or(OrgPolicyTypeDto::Password),
+            policy_type: require_policy_type_dto(&policy.policy_type)?,
             config: policy.config,
             is_active: policy.is_active,
             created_at: policy.created_at,
@@ -492,8 +501,7 @@ pub async fn upsert_org_policy(
             tenant_id: policy.tenant_id,
             group_id: policy.group_id,
             group_name: Some(group.display_name),
-            policy_type: str_to_policy_type_dto(&policy.policy_type)
-                .unwrap_or(OrgPolicyTypeDto::Password),
+            policy_type: require_policy_type_dto(&policy.policy_type)?,
             config: policy.config,
             is_active: policy.is_active,
             created_at: policy.created_at,
@@ -890,6 +898,25 @@ mod tests {
             Some(OrgPolicyTypeDto::IpRestriction)
         );
         assert_eq!(str_to_policy_type_dto("invalid"), None);
+        assert!(require_policy_type_dto("invalid").is_err());
+        assert_eq!(
+            require_policy_type_dto("mfa").unwrap(),
+            OrgPolicyTypeDto::Mfa
+        );
+    }
+
+    #[test]
+    fn stored_policy_type_does_not_default_to_password() {
+        let src = include_str!("org_security_policy.rs");
+        let production = src.split("mod tests").next().expect("production");
+        assert!(
+            production.contains("require_policy_type_dto("),
+            "stored org policy type must fail closed"
+        );
+        assert!(
+            !production.contains("unwrap_or(OrgPolicyTypeDto::Password)"),
+            "unknown stored policy type must not be reported as password"
+        );
     }
 
     #[test]

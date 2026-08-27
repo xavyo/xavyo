@@ -109,20 +109,14 @@ pub struct SyncConflict {
 }
 
 impl SyncConflict {
-    /// Get the conflict type enum.
-    #[must_use]
-    pub fn conflict_type(&self) -> SyncConflictType {
-        self.conflict_type
-            .parse()
-            .unwrap_or(SyncConflictType::ConcurrentUpdate)
+    /// Get the conflict type enum. Unknown stored values must not become `ConcurrentUpdate`.
+    pub fn conflict_type(&self) -> Result<SyncConflictType, String> {
+        self.conflict_type.parse()
     }
 
-    /// Get the resolution strategy enum.
-    #[must_use]
-    pub fn resolution_strategy(&self) -> SyncResolutionStrategy {
-        self.resolution_strategy
-            .parse()
-            .unwrap_or(SyncResolutionStrategy::Pending)
+    /// Get the resolution strategy enum. Unknown stored values must not become `Pending`.
+    pub fn resolution_strategy(&self) -> Result<SyncResolutionStrategy, String> {
+        self.resolution_strategy.parse()
     }
 
     /// Check if conflict is resolved.
@@ -369,5 +363,18 @@ mod tests {
             !production.contains("JOIN gov_inbound_changes ic ON sc.inbound_change_id = ic.id\n"),
             "must not join inbound changes by id alone"
         );
+    }
+
+    #[test]
+    fn sync_conflict_enums_do_not_silently_default() {
+        let src = include_str!("sync_conflict.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(SyncConflictType::ConcurrentUpdate)")
+                && !production.contains("unwrap_or(SyncResolutionStrategy::Pending)"),
+            "unknown conflict type/strategy must not silently default"
+        );
+        assert!("nope".parse::<SyncConflictType>().is_err());
+        assert!("bogus".parse::<SyncResolutionStrategy>().is_err());
     }
 }

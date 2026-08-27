@@ -15,6 +15,14 @@ use crate::services::filter_parser::{parse_filter, AttributeMapper};
 /// Maximum allowed hierarchy depth (10 levels).
 const MAX_DEPTH: i32 = 10;
 
+/// Depth from a recursive `MAX(...)` query. NULL/missing must not become 1 or 0.
+fn required_hierarchy_depth(value: Option<(Option<i64>,)>, what: &str) -> ScimResult<i32> {
+    value
+        .and_then(|(d,)| d)
+        .map(|d| d as i32)
+        .ok_or_else(|| ScimError::Validation(format!("Could not determine {what}")))
+}
+
 /// Allowed `group_type` values.
 const ALLOWED_GROUP_TYPES: &[&str] = &[
     "organizational_unit",
@@ -98,7 +106,7 @@ impl GroupService {
         .fetch_optional(&self.pool)
         .await?;
 
-        let parent_depth = parent_depth.and_then(|(d,)| d).unwrap_or(1) as i32;
+        let parent_depth = required_hierarchy_depth(parent_depth, "parent group depth")?;
 
         if parent_depth + 1 > MAX_DEPTH {
             return Err(ScimError::Validation(format!(
@@ -160,7 +168,7 @@ impl GroupService {
             .fetch_optional(&self.pool)
             .await?;
 
-            let subtree_max = subtree_depth.and_then(|(d,)| d).unwrap_or(0) as i32;
+            let subtree_max = required_hierarchy_depth(subtree_depth, "group subtree depth")?;
             if parent_depth + 1 + subtree_max > MAX_DEPTH {
                 return Err(ScimError::Validation(format!(
                     "Moving this group would exceed maximum hierarchy depth of {MAX_DEPTH} levels"
@@ -954,6 +962,31 @@ mod tests {
         assert!(
             !production.contains("JOIN subtree s ON g.parent_id = s.id\n"),
             "must not join subtree by parent_id alone"
+        );
+    }
+
+    #[test]
+    fn hierarchy_depth_does_not_default_when_missing() {
+        assert_eq!(
+            required_hierarchy_depth(Some((Some(3),)), "parent").unwrap(),
+            3
+        );
+        assert_eq!(
+            required_hierarchy_depth(Some((Some(0),)), "subtree").unwrap(),
+            0
+        );
+        assert!(required_hierarchy_depth(None, "parent group depth").is_err());
+        assert!(required_hierarchy_depth(Some((None,)), "parent group depth").is_err());
+
+        let src = include_str!("group_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("required_hierarchy_depth("),
+            "hierarchy validation must fail closed when depth is unknown"
+        );
+        assert!(
+            !production.contains("unwrap_or(1)") && !production.contains("unwrap_or(0)"),
+            "missing parent/subtree depth must not silently default"
         );
     }
 }

@@ -155,28 +155,19 @@ pub struct InboundChange {
 }
 
 impl InboundChange {
-    /// Get the change type enum.
-    #[must_use]
-    pub fn change_type(&self) -> InboundChangeType {
-        self.change_type
-            .parse()
-            .unwrap_or(InboundChangeType::Update)
+    /// Get the change type enum. Unknown stored values must not become `Update`.
+    pub fn change_type(&self) -> Result<InboundChangeType, String> {
+        self.change_type.parse()
     }
 
-    /// Get the sync situation enum.
-    #[must_use]
-    pub fn sync_situation(&self) -> SyncSituation {
-        self.sync_situation
-            .parse()
-            .unwrap_or(SyncSituation::Unmatched)
+    /// Get the sync situation enum. Unknown stored values must not become `Unmatched`.
+    pub fn sync_situation(&self) -> Result<SyncSituation, String> {
+        self.sync_situation.parse()
     }
 
-    /// Get the processing status enum.
-    #[must_use]
-    pub fn processing_status(&self) -> InboundProcessingStatus {
-        self.processing_status
-            .parse()
-            .unwrap_or(InboundProcessingStatus::Pending)
+    /// Get the processing status enum. Unknown stored values must not become `Pending`.
+    pub fn processing_status(&self) -> Result<InboundProcessingStatus, String> {
+        self.processing_status.parse()
     }
 
     /// Create a new inbound change.
@@ -554,5 +545,20 @@ mod tests {
             let parsed: InboundProcessingStatus = s.parse().unwrap();
             assert_eq!(status, parsed);
         }
+    }
+
+    #[test]
+    fn inbound_change_enums_do_not_silently_default() {
+        let src = include_str!("inbound_change.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(InboundChangeType::Update)")
+                && !production.contains("unwrap_or(SyncSituation::Unmatched)")
+                && !production.contains("unwrap_or(InboundProcessingStatus::Pending)"),
+            "unknown inbound change type/situation/status must not silently default"
+        );
+        assert!("nope".parse::<InboundChangeType>().is_err());
+        assert!("bogus".parse::<SyncSituation>().is_err());
+        assert!("explode".parse::<InboundProcessingStatus>().is_err());
     }
 }
