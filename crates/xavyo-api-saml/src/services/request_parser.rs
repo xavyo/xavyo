@@ -92,7 +92,8 @@ impl RequestParser {
             match reader.read_event() {
                 Ok(Event::Start(e)) => {
                     let local = e.local_name();
-                    let name = std::str::from_utf8(local.as_ref()).unwrap_or("");
+                    let name = crate::xml::decode_xml_name(local.as_ref())
+                        .map_err(SamlError::InvalidAuthnRequest)?;
                     if name == "Issuer" {
                         in_issuer = true;
                     }
@@ -205,12 +206,14 @@ impl RequestParser {
             match reader.read_event() {
                 Ok(Event::Start(e) | Event::Empty(e)) => {
                     let name = e.local_name();
-                    let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
+                    let name_str = crate::xml::decode_xml_name(name.as_ref())
+                        .map_err(SamlError::InvalidAuthnRequest)?;
 
                     match name_str {
                         "AuthnRequest" => {
                             for attr in e.attributes().flatten() {
-                                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                                let key = crate::xml::decode_xml_name(attr.key.as_ref())
+                                    .map_err(SamlError::InvalidAuthnRequest)?;
                                 let value = crate::xml::attribute_value(&attr)
                                     .map_err(SamlError::InvalidAuthnRequest)?;
 
@@ -233,7 +236,8 @@ impl RequestParser {
                         }
                         "NameIDPolicy" => {
                             for attr in e.attributes().flatten() {
-                                let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                                let key = crate::xml::decode_xml_name(attr.key.as_ref())
+                                    .map_err(SamlError::InvalidAuthnRequest)?;
                                 if key == "Format" {
                                     name_id_format = Some(
                                         crate::xml::attribute_value(&attr)
@@ -253,7 +257,8 @@ impl RequestParser {
                 }
                 Ok(Event::End(e)) => {
                     let local_name = e.local_name();
-                    let name = std::str::from_utf8(local_name.as_ref()).unwrap_or("");
+                    let name = crate::xml::decode_xml_name(local_name.as_ref())
+                        .map_err(SamlError::InvalidAuthnRequest)?;
                     if name == "Issuer" {
                         in_issuer = false;
                     }
@@ -427,6 +432,16 @@ mod tests {
                 && production.contains("map_err(SamlError::InvalidAuthnRequest)")
                 && !production.contains("attribute_value(&attr).to_string()"),
             "SAML AuthnRequest attributes must not become empty on decode failure"
+        );
+    }
+
+    #[test]
+    fn authn_request_names_do_not_default_to_empty_on_decode_error() {
+        let src = include_str!("request_parser.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("decode_xml_name(") && !production.contains("unwrap_or(\"\")"),
+            "SAML AuthnRequest names must not become empty on decode failure"
         );
     }
 }

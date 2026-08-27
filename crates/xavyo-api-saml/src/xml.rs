@@ -13,6 +13,11 @@ pub fn attribute_value<'a>(attr: &'a Attribute<'_>) -> Result<Cow<'a, str>, Stri
         .map_err(|err| format!("invalid XML attribute encoding: {err}"))
 }
 
+/// Decode an XML local name or attribute key. Invalid encoding must not become empty.
+pub fn decode_xml_name(bytes: &[u8]) -> Result<&str, String> {
+    std::str::from_utf8(bytes).map_err(|err| format!("invalid XML name encoding: {err}"))
+}
+
 /// Decode XML text. Invalid encoding must not become an empty string.
 pub fn decode_xml_text(e: &BytesText<'_>) -> Result<String, String> {
     e.decode()
@@ -63,6 +68,22 @@ mod tests {
         assert!(
             !attr_fn.contains("unwrap_or_default()"),
             "XML attribute decode must not become empty on error"
+        );
+    }
+
+    #[test]
+    fn decode_xml_name_does_not_default_to_empty() {
+        assert_eq!(decode_xml_name(b"Issuer").unwrap(), "Issuer");
+        assert!(decode_xml_name(&[0xff, 0xfe]).is_err());
+        let src = include_str!("xml.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let name_fn = production
+            .split("fn decode_xml_name")
+            .nth(1)
+            .expect("decode_xml_name");
+        assert!(
+            !name_fn.contains("unwrap_or(\"\")") && !name_fn.contains("from_utf8_lossy"),
+            "XML name decode must not become empty on error"
         );
     }
 }

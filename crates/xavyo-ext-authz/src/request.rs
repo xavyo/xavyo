@@ -75,18 +75,24 @@ pub fn parse_check_request(request: &proto::CheckRequest) -> Result<AuthzContext
     let action = derive_action(&method);
     let resource_type = derive_resource_type(&path);
 
-    // Parse act claim for delegation and validate chain depth
-    let act = claims
-        .act
-        .and_then(|v| serde_json::from_value::<xavyo_auth::ActorClaim>(v).ok())
-        .and_then(|a| match a.validate_depth() {
-            Ok(()) => Some(a),
-            Err(e) => {
-                tracing::warn!("rejecting act claim: {e}");
-                None
-            }
-        });
-    let delegation_id = claims.delegation_id.and_then(|s| Uuid::parse_str(&s).ok());
+    // Malformed delegation claims must deny, not look like a first-party token.
+    let act = match claims.act {
+        None => None,
+        Some(v) => {
+            let actor = serde_json::from_value::<xavyo_auth::ActorClaim>(v)
+                .map_err(|e| ExtAuthzError::JwtExtraction(format!("invalid act claim: {e}")))?;
+            actor
+                .validate_depth()
+                .map_err(|e| ExtAuthzError::JwtExtraction(format!("invalid act claim: {e}")))?;
+            Some(actor)
+        }
+    };
+    let delegation_id = match claims.delegation_id {
+        None => None,
+        Some(s) => Some(Uuid::parse_str(&s).map_err(|e| {
+            ExtAuthzError::JwtExtraction(format!("invalid delegation_id claim: {e}"))
+        })?),
+    };
     let delegation_depth = claims.delegation_depth;
 
     Ok(AuthzContext {
@@ -162,7 +168,7 @@ fn extract_claims_from_struct(s: &prost_types::Struct) -> Result<JwtClaims, ExtA
     let roles = get_string_list_field(s, "roles")?;
 
     // Delegation fields
-    let act = get_struct_field_as_json(s, "act");
+    let act = get_struct_field_as_json(s, "act")?;
     let delegation_id = get_string_field(s, "delegation_id");
     let delegation_depth = get_number_field(s, "delegation_depth").map(|n| n as i32);
 
@@ -204,13 +210,28 @@ fn decode_jwt_payload(token: &str) -> Result<JwtClaims, ExtAuthzError> {
 
     let roles = json_string_list(&payload["roles"], "roles")?;
 
-    // Delegation fields
-    let act = if payload["act"].is_object() {
-        Some(payload["act"].clone())
-    } else {
-        None
+    // Delegation fields. Present-but-malformed must not look first-party.
+    let act = match payload.get("act") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(v) if v.is_object() => Some(v.clone()),
+        Some(_) => {
+            return Err(ExtAuthzError::JwtExtraction(
+                "invalid act claim: expected object".into(),
+            ));
+        }
     };
-    let delegation_id = payload["delegation_id"].as_str().map(|s| s.to_string());
+    let delegation_id = match payload.get("delegation_id") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(v) => Some(
+            v.as_str()
+                .ok_or_else(|| {
+                    ExtAuthzError::JwtExtraction(
+                        "invalid delegation_id claim: expected string".into(),
+                    )
+                })?
+                .to_string(),
+        ),
+    };
     let delegation_depth = payload["delegation_depth"].as_i64().map(|n| n as i32);
 
     Ok(JwtClaims {
@@ -298,14 +319,22 @@ fn get_number_field(s: &prost_types::Struct, key: &str) -> Option<f64> {
 }
 
 /// Helper: convert a protobuf Struct field to a serde_json::Value (for nested structs like `act`).
-fn get_struct_field_as_json(s: &prost_types::Struct, key: &str) -> Option<serde_json::Value> {
-    s.fields.get(key).and_then(|v| {
-        if let Some(prost_types::value::Kind::StructValue(inner)) = &v.kind {
-            Some(prost_struct_to_json(inner))
-        } else {
-            None
-        }
-    })
+fn get_struct_field_as_json(
+    s: &prost_types::Struct,
+    key: &str,
+) -> Result<Option<serde_json::Value>, ExtAuthzError> {
+    match s.fields.get(key) {
+        None => Ok(None),
+        Some(v) => match &v.kind {
+            None | Some(prost_types::value::Kind::NullValue(_)) => Ok(None),
+            Some(prost_types::value::Kind::StructValue(inner)) => {
+                Ok(Some(prost_struct_to_json(inner)))
+            }
+            _ => Err(ExtAuthzError::JwtExtraction(format!(
+                "invalid {key} claim: expected object"
+            ))),
+        },
+    }
 }
 
 /// Convert a prost_types::Struct to serde_json::Value.
@@ -1115,10 +1144,40 @@ mod tests {
         });
 
         let req = check_request_with_bearer(&payload);
-        let ctx = parse_check_request(&req).unwrap();
+        let err = parse_check_request(&req).unwrap_err();
+        assert!(
+            matches!(err, ExtAuthzError::JwtExtraction(ref msg) if msg.contains("act claim")),
+            "oversized act chain must deny, not look first-party: {err}"
+        );
+    }
 
-        // The parse succeeds but act is None because validate_depth() rejects it
-        assert!(ctx.act.is_none());
+    #[test]
+    fn malformed_act_claim_does_not_look_first_party() {
+        let payload = serde_json::json!({
+            "sub": "550e8400-e29b-41d4-a716-446655440000",
+            "tid": "660e8400-e29b-41d4-a716-446655440000",
+            "roles": ["agent"],
+            "act": "not-an-object"
+        });
+        let req = check_request_with_bearer(&payload);
+        assert!(parse_check_request(&req).is_err());
+    }
+
+    #[test]
+    fn invalid_delegation_id_does_not_drop_silently() {
+        let payload = serde_json::json!({
+            "sub": "550e8400-e29b-41d4-a716-446655440000",
+            "tid": "660e8400-e29b-41d4-a716-446655440000",
+            "roles": ["agent"],
+            "act": {"sub": "770e8400-e29b-41d4-a716-446655440000"},
+            "delegation_id": "not-a-uuid"
+        });
+        let req = check_request_with_bearer(&payload);
+        let err = parse_check_request(&req).unwrap_err();
+        assert!(
+            matches!(err, ExtAuthzError::JwtExtraction(ref msg) if msg.contains("delegation_id")),
+            "invalid delegation_id must deny: {err}"
+        );
     }
 
     #[test]

@@ -298,12 +298,14 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
         match reader.read_event() {
             Ok(Event::Start(e)) => {
                 let local_name = e.local_name();
-                let name = std::str::from_utf8(local_name.as_ref()).unwrap_or("");
+                let name = crate::xml::decode_xml_name(local_name.as_ref())
+                    .map_err(SamlError::SignatureValidationFailed)?;
 
                 if name == "SignedInfo" {
                     in_signed_info = true;
                     // Capture the start tag, injecting any missing ancestor xmlns decls
-                    let full_tag = std::str::from_utf8(&e).unwrap_or("");
+                    let full_tag = crate::xml::decode_xml_name(e.as_ref())
+                        .map_err(SamlError::SignatureValidationFailed)?;
                     signed_info_content.push('<');
                     signed_info_content.push_str(full_tag);
                     // Inject ancestor namespace declarations not already on SignedInfo
@@ -315,14 +317,16 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
                     }
                     signed_info_content.push('>');
                 } else if in_signed_info {
-                    let full_tag = std::str::from_utf8(&e).unwrap_or("");
+                    let full_tag = crate::xml::decode_xml_name(e.as_ref())
+                        .map_err(SamlError::SignatureValidationFailed)?;
                     signed_info_content.push('<');
                     signed_info_content.push_str(full_tag);
                     signed_info_content.push('>');
                 } else {
                     // Collect xmlns:* declarations from ancestor elements
                     for attr in e.attributes().flatten() {
-                        let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                        let key = crate::xml::decode_xml_name(attr.key.as_ref())
+                            .map_err(SamlError::SignatureValidationFailed)?;
                         if let Some(prefix) = key.strip_prefix("xmlns:") {
                             let value = crate::xml::attribute_value(&attr)
                                 .map_err(SamlError::SignatureValidationFailed)?
@@ -340,7 +344,8 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
                     in_digest_value = true;
                 } else if name == "Reference" {
                     for attr in e.attributes().flatten() {
-                        let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                        let key = crate::xml::decode_xml_name(attr.key.as_ref())
+                            .map_err(SamlError::SignatureValidationFailed)?;
                         if key == "URI" {
                             reference_uri = crate::xml::attribute_value(&attr)
                                 .map_err(SamlError::SignatureValidationFailed)?
@@ -350,17 +355,20 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
                 }
             }
             Ok(Event::Empty(e)) if in_signed_info => {
-                let full_tag = std::str::from_utf8(&e).unwrap_or("");
+                let full_tag = crate::xml::decode_xml_name(e.as_ref())
+                    .map_err(SamlError::SignatureValidationFailed)?;
                 signed_info_content.push('<');
                 signed_info_content.push_str(full_tag);
                 signed_info_content.push_str("/>");
 
                 // Capture SignatureMethod and DigestMethod Algorithm attributes
                 let local_name_owned = e.local_name();
-                let local = std::str::from_utf8(local_name_owned.as_ref()).unwrap_or("");
+                let local = crate::xml::decode_xml_name(local_name_owned.as_ref())
+                    .map_err(SamlError::SignatureValidationFailed)?;
                 if local == "SignatureMethod" {
                     for attr in e.attributes().flatten() {
-                        let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                        let key = crate::xml::decode_xml_name(attr.key.as_ref())
+                            .map_err(SamlError::SignatureValidationFailed)?;
                         if key == "Algorithm" {
                             signature_algorithm = Some(
                                 crate::xml::attribute_value(&attr)
@@ -371,7 +379,8 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
                     }
                 } else if local == "DigestMethod" {
                     for attr in e.attributes().flatten() {
-                        let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                        let key = crate::xml::decode_xml_name(attr.key.as_ref())
+                            .map_err(SamlError::SignatureValidationFailed)?;
                         if key == "Algorithm" {
                             digest_algorithm = Some(
                                 crate::xml::attribute_value(&attr)
@@ -384,10 +393,12 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
             }
             Ok(Event::End(e)) => {
                 let local_name = e.local_name();
-                let local = std::str::from_utf8(local_name.as_ref()).unwrap_or("");
+                let local = crate::xml::decode_xml_name(local_name.as_ref())
+                    .map_err(SamlError::SignatureValidationFailed)?;
                 // Use the full qualified name (preserving namespace prefix) for correct C14N
                 let name_ref = e.name();
-                let full_name = std::str::from_utf8(name_ref.as_ref()).unwrap_or(local);
+                let full_name = crate::xml::decode_xml_name(name_ref.as_ref())
+                    .map_err(SamlError::SignatureValidationFailed)?;
 
                 if local == "SignedInfo" && in_signed_info {
                     signed_info_content.push_str("</");
@@ -530,7 +541,8 @@ fn extract_element_by_id(xml: &str, element_id: &str) -> SamlResult<String> {
             Ok(Event::Start(ref e)) => {
                 if !capturing {
                     for attr in e.attributes().flatten() {
-                        let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                        let key = crate::xml::decode_xml_name(attr.key.as_ref())
+                            .map_err(SamlError::SignatureValidationFailed)?;
                         // SECURITY: Use case-sensitive "ID" match per SAML 2.0 spec (XML ID type).
                         // Case-insensitive matching would find non-SAML elements with lowercase
                         // "id" attributes, enabling an XSW variant attack.
@@ -570,7 +582,8 @@ fn extract_element_by_id(xml: &str, element_id: &str) -> SamlResult<String> {
             }
             Ok(Event::Empty(ref e)) if !capturing => {
                 for attr in e.attributes().flatten() {
-                    let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                    let key = crate::xml::decode_xml_name(attr.key.as_ref())
+                        .map_err(SamlError::SignatureValidationFailed)?;
                     if key == "ID" {
                         let val = crate::xml::attribute_value(&attr)
                             .map_err(SamlError::SignatureValidationFailed)?;
@@ -626,7 +639,8 @@ fn remove_signature_element_parsed(xml: &str) -> SamlResult<String> {
         match reader.read_event() {
             Ok(Event::Start(ref e)) => {
                 let local_name = e.local_name();
-                let name = std::str::from_utf8(local_name.as_ref()).unwrap_or("");
+                let name = crate::xml::decode_xml_name(local_name.as_ref())
+                    .map_err(SamlError::SignatureValidationFailed)?;
                 if name == "Signature" && sig_depth == 0 {
                     sig_depth = 1;
                     sig_start_offset = Some(event_offset);
@@ -645,7 +659,8 @@ fn remove_signature_element_parsed(xml: &str) -> SamlResult<String> {
             }
             Ok(Event::Empty(ref e)) => {
                 let local_name = e.local_name();
-                let name = std::str::from_utf8(local_name.as_ref()).unwrap_or("");
+                let name = crate::xml::decode_xml_name(local_name.as_ref())
+                    .map_err(SamlError::SignatureValidationFailed)?;
                 if name == "Signature" && sig_depth == 0 {
                     let end_offset = reader.buffer_position() as usize;
                     sig_ranges.push((event_offset, end_offset));
@@ -814,6 +829,16 @@ t6Rp
                 && production.contains("map_err(SamlError::SignatureValidationFailed)")
                 && !production.contains("attribute_value(&attr).to_string()"),
             "SAML signature attributes must not become empty on decode failure"
+        );
+    }
+
+    #[test]
+    fn signature_names_do_not_default_to_empty_on_decode_error() {
+        let src = include_str!("signature_validator.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("decode_xml_name(") && !production.contains("unwrap_or(\"\")"),
+            "SAML signature names must not become empty on decode failure"
         );
     }
 }
