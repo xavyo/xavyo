@@ -137,7 +137,9 @@ impl SyncService {
             config.enabled = e;
         }
         if let Some(m) = mode {
-            config.sync_mode = m.parse().unwrap_or(SyncMode::Polling);
+            config.sync_mode = m
+                .parse::<SyncMode>()
+                .map_err(SyncServiceError::InvalidParameter)?;
         }
         if let Some(p) = polling_interval_secs {
             config.polling_interval_secs = p;
@@ -149,7 +151,9 @@ impl SyncService {
             config.rate_limit_per_minute = r;
         }
         if let Some(c) = conflict_resolution {
-            config.conflict_resolution = c.parse().unwrap_or(ConflictResolution::Manual);
+            config.conflict_resolution = c
+                .parse::<ConflictResolution>()
+                .map_err(SyncServiceError::InvalidParameter)?;
         }
 
         self.config_service
@@ -340,7 +344,9 @@ impl SyncService {
         resolved_by: Uuid,
     ) -> SyncServiceResult<()> {
         self.ensure_connector(tenant_id, connector_id).await?;
-        let strategy = resolution.parse().unwrap_or(ResolutionStrategy::Pending);
+        let strategy = resolution
+            .parse::<ResolutionStrategy>()
+            .map_err(SyncServiceError::InvalidParameter)?;
 
         self.conflict_detector
             .resolve(tenant_id, conflict_id, resolved_by, strategy, notes)
@@ -418,5 +424,20 @@ mod tests {
             src.contains(&list_call),
             "get_all_status must list tenant statuses, not return an empty vec"
         );
+    }
+
+    #[test]
+    fn update_and_resolve_do_not_silently_default_unknown_enums() {
+        let src = include_str!("sync_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(SyncMode::Polling)")
+                && !production.contains("unwrap_or(ConflictResolution::Manual)")
+                && !production.contains("unwrap_or(ResolutionStrategy::Pending)"),
+            "invalid sync mode/conflict/resolution must be 400, not a silent default"
+        );
+        assert!("nope".parse::<SyncMode>().is_err());
+        assert!("overwrite".parse::<ConflictResolution>().is_err());
+        assert!("drop".parse::<ResolutionStrategy>().is_err());
     }
 }

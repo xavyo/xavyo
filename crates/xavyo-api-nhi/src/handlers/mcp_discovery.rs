@@ -123,7 +123,8 @@ pub async fn discover_tools_handler(
         .await;
 
     // E1: Audit log the discovery operation
-    let user_id = Uuid::parse_str(&claims.sub).ok();
+    let user_id = Uuid::parse_str(&claims.sub)
+        .map_err(|_| NhiApiError::BadRequest("Invalid user ID".into()))?;
     tracing::info!(
         tenant_id = %tenant_uuid,
         actor_id = ?user_id,
@@ -274,6 +275,16 @@ mod tests {
         assert!(
             import.contains("GovNhiAuditEvent::create(") && import.contains(".await?;"),
             "MCP tool import must fail when NHI audit rows cannot be written"
+        );
+    }
+
+    #[test]
+    fn discover_requires_actor_uuid() {
+        let src = include_str!("mcp_discovery.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("Uuid::parse_str(&claims.sub).ok()"),
+            "MCP discovery must not drop a malformed JWT sub"
         );
     }
 }

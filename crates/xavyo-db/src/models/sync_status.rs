@@ -69,9 +69,8 @@ pub struct SyncStatus {
 
 impl SyncStatus {
     /// Get the current state enum.
-    #[must_use]
-    pub fn current_state(&self) -> SyncState {
-        self.current_state.parse().unwrap_or(SyncState::Idle)
+    pub fn current_state(&self) -> Result<SyncState, String> {
+        self.current_state.parse()
     }
 
     /// Get current rate as f64.
@@ -391,5 +390,16 @@ mod tests {
         assert_eq!(status.changes_pending, 0);
         assert_eq!(status.conflicts_pending, 0);
         assert!(!status.is_throttled);
+    }
+
+    #[test]
+    fn current_state_getter_does_not_default_to_idle() {
+        let src = include_str!("sync_status.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(SyncState::Idle)"),
+            "unknown sync state must not silently become idle"
+        );
+        assert!("nope".parse::<SyncState>().is_err());
     }
 }

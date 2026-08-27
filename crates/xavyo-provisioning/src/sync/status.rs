@@ -6,7 +6,7 @@ use sqlx::PgPool;
 use tracing::instrument;
 use uuid::Uuid;
 
-use super::error::SyncResult;
+use super::error::{SyncError, SyncResult};
 use super::types::SyncState;
 
 /// Real-time sync status for a connector.
@@ -102,7 +102,7 @@ impl SyncStatusManager {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(SyncStatusRow::into_status))
+        result.map(SyncStatusRow::into_status).transpose()
     }
 
     /// Initialize status for a new connector.
@@ -124,7 +124,7 @@ impl SyncStatusManager {
         .fetch_one(&self.pool)
         .await?;
 
-        Ok(result.into_status())
+        result.into_status()
     }
 
     /// Mark sync as started.
@@ -153,7 +153,7 @@ impl SyncStatusManager {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(SyncStatusRow::into_status))
+        result.map(SyncStatusRow::into_status).transpose()
     }
 
     /// Mark sync as completed.
@@ -184,7 +184,7 @@ impl SyncStatusManager {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(SyncStatusRow::into_status))
+        result.map(SyncStatusRow::into_status).transpose()
     }
 
     /// Set error state.
@@ -214,7 +214,7 @@ impl SyncStatusManager {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(SyncStatusRow::into_status))
+        result.map(SyncStatusRow::into_status).transpose()
     }
 
     /// Update throttling status.
@@ -246,7 +246,7 @@ impl SyncStatusManager {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(SyncStatusRow::into_status))
+        result.map(SyncStatusRow::into_status).transpose()
     }
 
     /// Update pending counts.
@@ -278,7 +278,7 @@ impl SyncStatusManager {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(SyncStatusRow::into_status))
+        result.map(SyncStatusRow::into_status).transpose()
     }
 
     /// Update current processing rate.
@@ -307,7 +307,7 @@ impl SyncStatusManager {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(SyncStatusRow::into_status))
+        result.map(SyncStatusRow::into_status).transpose()
     }
 
     /// List all statuses for a tenant.
@@ -328,7 +328,7 @@ impl SyncStatusManager {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(SyncStatusRow::into_status).collect())
+        rows.into_iter().map(SyncStatusRow::into_status).collect()
     }
 }
 
@@ -350,11 +350,14 @@ struct SyncStatusRow {
 }
 
 impl SyncStatusRow {
-    fn into_status(self) -> SyncStatus {
-        SyncStatus {
+    fn into_status(self) -> SyncResult<SyncStatus> {
+        Ok(SyncStatus {
             connector_id: self.connector_id,
             tenant_id: self.tenant_id,
-            current_state: self.current_state.parse().unwrap_or(SyncState::Idle),
+            current_state: self
+                .current_state
+                .parse()
+                .map_err(|e| SyncError::Configuration { message: e })?,
             last_sync_started_at: self.last_sync_started_at,
             last_sync_completed_at: self.last_sync_completed_at,
             last_sync_error: self.last_sync_error,
@@ -364,7 +367,7 @@ impl SyncStatusRow {
             current_rate: self.current_rate,
             is_throttled: self.is_throttled,
             updated_at: self.updated_at,
-        }
+        })
     }
 }
 
@@ -384,5 +387,16 @@ mod tests {
         assert_eq!(status.current_state, SyncState::Idle);
         assert!(!status.is_syncing());
         assert!(!status.has_error());
+    }
+
+    #[test]
+    fn into_status_does_not_default_unknown_state() {
+        let src = include_str!("status.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(SyncState::Idle)"),
+            "unknown stored sync state must not silently become idle"
+        );
+        assert!("nope".parse::<SyncState>().is_err());
     }
 }
