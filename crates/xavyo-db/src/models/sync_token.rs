@@ -55,9 +55,8 @@ pub struct SyncToken {
 
 impl SyncToken {
     /// Get the token type enum.
-    #[must_use]
-    pub fn token_type(&self) -> SyncTokenType {
-        self.token_type.parse().unwrap_or(SyncTokenType::Batch)
+    pub fn token_type(&self) -> Result<SyncTokenType, String> {
+        self.token_type.parse()
     }
 
     /// Create a new sync token.
@@ -291,5 +290,16 @@ mod tests {
         assert_eq!(token.token_value, "abc123");
         assert_eq!(token.token_type, SyncTokenType::Batch);
         assert_eq!(token.sequence_number, 0);
+    }
+
+    #[test]
+    fn token_type_getter_does_not_default_to_batch() {
+        let src = include_str!("sync_token.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(SyncTokenType::Batch)"),
+            "unknown sync token type must not silently become batch"
+        );
+        assert!("nope".parse::<SyncTokenType>().is_err());
     }
 }

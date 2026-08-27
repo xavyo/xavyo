@@ -183,23 +183,18 @@ pub struct ReconciliationDiscrepancy {
 
 impl ReconciliationDiscrepancy {
     /// Get discrepancy type enum.
-    #[must_use]
-    pub fn discrepancy_type(&self) -> ReconciliationDiscrepancyType {
-        self.discrepancy_type
-            .parse()
-            .unwrap_or(ReconciliationDiscrepancyType::Orphan)
+    pub fn discrepancy_type(&self) -> Result<ReconciliationDiscrepancyType, String> {
+        self.discrepancy_type.parse()
     }
 
     /// Get resolution status enum.
-    #[must_use]
-    pub fn resolution_status(&self) -> ReconciliationResolutionStatus {
-        self.resolution_status.parse().unwrap_or_default()
+    pub fn resolution_status(&self) -> Result<ReconciliationResolutionStatus, String> {
+        self.resolution_status.parse()
     }
 
     /// Get resolved action enum.
-    #[must_use]
-    pub fn resolved_action(&self) -> Option<ReconciliationActionType> {
-        self.resolved_action.as_ref().and_then(|s| s.parse().ok())
+    pub fn resolved_action(&self) -> Result<Option<ReconciliationActionType>, String> {
+        self.resolved_action.as_ref().map(|s| s.parse()).transpose()
     }
 
     /// Create a new discrepancy.
@@ -655,5 +650,19 @@ mod tests {
             !production.contains("JOIN gov_connector_reconciliation_runs r ON d.run_id = r.id\n"),
             "must not join reconciliation runs by id alone"
         );
+    }
+
+    #[test]
+    fn discrepancy_enums_do_not_silently_default() {
+        let src = include_str!("reconciliation_discrepancy.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(ReconciliationDiscrepancyType::Orphan)")
+                && !production.contains("unwrap_or_default()")
+                && !production.contains("s.parse().ok()"),
+            "unknown discrepancy type/status/action must not silently default or drop"
+        );
+        assert!("nope".parse::<ReconciliationDiscrepancyType>().is_err());
+        assert!("bogus".parse::<ReconciliationResolutionStatus>().is_err());
     }
 }

@@ -6,7 +6,7 @@ use sqlx::PgPool;
 use tracing::instrument;
 use uuid::Uuid;
 
-use super::error::SyncResult;
+use super::error::{SyncError, SyncResult};
 
 /// Token type indicating precision of resumption.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -138,7 +138,7 @@ impl SyncTokenManager {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(SyncTokenRow::into_token))
+        result.map(SyncTokenRow::into_token).transpose()
     }
 
     /// Get a valid token (returns None if token is invalid).
@@ -161,7 +161,7 @@ impl SyncTokenManager {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(SyncTokenRow::into_token))
+        result.map(SyncTokenRow::into_token).transpose()
     }
 
     /// Create or update a token.
@@ -192,7 +192,7 @@ impl SyncTokenManager {
         .fetch_one(&self.pool)
         .await?;
 
-        Ok(result.into_token())
+        result.into_token()
     }
 
     /// Update the token with optimistic locking.
@@ -228,7 +228,7 @@ impl SyncTokenManager {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(SyncTokenRow::into_token))
+        result.map(SyncTokenRow::into_token).transpose()
     }
 
     /// Invalidate a token (triggers full resync on next sync).
@@ -301,19 +301,22 @@ struct SyncTokenRow {
 }
 
 impl SyncTokenRow {
-    fn into_token(self) -> SyncToken {
-        SyncToken {
+    fn into_token(self) -> SyncResult<SyncToken> {
+        Ok(SyncToken {
             id: self.id,
             tenant_id: self.tenant_id,
             connector_id: self.connector_id,
             token_value: self.token_value,
-            token_type: self.token_type.parse().unwrap_or(TokenType::Batch),
+            token_type: self
+                .token_type
+                .parse()
+                .map_err(|e| SyncError::Configuration { message: e })?,
             sequence_number: self.sequence_number,
             last_processed_at: self.last_processed_at,
             is_valid: self.is_valid,
             created_at: self.created_at,
             updated_at: self.updated_at,
-        }
+        })
     }
 }
 
@@ -348,6 +351,17 @@ mod tests {
         assert_eq!(token.token_type, TokenType::Precise);
         assert!(token.can_resume());
         assert!(token.is_valid);
+    }
+
+    #[test]
+    fn into_token_does_not_default_unknown_type() {
+        let src = include_str!("token.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(TokenType::Batch)"),
+            "unknown stored sync token type must not silently become batch"
+        );
+        assert!("nope".parse::<TokenType>().is_err());
     }
 
     #[test]

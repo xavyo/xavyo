@@ -126,17 +126,13 @@ pub struct ConnectorReconciliationRun {
 
 impl ConnectorReconciliationRun {
     /// Get the mode enum.
-    #[must_use]
-    pub fn mode(&self) -> ConnectorReconciliationMode {
-        self.mode.parse().unwrap_or_default()
+    pub fn mode(&self) -> Result<ConnectorReconciliationMode, String> {
+        self.mode.parse()
     }
 
     /// Get the status enum.
-    #[must_use]
-    pub fn status(&self) -> ConnectorReconciliationStatus {
-        self.status
-            .parse()
-            .unwrap_or(ConnectorReconciliationStatus::Pending)
+    pub fn status(&self) -> Result<ConnectorReconciliationStatus, String> {
+        self.status.parse()
     }
 
     /// Create a new reconciliation run.
@@ -562,5 +558,18 @@ mod tests {
         assert!(!ConnectorReconciliationStatus::Completed.can_resume());
         assert!(ConnectorReconciliationStatus::Failed.can_resume());
         assert!(ConnectorReconciliationStatus::Cancelled.can_resume());
+    }
+
+    #[test]
+    fn recon_run_mode_and_status_do_not_silently_default() {
+        let src = include_str!("connector_reconciliation_run.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or_default()")
+                && !production.contains("unwrap_or(ConnectorReconciliationStatus::Pending)"),
+            "unknown recon run mode/status must not silently default"
+        );
+        assert!("nope".parse::<ConnectorReconciliationMode>().is_err());
+        assert!("bogus".parse::<ConnectorReconciliationStatus>().is_err());
     }
 }
