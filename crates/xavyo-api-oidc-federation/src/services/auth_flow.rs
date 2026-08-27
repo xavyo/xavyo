@@ -331,7 +331,9 @@ impl AuthFlowService {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
             .build()
-            .unwrap_or_else(|_| reqwest::Client::new());
+            .map_err(|e| {
+                FederationError::InvalidConfiguration(format!("Failed to create HTTP client: {e}"))
+            })?;
 
         let params = [
             ("grant_type", "authorization_code"),
@@ -540,4 +542,26 @@ struct TokenResponse {
     expires_in: Option<i64>,
     #[allow(dead_code)]
     token_type: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn token_exchange_http_client_does_not_drop_timeout() {
+        let src = include_str!("auth_flow.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let exchange = production
+            .split("async fn exchange_code")
+            .nth(1)
+            .and_then(|s| s.split("async fn ").next())
+            .expect("exchange_code");
+        assert!(
+            exchange.contains("map_err(") && !exchange.contains("Client::new()"),
+            "token exchange must not fall back to an unconfigured HTTP client"
+        );
+        assert!(
+            exchange.contains("Failed to create HTTP client"),
+            "HTTP client build failure must surface as configuration error"
+        );
+    }
 }

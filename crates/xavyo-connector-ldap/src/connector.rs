@@ -334,18 +334,22 @@ impl LdapConnector {
 /// Extra structural/auxiliary classes required by RFC 4512 / AD for a create.
 ///
 /// Known classes must not be created with only `top` plus the primary name.
-fn extra_structural_classes(object_class: &str) -> &'static [&'static str] {
+fn extra_structural_classes(object_class: &str) -> ConnectorResult<&'static [&'static str]> {
     match object_class.to_lowercase().as_str() {
-        "inetorgperson" | "user" => &["top", "person", "organizationalPerson"],
-        "organizationalperson" => &["top", "person"],
-        "person" => &["top"],
-        "posixaccount" => &["top", "account"],
-        "computer" => &["top", "person", "organizationalPerson", "user"],
-        "group" | "groupofnames" => &["top", "groupOfNames"],
-        "groupofuniquenames" => &["top", "groupOfUniqueNames"],
-        "posixgroup" => &["top", "posixGroup"],
-        "organizationalunit" => &["top"],
-        _ => &["top"],
+        "inetorgperson" | "user" => Ok(&["top", "person", "organizationalPerson"]),
+        "organizationalperson" => Ok(&["top", "person"]),
+        "person" => Ok(&["top"]),
+        "posixaccount" => Ok(&["top", "account"]),
+        "computer" => Ok(&["top", "person", "organizationalPerson", "user"]),
+        "group" | "groupofnames" => Ok(&["top", "groupOfNames"]),
+        "groupofuniquenames" => Ok(&["top", "groupOfUniqueNames"]),
+        "posixgroup" => Ok(&["top", "posixGroup"]),
+        "organizationalunit" => Ok(&["top"]),
+        other => Err(ConnectorError::InvalidData {
+            message: format!(
+                "Unsupported object class '{other}' for LDAP create objectClass hierarchy"
+            ),
+        }),
     }
 }
 
@@ -1025,7 +1029,7 @@ impl CreateOp for LdapConnector {
 
         let mut oc_set = std::collections::HashSet::new();
         oc_set.insert(object_class.to_string());
-        for extra in extra_structural_classes(object_class) {
+        for extra in extra_structural_classes(object_class)? {
             oc_set.insert(extra.to_string());
         }
         ldap_attrs.push(("objectClass".to_string(), oc_set));
@@ -1510,24 +1514,31 @@ mod tests {
 
     #[test]
     fn ldap_create_adds_structural_parents() {
-        let group: std::collections::HashSet<&str> =
-            extra_structural_classes("group").iter().copied().collect();
+        let group: std::collections::HashSet<&str> = extra_structural_classes("group")
+            .unwrap()
+            .iter()
+            .copied()
+            .collect();
         assert!(group.contains("top") && group.contains("groupOfNames"));
         let posix: std::collections::HashSet<&str> = extra_structural_classes("posixGroup")
+            .unwrap()
             .iter()
             .copied()
             .collect();
         assert!(posix.contains("posixGroup") && posix.contains("top"));
         let computer: std::collections::HashSet<&str> = extra_structural_classes("computer")
+            .unwrap()
             .iter()
             .copied()
             .collect();
         assert!(computer.contains("user") && computer.contains("person"));
         let ou: std::collections::HashSet<&str> = extra_structural_classes("organizationalUnit")
+            .unwrap()
             .iter()
             .copied()
             .collect();
         assert!(ou.contains("top"));
+        assert!(extra_structural_classes("mysteryClass").is_err());
 
         let src = include_str!("connector.rs");
         let production = src.split("mod tests").next().expect("production source");
