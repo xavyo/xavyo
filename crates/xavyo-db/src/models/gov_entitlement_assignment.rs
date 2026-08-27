@@ -550,26 +550,49 @@ impl GovEntitlementAssignment {
         .await
     }
 
-    /// List all parametric assignments for a user on a specific role.
+    /// List parametric assignments for a user on a specific role.
+    ///
+    /// When `include_inactive` is false, only active and currently valid rows
+    /// are returned — the same rules as `list_active_parametric_by_user`.
     pub async fn list_parametric_by_user_and_role(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         user_id: Uuid,
         entitlement_id: Uuid,
+        include_inactive: bool,
     ) -> Result<Vec<Self>, sqlx::Error> {
-        sqlx::query_as(
-            r"
-            SELECT * FROM gov_entitlement_assignments
-            WHERE tenant_id = $1 AND target_type = 'user' AND target_id = $2
-                AND entitlement_id = $3 AND parameter_hash IS NOT NULL
-            ORDER BY assigned_at DESC
-            ",
-        )
-        .bind(tenant_id)
-        .bind(user_id)
-        .bind(entitlement_id)
-        .fetch_all(pool)
-        .await
+        if include_inactive {
+            sqlx::query_as(
+                r"
+                SELECT * FROM gov_entitlement_assignments
+                WHERE tenant_id = $1 AND target_type = 'user' AND target_id = $2
+                    AND entitlement_id = $3 AND parameter_hash IS NOT NULL
+                ORDER BY assigned_at DESC
+                ",
+            )
+            .bind(tenant_id)
+            .bind(user_id)
+            .bind(entitlement_id)
+            .fetch_all(pool)
+            .await
+        } else {
+            sqlx::query_as(
+                r"
+                SELECT * FROM gov_entitlement_assignments
+                WHERE tenant_id = $1 AND target_type = 'user' AND target_id = $2
+                    AND entitlement_id = $3 AND parameter_hash IS NOT NULL
+                    AND status = 'active'
+                    AND (valid_from IS NULL OR valid_from <= NOW())
+                    AND (valid_to IS NULL OR valid_to > NOW())
+                ORDER BY assigned_at DESC
+                ",
+            )
+            .bind(tenant_id)
+            .bind(user_id)
+            .bind(entitlement_id)
+            .fetch_all(pool)
+            .await
+        }
     }
 
     /// List all currently active parametric assignments for a user.

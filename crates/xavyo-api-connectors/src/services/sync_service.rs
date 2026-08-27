@@ -333,8 +333,11 @@ impl SyncService {
             .get_pending(tenant_id, connector_id, limit)
             .await
             .map_err(|e| SyncServiceError::Sync(e.to_string()))?;
-
-        let total = conflicts.len() as i64;
+        let total = self
+            .conflict_detector
+            .count_pending(tenant_id, connector_id)
+            .await
+            .map_err(|e| SyncServiceError::Sync(e.to_string()))?;
         Ok((conflicts, total))
     }
 
@@ -397,6 +400,21 @@ mod tests {
         );
         let msg = err.to_string().to_lowercase();
         assert!(!msg.contains("success"), "{msg}");
+    }
+
+    #[test]
+    fn list_conflicts_counts_pending_not_page_length() {
+        let src = include_str!("sync_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_conflicts")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_conflicts");
+        assert!(
+            list.contains("count_pending(") && !list.contains("conflicts.len() as i64"),
+            "GET sync conflicts must report the pending count, not the page length"
+        );
     }
 
     #[test]

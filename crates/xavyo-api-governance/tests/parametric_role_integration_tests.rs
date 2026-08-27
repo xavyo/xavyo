@@ -331,7 +331,7 @@ async fn test_multiple_assignments_different_params() {
 
     // Verify all assignments exist
     let assignments = xavyo_db::GovEntitlementAssignment::list_parametric_by_user_and_role(
-        &pool, tenant_id, user_id, role_id,
+        &pool, tenant_id, user_id, role_id, true,
     )
     .await
     .expect("Failed to list assignments");
@@ -355,7 +355,7 @@ async fn test_multiple_assignments_different_params() {
         .expect("Failed to revoke");
 
     let remaining = xavyo_db::GovEntitlementAssignment::list_parametric_by_user_and_role(
-        &pool, tenant_id, user_id, role_id,
+        &pool, tenant_id, user_id, role_id, true,
     )
     .await
     .expect("Failed to list remaining");
