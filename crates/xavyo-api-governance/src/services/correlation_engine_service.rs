@@ -347,8 +347,8 @@ impl CorrelationEngineService {
             CorrelationOutcome::AmbiguousMatch => GovCorrelationOutcome::CollisionDetected,
         };
 
-        let rules_snapshot = serde_json::to_value(
-            rules
+        let rules_snapshot = correlation_json(
+            &rules
                 .iter()
                 .map(|r| {
                     serde_json::json!({
@@ -361,8 +361,7 @@ impl CorrelationEngineService {
                     })
                 })
                 .collect::<Vec<_>>(),
-        )
-        .unwrap_or_default();
+        )?;
 
         let thresholds_snapshot = serde_json::json!({
             "auto_confirm_threshold": auto_confirm,
@@ -371,8 +370,8 @@ impl CorrelationEngineService {
             "tuning_mode": thresholds.tuning_mode,
         });
 
-        let candidates_summary = serde_json::to_value(
-            candidates_above_review
+        let candidates_summary = correlation_json(
+            &candidates_above_review
                 .iter()
                 .take(10) // cap summary size
                 .map(|c| {
@@ -383,10 +382,9 @@ impl CorrelationEngineService {
                     })
                 })
                 .collect::<Vec<_>>(),
-        )
-        .unwrap_or_default();
+        )?;
 
-        let confidence_decimal = Decimal::try_from(confidence).ok();
+        let confidence_decimal = Some(f64_to_decimal(confidence)?);
 
         let _audit = GovCorrelationAuditEvent::create(
             &self.pool,
@@ -546,7 +544,7 @@ impl CorrelationEngineService {
                 .unwrap_or("unknown")
                 .to_string();
 
-            let highest_confidence_decimal = Decimal::try_from(confidence).unwrap_or(Decimal::ZERO);
+            let highest_confidence_decimal = f64_to_decimal(confidence)?;
 
             let case = GovCorrelationCase::create(
                 &self.pool,
@@ -590,8 +588,7 @@ impl CorrelationEngineService {
                             .collect(),
                         aggregate_confidence: c.aggregate_confidence,
                     };
-                    let agg_decimal =
-                        Decimal::try_from(c.aggregate_confidence).unwrap_or(Decimal::ZERO);
+                    let agg_decimal = f64_to_decimal(c.aggregate_confidence)?;
 
                     // Extract display name: prefer display_name, fall back to email.
                     let display_name = c
@@ -601,7 +598,7 @@ impl CorrelationEngineService {
                         .or_else(|| c.identity_attributes.get("email").and_then(|v| v.as_str()))
                         .map(String::from);
 
-                    CreateGovCorrelationCandidate {
+                    Ok(CreateGovCorrelationCandidate {
                         case_id: case.id,
                         identity_id: c.identity_id,
                         identity_display_name: display_name,
@@ -610,9 +607,9 @@ impl CorrelationEngineService {
                         per_attribute_scores: per_attr,
                         is_deactivated: false,
                         is_definitive_match: c.has_definitive_match,
-                    }
+                    })
                 })
-                .collect();
+                .collect::<Result<Vec<_>>>()?;
 
             if !candidate_inputs.is_empty() {
                 GovCorrelationCandidate::create_batch(&self.pool, candidate_inputs).await?;
@@ -1597,6 +1594,19 @@ fn decimal_to_f64(d: Decimal) -> Result<f64> {
         .ok_or_else(|| GovernanceError::Validation("Invalid stored decimal value".to_string()))
 }
 
+/// Persist a confidence score. Non-finite values must not look like 0.0.
+fn f64_to_decimal(value: f64) -> Result<Decimal> {
+    Decimal::try_from(value).map_err(|e| {
+        GovernanceError::Validation(format!("Invalid correlation confidence {value}: {e}"))
+    })
+}
+
+/// Correlation audit JSON. Serialize errors must not store empty snapshots.
+fn correlation_json<T: Serialize>(value: &T) -> Result<serde_json::Value> {
+    serde_json::to_value(value)
+        .map_err(|e| GovernanceError::Validation(format!("Invalid correlation JSON: {e}")))
+}
+
 /// Extract a string attribute from a JSON object.
 ///
 /// Supports nested access via dot notation (e.g., "address.city").
@@ -2048,6 +2058,26 @@ mod tests {
         assert!(
             !production.contains("unwrap_or(0.0)"),
             "correlation engine decimals must not become 0.0 (auto-confirm all)"
+        );
+    }
+
+    #[test]
+    fn correlation_audit_and_confidence_do_not_default() {
+        assert!(f64_to_decimal(0.85).is_ok());
+        assert!(f64_to_decimal(f64::NAN).is_err());
+        assert!(correlation_json(&serde_json::json!({"id": 1})).is_ok());
+        let src = include_str!("correlation_engine_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("correlation_json(")
+                && !production.contains("unwrap_or(Decimal::ZERO)"),
+            "correlation audit snapshots must not store empty JSON on serialize error"
+        );
+        assert!(
+            production.contains("f64_to_decimal(")
+                && !production.contains("unwrap_or(Decimal::ZERO)")
+                && !production.contains("Decimal::try_from(confidence).ok()"),
+            "correlation confidence must not become 0.0 or NULL on convert error"
         );
     }
 

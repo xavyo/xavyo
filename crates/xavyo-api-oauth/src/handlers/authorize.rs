@@ -99,7 +99,7 @@ pub async fn authorize_handler(
     let (csrf_token, csrf_sig) = csrf::generate_csrf_token(csrf_secret);
 
     // Build the consent/login URL with all parameters preserved, including CSRF
-    let frontend_base = state.frontend_url.as_deref().unwrap_or("");
+    let frontend_base = required_frontend_url(state.frontend_url.as_deref())?;
     let consent_url = format!(
         "{frontend_base}/oauth/authorize?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}&code_challenge={}&code_challenge_method={}{}{}&csrf_token={}&csrf_sig={}&tenant={}",
         urlencoding::encode(&request.client_id),
@@ -218,4 +218,35 @@ pub(crate) fn extract_tenant_from_request(
         tracing::warn!(tenant_str = %tenant_str, "Invalid tenant ID format");
         OAuthError::InvalidRequest("Invalid tenant ID format".to_string())
     })
+}
+
+/// Consent redirect base. Missing frontend URL must not become a relative path.
+fn required_frontend_url(frontend_url: Option<&str>) -> Result<&str, OAuthError> {
+    frontend_url
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| OAuthError::Internal("frontend_url is not configured".to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn consent_redirect_requires_frontend_url() {
+        assert_eq!(
+            required_frontend_url(Some("https://app.example.com")).unwrap(),
+            "https://app.example.com"
+        );
+        assert!(required_frontend_url(None).is_err());
+        assert!(required_frontend_url(Some("")).is_err());
+        assert!(required_frontend_url(Some("   ")).is_err());
+        let src = include_str!("authorize.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("required_frontend_url(")
+                && !production.contains("unwrap_or(\"\")"),
+            "OAuth consent redirect must not use an empty frontend_url"
+        );
+    }
 }
