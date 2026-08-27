@@ -403,7 +403,7 @@ impl IdentityMergeService {
             sqlx::query("SAVEPOINT sp_groups")
                 .execute(&mut *tx)
                 .await
-                .ok();
+                .map_err(GovernanceError::Database)?;
             match self
                 .transfer_group_memberships(
                     &mut *tx,
@@ -417,16 +417,14 @@ impl IdentityMergeService {
                     sqlx::query("RELEASE SAVEPOINT sp_groups")
                         .execute(&mut *tx)
                         .await
-                        .ok();
+                        .map_err(GovernanceError::Database)?;
                     count
                 }
                 Err(e) => {
-                    tracing::debug!(error = %e, "Group membership transfer failed, rolling back savepoint");
-                    sqlx::query("ROLLBACK TO SAVEPOINT sp_groups")
+                    let _ = sqlx::query("ROLLBACK TO SAVEPOINT sp_groups")
                         .execute(&mut *tx)
-                        .await
-                        .ok();
-                    0
+                        .await;
+                    return Err(e);
                 }
             }
         };
@@ -436,7 +434,7 @@ impl IdentityMergeService {
             sqlx::query("SAVEPOINT sp_access_requests")
                 .execute(&mut *tx)
                 .await
-                .ok();
+                .map_err(GovernanceError::Database)?;
             match self
                 .handle_pending_access_requests(
                     &mut *tx,
@@ -450,16 +448,14 @@ impl IdentityMergeService {
                     sqlx::query("RELEASE SAVEPOINT sp_access_requests")
                         .execute(&mut *tx)
                         .await
-                        .ok();
+                        .map_err(GovernanceError::Database)?;
                     count
                 }
                 Err(e) => {
-                    tracing::debug!(error = %e, "Access request cancellation failed, rolling back savepoint");
-                    sqlx::query("ROLLBACK TO SAVEPOINT sp_access_requests")
+                    let _ = sqlx::query("ROLLBACK TO SAVEPOINT sp_access_requests")
                         .execute(&mut *tx)
-                        .await
-                        .ok();
-                    0
+                        .await;
+                    return Err(e);
                 }
             }
         };
@@ -469,7 +465,7 @@ impl IdentityMergeService {
             sqlx::query("SAVEPOINT sp_ownerships")
                 .execute(&mut *tx)
                 .await
-                .ok();
+                .map_err(GovernanceError::Database)?;
             match self
                 .transfer_ownerships(
                     &mut tx,
@@ -483,16 +479,14 @@ impl IdentityMergeService {
                     sqlx::query("RELEASE SAVEPOINT sp_ownerships")
                         .execute(&mut *tx)
                         .await
-                        .ok();
+                        .map_err(GovernanceError::Database)?;
                     count
                 }
                 Err(e) => {
-                    tracing::debug!(error = %e, "Ownership transfer failed, rolling back savepoint");
-                    sqlx::query("ROLLBACK TO SAVEPOINT sp_ownerships")
+                    let _ = sqlx::query("ROLLBACK TO SAVEPOINT sp_ownerships")
                         .execute(&mut *tx)
-                        .await
-                        .ok();
-                    0
+                        .await;
+                    return Err(e);
                 }
             }
         };
@@ -1515,6 +1509,11 @@ mod tests {
         assert!(
             !production.contains("if let Ok(res) = app_result"),
             "must not swallow ownership transfer"
+        );
+        assert!(
+            production.matches("return Err(e);").count() >= 3
+                && !production.contains("Group membership transfer failed, rolling back savepoint"),
+            "merge must not report success with 0 groups/requests/ownerships transferred"
         );
     }
 

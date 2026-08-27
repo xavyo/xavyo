@@ -169,14 +169,20 @@ impl IdTokenClaimsBuilder {
     }
 
     /// Build the ID token claims.
-    #[must_use]
-    pub fn build(self) -> IdTokenClaims {
+    ///
+    /// Missing `iss`/`sub`/`aud` must not become empty strings in a signed JWT.
+    pub fn build(self) -> Result<IdTokenClaims, OAuthError> {
         let now = Utc::now().timestamp();
+        let required = |value: Option<String>, field: &str| {
+            value
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| OAuthError::Internal(format!("ID token {field} is required")))
+        };
 
-        IdTokenClaims {
-            iss: self.iss.unwrap_or_default(),
-            sub: self.sub.unwrap_or_default(),
-            aud: self.aud.unwrap_or_default(),
+        Ok(IdTokenClaims {
+            iss: required(self.iss, "iss")?,
+            sub: required(self.sub, "sub")?,
+            aud: required(self.aud, "aud")?,
             exp: self.exp.unwrap_or(now + ID_TOKEN_EXPIRY_SECS),
             iat: self.iat.unwrap_or(now),
             auth_time: self.auth_time,
@@ -184,7 +190,7 @@ impl IdTokenClaimsBuilder {
             tid: self.tid,
             at_hash: self.at_hash,
             sid: self.sid,
-        }
+        })
     }
 }
 
@@ -453,7 +459,7 @@ impl TokenService {
             .auth_time(auth_time)
             .nonce(nonce)
             .expires_in_secs(ID_TOKEN_EXPIRY_SECS)
-            .build();
+            .build()?;
 
         // Encode the token with key ID
         let key = jsonwebtoken::EncodingKey::from_rsa_pem(&self.private_key).map_err(|e| {
@@ -1341,7 +1347,7 @@ xxU7T7aU32bKZLygCDtwsN8=
                 .auth_time(auth_time)
                 .nonce(nonce)
                 .expires_in_secs(ID_TOKEN_EXPIRY_SECS)
-                .build();
+                .build()?;
 
             let key = jsonwebtoken::EncodingKey::from_rsa_pem(&self.private_key)
                 .map_err(|e| OAuthError::Internal(format!("Invalid signing key: {e}")))?;
@@ -1472,7 +1478,8 @@ xxU7T7aU32bKZLygCDtwsN8=
             .auth_time(auth_time)
             .nonce(Some("test-nonce"))
             .expires_in_secs(3600)
-            .build();
+            .build()
+            .unwrap();
 
         assert_eq!(claims.iss, "https://idp.test.xavyo.com");
         assert_eq!(claims.sub, "user-123");
@@ -1488,7 +1495,8 @@ xxU7T7aU32bKZLygCDtwsN8=
             .issuer("https://idp.test.xavyo.com")
             .subject("user-123")
             .audience("test-client")
-            .build();
+            .build()
+            .unwrap();
 
         let json = serde_json::to_string(&claims).unwrap();
         let deserialized: IdTokenClaims = serde_json::from_str(&json).unwrap();
@@ -1504,9 +1512,21 @@ xxU7T7aU32bKZLygCDtwsN8=
             .issuer("issuer")
             .subject("sub")
             .audience("aud")
-            .build();
+            .build()
+            .unwrap();
 
         let json = serde_json::to_string(&claims).unwrap();
+
+        assert!(IdTokenClaims::builder().build().is_err());
+        assert!(IdTokenClaims::builder().issuer("iss").build().is_err());
+        let src = include_str!("token.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("iss: self.iss.unwrap_or_default()")
+                && !production.contains("sub: self.sub.unwrap_or_default()")
+                && !production.contains("aud: self.aud.unwrap_or_default()"),
+            "ID tokens must not sign empty iss/sub/aud"
+        );
 
         // Optional fields should not be present in JSON
         assert!(!json.contains("auth_time"));
