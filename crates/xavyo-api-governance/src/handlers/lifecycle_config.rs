@@ -892,7 +892,13 @@ pub async fn get_user_lifecycle_status(
 
             let to_state = GovLifecycleState::find_by_id(pool, tenant_id, transition.to_state_id)
                 .await
-                .map_err(crate::error::ApiGovernanceError::Database)?;
+                .map_err(crate::error::ApiGovernanceError::Database)?
+                .ok_or_else(|| {
+                    crate::error::ApiGovernanceError::NotFound(format!(
+                        "Lifecycle state {} not found",
+                        transition.to_state_id
+                    ))
+                })?;
 
             // Evaluate conditions using evaluate_conditions method
             let result = condition_evaluator
@@ -914,7 +920,7 @@ pub async fn get_user_lifecycle_status(
                     from_state_id: transition.from_state_id,
                     from_state_name: current.name.clone(),
                     to_state_id: transition.to_state_id,
-                    to_state_name: to_state.map(|s| s.name).unwrap_or_default(),
+                    to_state_name: to_state.name,
                     requires_approval: transition.requires_approval,
                     approval_workflow_id: transition.approval_workflow_id,
                     grace_period_hours: transition.grace_period_hours,
@@ -1004,6 +1010,10 @@ mod tests {
                 && !production.contains("to_value(actions).ok()")
                 && !production.contains("from_value(v.clone()).ok()"),
             "lifecycle state actions and conditions must fail closed on JSON serialize/parse"
+        );
+        assert!(
+            !production.contains("to_state.map(|s| s.name).unwrap_or_default()"),
+            "user lifecycle status must not hide a missing to-state as an empty name"
         );
     }
 }

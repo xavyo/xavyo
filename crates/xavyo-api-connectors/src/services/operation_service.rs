@@ -17,6 +17,8 @@ use xavyo_db::models::{
 };
 use xavyo_provisioning::{EnqueueResult, OperationQueue, QueueConfig, QueuedOperation};
 
+use crate::error::ConnectorApiError;
+
 /// Operation service errors.
 #[derive(Debug, Error)]
 pub enum OperationServiceError {
@@ -826,26 +828,18 @@ pub struct ConflictResponse {
     pub is_pending: bool,
 }
 
-impl From<&xavyo_db::models::ConflictRecord> for ConflictResponse {
-    fn from(record: &xavyo_db::models::ConflictRecord) -> Self {
-        // Parse affected_attributes from JSON
-        let affected_attributes = record
-            .affected_attributes
-            .as_array()
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str())
-                    .map(std::string::ToString::to_string)
-                    .collect()
-            })
-            .unwrap_or_default();
+impl TryFrom<&xavyo_db::models::ConflictRecord> for ConflictResponse {
+    type Error = ConnectorApiError;
 
-        Self {
+    fn try_from(
+        record: &xavyo_db::models::ConflictRecord,
+    ) -> std::result::Result<Self, Self::Error> {
+        Ok(Self {
             id: record.id,
             operation_id: record.operation_id,
             conflicting_operation_id: record.conflicting_operation_id,
             conflict_type: record.conflict_type.to_string(),
-            affected_attributes,
+            affected_attributes: conflict_affected_attributes(&record.affected_attributes)?,
             detected_at: record.detected_at,
             resolution_strategy: record.resolution_strategy.to_string(),
             resolved_at: record.resolved_at,
@@ -853,7 +847,29 @@ impl From<&xavyo_db::models::ConflictRecord> for ConflictResponse {
             resolved_by: record.resolved_by,
             notes: record.notes.clone(),
             is_pending: record.is_pending(),
-        }
+        })
+    }
+}
+
+/// Stored conflict attribute JSON. Corrupt values must not look like no attributes.
+fn conflict_affected_attributes(
+    value: &serde_json::Value,
+) -> std::result::Result<Vec<String>, ConnectorApiError> {
+    match value {
+        serde_json::Value::Null => Ok(Vec::new()),
+        serde_json::Value::Array(arr) => arr
+            .iter()
+            .map(|v| {
+                v.as_str().map(str::to_string).ok_or_else(|| {
+                    ConnectorApiError::Validation(
+                        "conflict affected_attributes must be strings".to_string(),
+                    )
+                })
+            })
+            .collect(),
+        _ => Err(ConnectorApiError::Validation(
+            "conflict affected_attributes must be a JSON array".to_string(),
+        )),
     }
 }
 
@@ -966,6 +982,26 @@ mod tests {
         assert!(
             !production.contains("release_stale_operations().await"),
             "must not release stale operations across tenants from HTTP"
+        );
+    }
+
+    #[test]
+    fn conflict_affected_attributes_does_not_drop_corrupt_json() {
+        assert!(conflict_affected_attributes(&serde_json::Value::Null)
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            conflict_affected_attributes(&serde_json::json!(["email", "dept"])).unwrap(),
+            vec!["email", "dept"]
+        );
+        assert!(conflict_affected_attributes(&serde_json::json!("nope")).is_err());
+        assert!(conflict_affected_attributes(&serde_json::json!([1, 2])).is_err());
+        let src = include_str!("operation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("filter_map(|v| v.as_str())")
+                && !production.contains("unwrap_or_default()"),
+            "conflict GET must not hide corrupt affected_attributes as empty"
         );
     }
 

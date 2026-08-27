@@ -69,7 +69,10 @@ pub async fn list_bindings(
         .await?;
 
     Ok(Json(BindingListResponse {
-        bindings: bindings.into_iter().map(Into::into).collect(),
+        bindings: bindings
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, _>>()?,
         total,
     }))
 }
@@ -158,7 +161,7 @@ pub async fn create_binding(
         )
         .await?;
 
-    Ok((StatusCode::CREATED, Json(binding.into())))
+    Ok((StatusCode::CREATED, Json(binding.try_into()?)))
 }
 
 /// Get a script hook binding by ID.
@@ -192,7 +195,7 @@ pub async fn get_binding(
         .get_binding(tenant_id, id)
         .await?;
 
-    Ok(Json(binding.into()))
+    Ok(Json(binding.try_into()?))
 }
 
 /// Update a script hook binding.
@@ -251,7 +254,7 @@ pub async fn update_binding(
         )
         .await?;
 
-    Ok(Json(binding.into()))
+    Ok(Json(binding.try_into()?))
 }
 
 /// Delete a script hook binding.
@@ -344,7 +347,10 @@ pub async fn list_bindings_by_connector(
     let total = bindings.len() as i64;
 
     Ok(Json(BindingListResponse {
-        bindings: bindings.into_iter().map(Into::into).collect(),
+        bindings: bindings
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, _>>()?,
         total,
     }))
 }
@@ -353,34 +359,39 @@ pub async fn list_bindings_by_connector(
 // Conversion helpers
 // ============================================================================
 
-impl From<xavyo_db::models::GovScriptHookBinding> for BindingResponse {
-    fn from(b: xavyo_db::models::GovScriptHookBinding) -> Self {
-        Self {
+impl TryFrom<xavyo_db::models::GovScriptHookBinding> for BindingResponse {
+    type Error = ApiGovernanceError;
+
+    fn try_from(b: xavyo_db::models::GovScriptHookBinding) -> Result<Self, Self::Error> {
+        Ok(Self {
             id: b.id,
             tenant_id: b.tenant_id,
             script_id: b.script_id,
             connector_id: b.connector_id,
-            hook_phase: serde_json::to_value(b.hook_phase)
-                .ok()
-                .and_then(|v| v.as_str().map(String::from))
-                .unwrap_or_default(),
-            operation_type: serde_json::to_value(b.operation_type)
-                .ok()
-                .and_then(|v| v.as_str().map(String::from))
-                .unwrap_or_default(),
+            hook_phase: binding_enum_str(&b.hook_phase, "hook_phase")?,
+            operation_type: binding_enum_str(&b.operation_type, "operation_type")?,
             execution_order: b.execution_order,
-            failure_policy: serde_json::to_value(b.failure_policy)
-                .ok()
-                .and_then(|v| v.as_str().map(String::from))
-                .unwrap_or_default(),
+            failure_policy: binding_enum_str(&b.failure_policy, "failure_policy")?,
             max_retries: b.max_retries,
             timeout_seconds: b.timeout_seconds,
             enabled: b.enabled,
-            // The DB model does not store created_by; use nil UUID as placeholder.
-            created_by: Uuid::nil(),
+            created_by: None,
             created_at: b.created_at,
             updated_at: b.updated_at,
-        }
+        })
+    }
+}
+
+/// Stored hook enums. Serialize errors must not look like empty phase/policy.
+fn binding_enum_str<T: serde::Serialize>(
+    value: &T,
+    field: &str,
+) -> Result<String, ApiGovernanceError> {
+    match serde_json::to_value(value).map_err(|e| ApiGovernanceError::Validation(e.to_string()))? {
+        serde_json::Value::String(s) if !s.is_empty() => Ok(s),
+        _ => Err(ApiGovernanceError::Validation(format!(
+            "Invalid stored {field}"
+        ))),
     }
 }
 
@@ -425,6 +436,18 @@ mod tests {
             production.contains("parse_binding_enum(")
                 && !production.contains(".ok()\n            }),"),
             "binding list must not treat invalid enums as unfiltered"
+        );
+    }
+
+    #[test]
+    fn binding_response_does_not_invent_actor_or_empty_enums() {
+        let src = include_str!("script_hook_bindings.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("binding_enum_str(")
+                && !production.contains("unwrap_or_default()")
+                && !production.contains("Uuid::nil()"),
+            "binding GET must not invent a nil created_by or empty hook enums"
         );
     }
 }

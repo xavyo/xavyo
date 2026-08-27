@@ -441,9 +441,18 @@ impl MappingService {
             };
             obj.iter()
                 .map(|(source, target)| {
-                    let target_attr = target.as_str().unwrap_or_default().to_string();
-                    MappingRule {
-                        target_attribute: target_attr,
+                    let target_attr = target.as_str().ok_or_else(|| {
+                        ConnectorApiError::Validation(format!(
+                            "Mapping target for '{source}' must be a string"
+                        ))
+                    })?;
+                    if target_attr.is_empty() {
+                        return Err(ConnectorApiError::Validation(format!(
+                            "Mapping target for '{source}' must not be empty"
+                        )));
+                    }
+                    Ok(MappingRule {
+                        target_attribute: target_attr.to_string(),
                         source: AttributeSource::Attribute {
                             name: source.clone(),
                         },
@@ -451,9 +460,9 @@ impl MappingService {
                         required: false,
                         on_create: true,
                         on_update: true,
-                    }
+                    })
                 })
-                .collect()
+                .collect::<Result<Vec<_>>>()?
         } else {
             return Err(ConnectorApiError::Validation(
                 "Mappings must be an array or object".to_string(),
@@ -556,5 +565,15 @@ mod tests {
 
         let json = serde_json::to_string(&error).unwrap();
         assert!(json.contains("\"fatal\":true"));
+    }
+
+    #[test]
+    fn parse_mapping_config_does_not_empty_non_string_targets() {
+        let src = include_str!("mapping_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("target.as_str().unwrap_or_default()"),
+            "object-format mappings must not treat non-string targets as empty attributes"
+        );
     }
 }
