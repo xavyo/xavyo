@@ -820,7 +820,7 @@ impl PolicySimulationService {
                         false
                     }
                 }
-                _ => actual == expected, // Default to equals
+                _ => false,
             };
 
             if !matched {
@@ -1054,7 +1054,7 @@ mod tests {
                         false
                     }
                 }
-                _ => actual == expected,
+                _ => false,
             };
 
             if !matched {
@@ -1266,8 +1266,21 @@ mod tests {
             .nth(1)
             .expect("evaluate_conditions");
         assert!(
-            !eval.contains("unwrap_or(\"\")") && !eval.contains("unwrap_or(\"equals\")"),
+            !eval.contains("unwrap_or(\"\")")
+                && !eval.contains("unwrap_or(\"equals\")")
+                && !eval.contains("_ => actual == expected"),
             "malformed policy conditions must not match as empty attribute or default equals"
+        );
+        assert!(
+            !evaluate_conditions_test(
+                &[serde_json::json!({
+                    "attribute": "department",
+                    "operator": "eqq",
+                    "value": "Engineering"
+                })],
+                &user_attrs
+            ),
+            "unknown operators must not be treated as equals"
         );
     }
 

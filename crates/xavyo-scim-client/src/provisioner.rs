@@ -16,6 +16,17 @@ use xavyo_db::models::{
     ScimProvisioningState, ScimTargetAttributeMapping,
 };
 
+/// Target config only allows `delete` or `deactivate`.
+fn scim_deprovision_is_delete(strategy: &str) -> ScimClientResult<bool> {
+    match strategy {
+        "delete" => Ok(true),
+        "deactivate" => Ok(false),
+        other => Err(ScimClientError::InvalidConfig(format!(
+            "deprovisioning_strategy must be 'deactivate' or 'delete', got '{other}'"
+        ))),
+    }
+}
+
 /// Orchestrates SCIM provisioning operations for users and groups.
 ///
 /// The `Provisioner` coordinates the full lifecycle of SCIM resource
@@ -531,7 +542,7 @@ impl Provisioner {
         let eri = external_resource_id.to_string();
 
         // 2. Based on strategy: DELETE or deactivate_user.
-        let (http_method, http_status) = if deprovisioning_strategy == "delete" {
+        let (http_method, http_status) = if scim_deprovision_is_delete(deprovisioning_strategy)? {
             let result = self
                 .retry_policy
                 .execute("scim_delete_user", || {
@@ -574,7 +585,6 @@ impl Provisioner {
                 }
             }
         } else {
-            // Default to deactivate.
             let result = self
                 .retry_policy
                 .execute("scim_deactivate_user", || {
@@ -1391,6 +1401,33 @@ pub(crate) fn apply_put_fallback_ops(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unknown_deprovision_strategy_is_rejected() {
+        assert!(scim_deprovision_is_delete("delete").unwrap());
+        assert!(!scim_deprovision_is_delete("deactivate").unwrap());
+        let err = scim_deprovision_is_delete("hard_delete").unwrap_err();
+        assert!(
+            matches!(err, ScimClientError::InvalidConfig(_)),
+            "got {err:?}"
+        );
+
+        let src = include_str!("provisioner.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let deprov = production
+            .split("pub async fn provision_user_deprovision")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("provision_user_deprovision");
+        assert!(
+            deprov.contains("scim_deprovision_is_delete("),
+            "unknown deprovision strategy must not default to deactivate"
+        );
+        assert!(
+            !deprov.contains("Default to deactivate"),
+            "must not silently deactivate on an unknown strategy"
+        );
+    }
 
     #[test]
     fn test_provisioner_creation() {
