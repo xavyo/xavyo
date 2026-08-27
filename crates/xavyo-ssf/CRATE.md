@@ -14,9 +14,9 @@ domain
 
 ## Status
 
-🔴 **alpha**
+🟡 **beta**
 
-16 unit tests covering event payloads (incl. the SSF `verification` event), subject-identifier serialization, and SET signing. Don't depend on signatures yet — the API will still change.
+18 unit tests covering event payloads (incl. the SSF `verification` event), subject-identifier serialization, SET signing, and the `NoopEmitter`. Domain core is DB-free and production-used via `xavyo-api-ssf`; API surface may still evolve.
 
 ## Dependencies
 

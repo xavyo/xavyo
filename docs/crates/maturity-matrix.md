@@ -62,7 +62,7 @@ Criteria:
 | xavyo-authorization | 🟢 stable | 124+ | 16 | PDP + optional Cedar; foundation crate |
 | xavyo-webhooks | 🟢 stable | 160+ | 31 | 198 tests with `integration` feature; delivery, retry, DLQ |
 | xavyo-siem | 🟢 stable | 118+ | 47 | 269 tests with `integration` feature; syslog, Splunk HEC |
-| xavyo-ssf | 🔴 alpha | 16 | 24 | CAEP/SSF SET signing + emitter (incl. SSF verification event), no integration tests |
+| xavyo-ssf | 🟡 beta | 18 | 24 | CAEP/SSF SET signing + emitter; DB-free domain core |
 | xavyo-secrets | 🟢 stable | 51 | 28 | Multi-provider (Vault, AWS) |
 | xavyo-scim-client | 🟢 stable | 150+ | 24 | Full integration test coverage |
 | xavyo-scim-types | 🟢 stable | 9 | 17 | Pure SCIM 2.0 DTOs (RFC 7643/7644); RFC-pinned shape |
@@ -94,7 +94,7 @@ Criteria:
 | xavyo-api-import | 🟢 stable | 92+ | 45+ | Full integration test coverage |
 | xavyo-api-oidc-federation | 🟢 stable | 79+ | 16 | IdP interop tests (Auth0, Azure AD, Okta, Google) |
 | xavyo-api-nhi | 🟢 stable | 77 | 33 | Complete with risk scoring, F-047 & F-048 |
-| xavyo-api-ssf | 🔴 alpha | 20 | 50 | SSF push + poll (RFC 8936) delivery + SSRF guard, no integration tests |
+| xavyo-api-ssf | 🟡 beta | 29+ | 50 | Push+poll delivery + SSRF; 4 PostgreSQL integration tests in CI |
 
 ---
 
@@ -103,8 +103,8 @@ Criteria:
 | Status | Count | Crates |
 |--------|-------|--------|
 | 🟢 Stable | 32 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-connector-entra, xavyo-connector-rest, xavyo-connector-database, xavyo-governance, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-scim-client, xavyo-scim-types, xavyo-authorization, xavyo-ext-authz, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-tenants, xavyo-api-import, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-oidc-federation, xavyo-api-social, xavyo-api-nhi, xavyo-api-authorization, xavyo-api-connectors |
-| 🟡 Beta | 0 | — |
-| 🔴 Alpha | 2 | xavyo-ssf, xavyo-api-ssf |
+| 🟡 Beta | 2 | xavyo-ssf, xavyo-api-ssf |
+| 🔴 Alpha | 0 | — |
 
 ---
 

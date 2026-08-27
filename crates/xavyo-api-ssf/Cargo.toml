@@ -51,3 +51,13 @@ hex = "0.4"
 tokio = { workspace = true, features = ["full"] }
 tower = { workspace = true, features = ["util"] }
 wiremock = "0.6"
+sqlx = { workspace = true }
+
+[features]
+default = []
+integration = []
+
+[[test]]
+name = "integration"
+path = "tests/integration.rs"
+required-features = ["integration"]

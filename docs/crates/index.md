@@ -29,7 +29,7 @@ Business logic independent of HTTP transport.
 | [xavyo-authorization](../../crates/xavyo-authorization/CRATE.md) | Authorization engine (PDP) | 🟢 stable |
 | [xavyo-webhooks](../../crates/xavyo-webhooks/CRATE.md) | Event subscriptions and delivery | 🟢 stable |
 | [xavyo-siem](../../crates/xavyo-siem/CRATE.md) | Audit log export (syslog, Splunk) | 🟢 stable |
-| [xavyo-ssf](../../crates/xavyo-ssf/CRATE.md) | CAEP/Shared Signals: SETs, subject IDs, emitter | 🔴 alpha |
+| [xavyo-ssf](../../crates/xavyo-ssf/CRATE.md) | CAEP/Shared Signals: SETs, subject IDs, emitter | 🟡 beta |
 | [xavyo-secrets](../../crates/xavyo-secrets/CRATE.md) | External secret providers | 🟢 stable |
 | [xavyo-scim-client](../../crates/xavyo-scim-client/CRATE.md) | Outbound SCIM provisioning | 🟢 stable |
 | [xavyo-scim-types](../../crates/xavyo-scim-types/CRATE.md) | Shared SCIM 2.0 DTOs (RFC 7643/7644) | 🟢 stable |
@@ -65,7 +65,7 @@ REST endpoints exposed to clients.
 | [xavyo-api-import](../../crates/xavyo-api-import/CRATE.md) | Bulk user import API | 🟢 stable |
 | [xavyo-api-oidc-federation](../../crates/xavyo-api-oidc-federation/CRATE.md) | OIDC federation endpoints | 🟢 stable |
 | [xavyo-api-nhi](../../crates/xavyo-api-nhi/CRATE.md) | Non-human identity API | 🟢 stable |
-| [xavyo-api-ssf](../../crates/xavyo-api-ssf/CRATE.md) | SSF transmitter: streams, push CAEP signals | 🔴 alpha |
+| [xavyo-api-ssf](../../crates/xavyo-api-ssf/CRATE.md) | SSF transmitter: streams, push CAEP signals | 🟡 beta |
 
 ## Dependency Rules
 

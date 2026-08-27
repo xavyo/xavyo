@@ -14,9 +14,9 @@ api
 
 ## Status
 
-🔴 **alpha**
+🟡 **beta**
 
-20 unit tests (SSRF guard, model serialization, transmitter SET building, poll token hashing/parsing). Push (RFC 8935) + poll (RFC 8936) delivery, the poll-queue TTL bound, and stream-verification events (SSF §7.1.4) are all implemented (the verification event payload is tested in `xavyo-ssf`). No HTTP+Postgres integration tests yet — API will change.
+25 unit tests (SSRF guard, model serialization, transmitter SET building, poll token hashing/parsing) plus 4 PostgreSQL integration tests in CI (`beta-crate-integration` workflow): stream CRUD, subjects, poll queue enqueue/ack, and enabled-for-event fan-out. Push (RFC 8935) + poll (RFC 8936) delivery are implemented.
 
 ## Dependencies
 
@@ -110,7 +110,7 @@ let app = Router::new()
 
 ## Feature Flags
 
-- `integration` — gates Postgres-backed integration tests (none yet; reserved).
+- `integration` — gates Postgres-backed integration tests (`tests/integration.rs`).
 
 ## Anti-Patterns
 
