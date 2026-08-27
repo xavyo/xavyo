@@ -22,9 +22,9 @@ domain
 
 ## Status
 
-🟡 **beta**
+🟢 **stable**
 
-Core implementation complete with comprehensive unit tests. Requires integration tests with a real PostgreSQL database and end-to-end testing with AgentGateway for stable promotion.
+Core implementation with 62+ unit tests and PostgreSQL integration tests in CI (`beta-crate-integration` workflow). NHI cache load, missing-identity deny, and PDP default-deny paths are covered against a real database.
 
 ## Dependencies
 

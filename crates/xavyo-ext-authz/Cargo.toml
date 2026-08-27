@@ -47,7 +47,20 @@ tonic-build = "0.12"
 
 [dev-dependencies]
 tokio = { workspace = true }
+sqlx = { workspace = true }
+serde_json = { workspace = true }
+prost-types = "0.13"
+tonic = { version = "0.12", features = ["transport"] }
+xavyo-core = { path = "../xavyo-core" }
+xavyo-db = { path = "../xavyo-db" }
+xavyo-nhi = { path = "../xavyo-nhi", features = ["sqlx"] }
+xavyo-authorization = { path = "../xavyo-authorization" }
 
 [features]
 default = []
 integration = []
+
+[[test]]
+name = "db_integration"
+path = "tests/db_integration.rs"
+required-features = ["integration"]
