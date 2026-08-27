@@ -235,6 +235,10 @@ impl GovApprovalDelegation {
                 " AND is_active = TRUE AND starts_at <= ${param_count} AND ends_at > ${param_count}"
             ));
         }
+        if filter.status.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND status = ${param_count}"));
+        }
 
         query.push_str(&format!(
             " ORDER BY starts_at DESC LIMIT ${} OFFSET ${}",
@@ -255,6 +259,9 @@ impl GovApprovalDelegation {
         }
         if filter.active_now == Some(true) {
             q = q.bind(now);
+        }
+        if let Some(status) = filter.status {
+            q = q.bind(status);
         }
 
         q.bind(limit).bind(offset).fetch_all(pool).await
@@ -293,6 +300,10 @@ impl GovApprovalDelegation {
                 " AND is_active = TRUE AND starts_at <= ${param_count} AND ends_at > ${param_count}"
             ));
         }
+        if filter.status.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND status = ${param_count}"));
+        }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
 
@@ -307,6 +318,9 @@ impl GovApprovalDelegation {
         }
         if filter.active_now == Some(true) {
             q = q.bind(now);
+        }
+        if let Some(status) = filter.status {
+            q = q.bind(status);
         }
 
         q.fetch_one(pool).await
@@ -793,5 +807,26 @@ mod tests {
         };
 
         assert_eq!(filter.status, Some(DelegationStatus::Active));
+    }
+
+    #[test]
+    fn list_and_count_apply_status_filter() {
+        let src = include_str!("gov_approval_delegation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_by_tenant")
+            .nth(1)
+            .expect("list_by_tenant");
+        let count = production
+            .split("pub async fn count_by_tenant")
+            .nth(1)
+            .expect("count_by_tenant");
+        assert!(
+            list.contains("if filter.status.is_some()")
+                && list.contains("AND status = $")
+                && count.contains("if filter.status.is_some()")
+                && count.contains("AND status = $"),
+            "delegation list/count must apply advertised status filters in SQL"
+        );
     }
 }

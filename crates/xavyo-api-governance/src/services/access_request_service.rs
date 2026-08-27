@@ -179,12 +179,16 @@ impl AccessRequestService {
         tenant_id: Uuid,
         user_id: Uuid,
         status: Option<GovRequestStatus>,
+        entitlement_id: Option<Uuid>,
+        has_sod_warning: Option<bool>,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<GovAccessRequest>, i64)> {
         let filter = AccessRequestFilter {
             requester_id: Some(user_id),
+            entitlement_id,
             status,
+            has_sod_warning,
             ..Default::default()
         };
 

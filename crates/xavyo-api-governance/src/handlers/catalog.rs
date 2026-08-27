@@ -49,14 +49,7 @@ pub async fn list_catalog_categories(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    // Parse parent_id: "null" or empty string means root categories, otherwise parse UUID
-    let parent_id_filter = query.parent_id.as_ref().map(|pid| {
-        if pid.is_empty() || pid.eq_ignore_ascii_case("null") {
-            None // Root categories
-        } else {
-            Uuid::parse_str(pid).ok()
-        }
-    });
+    let parent_id_filter = parse_optional_parent_id(query.parent_id.as_deref())?;
 
     let (categories, total) = state
         .catalog_service
@@ -242,14 +235,7 @@ pub async fn admin_list_catalog_categories(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    // Parse parent_id: "null" or empty string means root categories, otherwise parse UUID
-    let parent_id_filter = query.parent_id.as_ref().map(|pid| {
-        if pid.is_empty() || pid.eq_ignore_ascii_case("null") {
-            None // Root categories
-        } else {
-            Uuid::parse_str(pid).ok()
-        }
-    });
+    let parent_id_filter = parse_optional_parent_id(query.parent_id.as_deref())?;
 
     let (categories, total) = state
         .catalog_service
@@ -967,4 +953,45 @@ pub async fn submit_cart(
             request_count: result.request_count,
         }),
     ))
+}
+
+/// Invalid `parent_id` filters must not silently list root categories.
+fn parse_optional_parent_id(parent_id: Option<&str>) -> ApiResult<Option<Option<Uuid>>> {
+    match parent_id {
+        None => Ok(None),
+        Some(s) if s.is_empty() || s.eq_ignore_ascii_case("null") => Ok(Some(None)),
+        Some(s) => {
+            let id = Uuid::parse_str(s).map_err(|_| {
+                ApiGovernanceError::Validation(format!(
+                    "Invalid parent_id '{s}'. Must be a UUID, empty, or null"
+                ))
+            })?;
+            Ok(Some(Some(id)))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_parent_id_does_not_list_root_categories() {
+        assert_eq!(parse_optional_parent_id(None).unwrap(), None);
+        assert_eq!(parse_optional_parent_id(Some("")).unwrap(), Some(None));
+        assert_eq!(parse_optional_parent_id(Some("null")).unwrap(), Some(None));
+        let id = Uuid::nil();
+        assert_eq!(
+            parse_optional_parent_id(Some(&id.to_string())).unwrap(),
+            Some(Some(id))
+        );
+        assert!(parse_optional_parent_id(Some("not-a-uuid")).is_err());
+        let src = include_str!("catalog.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_parent_id(")
+                && !production.contains("Uuid::parse_str(pid).ok()"),
+            "invalid catalog parent_id must be 400, not treated as root categories"
+        );
+    }
 }

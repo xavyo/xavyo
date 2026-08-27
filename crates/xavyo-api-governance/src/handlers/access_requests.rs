@@ -53,7 +53,15 @@ pub async fn list_my_requests(
 
     let (requests, total) = state
         .access_request_service
-        .list_my_requests(tenant_id, user_id, query.status, limit, offset)
+        .list_my_requests(
+            tenant_id,
+            user_id,
+            query.status,
+            query.entitlement_id,
+            query.has_sod_warning,
+            limit,
+            offset,
+        )
         .await?;
 
     let items: Vec<AccessRequestResponse> = requests
@@ -236,5 +244,20 @@ mod tests {
             .expires_in_secs(3600)
             .build();
         assert!(requester_from_claims(&claims).is_err());
+    }
+
+    #[test]
+    fn list_my_requests_honors_advertised_filters() {
+        let src = include_str!("access_requests.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_my_requests")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_my_requests");
+        assert!(
+            list.contains("query.entitlement_id") && list.contains("query.has_sod_warning"),
+            "GET /governance/access-requests must apply advertised entitlement_id and has_sod_warning filters"
+        );
     }
 }
