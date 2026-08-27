@@ -43,11 +43,13 @@ pub enum AppEnvironment {
 }
 
 impl AppEnvironment {
-    #[must_use]
-    pub fn from_env_str(s: &str) -> Self {
+    pub fn from_env_str(s: &str) -> Result<Self, String> {
         match s.to_lowercase().as_str() {
-            "production" | "prod" => Self::Production,
-            _ => Self::Development,
+            "production" | "prod" => Ok(Self::Production),
+            "development" | "dev" => Ok(Self::Development),
+            other => Err(format!(
+                "Unrecognized APP_ENV '{other}'. Must be one of: production, prod, development, dev"
+            )),
         }
     }
 
@@ -157,7 +159,8 @@ impl SecretProviderConfig {
     pub fn from_env() -> Result<Self, SecretError> {
         let app_env = AppEnvironment::from_env_str(
             &env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
-        );
+        )
+        .map_err(|detail| SecretError::ConfigError { detail })?;
 
         let provider_type = match env::var("SECRET_PROVIDER") {
             Ok(s) if !s.is_empty() => ProviderType::from_str_value(&s)?,
@@ -334,21 +337,18 @@ mod tests {
     #[test]
     fn test_app_environment_from_str() {
         assert_eq!(
-            AppEnvironment::from_env_str("production"),
+            AppEnvironment::from_env_str("production").unwrap(),
             AppEnvironment::Production
         );
         assert_eq!(
-            AppEnvironment::from_env_str("prod"),
+            AppEnvironment::from_env_str("prod").unwrap(),
             AppEnvironment::Production
         );
         assert_eq!(
-            AppEnvironment::from_env_str("development"),
+            AppEnvironment::from_env_str("development").unwrap(),
             AppEnvironment::Development
         );
-        assert_eq!(
-            AppEnvironment::from_env_str("anything"),
-            AppEnvironment::Development
-        );
+        assert!(AppEnvironment::from_env_str("anything").is_err());
     }
 
     #[test]

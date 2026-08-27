@@ -104,18 +104,15 @@ pub enum AppEnvironment {
 
 impl AppEnvironment {
     /// Parse from the `APP_ENV` environment variable value.
-    /// Defaults to `Development` if unset or unrecognized.
-    pub fn from_env_str(s: &str) -> Self {
+    ///
+    /// Unrecognized values must not silently become Development (insecure defaults).
+    pub fn from_env_str(s: &str) -> Result<Self, String> {
         match s.to_lowercase().as_str() {
-            "production" | "prod" => Self::Production,
-            "development" | "dev" => Self::Development,
-            other => {
-                tracing::warn!(
-                    value = other,
-                    "Unrecognized APP_ENV value, defaulting to Development"
-                );
-                Self::Development
-            }
+            "production" | "prod" => Ok(Self::Production),
+            "development" | "dev" => Ok(Self::Development),
+            other => Err(format!(
+                "Unrecognized APP_ENV '{other}'. Must be one of: production, prod, development, dev"
+            )),
         }
     }
 
@@ -648,10 +645,15 @@ impl Config {
         // Load .env file if present (development only)
         let _ = dotenvy::dotenv();
 
-        // Application environment (F069)
+        // Application environment (F069). Missing APP_ENV defaults to
+        // development; an unrecognized value must not.
         let app_env = AppEnvironment::from_env_str(
             &env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
-        );
+        )
+        .map_err(|message| ConfigError::InvalidValue {
+            var: "APP_ENV".to_string(),
+            message,
+        })?;
 
         // Required variables
         let database_url = env::var("DATABASE_URL")
@@ -1447,15 +1449,15 @@ mod tests {
     #[test]
     fn test_app_environment_parse_production() {
         assert_eq!(
-            AppEnvironment::from_env_str("production"),
+            AppEnvironment::from_env_str("production").unwrap(),
             AppEnvironment::Production
         );
         assert_eq!(
-            AppEnvironment::from_env_str("prod"),
+            AppEnvironment::from_env_str("prod").unwrap(),
             AppEnvironment::Production
         );
         assert_eq!(
-            AppEnvironment::from_env_str("PRODUCTION"),
+            AppEnvironment::from_env_str("PRODUCTION").unwrap(),
             AppEnvironment::Production
         );
     }
@@ -1463,29 +1465,25 @@ mod tests {
     #[test]
     fn test_app_environment_parse_development() {
         assert_eq!(
-            AppEnvironment::from_env_str("development"),
+            AppEnvironment::from_env_str("development").unwrap(),
             AppEnvironment::Development
         );
         assert_eq!(
-            AppEnvironment::from_env_str("dev"),
+            AppEnvironment::from_env_str("dev").unwrap(),
             AppEnvironment::Development
         );
     }
 
-    // T016: Unrecognized APP_ENV defaults to Development
     #[test]
-    fn test_app_environment_unrecognized_defaults_to_development() {
-        assert_eq!(
-            AppEnvironment::from_env_str("staging"),
-            AppEnvironment::Development
-        );
-        assert_eq!(
-            AppEnvironment::from_env_str(""),
-            AppEnvironment::Development
-        );
-        assert_eq!(
-            AppEnvironment::from_env_str("test"),
-            AppEnvironment::Development
+    fn test_app_environment_unrecognized_does_not_default_to_development() {
+        assert!(AppEnvironment::from_env_str("staging").is_err());
+        assert!(AppEnvironment::from_env_str("").is_err());
+        assert!(AppEnvironment::from_env_str("test").is_err());
+        let src = include_str!("config.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("defaulting to Development"),
+            "unrecognized APP_ENV must not silently enable insecure development defaults"
         );
     }
 

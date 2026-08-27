@@ -142,7 +142,7 @@ mod failure_reason_tests {
         for reason in reasons {
             let s = reason.as_str();
             let parsed = FailureReason::parse(s);
-            assert_eq!(reason, parsed);
+            assert_eq!(Some(reason), parsed);
         }
     }
 
@@ -157,8 +157,8 @@ mod failure_reason_tests {
     }
 
     #[test]
-    fn test_unknown_reason_parses_as_other() {
-        let parsed = FailureReason::parse("unknown_reason");
-        assert_eq!(parsed, FailureReason::Other);
+    fn test_unknown_reason_does_not_parse_as_other() {
+        assert!(FailureReason::parse("unknown_reason").is_none());
+        assert_eq!(FailureReason::parse("other"), Some(FailureReason::Other));
     }
 }
