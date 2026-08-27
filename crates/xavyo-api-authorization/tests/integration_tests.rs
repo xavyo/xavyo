@@ -256,9 +256,7 @@ async fn test_create_policy_without_auth() {
     create_test_tenant_with_id(&fixture.pool, fake_tenant).await;
     let fake_user = create_test_user(&fixture.pool, fake_tenant, "isolated@test.com").await;
 
-    let result = service
-        .create_policy(fake_tenant, request, fake_user)
-        .await;
+    let result = service.create_policy(fake_tenant, request, fake_user).await;
 
     // Policy is created in the other tenant and not visible from the fixture tenant
     assert!(result.is_ok());
