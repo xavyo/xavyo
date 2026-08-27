@@ -404,11 +404,7 @@ impl ConnectorService {
         match config.connector_type {
             DbConnectorType::Ldap => {
                 // Check if this is an AD connector
-                let use_ad = config
-                    .config
-                    .get("use_ad_features")
-                    .and_then(serde_json::Value::as_bool)
-                    .unwrap_or(false);
+                let use_ad = json_bool_field(&config.config, "use_ad_features", false)?;
 
                 if use_ad {
                     let ad_config = self.build_ad_config(&config.config, credentials)?;
@@ -430,11 +426,7 @@ impl ConnectorService {
             }
             DbConnectorType::Rest => {
                 // Check if this is an Entra ID connector
-                let use_entra = config
-                    .config
-                    .get("use_entra_features")
-                    .and_then(serde_json::Value::as_bool)
-                    .unwrap_or(false);
+                let use_entra = json_bool_field(&config.config, "use_entra_features", false)?;
 
                 if use_entra {
                     let entra_config = self.build_entra_config(&config.config)?;
@@ -468,10 +460,7 @@ impl ConnectorService {
                 }
 
                 // AD-specific validation
-                let use_ad = config
-                    .get("use_ad_features")
-                    .and_then(serde_json::Value::as_bool)
-                    .unwrap_or(false);
+                let use_ad = json_bool_field(config, "use_ad_features", false)?;
 
                 if use_ad && config.get("domain").and_then(|v| v.as_str()).is_none() {
                     return Err(ConnectorApiError::InvalidConfiguration(
@@ -499,10 +488,7 @@ impl ConnectorService {
                 }
             }
             DbConnectorType::Rest => {
-                let use_entra = config
-                    .get("use_entra_features")
-                    .and_then(serde_json::Value::as_bool)
-                    .unwrap_or(false);
+                let use_entra = json_bool_field(config, "use_entra_features", false)?;
 
                 if use_entra {
                     // Entra-specific validation
@@ -534,15 +520,8 @@ impl ConnectorService {
             ConnectorApiError::InvalidConfiguration("Missing 'host' in LDAP config".to_string())
         })?;
 
-        let base_dn = config
-            .get("base_dn")
-            .and_then(|v| v.as_str())
-            .unwrap_or("dc=example,dc=com");
-
-        let bind_dn = credentials
-            .get("bind_dn")
-            .and_then(|v| v.as_str())
-            .unwrap_or("cn=admin");
+        let base_dn = required_str(config, "base_dn")?;
+        let bind_dn = required_str(credentials, "bind_dn")?;
 
         let mut ldap_config = LdapConfig::new(host, base_dn, bind_dn);
 
@@ -551,11 +530,9 @@ impl ConnectorService {
             ldap_config.port = port as u16;
         }
 
-        // Apply SSL
-        if let Some(ssl) = config.get("use_ssl").and_then(serde_json::Value::as_bool) {
-            if ssl {
-                ldap_config = ldap_config.with_ssl();
-            }
+        // Apply SSL. A non-bool must not silently skip TLS.
+        if json_bool_field(config, "use_ssl", false)? {
+            ldap_config = ldap_config.with_ssl();
         }
 
         // Apply password (try both "bind_password" and "password" keys for flexibility)
@@ -592,14 +569,8 @@ impl ConnectorService {
             ldap: ldap_config,
             domain: domain.to_string(),
             use_ad_features: true,
-            sync_account_disabled: config
-                .get("sync_account_disabled")
-                .and_then(serde_json::Value::as_bool)
-                .unwrap_or(true),
-            enable_exchange: config
-                .get("enable_exchange")
-                .and_then(serde_json::Value::as_bool)
-                .unwrap_or(false),
+            sync_account_disabled: json_bool_field(config, "sync_account_disabled", true)?,
+            enable_exchange: json_bool_field(config, "enable_exchange", false)?,
             search_bases: Vec::new(),
             user_filter: config
                 .get("user_filter")
@@ -832,6 +803,26 @@ fn ad_search_base_object_types(value: Option<&serde_json::Value>) -> Result<Vec<
     }
 }
 
+fn json_bool_field(config: &serde_json::Value, field: &str, default: bool) -> Result<bool> {
+    match config.get(field) {
+        None | Some(serde_json::Value::Null) => Ok(default),
+        Some(v) => v.as_bool().ok_or_else(|| {
+            ConnectorApiError::InvalidConfiguration(format!("{field} must be a boolean"))
+        }),
+    }
+}
+
+fn required_str<'a>(obj: &'a serde_json::Value, field: &str) -> Result<&'a str> {
+    obj.get(field)
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            ConnectorApiError::InvalidConfiguration(format!(
+                "Missing '{field}' in LDAP config/credentials"
+            ))
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -938,6 +929,45 @@ mod tests {
             !production.contains("filter_map(|v|")
                 && !production.contains("unwrap_or_else(|| vec![\"all\".to_string()])"),
             "AD search_bases.object_types must not drop non-strings or invent [all]"
+        );
+    }
+
+    #[test]
+    fn ldap_placeholders_and_feature_flags_do_not_fail_open() {
+        assert!(required_str(&serde_json::json!({}), "base_dn").is_err());
+        assert!(required_str(&serde_json::json!({"bind_dn": ""}), "bind_dn").is_err());
+        assert_eq!(
+            required_str(&serde_json::json!({"bind_dn": "cn=real"}), "bind_dn").unwrap(),
+            "cn=real"
+        );
+        assert!(json_bool_field(
+            &serde_json::json!({"use_ad_features": "yes"}),
+            "use_ad_features",
+            false
+        )
+        .is_err());
+        assert!(!json_bool_field(&serde_json::json!({}), "use_ad_features", false).unwrap());
+        assert!(
+            json_bool_field(&serde_json::json!({"use_ssl": "true"}), "use_ssl", false).is_err()
+        );
+        assert!(json_bool_field(
+            &serde_json::json!({"enable_exchange": "yes"}),
+            "enable_exchange",
+            false
+        )
+        .is_err());
+        let src = include_str!("connector_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(\"dc=example,dc=com\")")
+                && !production.contains("unwrap_or(\"cn=admin\")"),
+            "LDAP must not invent example.com / cn=admin bind credentials"
+        );
+        assert!(
+            !production.contains("unwrap_or(false)")
+                && !production.contains("unwrap_or(true)")
+                && production.contains("json_bool_field("),
+            "use_ad_features/use_entra_features/AD flags must not treat non-bools as defaults"
         );
     }
 }
