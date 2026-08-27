@@ -2159,6 +2159,7 @@ impl Modify for SecurityAddon {
         xavyo_api_governance::models::ExtendPersonaRequest,
         xavyo_api_governance::models::ExtendPersonaResponse,
         xavyo_api_governance::models::ExtensionStatus,
+        xavyo_api_governance::models::PropagateAttributesResponse,
         xavyo_api_governance::models::PersonaResponse,
         xavyo_api_governance::models::PersonaDetailResponse,
         xavyo_api_governance::models::PersonaAttributesResponse,
