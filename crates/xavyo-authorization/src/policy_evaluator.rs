@@ -117,21 +117,30 @@ impl PolicyEvaluator {
     ///
     /// Checks if the current UTC time is within the specified window.
     /// Expected value format: `{"start_time": "09:00", "end_time": "17:00"}`
+    ///
+    /// Missing or malformed bounds must not match all day.
     fn evaluate_time_window(value: &serde_json::Value) -> bool {
-        let now = chrono::Utc::now();
-        let current_time = now.format("%H:%M").to_string();
-
-        let start = value
-            .get("start_time")
-            .and_then(|v| v.as_str())
-            .unwrap_or("00:00");
-        let end = value
-            .get("end_time")
-            .and_then(|v| v.as_str())
-            .unwrap_or("23:59");
-
+        let Some(start) = hhmm_bound(value.get("start_time")) else {
+            return false;
+        };
+        let Some(end) = hhmm_bound(value.get("end_time")) else {
+            return false;
+        };
+        let current_time = chrono::Utc::now().format("%H:%M").to_string();
         current_time.as_str() >= start && current_time.as_str() <= end
     }
+}
+
+/// Parse a `HH:MM` time bound. Invalid or missing values fail closed.
+fn hhmm_bound(value: Option<&serde_json::Value>) -> Option<&str> {
+    let s = value.and_then(serde_json::Value::as_str)?;
+    let bytes = s.as_bytes();
+    if bytes.len() != 5 || bytes[2] != b':' {
+        return None;
+    }
+    let hours: u8 = s[..2].parse().ok()?;
+    let minutes: u8 = s[3..].parse().ok()?;
+    (hours <= 23 && minutes <= 59).then_some(s)
 }
 
 #[cfg(test)]
@@ -349,10 +358,31 @@ mod tests {
     }
 
     #[test]
-    fn test_time_window_defaults() {
-        // Empty value should use defaults 00:00 - 23:59
-        let value = json!({});
-        assert!(PolicyEvaluator::evaluate_time_window(&value));
+    fn missing_or_malformed_time_window_does_not_match_all_day() {
+        assert!(!PolicyEvaluator::evaluate_time_window(&json!({})));
+        assert!(!PolicyEvaluator::evaluate_time_window(
+            &json!({"start_time": "09:00"})
+        ));
+        assert!(!PolicyEvaluator::evaluate_time_window(
+            &json!({"end_time": "17:00"})
+        ));
+        assert!(!PolicyEvaluator::evaluate_time_window(
+            &json!({"start_time": "9:00", "end_time": "17:00"})
+        ));
+        assert!(!PolicyEvaluator::evaluate_time_window(
+            &json!({"start_time": "09:00", "end_time": "25:00"})
+        ));
+        assert!(hhmm_bound(None).is_none());
+        assert!(hhmm_bound(Some(&json!("09:00"))).is_some());
+
+        let src = include_str!("policy_evaluator.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("hhmm_bound(")
+                && !production.contains("unwrap_or(\"00:00\")")
+                && !production.contains("unwrap_or(\"23:59\")"),
+            "missing time_window bounds must not default to all day"
+        );
     }
 
     #[test]
