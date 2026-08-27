@@ -17,6 +17,12 @@ use crate::models::{
 };
 use crate::router::GovernanceState;
 
+fn csv_json_field<T: serde::Serialize>(value: &T) -> Result<String, ApiGovernanceError> {
+    serde_json::to_string(value)
+        .map(|s| s.replace('"', "\"\""))
+        .map_err(|e| ApiGovernanceError::Internal(format!("Failed to serialize CSV field: {e}")))
+}
+
 // ============================================================================
 // Policy Simulation CRUD Endpoints
 // ============================================================================
@@ -527,9 +533,7 @@ pub async fn export_policy_simulation(
         let mut csv_output = String::from("user_id,impact_type,severity,details\n");
 
         for result in results {
-            let details_str = serde_json::to_string(&result.details)
-                .unwrap_or_default()
-                .replace('"', "\"\""); // Escape quotes for CSV
+            let details_str = csv_json_field(&result.details)?;
 
             csv_output.push_str(&format!(
                 "{},{:?},{},\"{}\"\n",
@@ -586,4 +590,23 @@ pub struct PolicySimulationExport {
     pub simulation: PolicySimulationResponse,
     /// All simulation results.
     pub results: Vec<PolicySimulationResultResponse>,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn policy_simulation_csv_does_not_drop_details() {
+        let src = include_str!("policy_simulations.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("csv_json_field(")
+                && !production
+                    .contains("to_string(&result.details)\n                .unwrap_or_default()"),
+            "policy simulation CSV must fail closed on serialize error"
+        );
+        assert_eq!(
+            super::csv_json_field(&serde_json::json!({"a": 1})).unwrap(),
+            "{\"a\":1}".replace('"', "\"\"")
+        );
+    }
 }

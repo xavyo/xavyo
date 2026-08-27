@@ -16,6 +16,12 @@ use crate::models::{
 };
 use crate::router::GovernanceState;
 
+fn csv_json_field<T: serde::Serialize>(value: &T) -> Result<String, ApiGovernanceError> {
+    serde_json::to_string(value)
+        .map(|s| s.replace('"', "\"\""))
+        .map_err(|e| ApiGovernanceError::Internal(format!("Failed to serialize CSV field: {e}")))
+}
+
 // ============================================================================
 // Simulation Comparison Endpoints
 // ============================================================================
@@ -250,9 +256,7 @@ pub async fn export_simulation_comparison(
 
         // Add entries
         for entry in delta.added {
-            let impact_str = serde_json::to_string(&entry.impact)
-                .unwrap_or_default()
-                .replace('"', "\"\"");
+            let impact_str = csv_json_field(&entry.impact)?;
             csv_output.push_str(&format!(
                 "added,{},\"{}\",\"\",\"\"\n",
                 entry.user_id, impact_str
@@ -260,9 +264,7 @@ pub async fn export_simulation_comparison(
         }
 
         for entry in delta.removed {
-            let impact_str = serde_json::to_string(&entry.impact)
-                .unwrap_or_default()
-                .replace('"', "\"\"");
+            let impact_str = csv_json_field(&entry.impact)?;
             csv_output.push_str(&format!(
                 "removed,{},\"{}\",\"\",\"\"\n",
                 entry.user_id, impact_str
@@ -270,15 +272,9 @@ pub async fn export_simulation_comparison(
         }
 
         for entry in delta.modified {
-            let impact_a_str = serde_json::to_string(&entry.impact_a)
-                .unwrap_or_default()
-                .replace('"', "\"\"");
-            let impact_b_str = serde_json::to_string(&entry.impact_b)
-                .unwrap_or_default()
-                .replace('"', "\"\"");
-            let diff_str = serde_json::to_string(&entry.diff)
-                .unwrap_or_default()
-                .replace('"', "\"\"");
+            let impact_a_str = csv_json_field(&entry.impact_a)?;
+            let impact_b_str = csv_json_field(&entry.impact_b)?;
+            let diff_str = csv_json_field(&entry.diff)?;
             csv_output.push_str(&format!(
                 "modified,{},\"{}\",\"{}\",\"{}\"\n",
                 entry.user_id, impact_a_str, impact_b_str, diff_str
@@ -341,6 +337,10 @@ mod tests {
                 && !production
                     .contains("from_value(comparison.delta_results.clone()).unwrap_or_default()"),
             "simulation comparison CSV export must fail closed on JSON parse"
+        );
+        assert!(
+            production.contains("csv_json_field(") && !production.contains("unwrap_or_default()"),
+            "simulation comparison CSV fields must not drop on serialize error"
         );
     }
 }

@@ -29,13 +29,15 @@ use crate::{
 /// Convert a DB `GovProvisioningScript` to an API `ScriptResponse`.
 fn map_script(
     script: xavyo_db::models::gov_provisioning_script::GovProvisioningScript,
-) -> ScriptResponse {
+) -> Result<ScriptResponse, ApiGovernanceError> {
     let status = serde_json::to_value(script.status)
         .ok()
         .and_then(|v| v.as_str().map(String::from))
-        .unwrap_or_default();
+        .ok_or_else(|| {
+            ApiGovernanceError::Internal("Failed to serialize script status".to_string())
+        })?;
 
-    ScriptResponse {
+    Ok(ScriptResponse {
         id: script.id,
         tenant_id: script.tenant_id,
         name: script.name,
@@ -46,7 +48,7 @@ fn map_script(
         created_by: script.created_by,
         created_at: script.created_at,
         updated_at: script.updated_at,
-    }
+    })
 }
 
 /// Convert a DB `GovScriptVersion` to an API `ScriptVersionResponse`.
@@ -111,7 +113,10 @@ pub async fn list_scripts(
         .await?;
 
     Ok(Json(ScriptListResponse {
-        scripts: scripts.into_iter().map(map_script).collect(),
+        scripts: scripts
+            .into_iter()
+            .map(map_script)
+            .collect::<Result<Vec<_>, _>>()?,
         total,
     }))
 }
@@ -161,7 +166,7 @@ pub async fn create_script(
         .record_created(tenant_id, script.id, actor_id, &script.name)
         .await?;
 
-    Ok((StatusCode::CREATED, Json(map_script(script))))
+    Ok((StatusCode::CREATED, Json(map_script(script)?)))
 }
 
 /// Get a provisioning script by ID.
@@ -192,7 +197,7 @@ pub async fn get_script(
 
     let script = state.script_service.get_script(tenant_id, id).await?;
 
-    Ok(Json(map_script(script)))
+    Ok(Json(map_script(script)?))
 }
 
 /// Update a provisioning script's metadata.
@@ -244,7 +249,7 @@ pub async fn update_script(
         )
         .await?;
 
-    Ok(Json(map_script(script)))
+    Ok(Json(map_script(script)?))
 }
 
 /// Delete a provisioning script.
@@ -327,7 +332,7 @@ pub async fn activate_script(
         .record_activated(tenant_id, id, actor_id)
         .await?;
 
-    Ok(Json(map_script(script)))
+    Ok(Json(map_script(script)?))
 }
 
 /// Deactivate a provisioning script.
@@ -368,7 +373,7 @@ pub async fn deactivate_script(
         .record_deactivated(tenant_id, id, actor_id)
         .await?;
 
-    Ok(Json(map_script(script)))
+    Ok(Json(map_script(script)?))
 }
 
 /// List all versions of a provisioning script.
@@ -687,6 +692,21 @@ mod tests {
             production.matches("script_audit_service").count() >= 7
                 && production.contains(".await?;"),
             "script mutations must fail when script audit rows cannot be written"
+        );
+    }
+
+    #[test]
+    fn map_script_does_not_blank_status() {
+        let src = include_str!("provisioning_scripts.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("ok_or_else")
+                && !production.contains(".unwrap_or_default();\n\n    ScriptResponse"),
+            "script status must not be blanked when serialize fails"
+        );
+        assert!(
+            !production.contains("Ok(Json(map_script(script)))"),
+            "map_script errors must propagate"
         );
     }
 }

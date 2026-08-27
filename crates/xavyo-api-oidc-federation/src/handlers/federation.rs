@@ -8,8 +8,6 @@ use axum::{
 use tracing::instrument;
 use xavyo_core::TenantId;
 
-use uuid::Uuid;
-
 use crate::error::{FederationError, FederationResult};
 use crate::models::{
     AuthorizeParams, CallbackParams, DiscoverRequest, DiscoverResponse, FederationTokenResponse,
@@ -99,11 +97,10 @@ pub async fn authorize(
     let idp_id = match (params.idp_id, params.login_hint.as_deref()) {
         (Some(id), _) => id,
         (None, Some(email)) => {
-            let hrd_result = state
-                .hrd
-                .discover(tenant_id, email)
-                .await?
-                .ok_or(FederationError::IdpNotFound(Uuid::nil()))?;
+            let hrd_result = state.hrd.discover(tenant_id, email).await?.ok_or_else(|| {
+                let domain = email.rsplit_once('@').map(|(_, d)| d).unwrap_or(email);
+                FederationError::DomainNotConfigured(domain.to_string())
+            })?;
             hrd_result.idp_id
         }
         (None, None) => {
@@ -391,6 +388,16 @@ mod tests {
         assert!(
             production.contains("federation_login_allowed(user.is_active, user.is_locked())"),
             "federation login must refuse locked/inactive accounts"
+        );
+    }
+
+    #[test]
+    fn hrd_miss_does_not_use_nil_idp() {
+        let src = include_str!("federation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("DomainNotConfigured") && !production.contains("Uuid::nil()"),
+            "HRD miss must not advertise IdP not found with a nil UUID"
         );
     }
 }
