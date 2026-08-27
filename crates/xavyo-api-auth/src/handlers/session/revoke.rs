@@ -34,11 +34,10 @@ pub async fn revoke_session(
     Extension(claims): Extension<JwtClaims>,
     Path(session_id): Path<Uuid>,
 ) -> Result<StatusCode, ApiAuthError> {
-    // Check if trying to revoke current session
-    if let Ok(current_jti) = Uuid::parse_str(&claims.jti) {
-        if current_jti == session_id {
-            return Err(ApiAuthError::CannotRevokeCurrentSession);
-        }
+    // Check if trying to revoke current session. A malformed jti must not skip this.
+    let current_jti = Uuid::parse_str(&claims.jti).map_err(|_| ApiAuthError::Unauthorized)?;
+    if current_jti == session_id {
+        return Err(ApiAuthError::CannotRevokeCurrentSession);
     }
 
     // Verify session exists and belongs to user
@@ -62,4 +61,18 @@ pub async fn revoke_session(
     }
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn revoke_session_does_not_skip_current_session_check() {
+        let src = include_str!("revoke.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("if let Ok(current_jti)")
+                && production.contains("CannotRevokeCurrentSession"),
+            "malformed JWT jti must not skip the current-session revoke guard"
+        );
+    }
 }

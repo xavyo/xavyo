@@ -233,11 +233,13 @@ pub async fn provision_agent(
         // Apply default delegation if not explicitly set
         if request.delegation.is_none() {
             if let Some(ref deleg) = blueprint.default_delegation {
-                // Parse delegation from blueprint JSONB
-                if let Ok(delegation) = serde_json::from_value::<ProvisionDelegation>(deleg.clone())
-                {
-                    request.delegation = Some(delegation);
-                }
+                request.delegation = Some(
+                    serde_json::from_value::<ProvisionDelegation>(deleg.clone()).map_err(|_| {
+                        NhiApiError::BadRequest(
+                            "Blueprint default_delegation is invalid JSON".into(),
+                        )
+                    })?,
+                );
             }
         }
         tracing::info!(
@@ -525,4 +527,18 @@ pub async fn provision_agent(
     };
 
     Ok((StatusCode::CREATED, Json(response)))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn blueprint_delegation_does_not_skip_invalid_json() {
+        let src = include_str!("provision.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("if let Ok(delegation) = serde_json::from_value")
+                && production.contains("Blueprint default_delegation is invalid JSON"),
+            "corrupt blueprint delegation must fail the provision request"
+        );
+    }
 }

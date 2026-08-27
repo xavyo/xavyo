@@ -243,28 +243,7 @@ pub async fn certify_nhi(
         .map_err(NhiApiError::Database)?
         .ok_or(NhiApiError::NotFound)?;
 
-    // Validate NHI is in campaign scope
-    match campaign.scope.as_str() {
-        "by_type" => {
-            if let Some(ref filter_type) = campaign.nhi_type_filter {
-                if nhi.nhi_type.to_string() != *filter_type {
-                    return Err(NhiApiError::BadRequest(format!(
-                        "NHI type '{}' does not match campaign filter '{}'",
-                        nhi.nhi_type, filter_type
-                    )));
-                }
-            }
-        }
-        "specific" => {
-            let allowed = campaign.specific_nhi_ids.as_deref().unwrap_or_default();
-            if !allowed.contains(&nhi_id) {
-                return Err(NhiApiError::BadRequest(
-                    "NHI is not in the scope of this campaign".into(),
-                ));
-            }
-        }
-        _ => {} // "all" or any other scope — no additional check
-    }
+    campaign_allows_nhi(&campaign, &nhi)?;
 
     // Set next certification 90 days from now
     let now = Utc::now();
@@ -359,6 +338,39 @@ pub async fn revoke_certification(
 // Router
 // ---------------------------------------------------------------------------
 
+/// Unknown campaign scopes must not skip membership checks.
+fn campaign_allows_nhi(
+    campaign: &NhiCertificationCampaign,
+    nhi: &NhiIdentity,
+) -> Result<(), NhiApiError> {
+    match campaign.scope.as_str() {
+        "all" => Ok(()),
+        "by_type" => {
+            if let Some(ref filter_type) = campaign.nhi_type_filter {
+                if nhi.nhi_type.to_string() != *filter_type {
+                    return Err(NhiApiError::BadRequest(format!(
+                        "NHI type '{}' does not match campaign filter '{}'",
+                        nhi.nhi_type, filter_type
+                    )));
+                }
+            }
+            Ok(())
+        }
+        "specific" => {
+            let allowed = campaign.specific_nhi_ids.as_deref().unwrap_or_default();
+            if !allowed.contains(&nhi.id) {
+                return Err(NhiApiError::BadRequest(
+                    "NHI is not in the scope of this campaign".into(),
+                ));
+            }
+            Ok(())
+        }
+        other => Err(NhiApiError::BadRequest(format!(
+            "Invalid campaign scope '{other}'. Must be 'all', 'by_type', or 'specific'"
+        ))),
+    }
+}
+
 /// Creates the certification routes sub-router.
 ///
 /// Routes:
@@ -379,4 +391,18 @@ pub fn certification_routes(state: NhiState) -> Router {
             post(revoke_certification),
         )
         .with_state(state)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn certify_does_not_skip_unknown_campaign_scope() {
+        let src = include_str!("certification.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("fn campaign_allows_nhi")
+                && !production.contains("_ => {} // \"all\" or any other scope"),
+            "unknown NHI campaign scopes must not skip membership checks"
+        );
+    }
 }
