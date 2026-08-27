@@ -211,22 +211,23 @@ pub fn map_ad_user(entry: &AttributeSet) -> Option<MappedUser> {
 }
 
 /// Build a `SyncChange` from a `MappedUser`.
-#[must_use]
-pub fn mapped_user_to_sync_change(user: &MappedUser, change_type: SyncChangeType) -> SyncChange {
+pub fn mapped_user_to_sync_change(
+    user: &MappedUser,
+    change_type: SyncChangeType,
+) -> Result<SyncChange, serde_json::Error> {
     let mut attrs = AttributeSet::new();
 
-    // Copy all mapped attributes into the AttributeSet
+    // Copy all mapped attributes into the AttributeSet. Corrupt arrays must not be dropped.
     for (key, value) in &user.attributes {
         match value {
             serde_json::Value::String(s) => {
                 attrs.set(key.clone(), s.clone());
             }
             serde_json::Value::Array(arr) => {
-                let values: Vec<AttributeValue> = arr
-                    .iter()
-                    .filter_map(|v| v.as_str().map(|s| AttributeValue::String(s.to_string())))
-                    .collect();
-                attrs.set(key.clone(), AttributeValue::Array(values));
+                attrs.set(
+                    key.clone(),
+                    AttributeValue::Array(json_array_attr_values(arr)?),
+                );
             }
             serde_json::Value::Number(n) => {
                 if let Some(i) = n.as_i64() {
@@ -248,11 +249,24 @@ pub fn mapped_user_to_sync_change(user: &MappedUser, change_type: SyncChangeType
 
     let uid = xavyo_connector::operation::Uid::new("objectGUID", &user.external_id);
 
-    match change_type {
+    Ok(match change_type {
         SyncChangeType::Create => SyncChange::created(uid, "user", attrs),
         SyncChangeType::Update => SyncChange::updated(uid, "user", attrs),
         SyncChangeType::Delete => SyncChange::deleted(uid, "user"),
-    }
+    })
+}
+
+/// JSON array attributes. Non-string elements must not be dropped.
+fn json_array_attr_values(
+    arr: &[serde_json::Value],
+) -> Result<Vec<AttributeValue>, serde_json::Error> {
+    arr.iter()
+        .map(|v| {
+            v.as_str()
+                .map(|s| AttributeValue::String(s.to_string()))
+                .ok_or_else(|| serde::de::Error::custom("array attribute values must be strings"))
+        })
+        .collect()
 }
 
 /// Build a `SyncResult` from a batch of mapped users.
@@ -271,7 +285,7 @@ pub fn build_sync_result(
     let changes: Vec<SyncChange> = users
         .iter()
         .map(|u| mapped_user_to_sync_change(u, change_type))
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
     let mut result = SyncResult::with_changes(changes);
 
@@ -1033,7 +1047,7 @@ mod tests {
             usn_changed: None,
         };
 
-        let change = mapped_user_to_sync_change(&user, SyncChangeType::Create);
+        let change = mapped_user_to_sync_change(&user, SyncChangeType::Create).unwrap();
         assert_eq!(change.object_class, "user");
         assert!(matches!(change.change_type, SyncChangeType::Create));
 
@@ -1055,8 +1069,34 @@ mod tests {
             usn_changed: None,
         };
 
-        let change = mapped_user_to_sync_change(&user, SyncChangeType::Delete);
+        let change = mapped_user_to_sync_change(&user, SyncChangeType::Delete).unwrap();
         assert!(matches!(change.change_type, SyncChangeType::Delete));
+    }
+
+    #[test]
+    fn mapped_user_array_attrs_do_not_drop_non_strings() {
+        let mut user = MappedUser {
+            external_id: "guid".to_string(),
+            dn: String::new(),
+            attributes: HashMap::new(),
+            is_active: true,
+            uac_value: None,
+            usn_changed: None,
+        };
+        user.attributes.insert(
+            "proxy".to_string(),
+            serde_json::json!(["a@b.com", "c@d.com"]),
+        );
+        assert!(mapped_user_to_sync_change(&user, SyncChangeType::Create).is_ok());
+        user.attributes
+            .insert("proxy".to_string(), serde_json::json!(["a@b.com", 1]));
+        assert!(mapped_user_to_sync_change(&user, SyncChangeType::Create).is_err());
+        let src = include_str!("sync.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("filter_map(|v| v.as_str()"),
+            "AD user sync must not drop non-string array attributes"
+        );
     }
 
     #[test]

@@ -132,13 +132,12 @@ pub async fn get_request_escalation_history(
         .collect();
 
     // Check if levels have been exhausted (look for metadata indicating this)
-    let levels_exhausted = events.iter().any(|e| {
-        e.metadata
-            .as_ref()
-            .and_then(|m| m.get("levels_exhausted"))
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false)
-    });
+    let levels_exhausted = events
+        .iter()
+        .map(|e| json_flag_bool(e.metadata.as_ref(), "levels_exhausted"))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .any(|v| v);
 
     Ok(Json(EscalationHistoryResponse {
         request_id,
@@ -259,6 +258,21 @@ pub async fn reset_escalation(
     }))
 }
 
+fn json_flag_bool(
+    metadata: Option<&serde_json::Value>,
+    field: &str,
+) -> Result<bool, ApiGovernanceError> {
+    let Some(meta) = metadata else {
+        return Ok(false);
+    };
+    match meta.get(field) {
+        None | Some(serde_json::Value::Null) => Ok(false),
+        Some(v) => v
+            .as_bool()
+            .ok_or_else(|| ApiGovernanceError::Validation(format!("{field} must be a boolean"))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -301,5 +315,27 @@ mod tests {
         assert_eq!(response.id, event.id);
         assert_eq!(response.request_id, event.request_id);
         assert_eq!(response.escalation_level, 1);
+    }
+
+    #[test]
+    fn json_flag_bool_does_not_treat_non_bool_as_false() {
+        assert!(!json_flag_bool(None, "levels_exhausted").unwrap());
+        assert!(json_flag_bool(
+            Some(&serde_json::json!({"levels_exhausted": true})),
+            "levels_exhausted"
+        )
+        .unwrap());
+        assert!(json_flag_bool(
+            Some(&serde_json::json!({"levels_exhausted": "yes"})),
+            "levels_exhausted"
+        )
+        .is_err());
+        let src = include_str!("escalation_events.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("as_bool()\n            .unwrap_or(false)")
+                && !production.contains("as_bool().unwrap_or(false)"),
+            "escalation history must not hide non-bool levels_exhausted as false"
+        );
     }
 }
