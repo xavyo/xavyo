@@ -205,12 +205,9 @@ impl ConditionEvaluator {
     /// Get termination_date from user's custom_attributes.
     ///
     /// The termination_date is stored in custom_attributes.termination_date
-    /// as an ISO 8601 date string (YYYY-MM-DD).
-    fn get_termination_date(&self, user: &User) -> Option<chrono::NaiveDate> {
-        user.custom_attributes
-            .get("termination_date")
-            .and_then(|v| v.as_str())
-            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+    /// as an ISO 8601 date string (YYYY-MM-DD). Malformed values must not look unset.
+    fn get_termination_date(&self, user: &User) -> Result<Option<chrono::NaiveDate>> {
+        parse_termination_date(&user.custom_attributes)
     }
 
     /// Evaluate termination_date_set condition.
@@ -221,7 +218,7 @@ impl ConditionEvaluator {
         user: &User,
         condition: &TransitionCondition,
     ) -> Result<TransitionConditionResult> {
-        let termination_date = self.get_termination_date(user);
+        let termination_date = self.get_termination_date(user)?;
         let satisfied = termination_date.is_some();
         let reason = if satisfied {
             format!(
@@ -248,7 +245,7 @@ impl ConditionEvaluator {
         condition: &TransitionCondition,
     ) -> Result<TransitionConditionResult> {
         let today = Utc::now().date_naive();
-        let (satisfied, reason) = match self.get_termination_date(user) {
+        let (satisfied, reason) = match self.get_termination_date(user)? {
             Some(termination_date) => {
                 if today >= termination_date {
                     (
@@ -430,6 +427,28 @@ impl ConditionEvaluator {
     }
 }
 
+/// Parse `termination_date` from user custom attributes.
+///
+/// Missing or null is unset. Present-but-malformed must not look like "no leaver date".
+pub(crate) fn parse_termination_date(
+    custom_attributes: &JsonValue,
+) -> Result<Option<chrono::NaiveDate>> {
+    match custom_attributes.get("termination_date") {
+        None | Some(JsonValue::Null) => Ok(None),
+        Some(v) => {
+            let s = v.as_str().ok_or_else(|| {
+                GovernanceError::Validation(
+                    "termination_date must be an ISO 8601 date string (YYYY-MM-DD)".to_string(),
+                )
+            })?;
+            let date = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").map_err(|e| {
+                GovernanceError::Validation(format!("Invalid termination_date '{s}': {e}"))
+            })?;
+            Ok(Some(date))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -551,6 +570,38 @@ mod tests {
         assert!(
             !production.contains("_tenant_id"),
             "must not ignore tenant_id when counting sessions"
+        );
+    }
+
+    #[test]
+    fn malformed_termination_date_does_not_look_unset() {
+        assert!(parse_termination_date(&serde_json::json!({}))
+            .unwrap()
+            .is_none());
+        assert!(
+            parse_termination_date(&serde_json::json!({"termination_date": null}))
+                .unwrap()
+                .is_none()
+        );
+        let set = parse_termination_date(&serde_json::json!({"termination_date": "2025-12-31"}))
+            .unwrap()
+            .expect("valid date");
+        assert_eq!(set, chrono::NaiveDate::from_ymd_opt(2025, 12, 31).unwrap());
+        assert!(
+            parse_termination_date(&serde_json::json!({"termination_date": "not-a-date"})).is_err()
+        );
+        assert!(
+            parse_termination_date(&serde_json::json!({"termination_date": 20251231})).is_err()
+        );
+        let src = include_str!("condition_evaluator.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let parse = production
+            .split("fn parse_termination_date")
+            .nth(1)
+            .expect("parse_termination_date");
+        assert!(
+            !parse.contains(".ok()") && !parse.contains("unwrap_or"),
+            "malformed termination_date must not look like an unset leaver date"
         );
     }
 }

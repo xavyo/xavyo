@@ -100,29 +100,26 @@ impl TemplateRuleService {
 
         // Validate expression syntax
         if let Err(e) = self.expression_service.validate(&input.expression) {
-            return Err(GovernanceError::TemplateRuleExpressionError {
-                rule_id: Uuid::nil(),
-                message: e.to_string(),
-            });
+            return Err(GovernanceError::Validation(format!(
+                "Invalid template rule expression: {e}"
+            )));
         }
 
         // Validate condition expression if present
         if let Some(ref condition) = input.condition {
             if let Err(e) = self.expression_service.validate(condition) {
-                return Err(GovernanceError::TemplateRuleExpressionError {
-                    rule_id: Uuid::nil(),
-                    message: format!("Invalid condition: {e}"),
-                });
+                return Err(GovernanceError::Validation(format!(
+                    "Invalid template rule condition: {e}"
+                )));
             }
         }
 
         // Validate time constraints if present
         if let (Some(from), Some(to)) = (input.time_from, input.time_to) {
             if from >= to {
-                return Err(GovernanceError::TemplateRuleExpressionError {
-                    rule_id: Uuid::nil(),
-                    message: "time_from must be before time_to".to_string(),
-                });
+                return Err(GovernanceError::Validation(
+                    "time_from must be before time_to".to_string(),
+                ));
             }
         }
 
@@ -582,6 +579,27 @@ mod tests {
             production.contains("template_rule_json(")
                 && !production.contains("to_value(&rule).unwrap_or_default()"),
             "template rule persist must fail closed on JSON serialize"
+        );
+    }
+
+    #[test]
+    fn add_rule_validation_does_not_use_nil_rule_id() {
+        let src = include_str!("template_rule_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let add = production
+            .split("pub async fn add_rule")
+            .nth(1)
+            .expect("add_rule")
+            .split("pub async fn update_rule")
+            .next()
+            .expect("add_rule body");
+        assert!(
+            !add.contains("Uuid::nil()"),
+            "add_rule must not report expression errors against a nil rule id"
+        );
+        assert!(
+            add.contains("GovernanceError::Validation"),
+            "add_rule expression errors must use Validation, not a nil rule id"
         );
     }
 }

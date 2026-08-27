@@ -277,11 +277,12 @@ impl GovTemplateMergePolicy {
     }
 
     /// Get the source precedence as a Vec<String>.
-    #[must_use]
-    pub fn get_source_precedence(&self) -> Option<Vec<String>> {
-        self.source_precedence
-            .as_ref()
-            .and_then(|v| serde_json::from_value(v.clone()).ok())
+    /// Corrupt JSON must not look like missing precedence.
+    pub fn get_source_precedence(&self) -> Result<Option<Vec<String>>, serde_json::Error> {
+        match &self.source_precedence {
+            None => Ok(None),
+            Some(v) => serde_json::from_value(v.clone()).map(Some),
+        }
     }
 
     /// Check if this policy uses source precedence strategy.
@@ -375,6 +376,35 @@ mod tests {
             production.contains("merge_policy_json(")
                 && !production.contains("unwrap_or(serde_json::Value::Null)"),
             "template merge policy persist must fail closed on JSON serialize"
+        );
+    }
+
+    #[test]
+    fn get_source_precedence_does_not_default_on_invalid_json() {
+        let mut policy = GovTemplateMergePolicy {
+            id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            template_id: Uuid::new_v4(),
+            attribute: "employeeNumber".to_string(),
+            strategy: TemplateMergeStrategy::SourcePrecedence,
+            source_precedence: Some(serde_json::json!(123)),
+            null_handling: TemplateNullHandling::default(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        assert!(policy.get_source_precedence().is_err());
+        policy.source_precedence = None;
+        assert_eq!(policy.get_source_precedence().unwrap(), None);
+        policy.source_precedence = Some(serde_json::json!(["hr_system"]));
+        assert_eq!(
+            policy.get_source_precedence().unwrap(),
+            Some(vec!["hr_system".to_string()])
+        );
+        let src = include_str!("gov_template_merge_policy.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("from_value(v.clone()).ok()"),
+            "merge policy source_precedence must fail closed on JSON parse"
         );
     }
 }
