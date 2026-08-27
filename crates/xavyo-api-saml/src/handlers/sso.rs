@@ -427,18 +427,17 @@ async fn handle_sso<'a>(
         attribute_name: sp_group_config.attribute_name,
         value_format: crate::models::group_config::GroupValueFormat::parse(
             &sp_group_config.value_format,
-        ),
-        filter: sp_group_config
-            .filter
-            .map(|f| crate::models::group_config::GroupFilter {
-                filter_type: match f.filter_type.as_str() {
-                    "pattern" => crate::models::group_config::GroupFilterType::Pattern,
-                    "allowlist" => crate::models::group_config::GroupFilterType::Allowlist,
-                    _ => crate::models::group_config::GroupFilterType::None,
-                },
+        )
+        .map_err(SamlError::AssertionGenerationFailed)?,
+        filter: match sp_group_config.filter {
+            None => None,
+            Some(f) => Some(crate::models::group_config::GroupFilter {
+                filter_type: crate::models::group_config::GroupFilterType::parse(&f.filter_type)
+                    .map_err(SamlError::AssertionGenerationFailed)?,
                 patterns: f.patterns,
                 allowlist: f.allowlist,
             }),
+        },
         include_groups: sp_group_config.include_groups,
         omit_empty_groups: sp_group_config.omit_empty_groups,
         dn_base: sp_group_config.dn_base,
@@ -558,6 +557,22 @@ mod tests {
         assert!(
             !normalize.contains("unwrap_or(\"\")"),
             "ACS URL normalize must not treat a missing host as empty"
+        );
+    }
+
+    #[test]
+    fn unknown_group_config_does_not_fail_open() {
+        let src = include_str!("sso.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("GroupValueFormat::parse(")
+                && production.contains("GroupFilterType::parse(")
+                && production.contains("map_err(SamlError::AssertionGenerationFailed)?"),
+            "unknown SAML group format/filter must fail closed, not include all groups"
+        );
+        assert!(
+            !production.contains("_ => crate::models::group_config::GroupFilterType::None"),
+            "unknown group filter type must not include every group"
         );
     }
 }
