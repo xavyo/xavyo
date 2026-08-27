@@ -129,6 +129,17 @@ impl NhiPermissionService {
         Ok(perms)
     }
 
+    /// Count tools an agent has permission to use (excluding expired).
+    pub async fn count_agent_tools(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        agent_nhi_id: Uuid,
+    ) -> Result<i64, NhiApiError> {
+        NhiToolPermission::count_by_agent(pool, tenant_id, agent_nhi_id)
+            .await
+            .map_err(NhiApiError::Database)
+    }
+
     /// List agents that have permission to use a tool (excluding expired).
     pub async fn list_tool_agents(
         pool: &PgPool,
@@ -140,6 +151,17 @@ impl NhiPermissionService {
         let perms =
             NhiToolPermission::list_by_tool(pool, tenant_id, tool_nhi_id, limit, offset).await?;
         Ok(perms)
+    }
+
+    /// Count agents that have permission to use a tool (excluding expired).
+    pub async fn count_tool_agents(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        tool_nhi_id: Uuid,
+    ) -> Result<i64, NhiApiError> {
+        NhiToolPermission::count_by_tool(pool, tenant_id, tool_nhi_id)
+            .await
+            .map_err(NhiApiError::Database)
     }
 
     /// Cascade revoke all permissions for an NHI (called on archive).

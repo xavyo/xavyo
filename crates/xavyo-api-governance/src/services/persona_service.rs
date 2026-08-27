@@ -576,7 +576,7 @@ impl PersonaService {
         &self,
         tenant_id: Uuid,
         persona_id: Uuid,
-    ) -> Result<GovPersona> {
+    ) -> Result<(GovPersona, serde_json::Map<String, serde_json::Value>)> {
         let persona = self.get(tenant_id, persona_id).await?;
 
         // Get archetype
@@ -617,17 +617,21 @@ impl PersonaService {
         }
 
         // Update persona with new inherited attributes
-        let updated =
-            GovPersona::update_inherited_attributes(&self.pool, tenant_id, persona_id, inherited)
-                .await?
-                .ok_or(GovernanceError::PersonaNotFound(persona_id))?;
+        let updated = GovPersona::update_inherited_attributes(
+            &self.pool,
+            tenant_id,
+            persona_id,
+            inherited.clone(),
+        )
+        .await?
+        .ok_or(GovernanceError::PersonaNotFound(persona_id))?;
 
         info!(
             persona_id = %persona_id,
             "Persona attributes propagated"
         );
 
-        Ok(updated)
+        Ok((updated, inherited))
     }
 
     // =========================================================================

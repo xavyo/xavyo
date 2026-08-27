@@ -184,6 +184,44 @@ impl NhiNhiPermission {
         .await
     }
 
+    /// Count non-expired permissions where this NHI is the source (callees).
+    pub async fn count_by_source(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        source_nhi_id: Uuid,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar(
+            r"
+            SELECT COUNT(*) FROM nhi_nhi_permissions
+            WHERE tenant_id = $1 AND source_nhi_id = $2
+              AND (expires_at IS NULL OR expires_at > NOW())
+            ",
+        )
+        .bind(tenant_id)
+        .bind(source_nhi_id)
+        .fetch_one(pool)
+        .await
+    }
+
+    /// Count non-expired permissions where this NHI is the target (callers).
+    pub async fn count_by_target(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        target_nhi_id: Uuid,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar(
+            r"
+            SELECT COUNT(*) FROM nhi_nhi_permissions
+            WHERE tenant_id = $1 AND target_nhi_id = $2
+              AND (expires_at IS NULL OR expires_at > NOW())
+            ",
+        )
+        .bind(tenant_id)
+        .bind(target_nhi_id)
+        .fetch_one(pool)
+        .await
+    }
+
     /// Revoke a permission by source-target-type triple.
     pub async fn revoke(
         pool: &PgPool,

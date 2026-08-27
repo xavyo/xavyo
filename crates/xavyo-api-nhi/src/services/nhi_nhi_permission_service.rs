@@ -156,6 +156,17 @@ impl NhiNhiPermissionService {
         Ok(perms)
     }
 
+    /// Count NHIs that have calling permission TO a target NHI (callers).
+    pub async fn count_callers(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        target_nhi_id: Uuid,
+    ) -> Result<i64, NhiApiError> {
+        NhiNhiPermission::count_by_target(pool, tenant_id, target_nhi_id)
+            .await
+            .map_err(NhiApiError::Database)
+    }
+
     /// List NHIs that a source NHI has calling permission FOR (callees).
     pub async fn list_callees(
         pool: &PgPool,
@@ -167,6 +178,17 @@ impl NhiNhiPermissionService {
         let perms =
             NhiNhiPermission::list_by_source(pool, tenant_id, source_nhi_id, limit, offset).await?;
         Ok(perms)
+    }
+
+    /// Count NHIs that a source NHI has calling permission FOR (callees).
+    pub async fn count_callees(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        source_nhi_id: Uuid,
+    ) -> Result<i64, NhiApiError> {
+        NhiNhiPermission::count_by_source(pool, tenant_id, source_nhi_id)
+            .await
+            .map_err(NhiApiError::Database)
     }
 
     /// Cascade revoke all NHI-to-NHI permissions involving an NHI (called on archive).
