@@ -4,6 +4,7 @@
 //! - `POST /sod/check` — Check if granting a permission would violate SoD rules
 //! - `POST /sod/rules` — Create a SoD rule
 //! - `GET /sod/rules` — List SoD rules
+//! - `GET /sod/rules/{id}` — Get a SoD rule
 //! - `DELETE /sod/rules/{id}` — Delete a SoD rule
 //!
 //! SoD rules define tool permission combinations that are prohibited or warned about.
@@ -13,7 +14,7 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{delete, post},
+    routing::{get, post},
     Extension, Json, Router,
 };
 use chrono::{DateTime, Utc};
@@ -242,6 +243,46 @@ pub async fn list_sod_rules(
     }))
 }
 
+/// GET /sod/rules/{id} — Get a SoD rule.
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/sod/rules/{id}",
+    tag = "NHI SoD",
+    operation_id = "getNhiSodRule",
+    params(
+        ("id" = Uuid, Path, description = "SoD rule ID")
+    ),
+    responses(
+        (status = 200, description = "SoD rule", body = SodRule),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "SoD rule not found")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn get_sod_rule(
+    State(state): State<NhiState>,
+    Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<SodRule>, NhiApiError> {
+    if !claims.has_role("admin") {
+        return Err(NhiApiError::Forbidden);
+    }
+
+    let tenant_uuid = *tenant_id.as_uuid();
+    let row: Option<SodRuleRow> =
+        sqlx::query_as(r"SELECT * FROM nhi_sod_rules WHERE tenant_id = $1 AND id = $2")
+            .bind(tenant_uuid)
+            .bind(id)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(NhiApiError::Database)?;
+
+    let row = row.ok_or(NhiApiError::NotFound)?;
+    Ok(Json(SodRule::try_from(row)?))
+}
+
 /// DELETE /sod/rules/{id} — Delete a SoD rule.
 #[cfg_attr(feature = "openapi", utoipa::path(
     delete,
@@ -429,7 +470,7 @@ fn parse_enforcement(s: &str) -> Result<SodEnforcement, NhiApiError> {
 pub fn sod_routes(state: NhiState) -> Router {
     Router::new()
         .route("/sod/rules", post(create_sod_rule).get(list_sod_rules))
-        .route("/sod/rules/:id", delete(delete_sod_rule))
+        .route("/sod/rules/:id", get(get_sod_rule).delete(delete_sod_rule))
         .route("/sod/check", post(check_sod))
         .with_state(state)
 }
@@ -454,6 +495,22 @@ mod tests {
         assert!(
             !production.contains("_ => SodEnforcement::Warn"),
             "unknown SoD enforcement must not weaken Prevent to Warn"
+        );
+    }
+
+    #[test]
+    fn get_sod_rule_is_tenant_scoped() {
+        let src = include_str!("sod.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let get = production
+            .split("pub async fn get_sod_rule")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_sod_rule");
+        assert!(
+            get.contains("WHERE tenant_id = $1 AND id = $2")
+                && get.contains("NhiApiError::NotFound"),
+            "GET /nhi/sod/rules/{{id}} must load the tenant-scoped row"
         );
     }
 

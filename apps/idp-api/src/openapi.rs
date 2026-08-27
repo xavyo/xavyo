@@ -1228,6 +1228,7 @@ impl Modify for SecurityAddon {
         // NHI SoD
         xavyo_api_nhi::handlers::sod::create_sod_rule,
         xavyo_api_nhi::handlers::sod::list_sod_rules,
+        xavyo_api_nhi::handlers::sod::get_sod_rule,
         xavyo_api_nhi::handlers::sod::delete_sod_rule,
         xavyo_api_nhi::handlers::sod::check_sod,
         // NHI Inactivity
