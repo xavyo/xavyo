@@ -9,7 +9,8 @@ use uuid::Uuid;
 
 use xavyo_db::{
     models::org_security_policy::{
-        CreateOrgSecurityPolicy, EffectiveOrgPolicy, OrgPolicyType, OrgSecurityPolicy, PolicySource,
+        CreateOrgSecurityPolicy, EffectiveOrgPolicy, EffectivePolicyRow, OrgPolicyType,
+        OrgSecurityPolicy, PolicySource,
     },
     models::Group,
     TenantMfaPolicy, TenantPasswordPolicy, TenantSessionPolicy,
@@ -46,6 +47,47 @@ pub enum OrgPolicyError {
 /// errors to `required: false`.
 pub(crate) fn tenant_mfa_is_required(policy: &TenantMfaPolicy) -> bool {
     policy.mfa_policy.to_string() == "required"
+}
+
+/// Stored org policy JSON. NULL or a non-object must not look like `{}` (MFA off).
+fn require_policy_config(
+    config: Option<serde_json::Value>,
+) -> Result<serde_json::Value, OrgPolicyError> {
+    match config {
+        Some(v @ serde_json::Value::Object(_)) => Ok(v),
+        Some(_) => Err(OrgPolicyError::InvalidConfig(
+            "organization policy config must be a JSON object".to_string(),
+        )),
+        None => Err(OrgPolicyError::InvalidConfig(
+            "organization policy config is missing".to_string(),
+        )),
+    }
+}
+
+/// Source attribution. Missing group_id must not be rewritten as the requested org.
+fn effective_policy_source(row: &EffectivePolicyRow) -> Result<PolicySource, OrgPolicyError> {
+    let group_id = row.group_id.ok_or_else(|| {
+        OrgPolicyError::InvalidConfig("effective policy missing group_id".to_string())
+    })?;
+    let group_name = row
+        .group_name
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            OrgPolicyError::InvalidConfig("effective policy missing group_name".to_string())
+        })?
+        .to_string();
+    if row.depth == 0 {
+        Ok(PolicySource::Local {
+            group_id,
+            group_name,
+        })
+    } else {
+        Ok(PolicySource::Inherited {
+            group_id,
+            group_name,
+        })
+    }
 }
 
 /// Treat missing org/policy as absent; other errors refuse the request.
@@ -174,20 +216,9 @@ impl OrgPolicyService {
             OrgSecurityPolicy::get_effective_policy(&self.pool, tenant_id, group_id, policy_type)
                 .await?
         {
-            let source = if row.depth == 0 {
-                PolicySource::Local {
-                    group_id: row.group_id.unwrap_or(group_id),
-                    group_name: row.group_name.unwrap_or_default(),
-                }
-            } else {
-                PolicySource::Inherited {
-                    group_id: row.group_id.unwrap_or(group_id),
-                    group_name: row.group_name.unwrap_or_default(),
-                }
-            };
-
+            let source = effective_policy_source(&row)?;
             return Ok(EffectiveOrgPolicy {
-                config: row.config.unwrap_or(serde_json::json!({})),
+                config: require_policy_config(row.config)?,
                 source,
                 policy_type,
             });
@@ -264,17 +295,32 @@ impl OrgPolicyService {
                 .await?;
 
         for parent in parent_policies.iter().filter(|p| p.depth > 0) {
-            if let Some(ref parent_config) = parent.config {
-                if let Some(warning) = self.check_conflict(
-                    policy_type,
-                    config,
-                    parent_config,
-                    parent.group_id.unwrap_or(Uuid::nil()),
-                    &parent.group_name.clone().unwrap_or_default(),
-                    true, // is_parent
-                )? {
-                    warnings.push(warning);
+            let parent_config = require_policy_config(parent.config.clone())?;
+            let parent_source = effective_policy_source(parent)?;
+            let (parent_id, parent_name) = match parent_source {
+                PolicySource::Local {
+                    group_id,
+                    group_name,
                 }
+                | PolicySource::Inherited {
+                    group_id,
+                    group_name,
+                } => (group_id, group_name),
+                PolicySource::TenantDefault => {
+                    return Err(OrgPolicyError::InvalidConfig(
+                        "hierarchy policy missing group attribution".to_string(),
+                    ));
+                }
+            };
+            if let Some(warning) = self.check_conflict(
+                policy_type,
+                config,
+                &parent_config,
+                parent_id,
+                &parent_name,
+                true, // is_parent
+            )? {
+                warnings.push(warning);
             }
         }
 
@@ -674,6 +720,60 @@ mod tests {
             "db".into(),
         ))));
         assert!(matches!(err, Err(ApiAuthError::Internal(_))));
+    }
+
+    #[test]
+    fn require_policy_config_does_not_default_null_to_empty_object() {
+        assert!(require_policy_config(None).is_err());
+        assert!(require_policy_config(Some(serde_json::json!("nope"))).is_err());
+        assert!(require_policy_config(Some(serde_json::json!({ "required": true }))).is_ok());
+        let src = include_str!("org_policy_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(serde_json::json!({}))")
+                && !production.contains("unwrap_or(group_id)")
+                && !production.contains("unwrap_or(Uuid::nil())")
+                && !production.contains("unwrap_or_default()"),
+            "effective org policy must not treat missing config as empty or rewrite group_id"
+        );
+    }
+
+    #[test]
+    fn effective_policy_source_does_not_invent_group() {
+        let missing_id = EffectivePolicyRow {
+            id: None,
+            group_id: None,
+            group_name: Some("Eng".into()),
+            config: Some(serde_json::json!({})),
+            depth: 0,
+        };
+        assert!(effective_policy_source(&missing_id).is_err());
+        let missing_name = EffectivePolicyRow {
+            id: None,
+            group_id: Some(Uuid::new_v4()),
+            group_name: None,
+            config: Some(serde_json::json!({})),
+            depth: 1,
+        };
+        assert!(effective_policy_source(&missing_name).is_err());
+        let gid = Uuid::new_v4();
+        let ok = EffectivePolicyRow {
+            id: None,
+            group_id: Some(gid),
+            group_name: Some("Eng".into()),
+            config: Some(serde_json::json!({})),
+            depth: 0,
+        };
+        match effective_policy_source(&ok).unwrap() {
+            PolicySource::Local {
+                group_id,
+                group_name,
+            } => {
+                assert_eq!(group_id, gid);
+                assert_eq!(group_name, "Eng");
+            }
+            other => panic!("expected local source, got {other:?}"),
+        }
     }
 
     #[test]

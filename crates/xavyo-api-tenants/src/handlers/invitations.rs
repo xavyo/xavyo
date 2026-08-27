@@ -119,7 +119,7 @@ pub async fn create_invitation_handler(
         StatusCode::CREATED,
         Json(InvitationResponse {
             id: invitation.id,
-            email: invitation.email.unwrap_or_default(),
+            email: invitation_email(invitation.email)?,
             role: request.role,
             status: invitation.status,
             created_at: invitation.created_at,
@@ -200,16 +200,18 @@ pub async fn list_invitations_handler(
 
     let responses: Vec<InvitationResponse> = invitations
         .into_iter()
-        .map(|inv| InvitationResponse {
-            id: inv.id,
-            email: inv.email.unwrap_or_default(),
-            role: inv.role,
-            status: inv.status,
-            created_at: inv.created_at,
-            expires_at: inv.expires_at,
-            invited_by: inv.invited_by_user_id,
+        .map(|inv| {
+            Ok(InvitationResponse {
+                id: inv.id,
+                email: invitation_email(inv.email)?,
+                role: inv.role,
+                status: inv.status,
+                created_at: inv.created_at,
+                expires_at: inv.expires_at,
+                invited_by: inv.invited_by_user_id,
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, TenantError>>()?;
 
     Ok(Json(InvitationListResponse {
         invitations: responses,
@@ -307,7 +309,7 @@ pub async fn cancel_invitation_handler(
 
     Ok(Json(InvitationResponse {
         id: invitation.id,
-        email: invitation.email.unwrap_or_default(),
+        email: invitation_email(invitation.email)?,
         role: invitation.role,
         status: invitation.status,
         created_at: invitation.created_at,
@@ -403,6 +405,16 @@ pub(crate) fn invitation_accept_ip(
         }
     }
     peer.map(|ip| ip.to_string())
+}
+
+/// Stored invitation email. NULL/empty must not look like a blank invitee.
+fn invitation_email(email: Option<String>) -> Result<String, TenantError> {
+    match email {
+        Some(e) if !e.is_empty() => Ok(e),
+        _ => Err(TenantError::Internal(
+            "Invitation is missing email".to_string(),
+        )),
+    }
 }
 
 #[cfg(test)]
@@ -572,6 +584,19 @@ mod tests {
         assert!(
             production.contains("trust_xff.is_some()"),
             "forwarded headers require TrustXff"
+        );
+    }
+
+    #[test]
+    fn invitation_email_does_not_default_missing() {
+        assert_eq!(invitation_email(Some("a@b.com".into())).unwrap(), "a@b.com");
+        assert!(invitation_email(None).is_err());
+        assert!(invitation_email(Some(String::new())).is_err());
+        let src = include_str!("invitations.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("email.unwrap_or_default()"),
+            "invitation GET must not hide a missing email as empty"
         );
     }
 

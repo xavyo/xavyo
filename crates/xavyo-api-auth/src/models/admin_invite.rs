@@ -150,11 +150,13 @@ pub struct InvitationResponse {
     pub accepted_at: Option<DateTime<Utc>>,
 }
 
-impl From<xavyo_db::models::UserInvitation> for InvitationResponse {
-    fn from(inv: xavyo_db::models::UserInvitation) -> Self {
-        Self {
+impl TryFrom<xavyo_db::models::UserInvitation> for InvitationResponse {
+    type Error = String;
+
+    fn try_from(inv: xavyo_db::models::UserInvitation) -> Result<Self, Self::Error> {
+        Ok(Self {
             id: inv.id,
-            email: inv.email.unwrap_or_default(),
+            email: invitation_email(inv.email)?,
             status: inv.status,
             role: inv.role,
             role_template_id: inv.role_template_id,
@@ -162,7 +164,15 @@ impl From<xavyo_db::models::UserInvitation> for InvitationResponse {
             expires_at: inv.expires_at,
             created_at: inv.created_at,
             accepted_at: inv.accepted_at,
-        }
+        })
+    }
+}
+
+/// Stored invitation email. NULL/empty must not look like a blank invitee.
+pub(crate) fn invitation_email(email: Option<String>) -> Result<String, String> {
+    match email {
+        Some(e) if !e.is_empty() => Ok(e),
+        _ => Err("Invitation is missing email".to_string()),
     }
 }
 
@@ -228,6 +238,13 @@ mod tests {
             role: Some("invalid".to_string()),
         };
         assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn invitation_email_does_not_default_missing() {
+        assert_eq!(invitation_email(Some("a@b.com".into())).unwrap(), "a@b.com");
+        assert!(invitation_email(None).is_err());
+        assert!(invitation_email(Some(String::new())).is_err());
     }
 
     #[test]

@@ -89,11 +89,11 @@ pub async fn suspend_tenant_handler(
             tenant_id = %tenant_id,
             "Tenant already suspended (idempotent success)"
         );
-        return Ok(Json(SuspendTenantResponse {
+        return Ok(Json(suspend_response(
             tenant_id,
-            suspended_at: target_tenant.suspended_at.unwrap_or_else(chrono::Utc::now),
-            suspension_reason: target_tenant.suspension_reason.unwrap_or_default(),
-        }));
+            target_tenant.suspended_at,
+            target_tenant.suspension_reason,
+        )?));
     }
 
     // Suspend the tenant
@@ -132,13 +132,11 @@ pub async fn suspend_tenant_handler(
         "Tenant suspended"
     );
 
-    Ok(Json(SuspendTenantResponse {
+    Ok(Json(suspend_response(
         tenant_id,
-        suspended_at: suspended_tenant
-            .suspended_at
-            .unwrap_or_else(chrono::Utc::now),
-        suspension_reason: request.reason,
-    }))
+        suspended_tenant.suspended_at,
+        Some(request.reason),
+    )?))
 }
 
 /// POST /system/tenants/{id}/reactivate
@@ -308,8 +306,53 @@ pub async fn get_tenant_status_handler(
     }))
 }
 
+/// Suspend response. Missing timestamp/reason must not look like a successful suspend.
+fn suspend_response(
+    tenant_id: Uuid,
+    suspended_at: Option<chrono::DateTime<chrono::Utc>>,
+    reason: Option<String>,
+) -> Result<SuspendTenantResponse, TenantError> {
+    let suspended_at = suspended_at.ok_or_else(|| {
+        TenantError::Internal("Suspended tenant is missing suspended_at".to_string())
+    })?;
+    let suspension_reason = match reason {
+        Some(r) if !r.is_empty() => r,
+        _ => {
+            return Err(TenantError::Internal(
+                "Suspended tenant is missing suspension_reason".to_string(),
+            ));
+        }
+    };
+    Ok(SuspendTenantResponse {
+        tenant_id,
+        suspended_at,
+        suspension_reason,
+    })
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn suspend_response_does_not_invent_timestamp_or_reason() {
+        let id = uuid::Uuid::new_v4();
+        assert!(suspend_response(id, None, Some("tos".into())).is_err());
+        assert!(suspend_response(id, Some(chrono::Utc::now()), None).is_err());
+        assert!(suspend_response(id, Some(chrono::Utc::now()), Some(String::new())).is_err());
+        let at = chrono::Utc::now();
+        let ok = suspend_response(id, Some(at), Some("tos".into())).unwrap();
+        assert_eq!(ok.suspension_reason, "tos");
+        assert_eq!(ok.suspended_at, at);
+        let src = include_str!("suspend.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or_else(chrono::Utc::now)")
+                && !production.contains("unwrap_or_default()"),
+            "suspend must not invent now or an empty reason"
+        );
+    }
+
     #[test]
     fn suspend_mutations_do_not_swallow_audit_errors() {
         let src = include_str!("suspend.rs");

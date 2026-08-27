@@ -83,7 +83,7 @@ pub async fn create_invitation_handler(
 
     Ok((
         StatusCode::CREATED,
-        Json(InvitationResponse::from(invitation)),
+        Json(InvitationResponse::try_from(invitation).map_err(ApiAuthError::Internal)?),
     ))
 }
 
@@ -160,7 +160,9 @@ pub async fn resend_invitation_handler(
         .resend_invitation(tenant_uuid, id, admin_user_id, ip_address, user_agent)
         .await?;
 
-    Ok(Json(InvitationResponse::from(invitation)))
+    Ok(Json(
+        InvitationResponse::try_from(invitation).map_err(ApiAuthError::Internal)?,
+    ))
 }
 
 /// DELETE /admin/invitations/{id} - Cancel an invitation.
@@ -201,7 +203,9 @@ pub async fn cancel_invitation_handler(
         .cancel_invitation(tenant_uuid, id, admin_user_id, ip_address, user_agent)
         .await?;
 
-    Ok(Json(InvitationResponse::from(invitation)))
+    Ok(Json(
+        InvitationResponse::try_from(invitation).map_err(ApiAuthError::Internal)?,
+    ))
 }
 
 /// GET /admin/invitations - List invitations.
@@ -240,10 +244,25 @@ pub async fn list_invitations_handler(
     Ok(Json(InvitationListResponse {
         invitations: invitations
             .into_iter()
-            .map(InvitationResponse::from)
-            .collect(),
+            .map(InvitationResponse::try_from)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(ApiAuthError::Internal)?,
         total,
         limit: query.limit,
         offset: query.offset,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn invitation_handlers_use_try_from() {
+        let src = include_str!("admin_invite.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("InvitationResponse::try_from")
+                && !production.contains("InvitationResponse::from("),
+            "admin invitation GET must not hide a missing email as empty"
+        );
+    }
 }
