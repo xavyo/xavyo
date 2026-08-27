@@ -77,14 +77,17 @@ fn resolve_single_attribute(
     })
 }
 
-/// Get the `NameID` value based on configuration
+/// Get the `NameID` value based on configuration.
+///
+/// Unknown sources must not silently become email — that would issue the
+/// wrong subject in a SAML assertion.
 #[must_use]
 pub fn get_name_id_value(user: &UserAttributes, name_id_source: &str) -> Option<String> {
     match name_id_source {
         "email" => Some(user.email.clone()),
         "user_id" => Some(user.user_id.clone()),
         "display_name" => user.display_name.clone(),
-        _ => Some(user.email.clone()), // Default to email
+        _ => None,
     }
 }
 
@@ -133,7 +136,10 @@ pub fn is_supported_nameid_format(format: &str) -> bool {
     )
 }
 
-/// Get `NameID` value for the specified format
+/// Get `NameID` value for the specified format.
+///
+/// Unsupported formats must not silently become email. Pair with
+/// [`is_supported_nameid_format`].
 pub fn get_nameid_for_format(
     user: &UserAttributes,
     format: &str,
@@ -147,7 +153,7 @@ pub fn get_nameid_for_format(
                 .map(String::from)
                 .unwrap_or_else(|| format!("_transient_{}", uuid::Uuid::new_v4())),
         ),
-        _ => Some(user.email.clone()), // Default to email
+        _ => None,
     }
 }
 
@@ -175,6 +181,58 @@ mod tests {
         assert_eq!(
             get_name_id_value(&user, "user_id"),
             Some("user-123".to_string())
+        );
+        assert_eq!(
+            get_name_id_value(&user, "display_name"),
+            Some("Test User".to_string())
+        );
+        assert!(
+            get_name_id_value(&user, "password").is_none(),
+            "unknown NameID source must not become email"
+        );
+        let src = include_str!("attributes.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let name_id = production
+            .split("pub fn get_name_id_value")
+            .nth(1)
+            .and_then(|s| s.split("pub fn ").next())
+            .expect("get_name_id_value");
+        assert!(
+            !name_id.contains("_ => Some(user.email.clone())"),
+            "unknown NameID source must not default to email"
+        );
+    }
+
+    #[test]
+    fn unknown_nameid_format_is_rejected() {
+        let user = test_user();
+        assert_eq!(
+            get_nameid_for_format(&user, NAMEID_FORMAT_EMAIL, None),
+            Some("test@example.com".to_string())
+        );
+        assert_eq!(
+            get_nameid_for_format(&user, NAMEID_FORMAT_PERSISTENT, None),
+            Some("user-123".to_string())
+        );
+        assert!(
+            get_nameid_for_format(
+                &user,
+                "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified",
+                None
+            )
+            .is_none(),
+            "unsupported NameID format must not become email"
+        );
+        let src = include_str!("attributes.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let format_fn = production
+            .split("pub fn get_nameid_for_format")
+            .nth(1)
+            .and_then(|s| s.split("pub fn ").next())
+            .expect("get_nameid_for_format");
+        assert!(
+            !format_fn.contains("_ => Some(user.email.clone())"),
+            "unsupported NameID format must not default to email"
         );
     }
 

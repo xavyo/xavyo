@@ -305,14 +305,7 @@ impl LdapConnector {
     /// SECURITY: The naming attribute value is escaped per RFC 4514 to prevent
     /// LDAP injection through malicious attribute values.
     fn build_dn(&self, object_class: &str, attrs: &AttributeSet) -> ConnectorResult<String> {
-        // Try to get the naming attribute (usually cn, uid, or ou)
-        let naming_attr = match object_class.to_lowercase().as_str() {
-            "person" | "inetorgperson" | "organizationalperson" | "user" => "cn",
-            "posixaccount" => "uid",
-            "group" | "groupofnames" | "groupofuniquenames" | "posixgroup" => "cn",
-            "organizationalunit" => "ou",
-            _ => "cn",
-        };
+        let naming_attr = naming_attribute_for_object_class(object_class)?;
 
         let naming_value = attrs
             .get(naming_attr)
@@ -342,6 +335,23 @@ impl LdapConnector {
 ///
 /// An empty or non-string value must not become `cn=,dc=...` — that would
 /// create (or look up) an entry under a forged empty RDN.
+/// Naming RDN attribute for well-known object classes.
+///
+/// Unknown classes must not guess `cn` — that would create the wrong DN.
+fn naming_attribute_for_object_class(object_class: &str) -> ConnectorResult<&'static str> {
+    match object_class.to_lowercase().as_str() {
+        "person" | "inetorgperson" | "organizationalperson" | "user" | "computer" => Ok("cn"),
+        "posixaccount" => Ok("uid"),
+        "group" | "groupofnames" | "groupofuniquenames" | "posixgroup" => Ok("cn"),
+        "organizationalunit" => Ok("ou"),
+        other => Err(ConnectorError::InvalidData {
+            message: format!(
+                "Unsupported object class '{other}' for DN construction. Supported: person, inetOrgPerson, organizationalPerson, user, computer, posixAccount, group, groupOfNames, groupOfUniqueNames, posixGroup, organizationalUnit"
+            ),
+        }),
+    }
+}
+
 fn naming_attribute_string(naming_value: &AttributeValue) -> ConnectorResult<String> {
     let s = match naming_value {
         AttributeValue::String(s) => s.clone(),
@@ -1457,6 +1467,43 @@ mod tests {
         assert!(
             !production.contains("unwrap_or_default()"),
             "LDAP naming attribute must not become an empty DN"
+        );
+    }
+
+    #[test]
+    fn unknown_object_class_does_not_guess_cn() {
+        assert_eq!(
+            naming_attribute_for_object_class("inetOrgPerson").unwrap(),
+            "cn"
+        );
+        assert_eq!(
+            naming_attribute_for_object_class("posixAccount").unwrap(),
+            "uid"
+        );
+        assert_eq!(
+            naming_attribute_for_object_class("organizationalUnit").unwrap(),
+            "ou"
+        );
+        let err = naming_attribute_for_object_class("mysteryClass").unwrap_err();
+        assert!(
+            matches!(err, ConnectorError::InvalidData { .. }),
+            "got {err:?}"
+        );
+
+        let src = include_str!("connector.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let naming = production
+            .split("fn naming_attribute_for_object_class")
+            .nth(1)
+            .and_then(|s| s.split("fn ").next())
+            .expect("naming_attribute_for_object_class");
+        assert!(
+            !naming.contains("_ => \"cn\""),
+            "unknown LDAP object class must not guess cn as the naming attribute"
+        );
+        assert!(
+            production.contains("naming_attribute_for_object_class(object_class)?"),
+            "build_dn must fail closed on unknown object classes"
         );
     }
 

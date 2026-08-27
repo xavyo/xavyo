@@ -52,6 +52,7 @@ pub mod tenant;
 pub use error::DbError;
 pub use migrations::run_migrations;
 pub use models::{
+    resolve_correlation_sort,
     // Role Mining and Analytics models (F041)
     AccessChange,
     // Enhanced Simulation models (F060)
