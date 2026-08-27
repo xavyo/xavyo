@@ -27,8 +27,20 @@ const DEFAULT_BATCH_SIZE: i64 = 500;
 struct UserInfo {
     id: Uuid,
     manager_id: Option<Uuid>,
-    #[allow(dead_code)]
     created_at: chrono::DateTime<Utc>,
+}
+
+/// Last activity is the most recent successful login, else account creation.
+/// Inventing "365 days ago" would mark brand-new users as inactive orphans.
+fn last_activity_at(
+    last_login_at: Option<chrono::DateTime<Utc>>,
+    created_at: chrono::DateTime<Utc>,
+) -> chrono::DateTime<Utc> {
+    last_login_at.unwrap_or(created_at)
+}
+
+fn days_inactive_between(last_activity: chrono::DateTime<Utc>, now: chrono::DateTime<Utc>) -> i64 {
+    now.signed_duration_since(last_activity).num_days().max(0)
 }
 
 /// Service for reconciliation operations.
@@ -175,16 +187,15 @@ impl ReconciliationService {
                         if existing.is_none() {
                             // Create new detection
                             let days_inactive = if reason == DetectionReason::Inactive {
-                                Self::calculate_days_inactive(&pool, tenant_id, user.id)
+                                Self::calculate_days_inactive(&pool, tenant_id, &user)
                                     .await
                                     .ok()
                             } else {
                                 None
                             };
 
-                            let last_activity = Self::get_last_activity(&pool, tenant_id, user.id)
-                                .await
-                                .ok();
+                            let last_activity =
+                                Self::get_last_activity(&pool, tenant_id, &user).await.ok();
 
                             GovOrphanDetection::create(
                                 &pool,
@@ -323,7 +334,7 @@ impl ReconciliationService {
         user: &UserInfo,
         days_threshold: i32,
     ) -> Result<Option<DetectionReason>> {
-        let days_inactive = Self::calculate_days_inactive(pool, tenant_id, user.id).await?;
+        let days_inactive = Self::calculate_days_inactive(pool, tenant_id, user).await?;
 
         if days_inactive >= i64::from(days_threshold) {
             Ok(Some(DetectionReason::Inactive))
@@ -333,54 +344,52 @@ impl ReconciliationService {
     }
 
     /// Calculate days since last activity for a user.
-    async fn calculate_days_inactive(pool: &PgPool, tenant_id: Uuid, user_id: Uuid) -> Result<i64> {
-        // Get the most recent successful login attempt
+    async fn calculate_days_inactive(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        user: &UserInfo,
+    ) -> Result<i64> {
         let last_logins = LoginAttempt::get_user_history_filtered(
             pool,
             tenant_id,
-            user_id,
-            Some(true), // success = true
-            None,       // start_date
-            None,       // end_date
-            None,       // cursor
-            1,          // limit - just need the most recent
+            user.id,
+            Some(true),
+            None,
+            None,
+            None,
+            1,
         )
         .await
         .map_err(GovernanceError::Database)?;
 
-        let last_activity = last_logins
-            .first()
-            .map(|l| l.created_at)
-            .unwrap_or_else(|| {
-                // If no login history, use user creation date
-                Utc::now() - chrono::Duration::days(365) // Default to 365 days ago if unknown
-            });
-
-        let days = Utc::now().signed_duration_since(last_activity).num_days();
-
-        Ok(days)
+        let last_activity =
+            last_activity_at(last_logins.first().map(|l| l.created_at), user.created_at);
+        Ok(days_inactive_between(last_activity, Utc::now()))
     }
 
     /// Get the last activity timestamp for a user.
     async fn get_last_activity(
         pool: &PgPool,
         tenant_id: Uuid,
-        user_id: Uuid,
+        user: &UserInfo,
     ) -> Result<chrono::DateTime<Utc>> {
         let last_logins = LoginAttempt::get_user_history_filtered(
             pool,
             tenant_id,
-            user_id,
-            Some(true), // success = true
-            None,       // start_date
-            None,       // end_date
-            None,       // cursor
-            1,          // limit
+            user.id,
+            Some(true),
+            None,
+            None,
+            None,
+            1,
         )
         .await
         .map_err(GovernanceError::Database)?;
 
-        Ok(last_logins.first().map_or_else(Utc::now, |l| l.created_at))
+        Ok(last_activity_at(
+            last_logins.first().map(|l| l.created_at),
+            user.created_at,
+        ))
     }
 
     /// Check for orphans that have been resolved.
@@ -945,6 +954,32 @@ mod tests {
     #[test]
     fn test_default_batch_size() {
         assert_eq!(DEFAULT_BATCH_SIZE, 500);
+    }
+
+    #[test]
+    fn no_login_history_uses_created_at_not_365_days() {
+        let created = Utc::now() - chrono::Duration::days(3);
+        let last = last_activity_at(None, created);
+        assert_eq!(last, created);
+        assert_eq!(
+            days_inactive_between(created, created + chrono::Duration::days(3)),
+            3
+        );
+        assert_eq!(
+            days_inactive_between(Utc::now() - chrono::Duration::days(10), Utc::now()),
+            10
+        );
+
+        let src = include_str!("reconciliation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("Duration::days(365)"),
+            "missing login history must not invent 365 days of inactivity"
+        );
+        assert!(
+            production.contains("last_activity_at("),
+            "inactivity must use last login or created_at"
+        );
     }
 
     // =========================================================================

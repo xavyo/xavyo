@@ -331,10 +331,24 @@ impl LdapConnector {
     }
 }
 
-/// Extract a non-empty naming-attribute string for DN construction.
+/// Extra structural/auxiliary classes required by RFC 4512 / AD for a create.
 ///
-/// An empty or non-string value must not become `cn=,dc=...` — that would
-/// create (or look up) an entry under a forged empty RDN.
+/// Known classes must not be created with only `top` plus the primary name.
+fn extra_structural_classes(object_class: &str) -> &'static [&'static str] {
+    match object_class.to_lowercase().as_str() {
+        "inetorgperson" | "user" => &["top", "person", "organizationalPerson"],
+        "organizationalperson" => &["top", "person"],
+        "person" => &["top"],
+        "posixaccount" => &["top", "account"],
+        "computer" => &["top", "person", "organizationalPerson", "user"],
+        "group" | "groupofnames" => &["top", "groupOfNames"],
+        "groupofuniquenames" => &["top", "groupOfUniqueNames"],
+        "posixgroup" => &["top", "posixGroup"],
+        "organizationalunit" => &["top"],
+        _ => &["top"],
+    }
+}
+
 /// Naming RDN attribute for well-known object classes.
 ///
 /// Unknown classes must not guess `cn` — that would create the wrong DN.
@@ -352,6 +366,10 @@ fn naming_attribute_for_object_class(object_class: &str) -> ConnectorResult<&'st
     }
 }
 
+/// Extract a non-empty naming-attribute string for DN construction.
+///
+/// An empty or non-string value must not become `cn=,dc=...` — that would
+/// create (or look up) an entry under a forged empty RDN.
 fn naming_attribute_string(naming_value: &AttributeValue) -> ConnectorResult<String> {
     let s = match naming_value {
         AttributeValue::String(s) => s.clone(),
@@ -1005,27 +1023,10 @@ impl CreateOp for LdapConnector {
         // Build LDAP attributes
         let mut ldap_attrs: Vec<(String, std::collections::HashSet<String>)> = Vec::new();
 
-        // Add objectClass
         let mut oc_set = std::collections::HashSet::new();
         oc_set.insert(object_class.to_string());
-
-        // Add structural object classes based on the primary class
-        match object_class.to_lowercase().as_str() {
-            "inetorgperson" => {
-                oc_set.insert("person".to_string());
-                oc_set.insert("organizationalPerson".to_string());
-            }
-            "user" => {
-                oc_set.insert("person".to_string());
-                oc_set.insert("organizationalPerson".to_string());
-            }
-            "posixaccount" => {
-                oc_set.insert("top".to_string());
-                oc_set.insert("account".to_string());
-            }
-            _ => {
-                oc_set.insert("top".to_string());
-            }
+        for extra in extra_structural_classes(object_class) {
+            oc_set.insert(extra.to_string());
         }
         ldap_attrs.push(("objectClass".to_string(), oc_set));
 
@@ -1504,6 +1505,44 @@ mod tests {
         assert!(
             production.contains("naming_attribute_for_object_class(object_class)?"),
             "build_dn must fail closed on unknown object classes"
+        );
+    }
+
+    #[test]
+    fn ldap_create_adds_structural_parents() {
+        let group: std::collections::HashSet<&str> =
+            extra_structural_classes("group").iter().copied().collect();
+        assert!(group.contains("top") && group.contains("groupOfNames"));
+        let posix: std::collections::HashSet<&str> = extra_structural_classes("posixGroup")
+            .iter()
+            .copied()
+            .collect();
+        assert!(posix.contains("posixGroup") && posix.contains("top"));
+        let computer: std::collections::HashSet<&str> = extra_structural_classes("computer")
+            .iter()
+            .copied()
+            .collect();
+        assert!(computer.contains("user") && computer.contains("person"));
+        let ou: std::collections::HashSet<&str> = extra_structural_classes("organizationalUnit")
+            .iter()
+            .copied()
+            .collect();
+        assert!(ou.contains("top"));
+
+        let src = include_str!("connector.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let create = production
+            .split("async fn create")
+            .nth(1)
+            .and_then(|s| s.split("async fn ").next())
+            .expect("create");
+        assert!(
+            create.contains("extra_structural_classes("),
+            "LDAP create must apply structural parent classes"
+        );
+        assert!(
+            !create.contains("_ => {\n                oc_set.insert(\"top\".to_string())"),
+            "LDAP create must not only insert top for known group/OU/computer classes"
         );
     }
 

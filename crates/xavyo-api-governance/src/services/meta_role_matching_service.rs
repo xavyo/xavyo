@@ -20,6 +20,16 @@ use xavyo_governance::error::{GovernanceError, Result};
 #[cfg(feature = "kafka")]
 use xavyo_events::EventProducer;
 
+/// Combine criteria matches. Unknown logic must not default to AND (which
+/// would apply a meta-role the caller did not ask for).
+fn apply_criteria_logic(logic: &str, all_matched: bool, any_matched: bool) -> Option<bool> {
+    match logic.to_lowercase().as_str() {
+        "and" => Some(all_matched),
+        "or" => Some(any_matched),
+        _ => None,
+    }
+}
+
 /// Result of evaluating meta-role matches for a role.
 #[derive(Debug, Clone)]
 pub struct RoleMatchResult {
@@ -326,12 +336,7 @@ impl MetaRoleMatchingService {
             }
         }
 
-        // Apply logic (AND vs OR)
-        match criteria_logic.to_lowercase().as_str() {
-            "and" => all_matched,
-            "or" => any_matched,
-            _ => all_matched, // Default to AND
-        }
+        apply_criteria_logic(criteria_logic, all_matched, any_matched).unwrap_or(false)
     }
 
     // =========================================================================
@@ -638,6 +643,26 @@ mod tests {
     fn test_criteria_logic() {
         // Test that AND requires all to match
         assert_eq!(CriteriaLogic::default(), CriteriaLogic::And);
+    }
+
+    #[test]
+    fn unknown_criteria_logic_does_not_default_to_and() {
+        assert_eq!(apply_criteria_logic("and", true, false), Some(true));
+        assert_eq!(apply_criteria_logic("OR", false, true), Some(true));
+        assert_eq!(apply_criteria_logic("xor", true, true), None);
+        assert_eq!(apply_criteria_logic("", true, true), None);
+
+        let src = include_str!("meta_role_matching_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let sim = production
+            .split("pub fn role_matches_criteria")
+            .nth(1)
+            .and_then(|s| s.split("pub fn ").next())
+            .expect("role_matches_criteria");
+        assert!(
+            sim.contains("apply_criteria_logic(") && !sim.contains("_ => all_matched"),
+            "unknown meta-role criteria_logic must not default to AND"
+        );
     }
 
     #[test]
