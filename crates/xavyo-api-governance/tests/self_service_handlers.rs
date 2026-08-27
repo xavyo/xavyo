@@ -69,6 +69,7 @@ async fn json_body(response: axum::response::Response) -> Value {
 }
 
 #[tokio::test]
+#[ignore = "Requires database - run locally with DATABASE_URL"]
 async fn non_admin_jwt_drives_self_service_handlers() {
     ensure_siem_key();
     let pool = create_test_pool().await;

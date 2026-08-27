@@ -6,9 +6,12 @@
 //! - Managing pending operations during outages
 //! - Reconciliation between xavyo and target systems
 
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Row};
+use std::collections::HashMap;
+use std::sync::Mutex;
 use thiserror::Error;
 use tracing::instrument;
 use uuid::Uuid;
@@ -570,6 +573,95 @@ impl ShadowRepository {
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
         })
+    }
+}
+
+/// Persistence operations used by the remediation executor.
+#[async_trait]
+pub trait ShadowStore: Send + Sync {
+    /// Create or update a shadow.
+    async fn upsert(&self, shadow: &Shadow) -> ShadowResult<()>;
+
+    /// Find shadow by target UID.
+    async fn find_by_target_uid(
+        &self,
+        tenant_id: Uuid,
+        connector_id: Uuid,
+        target_uid: &str,
+    ) -> ShadowResult<Option<Shadow>>;
+}
+
+#[async_trait]
+impl ShadowStore for ShadowRepository {
+    async fn upsert(&self, shadow: &Shadow) -> ShadowResult<()> {
+        ShadowRepository::upsert(self, shadow).await
+    }
+
+    async fn find_by_target_uid(
+        &self,
+        tenant_id: Uuid,
+        connector_id: Uuid,
+        target_uid: &str,
+    ) -> ShadowResult<Option<Shadow>> {
+        ShadowRepository::find_by_target_uid(self, tenant_id, connector_id, target_uid).await
+    }
+}
+
+/// In-memory [`ShadowStore`] for unit tests without PostgreSQL.
+#[derive(Default)]
+pub struct InMemoryShadowStore {
+    shadows: Mutex<HashMap<(Uuid, Uuid, String), Shadow>>,
+}
+
+impl InMemoryShadowStore {
+    /// Create an empty in-memory shadow store.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Seed a shadow for tests that expect an existing link.
+    pub fn insert(&self, shadow: Shadow) {
+        let key = (
+            shadow.tenant_id,
+            shadow.connector_id,
+            shadow.target_uid.clone(),
+        );
+        self.shadows
+            .lock()
+            .expect("in-memory shadow store lock")
+            .insert(key, shadow);
+    }
+}
+
+#[async_trait]
+impl ShadowStore for InMemoryShadowStore {
+    async fn upsert(&self, shadow: &Shadow) -> ShadowResult<()> {
+        let key = (
+            shadow.tenant_id,
+            shadow.connector_id,
+            shadow.target_uid.clone(),
+        );
+        self.shadows
+            .lock()
+            .expect("in-memory shadow store lock")
+            .insert(key, shadow.clone());
+        Ok(())
+    }
+
+    async fn find_by_target_uid(
+        &self,
+        tenant_id: Uuid,
+        connector_id: Uuid,
+        target_uid: &str,
+    ) -> ShadowResult<Option<Shadow>> {
+        let key = (tenant_id, connector_id, target_uid.to_string());
+        Ok(self
+            .shadows
+            .lock()
+            .expect("in-memory shadow store lock")
+            .get(&key)
+            .cloned())
     }
 }
 
