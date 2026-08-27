@@ -1,8 +1,17 @@
 # Product maturity backlog
 
-Tracking epic: **[#98 — Product maturity](https://github.com/xavyo/xavyo/issues/98)**
+Tracking epic: **[#98 — Product maturity](https://github.com/xavyo/xavyo/issues/98)** — delivered in [PR #114](https://github.com/xavyo/xavyo/pull/114) (+ follow-ups [#115](https://github.com/xavyo/xavyo/pull/115), [xavyo-web#16](https://github.com/xavyo/xavyo-web/pull/16), [xavyo-web#17](https://github.com/xavyo/xavyo-web/pull/17)).
 
 Issue bodies are also stored under [`.github/issues/`](issues/) for editing before `gh issue create`.
+
+## Status (2026-08-27)
+
+| Phase | Status |
+|-------|--------|
+| Phase 1 — Golden path & DX | ✅ Done |
+| Phase 2 — CI gates | ✅ Done |
+| Phase 3 — Operations | ✅ Done |
+| Phase 4 — Crate promotion (SAML/OIDC/SCIM) | ✅ Done (see `docs/crates/maturity-matrix.md`) |
 
 ## Phase 1 — Golden path & DX (start here)
 
