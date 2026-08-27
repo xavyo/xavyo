@@ -77,7 +77,7 @@ async fn test_sod_rule_simulation_detects_violations() {
     assert!(executed.affected_users.contains(&user_id));
 
     // Verify impact summary
-    let impact = executed.parse_impact_summary();
+    let impact = executed.parse_impact_summary().unwrap();
     assert_eq!(impact.affected_users, 1);
     assert_eq!(impact.by_severity.high, 1);
     assert_eq!(impact.by_impact_type.violation, 1);
@@ -144,7 +144,7 @@ async fn test_sod_rule_simulation_no_violations() {
 
     // No violations expected
     assert_eq!(executed.affected_users.len(), 0);
-    let impact = executed.parse_impact_summary();
+    let impact = executed.parse_impact_summary().unwrap();
     assert_eq!(impact.affected_users, 0);
     assert_eq!(impact.by_impact_type.violation, 0);
 
@@ -205,7 +205,7 @@ async fn test_sod_rule_simulation_filtered_users() {
     assert!(executed.affected_users.contains(&user1_id));
     assert!(!executed.affected_users.contains(&user2_id));
 
-    let impact = executed.parse_impact_summary();
+    let impact = executed.parse_impact_summary().unwrap();
     assert_eq!(impact.total_users_analyzed, 1); // Only analyzed 1 user
     assert_eq!(impact.affected_users, 1);
 
@@ -266,7 +266,7 @@ async fn test_birthright_policy_simulation_grants_entitlements() {
 
     // Should affect the Engineering user (who would gain the entitlement)
     // Finance user doesn't match the condition
-    let impact = executed.parse_impact_summary();
+    let impact = executed.parse_impact_summary().unwrap();
     assert!(impact.affected_users >= 1); // At least Engineering user
 
     // Get results
@@ -337,7 +337,7 @@ async fn test_birthright_policy_simulation_no_change_when_already_assigned() {
         .expect("Failed to execute simulation");
 
     // User matches condition but already has entitlement - should NOT be affected
-    let impact = executed.parse_impact_summary();
+    let impact = executed.parse_impact_summary().unwrap();
     assert_eq!(impact.affected_users, 0); // No one gains/loses
 
     // Cleanup

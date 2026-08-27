@@ -356,9 +356,8 @@ impl GovRoleMetrics {
     }
 
     /// Parse entitlement usage from JSON.
-    #[must_use]
-    pub fn parse_entitlement_usage(&self) -> Vec<EntitlementUsage> {
-        serde_json::from_value(self.entitlement_usage.clone()).unwrap_or_default()
+    pub fn parse_entitlement_usage(&self) -> Result<Vec<EntitlementUsage>, serde_json::Error> {
+        serde_json::from_value(self.entitlement_usage.clone())
     }
 }
 
@@ -425,6 +424,22 @@ mod tests {
             production.contains("role_metrics_json(")
                 && !production.contains("unwrap_or_else(|_| serde_json::json!([])"),
             "role metrics persist must fail closed on JSON serialize"
+        );
+    }
+
+    #[test]
+    fn parse_entitlement_usage_does_not_default_on_invalid_json() {
+        let src = include_str!("gov_role_metrics.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("from_value(self.entitlement_usage.clone())")
+                && !production
+                    .contains("from_value(self.entitlement_usage.clone()).unwrap_or_default()"),
+            "role metrics GET must fail closed on JSON parse"
+        );
+        assert!(
+            serde_json::from_value::<Vec<EntitlementUsage>>(serde_json::json!("not-usage"))
+                .is_err()
         );
     }
 }

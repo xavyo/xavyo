@@ -403,21 +403,18 @@ impl GovRoleSimulation {
     }
 
     /// Parse the simulation changes.
-    #[must_use]
-    pub fn parse_changes(&self) -> SimulationChanges {
-        serde_json::from_value(self.changes.clone()).unwrap_or_default()
+    pub fn parse_changes(&self) -> Result<SimulationChanges, serde_json::Error> {
+        serde_json::from_value(self.changes.clone())
     }
 
     /// Parse access gained.
-    #[must_use]
-    pub fn parse_access_gained(&self) -> Vec<AccessChange> {
-        serde_json::from_value(self.access_gained.clone()).unwrap_or_default()
+    pub fn parse_access_gained(&self) -> Result<Vec<AccessChange>, serde_json::Error> {
+        serde_json::from_value(self.access_gained.clone())
     }
 
     /// Parse access lost.
-    #[must_use]
-    pub fn parse_access_lost(&self) -> Vec<AccessChange> {
-        serde_json::from_value(self.access_lost.clone()).unwrap_or_default()
+    pub fn parse_access_lost(&self) -> Result<Vec<AccessChange>, serde_json::Error> {
+        serde_json::from_value(self.access_lost.clone())
     }
 }
 
@@ -501,6 +498,23 @@ mod tests {
             production.contains("role_sim_json(")
                 && !production.contains("unwrap_or_else(|_| serde_json::json!({})"),
             "role simulation persist must fail closed on JSON serialize"
+        );
+    }
+
+    #[test]
+    fn parse_changes_does_not_default_on_invalid_json() {
+        let src = include_str!("gov_role_simulation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("from_value(self.changes.clone())")
+                && !production.contains("from_value(self.changes.clone()).unwrap_or_default()")
+                && !production
+                    .contains("from_value(self.access_gained.clone()).unwrap_or_default()")
+                && !production.contains("from_value(self.access_lost.clone()).unwrap_or_default()"),
+            "role simulation GET must fail closed on JSON parse"
+        );
+        assert!(
+            serde_json::from_value::<SimulationChanges>(serde_json::json!("not-changes")).is_err()
         );
     }
 }

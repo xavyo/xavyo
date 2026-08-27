@@ -263,7 +263,7 @@ mod tests {
             applied_by: None,
         };
 
-        let parsed_filter = simulation.parse_filter_criteria();
+        let parsed_filter = simulation.parse_filter_criteria().unwrap();
         assert_eq!(
             parsed_filter.department,
             Some(vec!["Engineering".to_string()])

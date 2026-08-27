@@ -242,33 +242,35 @@ impl GovBatchSimulationResult {
     }
 
     /// Parse access gained.
-    #[must_use]
-    pub fn parse_access_gained(&self) -> Vec<AccessItem> {
-        serde_json::from_value(self.access_gained.clone()).unwrap_or_default()
+    pub fn parse_access_gained(&self) -> Result<Vec<AccessItem>, serde_json::Error> {
+        serde_json::from_value(self.access_gained.clone())
     }
 
     /// Parse access lost.
-    #[must_use]
-    pub fn parse_access_lost(&self) -> Vec<AccessItem> {
-        serde_json::from_value(self.access_lost.clone()).unwrap_or_default()
+    pub fn parse_access_lost(&self) -> Result<Vec<AccessItem>, serde_json::Error> {
+        serde_json::from_value(self.access_lost.clone())
     }
 
     /// Parse warnings.
-    #[must_use]
-    pub fn parse_warnings(&self) -> Vec<String> {
-        serde_json::from_value(self.warnings.clone()).unwrap_or_default()
+    pub fn parse_warnings(&self) -> Result<Vec<String>, serde_json::Error> {
+        serde_json::from_value(self.warnings.clone())
     }
 
     /// Check if this result has any warnings.
+    /// Corrupt JSON is treated as having warnings (fail closed).
     #[must_use]
     pub fn has_warnings(&self) -> bool {
-        !self.parse_warnings().is_empty()
+        self.parse_warnings().map(|w| !w.is_empty()).unwrap_or(true)
     }
 
     /// Check if this result has any access changes.
+    /// Corrupt JSON is treated as having changes (fail closed).
     #[must_use]
     pub fn has_changes(&self) -> bool {
-        !self.parse_access_gained().is_empty() || !self.parse_access_lost().is_empty()
+        match (self.parse_access_gained(), self.parse_access_lost()) {
+            (Ok(gained), Ok(lost)) => !gained.is_empty() || !lost.is_empty(),
+            _ => true,
+        }
     }
 }
 
@@ -387,6 +389,32 @@ mod tests {
             production.contains("batch_sim_json(")
                 && !production.contains("unwrap_or_else(|_| serde_json::json!([])"),
             "batch simulation result persist must fail closed on JSON serialize"
+        );
+    }
+
+    #[test]
+    fn parse_access_does_not_default_on_invalid_json() {
+        let result = GovBatchSimulationResult {
+            id: Uuid::new_v4(),
+            simulation_id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            access_gained: serde_json::json!("not-array"),
+            access_lost: serde_json::json!("not-array"),
+            warnings: serde_json::json!("not-array"),
+            created_at: Utc::now(),
+        };
+        assert!(result.parse_access_gained().is_err());
+        assert!(result.parse_access_lost().is_err());
+        assert!(result.parse_warnings().is_err());
+        assert!(result.has_warnings());
+        assert!(result.has_changes());
+        let src = include_str!("gov_batch_simulation_result.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("from_value(self.access_gained.clone()).unwrap_or_default()")
+                && !production.contains("from_value(self.access_lost.clone()).unwrap_or_default()")
+                && !production.contains("from_value(self.warnings.clone()).unwrap_or_default()"),
+            "batch simulation result GET must fail closed on JSON parse"
         );
     }
 }

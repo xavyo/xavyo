@@ -52,7 +52,7 @@ pub async fn get_batch_simulation(
         .get(tenant_id, simulation_id)
         .await?;
 
-    Ok(Json(BatchSimulationResponse::from(simulation)))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// List batch simulations.
@@ -96,8 +96,8 @@ pub async fn list_batch_simulations(
 
     let items: Vec<BatchSimulationResponse> = simulations
         .into_iter()
-        .map(std::convert::Into::into)
-        .collect();
+        .map(TryInto::try_into)
+        .collect::<Result<Vec<_>, _>>()?;
 
     Ok(Json(PaginatedResponse {
         items,
@@ -153,7 +153,7 @@ pub async fn create_batch_simulation(
         )
         .await?;
 
-    Ok(Json(BatchSimulationResponse::from(simulation)))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// Execute a batch simulation (calculate impact).
@@ -194,7 +194,7 @@ pub async fn execute_batch_simulation(
         .execute(tenant_id, simulation_id, request.acknowledge_scope_warning)
         .await?;
 
-    Ok(Json(BatchSimulationResponse::from(simulation)))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// Apply a batch simulation (commit changes).
@@ -243,7 +243,7 @@ pub async fn apply_batch_simulation(
         )
         .await?;
 
-    Ok(Json(BatchSimulationResponse::from(simulation)))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// Cancel a batch simulation.
@@ -281,7 +281,7 @@ pub async fn cancel_batch_simulation(
         .cancel(tenant_id, simulation_id)
         .await?;
 
-    Ok(Json(BatchSimulationResponse::from(simulation)))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// Archive a batch simulation.
@@ -318,7 +318,7 @@ pub async fn archive_batch_simulation(
         .archive(tenant_id, simulation_id)
         .await?;
 
-    Ok(Json(BatchSimulationResponse::from(simulation)))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// Restore an archived batch simulation.
@@ -355,7 +355,7 @@ pub async fn restore_batch_simulation(
         .restore(tenant_id, simulation_id)
         .await?;
 
-    Ok(Json(BatchSimulationResponse::from(simulation)))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// Update notes on a batch simulation.
@@ -395,7 +395,7 @@ pub async fn update_batch_simulation_notes(
         .update_notes(tenant_id, simulation_id, request.notes)
         .await?;
 
-    Ok(Json(BatchSimulationResponse::from(simulation)))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// Get batch simulation results (per-user impacts).
@@ -441,8 +441,10 @@ pub async fn get_batch_simulation_results(
         )
         .await?;
 
-    let items: Vec<BatchSimulationResultResponse> =
-        results.into_iter().map(std::convert::Into::into).collect();
+    let items: Vec<BatchSimulationResultResponse> = results
+        .into_iter()
+        .map(TryInto::try_into)
+        .collect::<Result<Vec<_>, _>>()?;
 
     Ok(Json(PaginatedResponse {
         items,
@@ -548,9 +550,25 @@ pub async fn export_batch_simulation(
             String::from("user_id,access_gained,access_lost,has_warnings,warnings\n");
 
         for result in results {
-            let access_gained_count = result.parse_access_gained().len();
-            let access_lost_count = result.parse_access_lost().len();
-            let warnings = result.parse_warnings();
+            let access_gained_count = result
+                .parse_access_gained()
+                .map_err(|e| {
+                    ApiGovernanceError::Validation(format!(
+                        "Invalid batch result access_gained JSON: {e}"
+                    ))
+                })?
+                .len();
+            let access_lost_count = result
+                .parse_access_lost()
+                .map_err(|e| {
+                    ApiGovernanceError::Validation(format!(
+                        "Invalid batch result access_lost JSON: {e}"
+                    ))
+                })?
+                .len();
+            let warnings = result.parse_warnings().map_err(|e| {
+                ApiGovernanceError::Validation(format!("Invalid batch result warnings JSON: {e}"))
+            })?;
             let warnings_str = warnings.join("; ").replace('"', "\"\"");
 
             csv_output.push_str(&format!(
@@ -579,8 +597,11 @@ pub async fn export_batch_simulation(
     } else {
         // JSON export (default)
         let export_data = BatchSimulationExport {
-            simulation: BatchSimulationResponse::from(simulation),
-            results: results.into_iter().map(std::convert::Into::into).collect(),
+            simulation: simulation.try_into()?,
+            results: results
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<Vec<_>, _>>()?,
         };
 
         let json = serde_json::to_string_pretty(&export_data)

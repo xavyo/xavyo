@@ -237,15 +237,22 @@ pub struct BirthrightPolicyResponse {
     pub updated_at: DateTime<Utc>,
 }
 
-impl From<GovBirthrightPolicy> for BirthrightPolicyResponse {
-    fn from(policy: GovBirthrightPolicy) -> Self {
+impl TryFrom<GovBirthrightPolicy> for BirthrightPolicyResponse {
+    type Error = crate::error::ApiGovernanceError;
+
+    fn try_from(policy: GovBirthrightPolicy) -> Result<Self, Self::Error> {
         let conditions: Vec<PolicyConditionResponse> = policy
             .parse_conditions()
+            .map_err(|e| {
+                crate::error::ApiGovernanceError::Validation(format!(
+                    "Invalid birthright policy conditions JSON: {e}"
+                ))
+            })?
             .into_iter()
             .map(PolicyConditionResponse::from)
             .collect();
 
-        Self {
+        Ok(Self {
             id: policy.id,
             tenant_id: policy.tenant_id,
             name: policy.name,
@@ -259,7 +266,7 @@ impl From<GovBirthrightPolicy> for BirthrightPolicyResponse {
             created_by: policy.created_by,
             created_at: policy.created_at,
             updated_at: policy.updated_at,
-        }
+        })
     }
 }
 
@@ -502,4 +509,19 @@ pub enum UserImpactType {
     Unchanged,
     /// User would both gain and lose entitlements.
     Mixed,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn birthright_response_does_not_default_on_invalid_json() {
+        let src = include_str!("birthright_policy.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_conditions()")
+                && production.contains("TryFrom")
+                && !production.contains("impl From<GovBirthrightPolicy>"),
+            "birthright policy GET must fail closed on JSON parse"
+        );
+    }
 }

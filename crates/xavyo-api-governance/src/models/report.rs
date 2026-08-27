@@ -310,11 +310,16 @@ impl From<xavyo_db::models::GovGeneratedReport> for GeneratedReportResponse {
     }
 }
 
-impl From<xavyo_db::models::GovReportSchedule> for ReportScheduleResponse {
-    fn from(s: xavyo_db::models::GovReportSchedule) -> Self {
-        // Parse recipients before moving fields
-        let recipients = s.parse_recipients();
-        Self {
+impl TryFrom<xavyo_db::models::GovReportSchedule> for ReportScheduleResponse {
+    type Error = crate::error::ApiGovernanceError;
+
+    fn try_from(s: xavyo_db::models::GovReportSchedule) -> Result<Self, Self::Error> {
+        let recipients = s.parse_recipients().map_err(|e| {
+            crate::error::ApiGovernanceError::Validation(format!(
+                "Invalid report schedule recipients JSON: {e}"
+            ))
+        })?;
+        Ok(Self {
             id: s.id,
             tenant_id: s.tenant_id,
             template_id: s.template_id,
@@ -334,6 +339,21 @@ impl From<xavyo_db::models::GovReportSchedule> for ReportScheduleResponse {
             created_by: s.created_by,
             created_at: s.created_at,
             updated_at: s.updated_at,
-        }
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn report_schedule_does_not_default_on_invalid_recipients() {
+        let src = include_str!("report.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_recipients()")
+                && production.contains("TryFrom")
+                && !production.contains("let recipients = s.parse_recipients();"),
+            "report schedule GET must fail closed on JSON parse"
+        );
     }
 }

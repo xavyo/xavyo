@@ -367,11 +367,17 @@ pub struct AccessSnapshotResponse {
     pub created_at: DateTime<Utc>,
 }
 
-impl From<GovAccessSnapshot> for AccessSnapshotResponse {
-    fn from(snapshot: GovAccessSnapshot) -> Self {
-        let content = snapshot.parse_assignments();
+impl TryFrom<GovAccessSnapshot> for AccessSnapshotResponse {
+    type Error = crate::error::ApiGovernanceError;
 
-        Self {
+    fn try_from(snapshot: GovAccessSnapshot) -> Result<Self, Self::Error> {
+        let content = snapshot.parse_assignments().map_err(|e| {
+            crate::error::ApiGovernanceError::Validation(format!(
+                "Invalid access snapshot assignments JSON: {e}"
+            ))
+        })?;
+
+        Ok(Self {
             id: snapshot.id,
             tenant_id: snapshot.tenant_id,
             user_id: snapshot.user_id,
@@ -379,7 +385,7 @@ impl From<GovAccessSnapshot> for AccessSnapshotResponse {
             snapshot_type: snapshot.snapshot_type,
             assignments: SnapshotContentResponse::from(content),
             created_at: snapshot.created_at,
-        }
+        })
     }
 }
 
@@ -482,14 +488,20 @@ pub struct AccessSnapshotSummary {
     pub created_at: DateTime<Utc>,
 }
 
-impl From<GovAccessSnapshot> for AccessSnapshotSummary {
-    fn from(snapshot: GovAccessSnapshot) -> Self {
-        Self {
+impl TryFrom<GovAccessSnapshot> for AccessSnapshotSummary {
+    type Error = crate::error::ApiGovernanceError;
+
+    fn try_from(snapshot: GovAccessSnapshot) -> Result<Self, Self::Error> {
+        Ok(Self {
             id: snapshot.id,
             snapshot_type: snapshot.snapshot_type,
-            assignment_count: snapshot.assignment_count(),
+            assignment_count: snapshot.assignment_count().map_err(|e| {
+                crate::error::ApiGovernanceError::Validation(format!(
+                    "Invalid access snapshot assignments JSON: {e}"
+                ))
+            })?,
             created_at: snapshot.created_at,
-        }
+        })
     }
 }
 
@@ -552,4 +564,19 @@ pub struct ProcessingSummary {
     /// Number of cancelled scheduled revocations.
     #[serde(default)]
     pub cancelled: i32,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn access_snapshot_does_not_default_on_invalid_json() {
+        let src = include_str!("lifecycle_event.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_assignments()")
+                && production.contains("TryFrom")
+                && !production.contains("let content = snapshot.parse_assignments();"),
+            "access snapshot GET must fail closed on JSON parse"
+        );
+    }
 }
