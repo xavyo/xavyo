@@ -161,7 +161,7 @@ pub async fn create_sod_rule(
         SodEnforcement::Warn => "warn",
     };
 
-    let rule: SodRule = sqlx::query_as::<_, SodRuleRow>(
+    let row: SodRuleRow = sqlx::query_as(
         r"INSERT INTO nhi_sod_rules (tenant_id, tool_id_a, tool_id_b, enforcement, description, created_by)
           VALUES ($1, $2, $3, $4, $5, $6)
           ON CONFLICT (tenant_id, tool_id_a, tool_id_b)
@@ -177,8 +177,8 @@ pub async fn create_sod_rule(
     .bind(user_id)
     .fetch_one(&state.pool)
     .await
-    .map(SodRule::from)
     .map_err(NhiApiError::Database)?;
+    let rule = SodRule::try_from(row)?;
 
     Ok((StatusCode::CREATED, Json(rule)))
 }
@@ -222,7 +222,10 @@ pub async fn list_sod_rules(
     .await
     .map_err(NhiApiError::Database)?;
 
-    let data = rows.into_iter().map(SodRule::from).collect();
+    let data = rows
+        .into_iter()
+        .map(SodRule::try_from)
+        .collect::<Result<Vec<_>, _>>()?;
 
     Ok(Json(PaginatedResponse {
         data,
@@ -347,15 +350,15 @@ pub async fn check_sod(
             } else {
                 row.tool_id_a
             };
-            let enforcement = parse_enforcement(&row.enforcement);
-            SodViolation {
+            let enforcement = parse_enforcement(&row.enforcement)?;
+            Ok(SodViolation {
                 rule_id: row.id,
                 conflicting_tool_id,
                 enforcement,
                 description: row.description,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, NhiApiError>>()?;
 
     let is_allowed = !violations
         .iter()
@@ -383,25 +386,31 @@ struct SodRuleRow {
     created_by: Option<Uuid>,
 }
 
-impl From<SodRuleRow> for SodRule {
-    fn from(row: SodRuleRow) -> Self {
-        Self {
+impl TryFrom<SodRuleRow> for SodRule {
+    type Error = NhiApiError;
+
+    fn try_from(row: SodRuleRow) -> Result<Self, Self::Error> {
+        Ok(Self {
             id: row.id,
             tenant_id: row.tenant_id,
             tool_id_a: row.tool_id_a,
             tool_id_b: row.tool_id_b,
-            enforcement: parse_enforcement(&row.enforcement),
+            enforcement: parse_enforcement(&row.enforcement)?,
             description: row.description,
             created_at: row.created_at,
             created_by: row.created_by,
-        }
+        })
     }
 }
 
-fn parse_enforcement(s: &str) -> SodEnforcement {
+/// Stored SoD enforcement. Unknown values must not weaken Prevent to Warn.
+fn parse_enforcement(s: &str) -> Result<SodEnforcement, NhiApiError> {
     match s {
-        "prevent" => SodEnforcement::Prevent,
-        _ => SodEnforcement::Warn,
+        "prevent" => Ok(SodEnforcement::Prevent),
+        "warn" => Ok(SodEnforcement::Warn),
+        other => Err(NhiApiError::Internal(format!(
+            "Invalid SoD enforcement value: {other}"
+        ))),
     }
 }
 
@@ -415,4 +424,28 @@ pub fn sod_routes(state: NhiState) -> Router {
         .route("/sod/rules/:id", delete(delete_sod_rule))
         .route("/sod/check", post(check_sod))
         .with_state(state)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_enforcement_does_not_fail_open_to_warn() {
+        assert_eq!(
+            parse_enforcement("prevent").unwrap(),
+            SodEnforcement::Prevent
+        );
+        assert_eq!(parse_enforcement("warn").unwrap(), SodEnforcement::Warn);
+        assert!(parse_enforcement("block").is_err());
+        assert!(parse_enforcement("").is_err());
+        assert!(parse_enforcement("PREVENT").is_err());
+
+        let src = include_str!("sod.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("_ => SodEnforcement::Warn"),
+            "unknown SoD enforcement must not weaken Prevent to Warn"
+        );
+    }
 }

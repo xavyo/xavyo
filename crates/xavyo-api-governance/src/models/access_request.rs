@@ -6,6 +6,7 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 use validator::Validate;
 use xavyo_db::{GovAccessRequest, GovRequestStatus, GovSodSeverity};
+use xavyo_governance::error::{GovernanceError, Result};
 
 /// Request to submit a new access request.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
@@ -119,14 +120,11 @@ pub struct SodViolationSummary {
     pub conflicting_entitlement_id: Uuid,
 }
 
-impl From<GovAccessRequest> for AccessRequestResponse {
-    fn from(request: GovAccessRequest) -> Self {
-        let sod_violations: Option<Vec<SodViolationSummary>> = request
-            .sod_violations
-            .as_ref()
-            .and_then(|v| serde_json::from_value::<Vec<SodViolationSummary>>(v.clone()).ok());
+impl TryFrom<GovAccessRequest> for AccessRequestResponse {
+    type Error = GovernanceError;
 
-        Self {
+    fn try_from(request: GovAccessRequest) -> Result<Self> {
+        Ok(Self {
             id: request.id,
             requester_id: request.requester_id,
             entitlement_id: request.entitlement_id,
@@ -136,12 +134,24 @@ impl From<GovAccessRequest> for AccessRequestResponse {
             justification: request.justification,
             requested_expires_at: request.requested_expires_at,
             has_sod_warning: request.has_sod_warning,
-            sod_violations,
+            sod_violations: access_request_sod_violations(request.sod_violations)?,
             provisioned_assignment_id: request.provisioned_assignment_id,
             created_at: request.created_at,
             updated_at: request.updated_at,
             expires_at: request.expires_at,
-        }
+        })
+    }
+}
+
+/// Stored SoD violation JSON. Parse errors must not look like a clean request.
+pub(crate) fn access_request_sod_violations(
+    value: Option<serde_json::Value>,
+) -> Result<Option<Vec<SodViolationSummary>>> {
+    match value {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => serde_json::from_value(v)
+            .map(Some)
+            .map_err(GovernanceError::from),
     }
 }
 
@@ -171,4 +181,26 @@ pub struct AccessRequestCreatedResponse {
     /// Message about `SoD` warnings if any.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sod_warning_message: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn access_request_sod_violations_does_not_drop_corrupt_json() {
+        assert!(access_request_sod_violations(None).unwrap().is_none());
+        assert!(access_request_sod_violations(Some(serde_json::Value::Null))
+            .unwrap()
+            .is_none());
+        assert!(access_request_sod_violations(Some(serde_json::json!("nope"))).is_err());
+        assert!(access_request_sod_violations(Some(serde_json::json!([{"x": 1}]))).is_err());
+
+        let src = include_str!("access_request.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("from_value::<Vec<SodViolationSummary>>(v.clone()).ok()"),
+            "GET access request must not hide SoD violation JSON as empty"
+        );
+    }
 }

@@ -315,10 +315,7 @@ impl CertificationCampaignService {
         tenant_id: Uuid,
         campaign: &GovCertificationCampaign,
     ) -> Result<Vec<GovEntitlementAssignment>> {
-        let scope_config: Option<ScopeConfig> = campaign
-            .scope_config
-            .as_ref()
-            .and_then(|v| serde_json::from_value(v.clone()).ok());
+        let scope_config = crate::models::campaign_scope_config(campaign.scope_config.clone())?;
 
         match campaign.scope_type {
             CertScopeType::AllUsers => {
@@ -679,6 +676,17 @@ mod tests {
         assert!(
             !production.contains("JOIN users u ON a.target_id = u.id\n"),
             "must not join users by id alone"
+        );
+    }
+
+    #[test]
+    fn launch_scope_parse_does_not_fail_open() {
+        let src = include_str!("certification_campaign_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("campaign_scope_config(")
+                && !production.contains("from_value(v.clone()).ok()"),
+            "campaign launch must fail closed on corrupt scope JSON"
         );
     }
 }

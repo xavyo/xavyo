@@ -56,8 +56,13 @@ pub async fn list_my_requests(
         .list_my_requests(tenant_id, user_id, query.status, limit, offset)
         .await?;
 
+    let items: Vec<AccessRequestResponse> = requests
+        .into_iter()
+        .map(TryInto::try_into)
+        .collect::<Result<Vec<_>, _>>()?;
+
     Ok(Json(AccessRequestListResponse {
-        items: requests.into_iter().map(Into::into).collect(),
+        items,
         total,
         limit,
         offset,
@@ -95,7 +100,7 @@ pub async fn get_request(
         .get_request(tenant_id, id)
         .await?;
 
-    Ok(Json(request.into()))
+    Ok(Json(request.try_into()?))
 }
 
 /// Submit a new access request.
@@ -141,7 +146,7 @@ pub async fn create_request(
         None
     };
 
-    let response: AccessRequestResponse = created.into();
+    let response: AccessRequestResponse = created.try_into()?;
 
     // F085: Publish access_request.created webhook event
     if let Some(Extension(publisher)) = publisher {
@@ -199,7 +204,7 @@ pub async fn cancel_request(
         .cancel_request(tenant_id, id, user_id)
         .await?;
 
-    Ok(Json(request.into()))
+    Ok(Json(request.try_into()?))
 }
 
 #[cfg(test)]

@@ -9,6 +9,7 @@ use xavyo_db::{
     CertCampaignStatus, CertDecisionType, CertItemStatus, CertItemSummary, CertReviewerType,
     CertScopeType, GovCertificationCampaign, GovCertificationDecision, GovCertificationItem,
 };
+use xavyo_governance::error::{GovernanceError, Result};
 
 // ============================================================================
 // Campaign Models
@@ -162,20 +163,17 @@ pub struct CampaignResponse {
     pub updated_at: DateTime<Utc>,
 }
 
-impl From<GovCertificationCampaign> for CampaignResponse {
-    fn from(campaign: GovCertificationCampaign) -> Self {
-        let scope_config = campaign
-            .scope_config
-            .as_ref()
-            .and_then(|v| serde_json::from_value::<ScopeConfig>(v.clone()).ok());
+impl TryFrom<GovCertificationCampaign> for CampaignResponse {
+    type Error = GovernanceError;
 
-        Self {
+    fn try_from(campaign: GovCertificationCampaign) -> Result<Self> {
+        Ok(Self {
             id: campaign.id,
             tenant_id: campaign.tenant_id,
             name: campaign.name,
             description: campaign.description,
             scope_type: campaign.scope_type,
-            scope_config,
+            scope_config: campaign_scope_config(campaign.scope_config)?,
             reviewer_type: campaign.reviewer_type,
             specific_reviewers: campaign.specific_reviewers,
             status: campaign.status,
@@ -185,7 +183,19 @@ impl From<GovCertificationCampaign> for CampaignResponse {
             created_by: campaign.created_by,
             created_at: campaign.created_at,
             updated_at: campaign.updated_at,
-        }
+        })
+    }
+}
+
+/// Stored campaign scope JSON. Parse errors must not drop the scope.
+pub(crate) fn campaign_scope_config(
+    value: Option<serde_json::Value>,
+) -> Result<Option<ScopeConfig>> {
+    match value {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => serde_json::from_value(v)
+            .map(Some)
+            .map_err(GovernanceError::from),
     }
 }
 
@@ -612,4 +622,26 @@ pub struct ReviewerCampaignSummary {
 
     /// Whether the campaign is overdue.
     pub is_overdue: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn campaign_scope_config_does_not_drop_corrupt_json() {
+        assert!(campaign_scope_config(None).unwrap().is_none());
+        assert!(campaign_scope_config(Some(serde_json::Value::Null))
+            .unwrap()
+            .is_none());
+        assert!(campaign_scope_config(Some(serde_json::json!("nope"))).is_err());
+        assert!(campaign_scope_config(Some(serde_json::json!([]))).is_err());
+
+        let src = include_str!("certification.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("from_value::<ScopeConfig>(v.clone()).ok()"),
+            "GET campaign must not hide corrupt scope_config as null"
+        );
+    }
 }

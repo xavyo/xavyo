@@ -166,7 +166,10 @@ pub async fn create_delegation_grant(
 
     // SECURITY: Always set granted_by from the authenticated caller, not from the
     // request body. Trusting client-supplied granted_by enables audit log forgery.
-    let caller_id = Uuid::parse_str(&claims.sub).ok();
+    let caller_id = Some(
+        Uuid::parse_str(&claims.sub)
+            .map_err(|_| NhiApiError::BadRequest("invalid caller subject".into()))?,
+    );
 
     let input = CreateNhiDelegationGrant {
         principal_id: request.principal_id,
@@ -315,7 +318,10 @@ pub async fn revoke_delegation_grant(
     let tenant_uuid = *tenant_id.as_uuid();
 
     // SECURITY: Always set revoked_by from the authenticated caller.
-    let caller_id = Uuid::parse_str(&claims.sub).ok();
+    let caller_id = Some(
+        Uuid::parse_str(&claims.sub)
+            .map_err(|_| NhiApiError::BadRequest("invalid caller subject".into()))?,
+    );
 
     // Load the grant before revoking so we have the data for the event
     #[cfg(feature = "kafka")]
@@ -472,4 +478,21 @@ pub fn nhi_delegation_routes(state: NhiState) -> Router {
         .route("/:id/delegations/incoming", get(list_incoming_delegations))
         .route("/:id/delegations/outgoing", get(list_outgoing_delegations))
         .with_state(state)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn delegation_grant_and_revoke_do_not_drop_malformed_actor() {
+        let src = include_str!("nhi_delegation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("Uuid::parse_str(&claims.sub).ok()"),
+            "delegation grant/revoke must refuse a malformed JWT sub"
+        );
+        assert!(
+            production.contains("invalid caller subject"),
+            "delegation actor parse errors must fail closed"
+        );
+    }
 }

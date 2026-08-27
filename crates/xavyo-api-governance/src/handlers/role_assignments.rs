@@ -188,11 +188,11 @@ pub async fn revoke_role(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
-    let revoked_by = Uuid::parse_str(&claims.sub).ok();
+    let revoked_by = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
     let result = state
         .role_assignment_service
-        .revoke_role(tenant_id, user_id, role_id, revoked_by)
+        .revoke_role(tenant_id, user_id, role_id, Some(revoked_by))
         .await?;
 
     Ok(Json(result.into()))
@@ -267,4 +267,23 @@ pub async fn list_user_roles(
         .await?;
 
     Ok(Json(UserRolesResponse { user_id, role_ids }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn revoke_role_does_not_drop_malformed_actor() {
+        let src = include_str!("role_assignments.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let revoke = production
+            .split("pub async fn revoke_role")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("revoke_role");
+        assert!(
+            revoke.contains("map_err(|_| ApiGovernanceError::Unauthorized)")
+                && !revoke.contains("parse_str(&claims.sub).ok()"),
+            "role revoke must refuse a malformed JWT sub"
+        );
+    }
 }
