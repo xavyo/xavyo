@@ -46,11 +46,11 @@ The `docs-site/` contains a full Docusaurus documentation site:
 
 ### Domain (11 crates)
 - [xavyo-connector](crates/xavyo-connector/CRATE.md): 🟢 Connector framework
-- [xavyo-provisioning](crates/xavyo-provisioning/CRATE.md): 🟡 Sync engine
+- [xavyo-provisioning](crates/xavyo-provisioning/CRATE.md): 🟢 Sync engine
 - [xavyo-governance](crates/xavyo-governance/CRATE.md): 🟢 IGA logic
-- [xavyo-authorization](crates/xavyo-authorization/CRATE.md): 🟡 Policy engine + Cedar (feature: `cedar`)
-- [xavyo-webhooks](crates/xavyo-webhooks/CRATE.md): 🟡 Event delivery
-- [xavyo-siem](crates/xavyo-siem/CRATE.md): 🟡 Audit export
+- [xavyo-authorization](crates/xavyo-authorization/CRATE.md): 🟢 Policy engine + Cedar (feature: `cedar`)
+- [xavyo-webhooks](crates/xavyo-webhooks/CRATE.md): 🟢 Event delivery
+- [xavyo-siem](crates/xavyo-siem/CRATE.md): 🟢 Audit export
 - [xavyo-ssf](crates/xavyo-ssf/CRATE.md): 🔴 CAEP/Shared Signals (SETs, emitter)
 - [xavyo-secrets](crates/xavyo-secrets/CRATE.md): 🟢 Secret providers
 - [xavyo-scim-client](crates/xavyo-scim-client/CRATE.md): 🟢 Outbound SCIM
@@ -67,15 +67,15 @@ The `docs-site/` contains a full Docusaurus documentation site:
 - [xavyo-api-auth](crates/xavyo-api-auth/CRATE.md): 🟢 Auth endpoints
 - [xavyo-api-oauth](crates/xavyo-api-oauth/CRATE.md): 🟢 OAuth2/OIDC provider
 - [xavyo-api-users](crates/xavyo-api-users/CRATE.md): 🟢 User management
-- [xavyo-api-scim](crates/xavyo-api-scim/CRATE.md): 🟡 SCIM provisioning
-- [xavyo-api-saml](crates/xavyo-api-saml/CRATE.md): 🟡 SAML IdP
-- [xavyo-api-social](crates/xavyo-api-social/CRATE.md): 🟡 Social login
+- [xavyo-api-scim](crates/xavyo-api-scim/CRATE.md): 🟢 SCIM provisioning
+- [xavyo-api-saml](crates/xavyo-api-saml/CRATE.md): 🟢 SAML IdP
+- [xavyo-api-social](crates/xavyo-api-social/CRATE.md): 🟢 Social login
 - [xavyo-api-governance](crates/xavyo-api-governance/CRATE.md): 🟢 IGA API
 - [xavyo-api-connectors](crates/xavyo-api-connectors/CRATE.md): 🟡 Connector API
 - [xavyo-api-tenants](crates/xavyo-api-tenants/CRATE.md): 🟢 Tenant management
-- [xavyo-api-authorization](crates/xavyo-api-authorization/CRATE.md): 🔴 Authz API
+- [xavyo-api-authorization](crates/xavyo-api-authorization/CRATE.md): 🟡 Authz API (integration tests require PostgreSQL)
 - [xavyo-api-import](crates/xavyo-api-import/CRATE.md): 🟢 Bulk import
-- [xavyo-api-oidc-federation](crates/xavyo-api-oidc-federation/CRATE.md): 🟡 OIDC federation
+- [xavyo-api-oidc-federation](crates/xavyo-api-oidc-federation/CRATE.md): 🟢 OIDC federation
 - [xavyo-api-nhi](crates/xavyo-api-nhi/CRATE.md): 🟢 Non-human identity API
 - [xavyo-api-ssf](crates/xavyo-api-ssf/CRATE.md): 🔴 SSF transmitter (streams, push CAEP)
 

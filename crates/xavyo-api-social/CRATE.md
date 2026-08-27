@@ -14,7 +14,7 @@ api
 
 🟢 **stable**
 
-Production-ready with comprehensive test coverage (73 tests total, including 46 provider integration tests). All four major providers (Google, Microsoft, Apple, GitHub) fully tested with mock OAuth2 infrastructure for CI reliability.
+Production-ready with comprehensive test coverage (120 tests, including provider OAuth integration tests for Google, Microsoft, Apple, and GitHub). CSRF state, PKCE (where supported), and encrypted token storage covered.
 
 ## Dependencies
 

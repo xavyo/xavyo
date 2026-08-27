@@ -24,11 +24,11 @@ Business logic independent of HTTP transport.
 | Crate | Description | Status |
 |-------|-------------|--------|
 | [xavyo-connector](../../crates/xavyo-connector/CRATE.md) | Abstract connector traits and types | 🟢 stable |
-| [xavyo-provisioning](../../crates/xavyo-provisioning/CRATE.md) | Sync engine, reconciliation, Rhai scripts | 🟡 beta |
+| [xavyo-provisioning](../../crates/xavyo-provisioning/CRATE.md) | Sync engine, reconciliation, Rhai scripts | 🟢 stable |
 | [xavyo-governance](../../crates/xavyo-governance/CRATE.md) | Access requests, certifications, SoD | 🟢 stable |
-| [xavyo-authorization](../../crates/xavyo-authorization/CRATE.md) | Authorization engine (PDP) | 🟡 beta |
-| [xavyo-webhooks](../../crates/xavyo-webhooks/CRATE.md) | Event subscriptions and delivery | 🟡 beta |
-| [xavyo-siem](../../crates/xavyo-siem/CRATE.md) | Audit log export (syslog, Splunk) | 🟡 beta |
+| [xavyo-authorization](../../crates/xavyo-authorization/CRATE.md) | Authorization engine (PDP) | 🟢 stable |
+| [xavyo-webhooks](../../crates/xavyo-webhooks/CRATE.md) | Event subscriptions and delivery | 🟢 stable |
+| [xavyo-siem](../../crates/xavyo-siem/CRATE.md) | Audit log export (syslog, Splunk) | 🟢 stable |
 | [xavyo-ssf](../../crates/xavyo-ssf/CRATE.md) | CAEP/Shared Signals: SETs, subject IDs, emitter | 🔴 alpha |
 | [xavyo-secrets](../../crates/xavyo-secrets/CRATE.md) | External secret providers | 🟢 stable |
 | [xavyo-scim-client](../../crates/xavyo-scim-client/CRATE.md) | Outbound SCIM provisioning | 🟢 stable |
@@ -55,15 +55,15 @@ REST endpoints exposed to clients.
 | [xavyo-api-auth](../../crates/xavyo-api-auth/CRATE.md) | Login, MFA, sessions, password reset | 🟢 stable |
 | [xavyo-api-oauth](../../crates/xavyo-api-oauth/CRATE.md) | OAuth2/OIDC provider endpoints | 🟢 stable |
 | [xavyo-api-users](../../crates/xavyo-api-users/CRATE.md) | User CRUD and attributes | 🟢 stable |
-| [xavyo-api-scim](../../crates/xavyo-api-scim/CRATE.md) | SCIM 2.0 inbound provisioning | 🟡 beta |
-| [xavyo-api-saml](../../crates/xavyo-api-saml/CRATE.md) | SAML 2.0 IdP endpoints | 🟡 beta |
-| [xavyo-api-social](../../crates/xavyo-api-social/CRATE.md) | Social login providers | 🟡 beta |
+| [xavyo-api-scim](../../crates/xavyo-api-scim/CRATE.md) | SCIM 2.0 inbound provisioning | 🟢 stable |
+| [xavyo-api-saml](../../crates/xavyo-api-saml/CRATE.md) | SAML 2.0 IdP endpoints | 🟢 stable |
+| [xavyo-api-social](../../crates/xavyo-api-social/CRATE.md) | Social login providers | 🟢 stable |
 | [xavyo-api-governance](../../crates/xavyo-api-governance/CRATE.md) | IGA workflows and reporting | 🟢 stable |
 | [xavyo-api-connectors](../../crates/xavyo-api-connectors/CRATE.md) | Connector management API | 🟡 beta |
 | [xavyo-api-tenants](../../crates/xavyo-api-tenants/CRATE.md) | Tenant provisioning API | 🟢 stable |
 | [xavyo-api-authorization](../../crates/xavyo-api-authorization/CRATE.md) | Authorization policy API | 🟡 beta |
 | [xavyo-api-import](../../crates/xavyo-api-import/CRATE.md) | Bulk user import API | 🟢 stable |
-| [xavyo-api-oidc-federation](../../crates/xavyo-api-oidc-federation/CRATE.md) | OIDC federation endpoints | 🟡 beta |
+| [xavyo-api-oidc-federation](../../crates/xavyo-api-oidc-federation/CRATE.md) | OIDC federation endpoints | 🟢 stable |
 | [xavyo-api-nhi](../../crates/xavyo-api-nhi/CRATE.md) | Non-human identity API | 🟢 stable |
 | [xavyo-api-ssf](../../crates/xavyo-api-ssf/CRATE.md) | SSF transmitter: streams, push CAEP signals | 🔴 alpha |
 
