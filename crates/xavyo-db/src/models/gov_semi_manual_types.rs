@@ -152,29 +152,33 @@ impl TicketStatusCategory {
     }
 
     /// Map from `ServiceNow` state.
+    ///
+    /// Unknown states must not silently become Open.
     #[must_use]
-    pub fn from_servicenow_state(state: i32) -> Self {
+    pub fn from_servicenow_state(state: i32) -> Option<Self> {
         match state {
-            1 => Self::Open,       // New
-            2 => Self::InProgress, // In Progress
-            3 => Self::Pending,    // On Hold
-            6 => Self::Resolved,   // Resolved
-            7 => Self::Closed,     // Closed
-            8 => Self::Rejected,   // Cancelled
-            _ => Self::Open,
+            1 => Some(Self::Open),        // New
+            2 => Some(Self::InProgress),  // In Progress
+            3 | 4 => Some(Self::Pending), // On Hold / Pending
+            6 => Some(Self::Resolved),    // Resolved
+            7 => Some(Self::Closed),      // Closed
+            8 => Some(Self::Rejected),    // Cancelled
+            _ => None,
         }
     }
 
     /// Map from Jira status category.
+    ///
+    /// Unknown categories must not silently become Open.
     #[must_use]
-    pub fn from_jira_category(category: &str) -> Self {
+    pub fn from_jira_category(category: &str) -> Option<Self> {
         match category.to_lowercase().as_str() {
-            "new" | "to do" | "todo" => Self::Open,
-            "indeterminate" | "in progress" => Self::InProgress,
-            "done" | "complete" | "resolved" => Self::Resolved,
-            "closed" => Self::Closed,
-            "cancelled" | "rejected" | "won't do" => Self::Rejected,
-            _ => Self::Open,
+            "new" | "to do" | "todo" => Some(Self::Open),
+            "indeterminate" | "in progress" => Some(Self::InProgress),
+            "done" | "complete" | "resolved" => Some(Self::Resolved),
+            "closed" => Some(Self::Closed),
+            "cancelled" | "rejected" | "won't do" => Some(Self::Rejected),
+            _ => None,
         }
     }
 }
@@ -214,32 +218,34 @@ mod tests {
     fn test_ticket_status_from_servicenow() {
         assert_eq!(
             TicketStatusCategory::from_servicenow_state(1),
-            TicketStatusCategory::Open
+            Some(TicketStatusCategory::Open)
         );
         assert_eq!(
             TicketStatusCategory::from_servicenow_state(6),
-            TicketStatusCategory::Resolved
+            Some(TicketStatusCategory::Resolved)
         );
         assert_eq!(
             TicketStatusCategory::from_servicenow_state(7),
-            TicketStatusCategory::Closed
+            Some(TicketStatusCategory::Closed)
         );
+        assert!(TicketStatusCategory::from_servicenow_state(99).is_none());
     }
 
     #[test]
     fn test_ticket_status_from_jira() {
         assert_eq!(
             TicketStatusCategory::from_jira_category("To Do"),
-            TicketStatusCategory::Open
+            Some(TicketStatusCategory::Open)
         );
         assert_eq!(
             TicketStatusCategory::from_jira_category("Done"),
-            TicketStatusCategory::Resolved
+            Some(TicketStatusCategory::Resolved)
         );
         assert_eq!(
             TicketStatusCategory::from_jira_category("In Progress"),
-            TicketStatusCategory::InProgress
+            Some(TicketStatusCategory::InProgress)
         );
+        assert!(TicketStatusCategory::from_jira_category("bogus").is_none());
     }
 
     #[test]

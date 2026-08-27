@@ -250,7 +250,7 @@ impl OAuth2ClientService {
         })?
         .ok_or(OAuthError::ClientNotFound)?;
 
-        Ok(self.db_client_to_response(client))
+        self.db_client_to_response(client)
     }
 
     /// Authenticate a confidential client via `private_key_jwt` (RFC 7523):
@@ -360,7 +360,7 @@ impl OAuth2ClientService {
         })?
         .ok_or(OAuthError::ClientNotFound)?;
 
-        Ok(self.db_client_to_response(client))
+        self.db_client_to_response(client)
     }
 
     /// List all clients for a tenant.
@@ -401,10 +401,10 @@ impl OAuth2ClientService {
             OAuthError::Internal("Database error".to_string())
         })?;
 
-        Ok(clients
+        clients
             .into_iter()
             .map(|c| self.db_client_to_response(c))
-            .collect())
+            .collect()
     }
 
     /// Update a client.
@@ -518,10 +518,7 @@ impl OAuth2ClientService {
         })?;
 
         // Return updated client
-        let client_type = match existing.client_type.as_str() {
-            "confidential" => ClientType::Confidential,
-            _ => ClientType::Public,
-        };
+        let client_type = Self::parse_stored_client_type(&existing.client_type)?;
 
         Ok(ClientResponse {
             id: existing.id,
@@ -886,7 +883,7 @@ impl OAuth2ClientService {
         }
 
         // Convert to ClientResponse
-        Ok(self.db_client_to_response(client))
+        self.db_client_to_response(client)
     }
 
     /// Verify a public client by client_id only (no secret).
@@ -946,17 +943,14 @@ impl OAuth2ClientService {
             return Err(OAuthError::InvalidClient(GENERIC_AUTH_ERROR.to_string()));
         }
 
-        Ok(self.db_client_to_response(client))
+        self.db_client_to_response(client)
     }
 
     /// Convert database client to response type.
-    fn db_client_to_response(&self, client: DbOAuth2Client) -> ClientResponse {
-        let client_type = match client.client_type.as_str() {
-            "confidential" => ClientType::Confidential,
-            _ => ClientType::Public,
-        };
+    fn db_client_to_response(&self, client: DbOAuth2Client) -> Result<ClientResponse, OAuthError> {
+        let client_type = Self::parse_stored_client_type(&client.client_type)?;
 
-        ClientResponse {
+        Ok(ClientResponse {
             id: client.id,
             client_id: client.client_id,
             name: client.name,
@@ -975,6 +969,17 @@ impl OAuth2ClientService {
             fapi_profile: client.fapi_profile,
             jwks: client.jwks,
             tls_client_cert_thumbprint: client.tls_client_cert_thumbprint,
+        })
+    }
+
+    /// Stored client types must not silently become public.
+    fn parse_stored_client_type(s: &str) -> Result<ClientType, OAuthError> {
+        match s {
+            "confidential" => Ok(ClientType::Confidential),
+            "public" => Ok(ClientType::Public),
+            other => Err(OAuthError::Internal(format!(
+                "Invalid stored client_type '{other}'"
+            ))),
         }
     }
 
@@ -1194,10 +1199,8 @@ mod tests {
         // For now, we test the conversion logic in isolation
 
         // Test conversion logic directly
-        let client_type = match db_client.client_type.as_str() {
-            "confidential" => ClientType::Confidential,
-            _ => ClientType::Public,
-        };
+        let client_type =
+            OAuth2ClientService::parse_stored_client_type(&db_client.client_type).unwrap();
 
         assert_eq!(client_type, ClientType::Confidential);
         assert!(db_client.is_active);
@@ -1233,13 +1236,34 @@ mod tests {
             tls_client_cert_thumbprint: None,
         };
 
-        let client_type = match db_client.client_type.as_str() {
-            "confidential" => ClientType::Confidential,
-            _ => ClientType::Public,
-        };
+        let client_type =
+            OAuth2ClientService::parse_stored_client_type(&db_client.client_type).unwrap();
 
         assert_eq!(client_type, ClientType::Public);
         assert!(db_client.client_secret_hash.is_none());
+    }
+
+    #[test]
+    fn unknown_stored_client_type_does_not_become_public() {
+        assert_eq!(
+            OAuth2ClientService::parse_stored_client_type("confidential").unwrap(),
+            ClientType::Confidential
+        );
+        assert_eq!(
+            OAuth2ClientService::parse_stored_client_type("public").unwrap(),
+            ClientType::Public
+        );
+        assert!(OAuth2ClientService::parse_stored_client_type("Confidential").is_err());
+        assert!(OAuth2ClientService::parse_stored_client_type("").is_err());
+        assert!(OAuth2ClientService::parse_stored_client_type("unknown").is_err());
+
+        let src = include_str!("client.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_stored_client_type(")
+                && !production.contains("_ => ClientType::Public"),
+            "unknown stored OAuth client_type must not be advertised as public"
+        );
     }
 
     #[test]

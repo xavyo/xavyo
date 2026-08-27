@@ -416,7 +416,10 @@ pub async fn login_handler(
         geo_lat: None,
         geo_lon: None,
         is_new_device: is_new_device_for_risk,
-        is_new_location: false, // TODO: Determine from geo-IP
+        is_new_location: login_new_location_for_risk(
+            Some(audit_result.is_new_location),
+            risk_context_geo_known(None, None),
+        ),
         login_time: chrono::Utc::now(),
     };
 
@@ -656,6 +659,22 @@ pub fn login_new_device_for_risk(audit_is_new: Option<bool>, tracked_new: bool) 
     audit_is_new.unwrap_or(true) || tracked_new
 }
 
+/// Geo is known only when both country and city were resolved.
+#[must_use]
+pub fn risk_context_geo_known(country: Option<&str>, city: Option<&str>) -> bool {
+    country.is_some() && city.is_some()
+}
+
+/// New-location flag for risk. Missing geo or audit data must not skip
+/// new-location risk scoring.
+#[must_use]
+pub fn login_new_location_for_risk(audit_is_new: Option<bool>, geo_known: bool) -> bool {
+    if !geo_known {
+        return true;
+    }
+    audit_is_new.unwrap_or(true)
+}
+
 /// User lookup for lockout recording. Database errors must not be treated as
 /// "unknown email", which skips incrementing the lockout counter.
 pub fn user_for_lockout_record<T, E: std::fmt::Display>(
@@ -802,6 +821,17 @@ mod tests {
     }
 
     #[test]
+    fn login_new_location_for_risk_does_not_skip_when_geo_unknown() {
+        assert!(!risk_context_geo_known(None, None));
+        assert!(!risk_context_geo_known(Some("US"), None));
+        assert!(risk_context_geo_known(Some("US"), Some("NYC")));
+        assert!(login_new_location_for_risk(Some(false), false));
+        assert!(login_new_location_for_risk(None, true));
+        assert!(!login_new_location_for_risk(Some(false), true));
+        assert!(login_new_location_for_risk(Some(true), true));
+    }
+
+    #[test]
     fn login_handler_does_not_skip_revoked_device_or_new_device_risk() {
         let src = include_str!("login.rs");
         let production = src.split("mod tests").next().expect("production source");
@@ -816,6 +846,11 @@ mod tests {
         assert!(
             production.contains("login_new_device_for_risk("),
             "missing audit data must not skip new-device risk"
+        );
+        assert!(
+            production.contains("login_new_location_for_risk(")
+                && !production.contains("is_new_location: false"),
+            "missing geo must not skip new-location risk"
         );
         assert!(
             production.contains("enforce_access("),
