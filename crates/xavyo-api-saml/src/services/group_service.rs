@@ -85,30 +85,37 @@ impl GroupService {
     pub fn format_groups(groups: &[GroupInfo], config: &GroupAttributeConfig) -> Vec<String> {
         groups
             .iter()
-            .map(|g| Self::format_group_value(g, &config.value_format, config.dn_base.as_deref()))
+            .filter_map(|g| {
+                Self::format_group_value(g, &config.value_format, config.dn_base.as_deref())
+            })
             .collect()
     }
 
-    /// Format a single group value according to format specification
+    /// Format a single group value according to format specification.
+    ///
+    /// DN format without `dn_base` returns `None` — never invents a forest.
     #[must_use]
     pub fn format_group_value(
         group: &GroupInfo,
         format: &GroupValueFormat,
         dn_base: Option<&str>,
-    ) -> String {
+    ) -> Option<String> {
         match format {
-            GroupValueFormat::Name => group.display_name.clone(),
-            GroupValueFormat::Identifier => group.id.to_string(),
+            GroupValueFormat::Name => Some(group.display_name.clone()),
+            GroupValueFormat::Identifier => Some(group.id.to_string()),
             GroupValueFormat::Dn => {
-                let base = dn_base.unwrap_or("ou=Groups,dc=example,dc=com");
+                let base = dn_base.filter(|b| !b.is_empty())?;
                 // R9: Sanitize dn_base to prevent LDAP injection — reject control chars and NUL
                 let safe_base: String = base
                     .chars()
                     .filter(|c| !c.is_control() && *c != '\0')
                     .collect();
+                if safe_base.is_empty() {
+                    return None;
+                }
                 // Escape special DN characters in group name
                 let escaped_name = Self::escape_dn_value(&group.display_name);
-                format!("cn={escaped_name},{safe_base}")
+                Some(format!("cn={escaped_name},{safe_base}"))
             }
         }
     }
@@ -163,14 +170,17 @@ mod tests {
     fn test_format_group_value_name() {
         let group = test_group("550e8400-e29b-41d4-a716-446655440000", "Engineering");
         let result = GroupService::format_group_value(&group, &GroupValueFormat::Name, None);
-        assert_eq!(result, "Engineering");
+        assert_eq!(result.as_deref(), Some("Engineering"));
     }
 
     #[test]
     fn test_format_group_value_id() {
         let group = test_group("550e8400-e29b-41d4-a716-446655440000", "Engineering");
         let result = GroupService::format_group_value(&group, &GroupValueFormat::Identifier, None);
-        assert_eq!(result, "550e8400-e29b-41d4-a716-446655440000");
+        assert_eq!(
+            result.as_deref(),
+            Some("550e8400-e29b-41d4-a716-446655440000")
+        );
     }
 
     #[test]
@@ -181,14 +191,26 @@ mod tests {
             &GroupValueFormat::Dn,
             Some("ou=Groups,dc=example,dc=com"),
         );
-        assert_eq!(result, "cn=Engineering,ou=Groups,dc=example,dc=com");
+        assert_eq!(
+            result.as_deref(),
+            Some("cn=Engineering,ou=Groups,dc=example,dc=com")
+        );
     }
 
     #[test]
-    fn test_format_group_value_dn_default_base() {
+    fn test_format_group_value_dn_missing_base_does_not_invent_forest() {
         let group = test_group("550e8400-e29b-41d4-a716-446655440000", "Admins");
         let result = GroupService::format_group_value(&group, &GroupValueFormat::Dn, None);
-        assert_eq!(result, "cn=Admins,ou=Groups,dc=example,dc=com");
+        assert!(result.is_none());
+        assert!(
+            GroupService::format_group_value(&group, &GroupValueFormat::Dn, Some("")).is_none()
+        );
+        let src = include_str!("group_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("ou=Groups,dc=example,dc=com"),
+            "DN format must not invent dc=example,dc=com when dn_base is missing"
+        );
     }
 
     #[test]

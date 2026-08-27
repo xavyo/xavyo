@@ -168,7 +168,10 @@ fn test_group_id_format() {
 
     let result = GroupService::format_group_value(&group, &GroupValueFormat::Identifier, None);
 
-    assert_eq!(result, "550e8400-e29b-41d4-a716-446655440000");
+    assert_eq!(
+        result.as_deref(),
+        Some("550e8400-e29b-41d4-a716-446655440000")
+    );
 }
 
 #[test]
@@ -185,7 +188,10 @@ fn test_group_dn_format() {
         Some("ou=Groups,dc=example,dc=com"),
     );
 
-    assert_eq!(result, "cn=Engineering,ou=Groups,dc=example,dc=com");
+    assert_eq!(
+        result.as_deref(),
+        Some("cn=Engineering,ou=Groups,dc=example,dc=com")
+    );
 }
 
 #[test]
@@ -198,7 +204,7 @@ fn test_default_name_format() {
 
     let result = GroupService::format_group_value(&group, &GroupValueFormat::Name, None);
 
-    assert_eq!(result, "Engineering");
+    assert_eq!(result.as_deref(), Some("Engineering"));
 }
 
 // ============================================================================

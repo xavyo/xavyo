@@ -221,11 +221,11 @@ pub async fn check_org_ip_restriction(
             if ip_config.is_ip_allowed(ip) {
                 Ok(())
             } else {
-                match ip_config.action_on_violation.as_str() {
-                    "deny" => Err(format!(
+                match org_ip_violation_decision(ip_config.action_on_violation.as_str()) {
+                    OrgIpViolationDecision::Deny => Err(format!(
                         "IP address {ip_address} is not allowed by organization policy"
                     )),
-                    "warn" => {
+                    OrgIpViolationDecision::Warn => {
                         warn!(
                             tenant_id = %tenant_id,
                             user_id = %user_id,
@@ -234,8 +234,7 @@ pub async fn check_org_ip_restriction(
                         );
                         Ok(())
                     }
-                    _ => {
-                        // "log" mode - just log and allow
+                    OrgIpViolationDecision::Log => {
                         debug!(
                             tenant_id = %tenant_id,
                             user_id = %user_id,
@@ -247,6 +246,23 @@ pub async fn check_org_ip_restriction(
                 }
             }
         }
+    }
+}
+
+/// Org IP violation action. Unknown values deny (fail closed).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OrgIpViolationDecision {
+    Deny,
+    Warn,
+    Log,
+}
+
+fn org_ip_violation_decision(action: &str) -> OrgIpViolationDecision {
+    match action {
+        "warn" => OrgIpViolationDecision::Warn,
+        "log" => OrgIpViolationDecision::Log,
+        // "deny" and any unknown/corrupt stored action refuse the request.
+        _ => OrgIpViolationDecision::Deny,
     }
 }
 
@@ -393,6 +409,38 @@ mod tests {
         assert!(
             !production.contains("Fail-open on errors"),
             "must not skip IP restriction on lookup error"
+        );
+    }
+
+    #[test]
+    fn unknown_org_ip_action_on_violation_denies() {
+        assert_eq!(
+            org_ip_violation_decision("deny"),
+            OrgIpViolationDecision::Deny
+        );
+        assert_eq!(
+            org_ip_violation_decision("warn"),
+            OrgIpViolationDecision::Warn
+        );
+        assert_eq!(
+            org_ip_violation_decision("log"),
+            OrgIpViolationDecision::Log
+        );
+        assert_eq!(
+            org_ip_violation_decision("block"),
+            OrgIpViolationDecision::Deny
+        );
+        assert_eq!(
+            org_ip_violation_decision("allow"),
+            OrgIpViolationDecision::Deny
+        );
+        assert_eq!(org_ip_violation_decision(""), OrgIpViolationDecision::Deny);
+        let src = include_str!("ip_filter.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("org_ip_violation_decision(")
+                && !production.contains("// \"log\" mode - just log and allow"),
+            "unknown action_on_violation must deny, not allow"
         );
     }
 }
