@@ -2274,7 +2274,7 @@ mod tests {
             );
         }
         assert!(
-            production.contains("if let Ok(Some(device_code_info))") == false,
+            !production.contains("if let Ok(Some(device_code_info))"),
             "must not skip risk scoring when device-code lookup fails"
         );
     }
