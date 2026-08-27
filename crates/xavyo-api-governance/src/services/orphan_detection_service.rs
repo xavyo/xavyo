@@ -179,8 +179,8 @@ impl OrphanDetectionService {
         .await
         .map_err(GovernanceError::Database)?;
 
-        // Calculate average age for pending orphans
-        let average_age_days = self.calculate_average_age(tenant_id).await.ok();
+        // Calculate average age for pending orphans. Query errors must not drop the metric.
+        let average_age_days = Some(self.calculate_average_age(tenant_id).await?);
 
         Ok(OrphanSummaryResponse {
             total_pending: pending,
@@ -1078,6 +1078,16 @@ mod tests {
         assert!(
             !production.contains("JOIN gov_entitlements e ON ea.entitlement_id = e.id\n"),
             "must not join entitlements by id alone"
+        );
+    }
+
+    #[test]
+    fn orphan_summary_does_not_drop_average_age_on_error() {
+        let src = include_str!("orphan_detection_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("calculate_average_age(tenant_id).await.ok()"),
+            "orphan summary must not hide average-age query errors as missing"
         );
     }
 }

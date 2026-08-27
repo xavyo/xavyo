@@ -59,12 +59,16 @@ pub async fn list_pending_approvals(
         if let std::collections::hash_map::Entry::Vacant(e) =
             entitlement_names.entry(entitlement_id)
         {
-            if let Ok(entitlement) = state
+            match state
                 .entitlement_service
                 .get_entitlement(tenant_id, entitlement_id)
                 .await
             {
-                e.insert(entitlement.name);
+                Ok(entitlement) => {
+                    e.insert(entitlement.name);
+                }
+                Err(xavyo_governance::error::GovernanceError::EntitlementNotFound(_)) => {}
+                Err(e) => return Err(e.into()),
             }
         }
     }
@@ -250,4 +254,22 @@ pub async fn reject_request(
         message: "Request rejected".to_string(),
         provisioned_assignment_id: None,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn pending_approvals_do_not_skip_entitlement_lookup_errors() {
+        let src = include_str!("approvals.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_pending_approvals")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_pending_approvals");
+        assert!(
+            !list.contains("if let Ok(entitlement)") && list.contains("EntitlementNotFound"),
+            "pending approvals must not hide entitlement lookup errors as unknown names"
+        );
+    }
 }

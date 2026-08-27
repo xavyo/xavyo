@@ -1081,8 +1081,8 @@ pub async fn get_current_context(
 
     let response = if let Some(info) = context_info {
         let active_persona = if let Some(persona_id) = info.persona_id {
-            let persona = state.persona_service.get(tenant_id, persona_id).await.ok();
-            persona.map(PersonaResponse::from)
+            let persona = state.persona_service.get(tenant_id, persona_id).await?;
+            Some(PersonaResponse::from(persona))
         } else {
             None
         };
@@ -1329,6 +1329,21 @@ mod tests {
                 && !production.contains("to_value(&attrs).unwrap_or_default()")
                 && !production.contains("parse_attributes().unwrap_or_default()"),
             "persona create/get must fail closed on attribute JSON"
+        );
+    }
+
+    #[test]
+    fn current_context_does_not_hide_persona_lookup_errors() {
+        let src = include_str!("personas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let ctx = production
+            .split("pub async fn get_current_context")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_current_context");
+        assert!(
+            !ctx.contains(".await.ok()") && ctx.contains("persona_service.get("),
+            "persona current-context must not treat lookup errors as no active persona"
         );
     }
 }
