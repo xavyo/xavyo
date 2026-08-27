@@ -59,6 +59,18 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid> {
         })
 }
 
+/// Invalid sync `run_type` filters must not silently list every run.
+fn parse_optional_sync_run_type(run_type: Option<&str>) -> Result<Option<&str>> {
+    match run_type {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "full_sync" | "reconciliation") => Ok(Some(s)),
+        Some(s) => Err(ConnectorApiError::Validation(format!(
+            "Invalid sync run type '{s}'. Must be one of: full_sync, reconciliation"
+        ))),
+    }
+}
+
 /// Outbound SCIM target full-sync and reconciliation are not wired.
 ///
 /// Callers must not receive HTTP 202 with `status: running` and no worker.
@@ -188,15 +200,9 @@ pub async fn list_sync_runs(
     let limit = query.limit.clamp(1, 100);
     let offset = query.offset.max(0);
 
-    let (items, total_count) = ScimSyncRun::list_by_target(
-        pool,
-        tenant_id,
-        target_id,
-        query.run_type.as_deref(),
-        limit,
-        offset,
-    )
-    .await?;
+    let run_type = parse_optional_sync_run_type(query.run_type.as_deref())?;
+    let (items, total_count) =
+        ScimSyncRun::list_by_target(pool, tenant_id, target_id, run_type, limit, offset).await?;
 
     Ok(Json(SyncRunListResponse {
         target_id,
@@ -315,5 +321,22 @@ mod tests {
                 "SCIM target trigger handlers must not fake a running sync ({needle})"
             );
         }
+    }
+
+    #[test]
+    fn invalid_sync_run_type_does_not_list_all_runs() {
+        assert_eq!(parse_optional_sync_run_type(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_sync_run_type(Some("full_sync")).unwrap(),
+            Some("full_sync")
+        );
+        assert!(parse_optional_sync_run_type(Some("bogus")).is_err());
+        let src = include_str!("scim_sync.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_sync_run_type(")
+                && !production.contains("query.run_type.as_deref(),"),
+            "invalid SCIM sync run_type must be 400, not an unfiltered list"
+        );
     }
 }

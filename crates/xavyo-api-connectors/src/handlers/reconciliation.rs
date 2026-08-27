@@ -685,14 +685,16 @@ pub async fn list_discrepancies(
 ) -> Result<Json<ListDiscrepanciesResponse>, ApiError> {
     let tenant_id = extract_tenant_id(&claims)?;
 
+    let discrepancy_type = parse_optional_discrepancy_type(query.discrepancy_type.as_deref())?;
+    let resolution_status = parse_optional_resolution_status(query.resolution_status.as_deref())?;
     let (discrepancies, total) = state
         .reconciliation_service
         .list_discrepancies(
             tenant_id,
             connector_id,
             query.run_id,
-            query.discrepancy_type.as_deref(),
-            query.resolution_status.as_deref(),
+            discrepancy_type,
+            resolution_status,
             query.identity_id,
             query.external_uid.as_deref(),
             query.limit.unwrap_or(50).min(100),
@@ -1270,14 +1272,16 @@ pub async fn list_actions(
 ) -> Result<Json<ListActionsResponse>, ApiError> {
     let tenant_id = extract_tenant_id(&claims)?;
 
+    let action_type = parse_optional_action_type(query.action_type.as_deref())?;
+    let result = parse_optional_action_result(query.result.as_deref())?;
     let (actions, total) = state
         .reconciliation_service
         .list_actions(
             tenant_id,
             connector_id,
             query.discrepancy_id,
-            query.action_type.as_deref(),
-            query.result.as_deref(),
+            action_type,
+            result,
             query.dry_run,
             query.limit.unwrap_or(50).min(100),
             query.offset.unwrap_or(0).max(0),
@@ -1346,6 +1350,71 @@ fn parse_optional_recon_mode(mode: Option<&str>) -> Result<Option<&str>, ApiErro
         Some(s) if matches!(s, "full" | "delta") => Ok(Some(s)),
         Some(s) => Err(ApiError::bad_request(format!(
             "Invalid reconciliation mode '{s}'. Must be one of: full, delta"
+        ))),
+    }
+}
+
+fn parse_optional_discrepancy_type(value: Option<&str>) -> Result<Option<&str>, ApiError> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s)
+            if matches!(
+                s,
+                "missing" | "orphan" | "mismatch" | "collision" | "unlinked" | "deleted"
+            ) =>
+        {
+            Ok(Some(s))
+        }
+        Some(s) => Err(ApiError::bad_request(format!(
+            "Invalid discrepancy type '{s}'. Must be one of: missing, orphan, mismatch, collision, unlinked, deleted"
+        ))),
+    }
+}
+
+fn parse_optional_resolution_status(value: Option<&str>) -> Result<Option<&str>, ApiError> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "pending" | "resolved" | "ignored") => Ok(Some(s)),
+        Some(s) => Err(ApiError::bad_request(format!(
+            "Invalid resolution status '{s}'. Must be one of: pending, resolved, ignored"
+        ))),
+    }
+}
+
+fn parse_optional_action_type(value: Option<&str>) -> Result<Option<&str>, ApiError> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s)
+            if matches!(
+                s,
+                "create"
+                    | "update"
+                    | "delete"
+                    | "link"
+                    | "unlink"
+                    | "inactivate_identity"
+                    | "create_identity"
+                    | "delete_identity"
+            ) =>
+        {
+            Ok(Some(s))
+        }
+        Some(s) => Err(ApiError::bad_request(format!(
+            "Invalid action type '{s}'. Must be one of: create, update, delete, link, unlink, inactivate_identity, create_identity, delete_identity"
+        ))),
+    }
+}
+
+fn parse_optional_action_result(value: Option<&str>) -> Result<Option<&str>, ApiError> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "success" | "failure") => Ok(Some(s)),
+        Some(s) => Err(ApiError::bad_request(format!(
+            "Invalid action result '{s}'. Must be one of: success, failure"
         ))),
     }
 }
@@ -1450,6 +1519,39 @@ mod tests {
                 && production.contains("parse_optional_recon_mode(")
                 && !production.contains("query.status.as_deref(),"),
             "invalid reconciliation filters must be 400, not an unfiltered list"
+        );
+    }
+
+    #[test]
+    fn invalid_discrepancy_and_action_filters_do_not_list_all() {
+        assert!(parse_optional_discrepancy_type(Some("bogus")).is_err());
+        assert_eq!(
+            parse_optional_discrepancy_type(Some("orphan")).unwrap(),
+            Some("orphan")
+        );
+        assert!(parse_optional_resolution_status(Some("bogus")).is_err());
+        assert_eq!(
+            parse_optional_resolution_status(Some("pending")).unwrap(),
+            Some("pending")
+        );
+        assert!(parse_optional_action_type(Some("bogus")).is_err());
+        assert_eq!(
+            parse_optional_action_type(Some("link")).unwrap(),
+            Some("link")
+        );
+        assert!(parse_optional_action_result(Some("bogus")).is_err());
+        assert_eq!(
+            parse_optional_action_result(Some("success")).unwrap(),
+            Some("success")
+        );
+        let src = include_str!("reconciliation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_discrepancy_type(")
+                && production.contains("parse_optional_resolution_status(")
+                && production.contains("parse_optional_action_type(")
+                && production.contains("parse_optional_action_result("),
+            "invalid discrepancy/action filters must be 400, not an unfiltered list"
         );
     }
 }
