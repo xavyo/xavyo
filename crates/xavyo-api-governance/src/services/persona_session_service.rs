@@ -302,11 +302,13 @@ impl PersonaSessionService {
         user_id: Uuid,
         limit: i64,
         offset: i64,
-    ) -> Result<Vec<GovPersonaSession>> {
+    ) -> Result<(Vec<GovPersonaSession>, i64)> {
         let sessions =
             GovPersonaSession::find_history_for_user(&self.pool, tenant_id, user_id, limit, offset)
                 .await?;
-        Ok(sessions)
+        let total =
+            GovPersonaSession::count_history_for_user(&self.pool, tenant_id, user_id).await?;
+        Ok((sessions, total))
     }
 
     /// Get sessions for a specific persona (for audit purposes).
@@ -507,5 +509,21 @@ mod tests {
         assert_eq!(context.operating_as, "physical");
         assert!(context.persona_id.is_none());
         assert!(context.previous_persona_id.is_some());
+    }
+
+    #[test]
+    fn session_history_returns_count_not_page_length() {
+        let src = include_str!("persona_session_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let history = production
+            .split("pub async fn get_session_history")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_session_history");
+        assert!(
+            history.contains("count_history_for_user(")
+                && history.contains("Ok((sessions, total))"),
+            "persona session history must return a tenant-scoped count, not the page length"
+        );
     }
 }

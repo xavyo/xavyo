@@ -423,10 +423,16 @@ pub async fn trigger_schema_discovery(
     State(state): State<ConnectorState>,
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
-    Json(_request): Json<DiscoverSchemaRequest>,
+    Json(request): Json<DiscoverSchemaRequest>,
 ) -> Result<(StatusCode, Json<DiscoveryStatusResponse>)> {
     use xavyo_connector::schema::DiscoveryState;
     use xavyo_db::models::TriggeredBy;
+
+    if request.include_operational {
+        return Err(crate::error::ConnectorApiError::Validation(
+            "include_operational is not supported for async schema discovery".into(),
+        ));
+    }
 
     let tenant_id = extract_tenant_id(&claims)?;
     let user_id = Some(extract_user_id(&claims)?);
@@ -1086,6 +1092,24 @@ mod tests {
             production.contains("extract_user_id(")
                 && !production.contains("Uuid::parse_str(&claims.sub).ok()"),
             "schema discovery must not drop a malformed JWT sub"
+        );
+    }
+
+    #[test]
+    fn async_schema_discovery_rejects_unsupported_include_operational() {
+        let src = include_str!("schemas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let trigger = production
+            .split("pub async fn trigger_schema_discovery")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("trigger_schema_discovery");
+        assert!(
+            trigger.contains("Json(request)")
+                && trigger.contains("request.include_operational")
+                && trigger.contains("ConnectorApiError::Validation(")
+                && !trigger.contains("Json(_request)"),
+            "POST /connectors/{{id}}/schema/discover must not ignore include_operational"
         );
     }
 }

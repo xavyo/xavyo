@@ -60,11 +60,12 @@ impl PersonaAuditService {
         persona_id: Uuid,
         limit: i64,
         offset: i64,
-    ) -> Result<Vec<GovPersonaAuditEvent>> {
-        let events =
-            GovPersonaAuditEvent::find_by_persona(&self.pool, tenant_id, persona_id, limit, offset)
-                .await?;
-        Ok(events)
+    ) -> Result<(Vec<GovPersonaAuditEvent>, i64)> {
+        let filter = PersonaAuditEventFilter {
+            persona_id: Some(persona_id),
+            ..Default::default()
+        };
+        self.list(tenant_id, &filter, limit, offset).await
     }
 
     /// List audit events for a specific archetype.
@@ -774,5 +775,22 @@ mod tests {
         assert!(filter.to_date.is_some());
         assert!(filter.archetype_id.is_none());
         assert!(filter.actor_id.is_none());
+    }
+
+    #[test]
+    fn list_for_persona_returns_filtered_total() {
+        let src = include_str!("persona_audit_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_for_persona")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_for_persona");
+        assert!(
+            list.contains("PersonaAuditEventFilter")
+                && list.contains("persona_id: Some(persona_id)")
+                && list.contains("self.list("),
+            "persona audit list must count with the same persona_id filter as the page"
+        );
     }
 }

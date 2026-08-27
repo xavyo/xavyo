@@ -736,8 +736,10 @@ pub async fn list_inheritances(
         .meta_role_matching_service
         .list_inheritances_by_meta_role(tenant_id, id, query.status, limit, offset)
         .await?;
-
-    let total = inheritances.len() as i64;
+    let total = state
+        .meta_role_matching_service
+        .count_inheritances_by_meta_role(tenant_id, id, query.status)
+        .await?;
     let items: Vec<InheritanceResponse> = inheritances
         .into_iter()
         .map(InheritanceResponse::from)
@@ -1200,6 +1202,22 @@ mod tests {
                 && !cascade.contains("Uuid::nil()")
                 && !cascade.contains("Json(_request)"),
             "POST cascade must not execute when dry_run is set and must not report Uuid::nil as a failed role"
+        );
+    }
+
+    #[test]
+    fn list_inheritances_uses_count_not_page_length() {
+        let src = include_str!("meta_roles.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_inheritances")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_inheritances");
+        assert!(
+            list.contains("count_inheritances_by_meta_role(")
+                && !list.contains("inheritances.len() as i64"),
+            "GET /governance/meta-roles/{{id}}/inheritances must report the filtered total, not the page length"
         );
     }
 }

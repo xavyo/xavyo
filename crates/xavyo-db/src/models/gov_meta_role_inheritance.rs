@@ -170,6 +170,39 @@ impl GovMetaRoleInheritance {
         }
     }
 
+    /// Count inheritances for a meta-role, optionally filtered by status.
+    pub async fn count_by_meta_role(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        meta_role_id: Uuid,
+        status: Option<InheritanceStatus>,
+    ) -> Result<i64, sqlx::Error> {
+        if let Some(status) = status {
+            sqlx::query_scalar(
+                r"
+                SELECT COUNT(*) FROM gov_meta_role_inheritances
+                WHERE tenant_id = $1 AND meta_role_id = $2 AND status = $3
+                ",
+            )
+            .bind(tenant_id)
+            .bind(meta_role_id)
+            .bind(status)
+            .fetch_one(pool)
+            .await
+        } else {
+            sqlx::query_scalar(
+                r"
+                SELECT COUNT(*) FROM gov_meta_role_inheritances
+                WHERE tenant_id = $1 AND meta_role_id = $2
+                ",
+            )
+            .bind(tenant_id)
+            .bind(meta_role_id)
+            .fetch_one(pool)
+            .await
+        }
+    }
+
     /// Count active inheritances for a meta-role.
     pub async fn count_active_by_meta_role(
         pool: &sqlx::PgPool,
@@ -347,5 +380,23 @@ mod tests {
         assert!(filter.meta_role_id.is_none());
         assert!(filter.child_role_id.is_none());
         assert!(filter.status.is_none());
+    }
+
+    #[test]
+    fn count_by_meta_role_filters_tenant_and_status() {
+        let src = include_str!("gov_meta_role_inheritance.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let count = production
+            .split("pub async fn count_by_meta_role")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("count_by_meta_role");
+        assert!(
+            count.contains("SELECT COUNT(*)")
+                && count.contains("tenant_id = $1")
+                && count.contains("meta_role_id = $2")
+                && count.contains("status = $3"),
+            "inheritance count must stay tenant-scoped and honor optional status"
+        );
     }
 }

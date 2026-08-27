@@ -992,7 +992,7 @@ impl MicroCertificationService {
         user_id: Uuid,
         limit: i64,
         offset: i64,
-    ) -> Result<Vec<GovMicroCertification>> {
+    ) -> Result<(Vec<GovMicroCertification>, i64)> {
         // Get certifications where user is the primary reviewer
         let mut pending = GovMicroCertification::find_pending_by_reviewer(
             &self.pool, tenant_id, user_id, limit, offset,
@@ -1013,7 +1013,14 @@ impl MicroCertificationService {
         // Truncate to limit
         pending.truncate(limit.max(0) as usize);
 
-        Ok(pending)
+        let primary =
+            GovMicroCertification::count_pending_by_reviewer(&self.pool, tenant_id, user_id)
+                .await?;
+        let backup =
+            GovMicroCertification::count_pending_by_backup_reviewer(&self.pool, tenant_id, user_id)
+                .await?;
+
+        Ok((pending, primary + backup))
     }
 
     /// Get statistics for the tenant.
@@ -1717,6 +1724,23 @@ mod tests {
             production.contains("GovEntitlementAssignment::revoke")
                 && production.contains("map_err(GovernanceError::Database)?"),
             "micro-cert revoke must fail when the assignment cannot be revoked"
+        );
+    }
+
+    #[test]
+    fn my_pending_returns_primary_and_backup_counts() {
+        let src = include_str!("micro_certification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let pending = production
+            .split("pub async fn get_my_pending")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_my_pending");
+        assert!(
+            pending.contains("count_pending_by_reviewer")
+                && pending.contains("count_pending_by_backup_reviewer")
+                && pending.contains("Ok((pending, primary + backup))"),
+            "my-pending must count primary and backup reviewer rows, not the returned page length"
         );
     }
 

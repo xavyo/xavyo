@@ -117,12 +117,10 @@ pub async fn my_pending(
     let limit = query.limit.unwrap_or(50).min(100);
     let offset = query.offset.unwrap_or(0).max(0);
 
-    let certs = state
+    let (certs, total) = state
         .micro_certification_service
         .get_my_pending(tenant_id, user_id, limit, offset)
         .await?;
-
-    let total = certs.len() as i64;
 
     let items: Vec<MicroCertificationWithDetailsResponse> = certs
         .into_iter()
@@ -553,5 +551,23 @@ pub async fn skip_certification(
             .await?
             .ok_or(ApiGovernanceError::MicroCertificationNotFound(id))?;
         Ok(Json(MicroCertificationResponse::from(updated)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn my_pending_uses_count_not_page_length() {
+        let src = include_str!("micro_certifications.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let pending = production
+            .split("pub async fn my_pending")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("my_pending");
+        assert!(
+            pending.contains("let (certs, total)") && !pending.contains("certs.len() as i64"),
+            "GET /governance/micro-certifications/my-pending must report the filtered total, not the page length"
+        );
     }
 }

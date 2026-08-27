@@ -222,6 +222,49 @@ impl GovAccessSnapshot {
         q.bind(limit).bind(offset).fetch_all(pool).await
     }
 
+    /// Count snapshots for a tenant with the same filters as `list_by_tenant`.
+    pub async fn count_by_tenant(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        filter: &AccessSnapshotFilter,
+    ) -> Result<i64, sqlx::Error> {
+        let mut query = String::from(
+            r"
+            SELECT COUNT(*) FROM gov_access_snapshots
+            WHERE tenant_id = $1
+            ",
+        );
+        let mut param_count = 1;
+
+        if filter.user_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND user_id = ${param_count}"));
+        }
+        if filter.event_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND event_id = ${param_count}"));
+        }
+        if filter.snapshot_type.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND snapshot_type = ${param_count}"));
+        }
+
+        let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
+
+        if let Some(user_id) = filter.user_id {
+            q = q.bind(user_id);
+        }
+        if let Some(event_id) = filter.event_id {
+            q = q.bind(event_id);
+        }
+        if let Some(snapshot_type) = filter.snapshot_type {
+            q = q.bind(snapshot_type);
+        }
+
+        let _ = param_count;
+        q.fetch_one(pool).await
+    }
+
     /// Create a new access snapshot.
     pub async fn create(
         pool: &sqlx::PgPool,
@@ -342,6 +385,25 @@ mod tests {
         assert!(
             !production.contains("from_value(self.assignments.clone()).unwrap_or_default()"),
             "access snapshot GET must fail closed on JSON parse"
+        );
+    }
+
+    #[test]
+    fn count_by_tenant_applies_the_same_filters_as_list() {
+        let src = include_str!("gov_access_snapshot.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let count = production
+            .split("pub async fn count_by_tenant")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("count_by_tenant");
+        assert!(
+            count.contains("SELECT COUNT(*)")
+                && count.contains("filter.user_id")
+                && count.contains("filter.event_id")
+                && count.contains("filter.snapshot_type")
+                && count.contains("tenant_id"),
+            "access snapshot count must apply tenant_id and the same list filters"
         );
     }
 }

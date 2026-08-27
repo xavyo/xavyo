@@ -109,6 +109,24 @@ impl GovPersonaSession {
         .await
     }
 
+    /// Count session history rows for a user.
+    pub async fn count_history_for_user(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar(
+            r"
+            SELECT COUNT(*) FROM gov_persona_sessions
+            WHERE tenant_id = $1 AND user_id = $2
+            ",
+        )
+        .bind(tenant_id)
+        .bind(user_id)
+        .fetch_one(pool)
+        .await
+    }
+
     /// List sessions for a persona (for audit).
     pub async fn find_by_persona(
         pool: &sqlx::PgPool,
@@ -334,5 +352,22 @@ mod tests {
 
         assert!(session.is_valid());
         assert!(!session.is_persona_active());
+    }
+
+    #[test]
+    fn count_history_for_user_matches_find_history_filters() {
+        let src = include_str!("gov_persona_session.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let count = production
+            .split("pub async fn count_history_for_user")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("count_history_for_user");
+        assert!(
+            count.contains("SELECT COUNT(*)")
+                && count.contains("tenant_id = $1")
+                && count.contains("user_id = $2"),
+            "session history count must stay tenant- and user-scoped"
+        );
     }
 }
