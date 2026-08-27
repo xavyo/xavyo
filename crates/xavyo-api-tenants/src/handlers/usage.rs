@@ -66,7 +66,7 @@ pub async fn get_tenant_usage_handler(
         .map_err(|e| TenantError::Database(e.to_string()))?;
 
     // Extract limits from tenant settings if available
-    let limits = extract_limits_from_settings(&tenant.settings);
+    let limits = extract_limits_from_settings(&tenant.settings)?;
 
     Ok(Json(UsageResponse {
         tenant_id,
@@ -155,19 +155,73 @@ pub async fn get_tenant_usage_history_handler(
 }
 
 /// Extract usage limits from tenant settings JSON.
-fn extract_limits_from_settings(settings: &serde_json::Value) -> UsageLimits {
-    let limits = settings.get("limits").cloned().unwrap_or_default();
+/// Corrupt `limits` must not look like unlimited quotas.
+fn extract_limits_from_settings(settings: &serde_json::Value) -> Result<UsageLimits, TenantError> {
+    let Some(limits) = settings.get("limits") else {
+        return Ok(UsageLimits {
+            max_mau: None,
+            max_api_calls: None,
+            max_agent_invocations: None,
+        });
+    };
+    if limits.is_null() {
+        return Ok(UsageLimits {
+            max_mau: None,
+            max_api_calls: None,
+            max_agent_invocations: None,
+        });
+    }
+    let obj = limits.as_object().ok_or_else(|| {
+        TenantError::Validation("tenant settings.limits must be an object".to_string())
+    })?;
 
-    UsageLimits {
-        max_mau: limits
-            .get("max_mau")
-            .and_then(serde_json::Value::as_i64)
-            .map(|v| v as i32),
-        max_api_calls: limits
-            .get("max_api_calls")
-            .and_then(serde_json::Value::as_i64),
-        max_agent_invocations: limits
-            .get("max_agent_invocations")
-            .and_then(serde_json::Value::as_i64),
+    Ok(UsageLimits {
+        max_mau: optional_i64(obj.get("max_mau"), "max_mau")?.map(|v| v as i32),
+        max_api_calls: optional_i64(obj.get("max_api_calls"), "max_api_calls")?,
+        max_agent_invocations: optional_i64(
+            obj.get("max_agent_invocations"),
+            "max_agent_invocations",
+        )?,
+    })
+}
+
+fn optional_i64(
+    value: Option<&serde_json::Value>,
+    field: &str,
+) -> Result<Option<i64>, TenantError> {
+    match value {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => v
+            .as_i64()
+            .ok_or_else(|| {
+                TenantError::Validation(format!("tenant settings.limits.{field} must be a number"))
+            })
+            .map(Some),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_limits_does_not_treat_corrupt_json_as_unlimited() {
+        let missing = extract_limits_from_settings(&serde_json::json!({})).unwrap();
+        assert!(missing.max_mau.is_none());
+        assert!(extract_limits_from_settings(&serde_json::json!({"limits": "nope"})).is_err());
+        assert!(
+            extract_limits_from_settings(&serde_json::json!({"limits": {"max_mau": "10"}}))
+                .is_err()
+        );
+        let ok =
+            extract_limits_from_settings(&serde_json::json!({"limits": {"max_mau": 50}})).unwrap();
+        assert_eq!(ok.max_mau, Some(50));
+
+        let src = include_str!("usage.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or_default()"),
+            "usage GET must not hide corrupt limits as unlimited"
+        );
     }
 }
