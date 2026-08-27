@@ -88,13 +88,15 @@ pub async fn list_provisioning_log(
 
     let limit = query.limit.min(100);
     let offset = query.offset.max(0);
+    let resource_type = parse_optional_scim_log_resource_type(query.resource_type.as_deref())?;
+    let operation_type = parse_optional_scim_operation_type(query.operation_type.as_deref())?;
 
     let (items, total_count) = ScimProvisioningLog::list_by_target(
         pool,
         tenant_id,
         target_id,
-        query.resource_type.as_deref(),
-        query.operation_type.as_deref(),
+        resource_type,
+        operation_type,
         limit,
         offset,
     )
@@ -160,4 +162,72 @@ pub async fn get_log_detail(
     }
 
     Ok(Json(log_entry))
+}
+
+/// Invalid SCIM log `resource_type` filters must not silently list every entry.
+fn parse_optional_scim_log_resource_type(value: Option<&str>) -> Result<Option<&str>> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "User" | "Group") => Ok(Some(s)),
+        Some(s) => Err(ConnectorApiError::Validation(format!(
+            "Invalid SCIM log resource type '{s}'. Must be one of: User, Group"
+        ))),
+    }
+}
+
+/// Invalid SCIM log `operation_type` filters must not silently list every entry.
+fn parse_optional_scim_operation_type(value: Option<&str>) -> Result<Option<&str>> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s)
+            if matches!(
+                s,
+                "create"
+                    | "update"
+                    | "deprovision"
+                    | "delete"
+                    | "lookup"
+                    | "create_conflict_resolved"
+                    | "add_members"
+                    | "remove_members"
+            ) =>
+        {
+            Ok(Some(s))
+        }
+        Some(s) => Err(ConnectorApiError::Validation(format!(
+            "Invalid SCIM operation type '{s}'. Must be one of: create, update, deprovision, delete, lookup, create_conflict_resolved, add_members, remove_members"
+        ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_scim_log_filters_do_not_list_all_entries() {
+        assert_eq!(parse_optional_scim_log_resource_type(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_scim_log_resource_type(Some("User")).unwrap(),
+            Some("User")
+        );
+        assert!(parse_optional_scim_log_resource_type(Some("bogus")).is_err());
+        assert_eq!(parse_optional_scim_operation_type(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_scim_operation_type(Some("create")).unwrap(),
+            Some("create")
+        );
+        assert!(parse_optional_scim_operation_type(Some("bogus")).is_err());
+        let src = include_str!("scim_log.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_scim_log_resource_type(")
+                && production.contains("parse_optional_scim_operation_type(")
+                && !production.contains("query.resource_type.as_deref(),")
+                && !production.contains("query.operation_type.as_deref(),"),
+            "invalid SCIM log filters must be 400, not an unfiltered list"
+        );
+    }
 }

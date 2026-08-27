@@ -317,10 +317,16 @@ impl SyncService {
         &self,
         tenant_id: Uuid,
         connector_id: Uuid,
-        _status: Option<&str>,
+        status: Option<&str>,
         limit: i64,
     ) -> SyncServiceResult<(Vec<SyncConflict>, i64)> {
         self.ensure_connector(tenant_id, connector_id).await?;
+
+        // Only pending conflicts are stored for lookup. Other valid statuses must
+        // not be answered with the pending list (the previous contract lie).
+        if matches!(status, Some(s) if s != "pending") {
+            return Ok((Vec::new(), 0));
+        }
 
         let conflicts = self
             .conflict_detector
@@ -439,5 +445,15 @@ mod tests {
         assert!("nope".parse::<SyncMode>().is_err());
         assert!("overwrite".parse::<ConflictResolution>().is_err());
         assert!("drop".parse::<ResolutionStrategy>().is_err());
+    }
+
+    #[test]
+    fn list_conflicts_does_not_ignore_status_filter() {
+        let src = include_str!("sync_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("if matches!(status, Some(s) if s != \"pending\")"),
+            "non-pending conflict status must not return the pending list"
+        );
     }
 }
