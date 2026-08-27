@@ -99,6 +99,8 @@ pub struct NhiAgentFilter {
     pub owner_id: Option<Uuid>,
     pub requires_human_approval: Option<bool>,
     pub team_id: Option<Uuid>,
+    /// When set, restrict to these identity IDs (permission-scoped lists).
+    pub ids: Option<Vec<Uuid>>,
 }
 
 const AGENT_JOIN_SELECT: &str = r"
@@ -241,6 +243,10 @@ impl NhiAgent {
             query.push_str(&format!(" AND a.team_id = ${param_idx}"));
             param_idx += 1;
         }
+        if filter.ids.is_some() {
+            query.push_str(&format!(" AND i.id = ANY(${param_idx})"));
+            param_idx += 1;
+        }
 
         query.push_str(&format!(
             " ORDER BY i.name ASC LIMIT ${} OFFSET ${}",
@@ -264,6 +270,9 @@ impl NhiAgent {
         }
         if let Some(team_id) = filter.team_id {
             q = q.bind(team_id);
+        }
+        if let Some(ref ids) = filter.ids {
+            q = q.bind(ids);
         }
 
         q.bind(limit).bind(offset).fetch_all(pool).await

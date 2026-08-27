@@ -215,24 +215,15 @@ pub async fn list_service_accounts(
     let limit = query.limit.unwrap_or(20).clamp(1, 100);
     let offset = query.offset.unwrap_or(0).max(0);
 
-    let filter = NhiServiceAccountFilter {
+    let mut filter = NhiServiceAccountFilter {
         environment: query.environment,
         lifecycle_state: query.lifecycle_state,
         owner_id: query.owner_id,
+        ids: None,
     };
 
     // Admin/super_admin see all service accounts; non-admin users only see permitted ones
-    if claims.has_role("admin") || claims.has_role("super_admin") {
-        let data =
-            NhiServiceAccount::list(&state.pool, tenant_uuid, &filter, limit, offset).await?;
-        let total = count_service_accounts(&state.pool, tenant_uuid, &filter).await?;
-        Ok(Json(PaginatedResponse {
-            data,
-            total,
-            limit,
-            offset,
-        }))
-    } else {
+    if !(claims.has_role("admin") || claims.has_role("super_admin")) {
         use xavyo_db::models::nhi_user_permission::NhiUserPermission;
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|_| NhiApiError::BadRequest("Invalid user ID".into()))?;
@@ -251,27 +242,17 @@ pub async fn list_service_accounts(
             }));
         }
 
-        let fetch_limit = (limit + offset) * 10;
-        let all_data =
-            NhiServiceAccount::list(&state.pool, tenant_uuid, &filter, fetch_limit.min(10000), 0)
-                .await?;
-        let filtered: Vec<NhiServiceAccountWithIdentity> = all_data
-            .into_iter()
-            .filter(|sa| permitted_nhi_ids.binary_search(&sa.id).is_ok())
-            .collect();
-        let total = filtered.len() as i64;
-        let data: Vec<NhiServiceAccountWithIdentity> = filtered
-            .into_iter()
-            .skip(offset as usize)
-            .take(limit as usize)
-            .collect();
-        Ok(Json(PaginatedResponse {
-            data,
-            total,
-            limit,
-            offset,
-        }))
+        filter.ids = Some(permitted_nhi_ids);
     }
+
+    let data = NhiServiceAccount::list(&state.pool, tenant_uuid, &filter, limit, offset).await?;
+    let total = count_service_accounts(&state.pool, tenant_uuid, &filter).await?;
+    Ok(Json(PaginatedResponse {
+        data,
+        total,
+        limit,
+        offset,
+    }))
 }
 
 /// Count service accounts matching a filter.
@@ -300,6 +281,10 @@ async fn count_service_accounts(
     }
     if filter.owner_id.is_some() {
         query.push_str(&format!(" AND i.owner_id = ${param_idx}"));
+        param_idx += 1;
+    }
+    if filter.ids.is_some() {
+        query.push_str(&format!(" AND i.id = ANY(${param_idx})"));
     }
 
     let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -312,6 +297,9 @@ async fn count_service_accounts(
     }
     if let Some(owner_id) = filter.owner_id {
         q = q.bind(owner_id);
+    }
+    if let Some(ref ids) = filter.ids {
+        q = q.bind(ids);
     }
 
     q.fetch_one(pool).await
@@ -577,4 +565,29 @@ pub fn service_account_routes(state: NhiState) -> Router {
                 .delete(delete_service_account),
         )
         .with_state(state)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn list_service_accounts_counts_permitted_ids_not_overfetch_window() {
+        let src = include_str!("service_accounts.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_service_accounts")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_service_accounts");
+        assert!(
+            list.contains("filter.ids")
+                && list.contains("count_service_accounts(")
+                && !list.contains("filtered.len() as i64")
+                && !list.contains("fetch_limit"),
+            "GET /nhi/service-accounts must count permitted matching rows, not the over-fetch window length"
+        );
+        assert!(
+            production.contains("i.id = ANY("),
+            "service-account count must restrict to permitted identity IDs"
+        );
+    }
 }

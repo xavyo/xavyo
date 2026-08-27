@@ -722,10 +722,7 @@ impl PoaService {
         let events =
             PoaAuditEvent::list_by_tenant(&self.pool, tenant_id, &full_filter, limit, offset)
                 .await?;
-
-        // For total count, we fetch one more page to estimate if there are more
-        // In production, we'd add count_by_tenant to the model
-        let total = events.len() as i64;
+        let total = PoaAuditEvent::count_by_tenant(&self.pool, tenant_id, &full_filter).await?;
 
         Ok((events, total))
     }
@@ -740,7 +737,7 @@ impl PoaService {
     ) -> Result<(Vec<PoaAuditEvent>, i64)> {
         let events =
             PoaAuditEvent::list_by_tenant(&self.pool, tenant_id, &filter, limit, offset).await?;
-        let total = events.len() as i64;
+        let total = PoaAuditEvent::count_by_tenant(&self.pool, tenant_id, &filter).await?;
 
         Ok((events, total))
     }
@@ -846,6 +843,30 @@ mod tests {
         assert!(
             drop.contains("get_poa(tenant_id, session.poa_id).await?"),
             "PoA lookup errors must fail drop_identity"
+        );
+    }
+
+    #[test]
+    fn poa_audit_lists_use_filtered_count_not_page_length() {
+        let src = include_str!("poa_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let poa = production
+            .split("pub async fn list_poa_audit_events")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_poa_audit_events");
+        assert!(
+            poa.contains("count_by_tenant(") && !poa.contains("events.len() as i64"),
+            "PoA audit trail must report the filtered total, not the page length"
+        );
+        let admin = production
+            .split("pub async fn admin_list_audit_events")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("admin_list_audit_events");
+        assert!(
+            admin.contains("count_by_tenant(") && !admin.contains("events.len() as i64"),
+            "admin PoA audit list must report the filtered total, not the page length"
         );
     }
 }

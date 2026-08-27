@@ -52,12 +52,7 @@ impl SemiManualResourceService {
         let limit = query.limit.unwrap_or(50).min(100);
         let offset = query.offset.unwrap_or(0).max(0);
 
-        // Get all semi-manual applications to calculate total count
-        let all_applications =
-            GovApplication::list_semi_manual(&self.pool, tenant_id, 10000, 0).await?;
-        let total = all_applications.len() as i64;
-
-        // Get paginated results
+        let total = GovApplication::count_semi_manual(&self.pool, tenant_id).await?;
         let applications =
             GovApplication::list_semi_manual(&self.pool, tenant_id, limit, offset).await?;
 
@@ -244,5 +239,20 @@ mod tests {
     fn test_service_construction() {
         // This test verifies the types compile correctly
         // Actual service tests would require a database connection
+    }
+
+    #[test]
+    fn list_semi_manual_uses_count_not_capped_fetch() {
+        let src = include_str!("semi_manual_resource_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_semi_manual_applications")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_semi_manual_applications");
+        assert!(
+            list.contains("count_semi_manual(") && !list.contains("10000"),
+            "GET /governance/semi-manual/applications must COUNT matching rows, not cap total at 10000"
+        );
     }
 }

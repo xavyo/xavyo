@@ -233,6 +233,70 @@ impl PoaAuditEvent {
         q.bind(limit).bind(offset).fetch_all(pool).await
     }
 
+    /// Count events with the same filters as `list_by_tenant`.
+    pub async fn count_by_tenant(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        filter: &PoaAuditEventFilter,
+    ) -> Result<i64, sqlx::Error> {
+        let mut query = String::from(
+            r"
+            SELECT COUNT(*) FROM poa_audit_events
+            WHERE tenant_id = $1
+            ",
+        );
+        let mut param_count = 1;
+
+        if filter.poa_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND poa_id = ${param_count}"));
+        }
+        if filter.event_type.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND event_type = ${param_count}"));
+        }
+        if filter.actor_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND actor_id = ${param_count}"));
+        }
+        if filter.affected_user_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND affected_user_id = ${param_count}"));
+        }
+        if filter.after.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
+        }
+        if filter.before.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
+        }
+
+        let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
+
+        if let Some(poa_id) = filter.poa_id {
+            q = q.bind(poa_id);
+        }
+        if let Some(event_type) = filter.event_type {
+            q = q.bind(event_type);
+        }
+        if let Some(actor_id) = filter.actor_id {
+            q = q.bind(actor_id);
+        }
+        if let Some(affected_user_id) = filter.affected_user_id {
+            q = q.bind(affected_user_id);
+        }
+        if let Some(after) = filter.after {
+            q = q.bind(after);
+        }
+        if let Some(before) = filter.before {
+            q = q.bind(before);
+        }
+
+        let _ = param_count;
+        q.fetch_one(pool).await
+    }
+
     /// Create a new audit event (INSERT-ONLY - no updates or deletes).
     pub async fn create(
         pool: &sqlx::PgPool,
@@ -502,6 +566,27 @@ mod tests {
         assert!(filter.affected_user_id.is_none());
         assert!(filter.after.is_none());
         assert!(filter.before.is_none());
+    }
+
+    #[test]
+    fn count_by_tenant_applies_the_same_filters_as_list() {
+        let src = include_str!("poa_audit_event.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let count = production
+            .split("pub async fn count_by_tenant")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("count_by_tenant");
+        assert!(
+            count.contains("SELECT COUNT(*)")
+                && count.contains("filter.poa_id")
+                && count.contains("filter.event_type")
+                && count.contains("filter.actor_id")
+                && count.contains("filter.affected_user_id")
+                && count.contains("filter.after")
+                && count.contains("filter.before"),
+            "PoA audit count must apply the same tenant and list filters"
+        );
     }
 
     #[test]

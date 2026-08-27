@@ -465,6 +465,22 @@ impl GovApplication {
         .fetch_all(pool)
         .await
     }
+
+    /// Count active semi-manual applications for a tenant.
+    pub async fn count_semi_manual(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar(
+            r"
+            SELECT COUNT(*) FROM gov_applications
+            WHERE tenant_id = $1 AND is_semi_manual = true AND status = 'active'
+            ",
+        )
+        .bind(tenant_id)
+        .fetch_one(pool)
+        .await
+    }
 }
 
 #[cfg(test)]
@@ -525,5 +541,23 @@ mod tests {
         let active = GovAppStatus::Active;
         let json = serde_json::to_string(&active).unwrap();
         assert_eq!(json, "\"active\"");
+    }
+
+    #[test]
+    fn count_semi_manual_matches_list_filters() {
+        let src = include_str!("gov_application.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let count = production
+            .split("pub async fn count_semi_manual")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("count_semi_manual");
+        assert!(
+            count.contains("SELECT COUNT(*)")
+                && count.contains("tenant_id = $1")
+                && count.contains("is_semi_manual = true")
+                && count.contains("status = 'active'"),
+            "semi-manual count must match list_semi_manual filters"
+        );
     }
 }

@@ -243,25 +243,17 @@ pub async fn list_tools(
     let limit = query.limit.unwrap_or(20).clamp(1, 100);
     let offset = query.offset.unwrap_or(0).max(0);
 
-    let filter = NhiToolFilter {
+    let mut filter = NhiToolFilter {
         category: query.category,
         requires_approval: query.requires_approval,
         provider_verified: query.provider_verified,
         lifecycle_state: query.lifecycle_state,
         owner_id: query.owner_id,
+        ids: None,
     };
 
     // Admin/super_admin see all tools; non-admin users only see permitted ones
-    if claims.has_role("admin") || claims.has_role("super_admin") {
-        let data = NhiTool::list(&state.pool, tenant_uuid, &filter, limit, offset).await?;
-        let total = count_tools(&state.pool, tenant_uuid, &filter).await?;
-        Ok(Json(PaginatedResponse {
-            data,
-            total,
-            limit,
-            offset,
-        }))
-    } else {
+    if !(claims.has_role("admin") || claims.has_role("super_admin")) {
         use xavyo_db::models::nhi_user_permission::NhiUserPermission;
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|_| NhiApiError::BadRequest("Invalid user ID".into()))?;
@@ -280,26 +272,17 @@ pub async fn list_tools(
             }));
         }
 
-        let fetch_limit = (limit + offset) * 10;
-        let all_data =
-            NhiTool::list(&state.pool, tenant_uuid, &filter, fetch_limit.min(10000), 0).await?;
-        let filtered: Vec<NhiToolWithIdentity> = all_data
-            .into_iter()
-            .filter(|t| permitted_nhi_ids.binary_search(&t.id).is_ok())
-            .collect();
-        let total = filtered.len() as i64;
-        let data: Vec<NhiToolWithIdentity> = filtered
-            .into_iter()
-            .skip(offset as usize)
-            .take(limit as usize)
-            .collect();
-        Ok(Json(PaginatedResponse {
-            data,
-            total,
-            limit,
-            offset,
-        }))
+        filter.ids = Some(permitted_nhi_ids);
     }
+
+    let data = NhiTool::list(&state.pool, tenant_uuid, &filter, limit, offset).await?;
+    let total = count_tools(&state.pool, tenant_uuid, &filter).await?;
+    Ok(Json(PaginatedResponse {
+        data,
+        total,
+        limit,
+        offset,
+    }))
 }
 
 /// Count tools matching a filter.
@@ -336,6 +319,10 @@ async fn count_tools(
     }
     if filter.owner_id.is_some() {
         query.push_str(&format!(" AND i.owner_id = ${param_idx}"));
+        param_idx += 1;
+    }
+    if filter.ids.is_some() {
+        query.push_str(&format!(" AND i.id = ANY(${param_idx})"));
     }
 
     let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -354,6 +341,9 @@ async fn count_tools(
     }
     if let Some(owner_id) = filter.owner_id {
         q = q.bind(owner_id);
+    }
+    if let Some(ref ids) = filter.ids {
+        q = q.bind(ids);
     }
 
     q.fetch_one(pool).await
@@ -642,4 +632,29 @@ pub fn tool_routes(state: NhiState) -> Router {
             get(get_tool).patch(update_tool).delete(delete_tool),
         )
         .with_state(state)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn list_tools_counts_permitted_ids_not_overfetch_window() {
+        let src = include_str!("tools.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_tools")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_tools");
+        assert!(
+            list.contains("filter.ids")
+                && list.contains("count_tools(")
+                && !list.contains("filtered.len() as i64")
+                && !list.contains("fetch_limit"),
+            "GET /nhi/tools must count permitted matching rows, not the over-fetch window length"
+        );
+        assert!(
+            production.contains("i.id = ANY("),
+            "tool count must restrict to permitted identity IDs"
+        );
+    }
 }

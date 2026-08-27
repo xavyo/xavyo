@@ -245,25 +245,17 @@ pub async fn list_agents(
     let limit = query.limit.unwrap_or(20).clamp(1, 100);
     let offset = query.offset.unwrap_or(0).max(0);
 
-    let filter = NhiAgentFilter {
+    let mut filter = NhiAgentFilter {
         agent_type: query.agent_type,
         lifecycle_state: query.lifecycle_state,
         owner_id: query.owner_id,
         requires_human_approval: query.requires_human_approval,
         team_id: query.team_id,
+        ids: None,
     };
 
     // Admin/super_admin see all agents; non-admin users only see permitted ones
-    if claims.has_role("admin") || claims.has_role("super_admin") {
-        let data = NhiAgent::list(&state.pool, tenant_uuid, &filter, limit, offset).await?;
-        let total = count_agents(&state.pool, tenant_uuid, &filter).await?;
-        Ok(Json(PaginatedResponse {
-            data,
-            total,
-            limit,
-            offset,
-        }))
-    } else {
+    if !(claims.has_role("admin") || claims.has_role("super_admin")) {
         use xavyo_db::models::nhi_user_permission::NhiUserPermission;
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|_| NhiApiError::BadRequest("Invalid user ID".into()))?;
@@ -282,26 +274,17 @@ pub async fn list_agents(
             }));
         }
 
-        let fetch_limit = (limit + offset) * 10;
-        let all_data =
-            NhiAgent::list(&state.pool, tenant_uuid, &filter, fetch_limit.min(10000), 0).await?;
-        let filtered: Vec<NhiAgentWithIdentity> = all_data
-            .into_iter()
-            .filter(|a| permitted_nhi_ids.binary_search(&a.id).is_ok())
-            .collect();
-        let total = filtered.len() as i64;
-        let data: Vec<NhiAgentWithIdentity> = filtered
-            .into_iter()
-            .skip(offset as usize)
-            .take(limit as usize)
-            .collect();
-        Ok(Json(PaginatedResponse {
-            data,
-            total,
-            limit,
-            offset,
-        }))
+        filter.ids = Some(permitted_nhi_ids);
     }
+
+    let data = NhiAgent::list(&state.pool, tenant_uuid, &filter, limit, offset).await?;
+    let total = count_agents(&state.pool, tenant_uuid, &filter).await?;
+    Ok(Json(PaginatedResponse {
+        data,
+        total,
+        limit,
+        offset,
+    }))
 }
 
 /// Count agents matching a filter.
@@ -340,7 +323,9 @@ async fn count_agents(
         query.push_str(&format!(" AND a.team_id = ${param_idx}"));
         param_idx += 1;
     }
-    let _ = param_idx; // suppress unused warning
+    if filter.ids.is_some() {
+        query.push_str(&format!(" AND i.id = ANY(${param_idx})"));
+    }
 
     let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
 
@@ -358,6 +343,9 @@ async fn count_agents(
     }
     if let Some(team_id) = filter.team_id {
         q = q.bind(team_id);
+    }
+    if let Some(ref ids) = filter.ids {
+        q = q.bind(ids);
     }
 
     q.fetch_one(pool).await
@@ -647,4 +635,29 @@ pub fn agent_routes(state: NhiState) -> Router {
             get(get_agent).patch(update_agent).delete(delete_agent),
         )
         .with_state(state)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn list_agents_counts_permitted_ids_not_overfetch_window() {
+        let src = include_str!("agents.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_agents")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_agents");
+        assert!(
+            list.contains("filter.ids")
+                && list.contains("count_agents(")
+                && !list.contains("filtered.len() as i64")
+                && !list.contains("fetch_limit"),
+            "GET /nhi/agents must count permitted matching rows, not the over-fetch window length"
+        );
+        assert!(
+            production.contains("i.id = ANY("),
+            "agent count must restrict to permitted identity IDs"
+        );
+    }
 }
