@@ -14,7 +14,7 @@ api
 
 🟢 **stable**
 
-Production-ready with comprehensive test coverage (157+ tests). Full connector management, reconciliation, and background job tracking (F-044).
+Production-ready with comprehensive test coverage (244+ tests). Connector CRUD, schema discovery, reconciliation runs, job tracking (F-044). Unwired worker paths return HTTP 501 fail-closed (remediation, outbound SCIM sync, live inbound sync).
 
 ## Dependencies
 

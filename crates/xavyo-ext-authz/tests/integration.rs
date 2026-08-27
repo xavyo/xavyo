@@ -5,8 +5,7 @@
 
 #[cfg(feature = "integration")]
 mod integration {
-    // Integration tests would go here, requiring a real database.
-    // For now, unit tests in individual modules cover the core logic.
+    // PostgreSQL-backed tests live in `tests/db_integration.rs`.
 }
 
 /// Smoke test: verify proto types compile and are accessible.

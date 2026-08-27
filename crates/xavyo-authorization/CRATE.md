@@ -21,7 +21,7 @@ domain
 
 🟢 **stable**
 
-Full implementation with comprehensive test coverage (105 unit tests, 3 doc tests). Core PDP, SearchOp trait, role resolution, obligation handling, policy versioning, and audit logging all complete.
+Full implementation with comprehensive test coverage (124+ unit tests). Core PDP, SearchOp trait, role resolution, obligation handling, policy versioning, and audit logging all complete.
 
 ## Dependencies
 

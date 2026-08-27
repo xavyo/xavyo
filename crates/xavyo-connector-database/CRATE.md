@@ -12,9 +12,9 @@ connector
 
 ## Status
 
-🟡 **beta**
+🟢 **stable**
 
-Functional PostgreSQL connector with transaction support (47 tests). Core operations implemented: create, update, delete, search. Transaction support includes begin/commit/rollback, savepoints, batch operations, and prepared statement caching. Per Constitution Principle XI, only PostgreSQL is supported.
+Functional PostgreSQL connector with transaction support (51+ unit tests) and PostgreSQL integration tests in CI (`beta-crate-integration` workflow). Core operations implemented: create, update, delete, search, schema discovery.
 
 ## Dependencies
 
