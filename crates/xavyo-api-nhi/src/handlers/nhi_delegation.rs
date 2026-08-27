@@ -66,6 +66,7 @@ pub struct RevokeRequest {
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PaginatedDelegationResponse {
     pub data: Vec<NhiDelegationGrant>,
+    pub total: i64,
     pub limit: i64,
     pub offset: i64,
 }
@@ -234,16 +235,31 @@ pub async fn list_delegation_grants(
     let limit = query.limit.clamp(1, 100);
     let offset = query.offset.max(0);
 
-    let data = if let Some(principal_id) = query.principal_id {
-        NhiDelegationGrant::list_by_principal(&state.pool, tenant_uuid, principal_id, limit, offset)
-            .await?
+    let (data, total) = if let Some(principal_id) = query.principal_id {
+        let data = NhiDelegationGrant::list_by_principal(
+            &state.pool,
+            tenant_uuid,
+            principal_id,
+            limit,
+            offset,
+        )
+        .await?;
+        let total =
+            NhiDelegationGrant::count_by_principal(&state.pool, tenant_uuid, principal_id).await?;
+        (data, total)
     } else if let Some(actor_nhi_id) = query.actor_nhi_id {
-        NhiDelegationGrant::list_by_actor(&state.pool, tenant_uuid, actor_nhi_id, limit, offset)
-            .await?
+        let data = NhiDelegationGrant::list_by_actor(
+            &state.pool,
+            tenant_uuid,
+            actor_nhi_id,
+            limit,
+            offset,
+        )
+        .await?;
+        let total =
+            NhiDelegationGrant::count_by_actor(&state.pool, tenant_uuid, actor_nhi_id).await?;
+        (data, total)
     } else {
-        // No filter: list by principal with a nil UUID won't return results.
-        // For a full listing, we'd need a separate query. Return empty for now
-        // or require at least one filter.
         return Err(NhiApiError::BadRequest(
             "Either principal_id or actor_nhi_id query parameter is required".into(),
         ));
@@ -251,6 +267,7 @@ pub async fn list_delegation_grants(
 
     Ok(Json(PaginatedDelegationResponse {
         data,
+        total,
         limit,
         offset,
     }))
@@ -370,9 +387,11 @@ pub async fn list_incoming_delegations(
 
     let data =
         NhiDelegationGrant::list_by_actor(&state.pool, tenant_uuid, nhi_id, limit, offset).await?;
+    let total = NhiDelegationGrant::count_by_actor(&state.pool, tenant_uuid, nhi_id).await?;
 
     Ok(Json(PaginatedDelegationResponse {
         data,
+        total,
         limit,
         offset,
     }))
@@ -409,9 +428,11 @@ pub async fn list_outgoing_delegations(
     let data =
         NhiDelegationGrant::list_by_principal(&state.pool, tenant_uuid, nhi_id, limit, offset)
             .await?;
+    let total = NhiDelegationGrant::count_by_principal(&state.pool, tenant_uuid, nhi_id).await?;
 
     Ok(Json(PaginatedDelegationResponse {
         data,
+        total,
         limit,
         offset,
     }))
@@ -493,6 +514,41 @@ mod tests {
         assert!(
             production.contains("invalid caller subject"),
             "delegation actor parse errors must fail closed"
+        );
+    }
+
+    #[test]
+    fn list_delegations_reports_filtered_total() {
+        let src = include_str!("nhi_delegation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_delegation_grants")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_delegation_grants");
+        assert!(
+            list.contains("count_by_principal")
+                && list.contains("count_by_actor")
+                && list.contains("total"),
+            "GET /nhi/delegations must report the filtered total, not only the page"
+        );
+        let incoming = production
+            .split("pub async fn list_incoming_delegations")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_incoming_delegations");
+        assert!(
+            incoming.contains("count_by_actor"),
+            "incoming delegations must report a real total"
+        );
+        let outgoing = production
+            .split("pub async fn list_outgoing_delegations")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_outgoing_delegations");
+        assert!(
+            outgoing.contains("count_by_principal"),
+            "outgoing delegations must report a real total"
         );
     }
 }

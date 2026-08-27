@@ -318,7 +318,8 @@ pub async fn bulk_decide(
     path = "/governance/micro-certifications/{id}/events",
     tag = "Governance - Micro-certification",
     params(
-        ("id" = Uuid, Path, description = "Micro-certification ID")
+        ("id" = Uuid, Path, description = "Micro-certification ID"),
+        ListMicroCertEventsQuery
     ),
     responses(
         (status = 200, description = "Micro-certification events", body = MicroCertEventListResponse),
@@ -332,6 +333,7 @@ pub async fn get_events(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
+    Query(query): Query<ListMicroCertEventsQuery>,
 ) -> ApiResult<Json<MicroCertEventListResponse>> {
     let tenant_id = *claims
         .tenant_id()
@@ -341,12 +343,20 @@ pub async fn get_events(
     // Verify certification exists
     let _ = state.micro_certification_service.get(tenant_id, id).await?;
 
-    let events = state
-        .micro_certification_service
-        .get_events(tenant_id, id)
-        .await?;
+    let limit = query.limit.unwrap_or(50).min(100);
+    let offset = query.offset.unwrap_or(0).max(0);
+    let filter = MicroCertEventFilter {
+        micro_certification_id: Some(id),
+        event_type: query.event_type,
+        actor_id: query.actor_id,
+        from_date: query.from_date,
+        to_date: query.to_date,
+    };
 
-    let total = events.len() as i64;
+    let (events, total) = state
+        .micro_certification_service
+        .search_events(tenant_id, &filter, limit, offset)
+        .await?;
 
     let items: Vec<MicroCertEventResponse> = events
         .into_iter()
@@ -356,8 +366,8 @@ pub async fn get_events(
     Ok(Json(MicroCertEventListResponse {
         items,
         total,
-        limit: 100,
-        offset: 0,
+        limit,
+        offset,
     }))
 }
 
@@ -568,6 +578,24 @@ mod tests {
         assert!(
             pending.contains("let (certs, total)") && !pending.contains("certs.len() as i64"),
             "GET /governance/micro-certifications/my-pending must report the filtered total, not the page length"
+        );
+    }
+
+    #[test]
+    fn get_events_honors_pagination_and_filters() {
+        let src = include_str!("micro_certifications.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let events = production
+            .split("pub async fn get_events")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_events");
+        assert!(
+            events.contains("search_events(")
+                && events.contains("query.limit")
+                && !events.contains("limit: 100")
+                && !events.contains("events.len() as i64"),
+            "GET micro-certification events must paginate with a real total, not a fake limit of 100"
         );
     }
 }

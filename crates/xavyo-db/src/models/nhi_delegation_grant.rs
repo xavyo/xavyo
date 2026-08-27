@@ -236,6 +236,42 @@ impl NhiDelegationGrant {
         .await
     }
 
+    /// Count grants by principal.
+    pub async fn count_by_principal(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        principal_id: Uuid,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar(
+            r"
+            SELECT COUNT(*) FROM nhi_delegation_grants
+            WHERE tenant_id = $1 AND principal_id = $2
+            ",
+        )
+        .bind(tenant_id)
+        .bind(principal_id)
+        .fetch_one(pool)
+        .await
+    }
+
+    /// Count grants by actor NHI.
+    pub async fn count_by_actor(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        actor_nhi_id: Uuid,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar(
+            r"
+            SELECT COUNT(*) FROM nhi_delegation_grants
+            WHERE tenant_id = $1 AND actor_nhi_id = $2
+            ",
+        )
+        .bind(tenant_id)
+        .bind(actor_nhi_id)
+        .fetch_one(pool)
+        .await
+    }
+
     /// Mark expired grants as 'expired' for a tenant.
     pub async fn cleanup_expired(pool: &PgPool, tenant_id: Uuid) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(

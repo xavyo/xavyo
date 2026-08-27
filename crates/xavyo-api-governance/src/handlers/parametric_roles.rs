@@ -717,7 +717,12 @@ pub async fn list_user_parametric_assignments(
     let assignments = if let Some(role_id) = query.role_id {
         state
             .parameter_service
-            .list_parametric_assignments_by_user_and_role(tenant_id, user_id, role_id)
+            .list_parametric_assignments_by_user_and_role(
+                tenant_id,
+                user_id,
+                role_id,
+                include_inactive,
+            )
             .await?
     } else {
         state
@@ -1027,6 +1032,11 @@ mod tests {
             list.contains("get_assignment_parameters(tenant_id, assignment.id)")
                 && list.contains(".await?"),
             "listing parametric assignments must propagate parameter-load errors"
+        );
+        assert!(
+            list.contains("include_inactive")
+                && list.contains("list_parametric_assignments_by_user_and_role("),
+            "role_id filter must honor include_inactive instead of leaking revoked assignments"
         );
     }
 }

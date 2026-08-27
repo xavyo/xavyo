@@ -33,8 +33,18 @@ use crate::router::GovernanceState;
 pub async fn trigger_reconciliation(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
-    Json(_request): Json<TriggerReconciliationRequest>,
+    Json(request): Json<TriggerReconciliationRequest>,
 ) -> ApiResult<(StatusCode, Json<ReconciliationRunResponse>)> {
+    if request
+        .notes
+        .as_deref()
+        .is_some_and(|s| !s.trim().is_empty())
+    {
+        return Err(ApiGovernanceError::Validation(
+            "notes is not supported for reconciliation runs".into(),
+        ));
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -292,6 +302,23 @@ mod tests {
         assert!(
             !trigger.contains("let _ = claims.tenant_id()"),
             "must not discard the JWT tenant id"
+        );
+    }
+
+    #[test]
+    fn trigger_reconciliation_rejects_unsupported_notes() {
+        let src = include_str!("reconciliation_runs.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let trigger = production
+            .split("pub async fn trigger_reconciliation")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("trigger_reconciliation");
+        assert!(
+            trigger.contains("Json(request)")
+                && trigger.contains(".notes")
+                && !trigger.contains("Json(_request)"),
+            "POST /governance/reconciliation-runs must not ignore advertised notes"
         );
     }
 }

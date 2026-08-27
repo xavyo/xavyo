@@ -480,9 +480,14 @@ impl ParameterService {
         tenant_id: Uuid,
         user_id: Uuid,
         role_id: Uuid,
+        include_inactive: bool,
     ) -> Result<Vec<GovEntitlementAssignment>, GovernanceError> {
         let assignments = GovEntitlementAssignment::list_parametric_by_user_and_role(
-            &self.pool, tenant_id, user_id, role_id,
+            &self.pool,
+            tenant_id,
+            user_id,
+            role_id,
+            include_inactive,
         )
         .await?;
         Ok(assignments)
