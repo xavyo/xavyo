@@ -82,13 +82,15 @@ impl Severity {
     }
 
     /// Parse from database string representation.
+    ///
+    /// Unknown values must not silently become `Info`.
     #[must_use]
-    pub fn parse(s: &str) -> Self {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
-            "info" => Self::Info,
-            "warning" => Self::Warning,
-            "critical" => Self::Critical,
-            _ => Self::Info,
+            "info" => Some(Self::Info),
+            "warning" => Some(Self::Warning),
+            "critical" => Some(Self::Critical),
+            _ => None,
         }
     }
 }
@@ -177,7 +179,7 @@ impl SecurityAlert {
 
     /// Get the severity as an enum.
     #[must_use]
-    pub fn severity_enum(&self) -> Severity {
+    pub fn severity_enum(&self) -> Option<Severity> {
         Severity::parse(&self.severity)
     }
 
@@ -349,7 +351,7 @@ mod tests {
         for severity in severities {
             let s = severity.as_str();
             let parsed = Severity::parse(s);
-            assert_eq!(severity, parsed);
+            assert_eq!(Some(severity), parsed);
         }
     }
 
@@ -360,8 +362,9 @@ mod tests {
     }
 
     #[test]
-    fn test_unknown_severity_defaults_to_info() {
-        let parsed = Severity::parse("unknown");
-        assert_eq!(parsed, Severity::Info);
+    fn test_unknown_severity_does_not_default_to_info() {
+        assert!(Severity::parse("unknown").is_none());
+        assert!(Severity::parse("").is_none());
+        assert!(Severity::parse("CRITICAL").is_none());
     }
 }

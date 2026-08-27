@@ -19,13 +19,17 @@ pub enum GroupValueFormat {
 }
 
 impl GroupValueFormat {
-    /// Parse from string representation
-    #[must_use]
-    pub fn parse(s: &str) -> Self {
+    /// Parse from string representation.
+    ///
+    /// Unknown formats must not silently become display names.
+    pub fn parse(s: &str) -> Result<Self, String> {
         match s.to_lowercase().as_str() {
-            "id" | "identifier" => Self::Identifier,
-            "dn" => Self::Dn,
-            _ => Self::Name,
+            "name" => Ok(Self::Name),
+            "id" | "identifier" => Ok(Self::Identifier),
+            "dn" => Ok(Self::Dn),
+            other => Err(format!(
+                "Invalid group value format '{other}'. Must be one of: name, id, dn"
+            )),
         }
     }
 
@@ -51,6 +55,22 @@ pub enum GroupFilterType {
     Pattern,
     /// Filter by explicit allowlist of group names
     Allowlist,
+}
+
+impl GroupFilterType {
+    /// Parse from string representation.
+    ///
+    /// Unknown filter types must not silently include every group.
+    pub fn parse(s: &str) -> Result<Self, String> {
+        match s.to_lowercase().as_str() {
+            "" | "none" => Ok(Self::None),
+            "pattern" => Ok(Self::Pattern),
+            "allowlist" => Ok(Self::Allowlist),
+            other => Err(format!(
+                "Invalid group filter type '{other}'. Must be one of: none, pattern, allowlist"
+            )),
+        }
+    }
 }
 
 /// Group filter configuration
@@ -282,14 +302,37 @@ mod tests {
 
     #[test]
     fn test_group_value_format_from_str() {
-        assert_eq!(GroupValueFormat::parse("name"), GroupValueFormat::Name);
-        assert_eq!(GroupValueFormat::parse("id"), GroupValueFormat::Identifier);
         assert_eq!(
-            GroupValueFormat::parse("identifier"),
+            GroupValueFormat::parse("name").unwrap(),
+            GroupValueFormat::Name
+        );
+        assert_eq!(
+            GroupValueFormat::parse("id").unwrap(),
             GroupValueFormat::Identifier
         );
-        assert_eq!(GroupValueFormat::parse("dn"), GroupValueFormat::Dn);
-        assert_eq!(GroupValueFormat::parse("unknown"), GroupValueFormat::Name);
+        assert_eq!(
+            GroupValueFormat::parse("identifier").unwrap(),
+            GroupValueFormat::Identifier
+        );
+        assert_eq!(GroupValueFormat::parse("dn").unwrap(), GroupValueFormat::Dn);
+        assert!(GroupValueFormat::parse("unknown").is_err());
+    }
+
+    #[test]
+    fn unknown_group_filter_type_does_not_include_all_groups() {
+        assert_eq!(
+            GroupFilterType::parse("none").unwrap(),
+            GroupFilterType::None
+        );
+        assert_eq!(
+            GroupFilterType::parse("pattern").unwrap(),
+            GroupFilterType::Pattern
+        );
+        assert_eq!(
+            GroupFilterType::parse("allowlist").unwrap(),
+            GroupFilterType::Allowlist
+        );
+        assert!(GroupFilterType::parse("bogus").is_err());
     }
 
     #[test]

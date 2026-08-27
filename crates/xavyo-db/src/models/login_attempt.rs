@@ -37,15 +37,17 @@ impl AuthMethod {
     }
 
     /// Parse from database string representation.
+    ///
+    /// Unknown values must not silently become password.
     #[must_use]
-    pub fn parse(s: &str) -> Self {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
-            "password" => Self::Password,
-            "social" => Self::Social,
-            "sso" => Self::Sso,
-            "mfa" => Self::Mfa,
-            "refresh" => Self::Refresh,
-            _ => Self::Password,
+            "password" => Some(Self::Password),
+            "social" => Some(Self::Social),
+            "sso" => Some(Self::Sso),
+            "mfa" => Some(Self::Mfa),
+            "refresh" => Some(Self::Refresh),
+            _ => None,
         }
     }
 }
@@ -161,7 +163,7 @@ impl LoginAttempt {
 
     /// Get the authentication method as an enum.
     #[must_use]
-    pub fn method(&self) -> AuthMethod {
+    pub fn method(&self) -> Option<AuthMethod> {
         AuthMethod::parse(&self.auth_method)
     }
 
@@ -357,7 +359,7 @@ mod tests {
         for method in methods {
             let s = method.as_str();
             let parsed = AuthMethod::parse(s);
-            assert_eq!(method, parsed);
+            assert_eq!(Some(method), parsed);
         }
     }
 
@@ -368,8 +370,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unknown_method_defaults_to_password() {
-        let parsed = AuthMethod::parse("unknown");
-        assert_eq!(parsed, AuthMethod::Password);
+    fn test_unknown_method_does_not_default_to_password() {
+        assert!(AuthMethod::parse("unknown").is_none());
     }
 }
