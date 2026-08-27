@@ -46,11 +46,27 @@ impl PolicyEvaluator {
                 }
             }
 
-            // Check all conditions (AND-combined)
-            let all_conditions_match = policy
-                .conditions
-                .iter()
-                .all(|c| Self::evaluate_condition(c, request, user_attributes, user_entitlements));
+            // Check all conditions (AND-combined). Unknown types/operators must
+            // not skip a deny policy — treat them as a fail-closed deny.
+            let mut all_conditions_match = true;
+            let mut invalid = false;
+            for c in &policy.conditions {
+                match Self::evaluate_condition(c, request, user_attributes, user_entitlements) {
+                    ConditionOutcome::Satisfied => {}
+                    ConditionOutcome::Unsatisfied => {
+                        all_conditions_match = false;
+                        break;
+                    }
+                    ConditionOutcome::Invalid => {
+                        invalid = true;
+                        break;
+                    }
+                }
+            }
+
+            if invalid {
+                return Some((PolicyEffect::Deny, policy.id));
+            }
 
             if all_conditions_match {
                 let effect = PolicyEffect::from_effect_str(&policy.effect);
@@ -67,24 +83,40 @@ impl PolicyEvaluator {
         _request: &AuthorizationRequest,
         user_attributes: Option<&serde_json::Value>,
         user_entitlements: Option<&[ResolvedEntitlement]>,
-    ) -> bool {
+    ) -> ConditionOutcome {
         match condition.condition_type.as_str() {
-            "time_window" => Self::evaluate_time_window(&condition.value),
-            "user_attribute" => {
-                if let (Some(path), Some(op), Some(attrs)) = (
-                    &condition.attribute_path,
-                    &condition.operator,
-                    user_attributes,
-                ) {
-                    crate::abac::evaluate_abac_condition(attrs, path, op, &condition.value)
+            "time_window" => {
+                if Self::evaluate_time_window(&condition.value) {
+                    ConditionOutcome::Satisfied
                 } else {
-                    false // Missing data = condition not satisfied (fail-safe)
+                    ConditionOutcome::Unsatisfied
+                }
+            }
+            "user_attribute" => {
+                let Some(op) = condition.operator.as_deref() else {
+                    return ConditionOutcome::Unsatisfied;
+                };
+                if !crate::abac::is_known_operator(op) {
+                    return ConditionOutcome::Invalid;
+                }
+                if let (Some(path), Some(attrs)) = (&condition.attribute_path, user_attributes) {
+                    if crate::abac::evaluate_abac_condition(attrs, path, op, &condition.value) {
+                        ConditionOutcome::Satisfied
+                    } else {
+                        ConditionOutcome::Unsatisfied
+                    }
+                } else {
+                    ConditionOutcome::Unsatisfied
                 }
             }
             "entitlement_check" => {
-                Self::evaluate_entitlement_check(&condition.value, user_entitlements)
+                if Self::evaluate_entitlement_check(&condition.value, user_entitlements) {
+                    ConditionOutcome::Satisfied
+                } else {
+                    ConditionOutcome::Unsatisfied
+                }
             }
-            _ => false, // Unknown condition type = not satisfied
+            _ => ConditionOutcome::Invalid,
         }
     }
 
@@ -129,6 +161,14 @@ impl PolicyEvaluator {
         let current_time = chrono::Utc::now().format("%H:%M").to_string();
         current_time.as_str() >= start && current_time.as_str() <= end
     }
+}
+
+/// Outcome of a single policy condition.
+enum ConditionOutcome {
+    Satisfied,
+    Unsatisfied,
+    /// Unknown type or operator — must not skip a deny policy.
+    Invalid,
 }
 
 /// Parse a `HH:MM` time bound. Invalid or missing values fail closed.
@@ -386,7 +426,7 @@ mod tests {
     }
 
     #[test]
-    fn test_unknown_condition_type_returns_false() {
+    fn unknown_condition_type_does_not_skip_deny() {
         let condition = ConditionData {
             id: Uuid::new_v4(),
             condition_type: "unknown_type".to_string(),
@@ -394,10 +434,47 @@ mod tests {
             operator: None,
             value: json!({}),
         };
-        let policies = vec![make_policy("allow", 100, None, None, vec![condition])];
         let request = make_request("read", "document");
 
-        let result = PolicyEvaluator::evaluate_policies(&policies, &request, None, None);
-        assert!(result.is_none());
+        let deny = vec![make_policy("deny", 10, None, None, vec![condition.clone()])];
+        let (effect, _) = PolicyEvaluator::evaluate_policies(&deny, &request, None, None).unwrap();
+        assert_eq!(
+            effect,
+            PolicyEffect::Deny,
+            "unknown condition on a deny policy must deny, not skip"
+        );
+
+        let allow = vec![make_policy("allow", 100, None, None, vec![condition])];
+        let (effect, _) = PolicyEvaluator::evaluate_policies(&allow, &request, None, None).unwrap();
+        assert_eq!(
+            effect,
+            PolicyEffect::Deny,
+            "unknown condition on an allow policy must fail closed"
+        );
+
+        let src = include_str!("policy_evaluator.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("_ => false, // Unknown condition type")
+                && production.contains("ConditionOutcome::Invalid"),
+            "unknown condition types must not be treated as unsatisfied-skip"
+        );
+    }
+
+    #[test]
+    fn unknown_abac_operator_does_not_skip_deny() {
+        let condition = ConditionData {
+            id: Uuid::new_v4(),
+            condition_type: "user_attribute".to_string(),
+            attribute_path: Some("department".to_string()),
+            operator: Some("regex".to_string()),
+            value: json!("engineering"),
+        };
+        let attrs = json!({"department": "engineering"});
+        let request = make_request("read", "document");
+        let deny = vec![make_policy("deny", 10, None, None, vec![condition])];
+        let (effect, _) =
+            PolicyEvaluator::evaluate_policies(&deny, &request, Some(&attrs), None).unwrap();
+        assert_eq!(effect, PolicyEffect::Deny);
     }
 }

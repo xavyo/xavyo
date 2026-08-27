@@ -614,18 +614,28 @@ mod tests {
 
     #[test]
     fn test_duplicate_check_fields_parse() {
-        let fields = DuplicateCheckFields::parse("email,username");
+        let fields = DuplicateCheckFields::parse("email,username").unwrap();
         assert!(fields.email);
         assert!(fields.username);
         assert!(!fields.external_id);
 
-        let fields = DuplicateCheckFields::parse("username,external_id");
-        assert!(!fields.email); // Not specified, but will default to email if all false
+        let fields = DuplicateCheckFields::parse("username,external_id").unwrap();
+        assert!(!fields.email);
         assert!(fields.username);
         assert!(fields.external_id);
 
-        let fields = DuplicateCheckFields::parse("");
+        let fields = DuplicateCheckFields::parse("").unwrap();
         assert!(fields.email); // Defaults to email when empty
+
+        let err = DuplicateCheckFields::parse("email,emial").unwrap_err();
+        assert!(err.contains("emial"), "got {err}");
+        let src = include_str!("../models.rs");
+        let production = src.split("impl DuplicateCheckFields").nth(1).expect("impl");
+        let parse = production.split("pub fn parse").nth(1).expect("parse");
+        assert!(
+            !parse.contains("_ => {}") && parse.contains("Unknown duplicate-check field"),
+            "unknown duplicate-check fields must not be ignored"
+        );
     }
 
     // =========================================================================

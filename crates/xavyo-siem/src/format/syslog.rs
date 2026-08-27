@@ -38,7 +38,7 @@ impl SyslogFormatter {
             3..=4 => 5,  // Notice
             1..=2 => 6,  // Informational
             0 => 7,      // Debug
-            _ => 6,      // Default: Informational
+            _ => 0,      // Unknown CEF severity must not be downgraded to Informational
         }
     }
 
@@ -202,6 +202,14 @@ mod tests {
         assert_eq!(SyslogFormatter::map_severity(3), 5); // Notice
         assert_eq!(SyslogFormatter::map_severity(1), 6); // Informational
         assert_eq!(SyslogFormatter::map_severity(0), 7); // Debug
+        assert_eq!(SyslogFormatter::map_severity(11), 0); // Emergency, not Info
+        assert_eq!(SyslogFormatter::map_severity(255), 0);
+        let src = include_str!("syslog.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("_ => 6,      // Default: Informational"),
+            "unknown CEF severity must not map to Informational"
+        );
     }
 
     #[test]

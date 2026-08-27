@@ -75,22 +75,30 @@ impl DuplicateCheckFields {
     }
 
     /// Parse from comma-separated string (e.g., "`email,username,external_id`").
-    #[must_use]
-    pub fn parse(s: &str) -> Self {
+    ///
+    /// Unknown field names are an error so a typo cannot silently drop a check.
+    pub fn parse(s: &str) -> Result<Self, String> {
         let mut fields = Self::default();
         for field in s.split(',').map(|f| f.trim().to_lowercase()) {
+            if field.is_empty() {
+                continue;
+            }
             match field.as_str() {
                 "email" => fields.email = true,
                 "username" => fields.username = true,
                 "external_id" | "externalid" => fields.external_id = true,
-                _ => {} // Ignore unknown fields
+                other => {
+                    return Err(format!(
+                        "Unknown duplicate-check field '{other}'. Valid values: email, username, external_id"
+                    ));
+                }
             }
         }
         // Default to email if nothing specified
         if !fields.email && !fields.username && !fields.external_id {
             fields.email = true;
         }
-        fields
+        Ok(fields)
     }
 }
 
