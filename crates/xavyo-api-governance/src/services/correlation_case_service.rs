@@ -120,7 +120,7 @@ impl CorrelationCaseService {
             "Correlation case created"
         );
 
-        Ok(case_to_summary(case))
+        case_to_summary(case)
     }
 
     /// Get a single correlation case by ID, including all candidates.
@@ -136,7 +136,7 @@ impl CorrelationCaseService {
         let candidates =
             GovCorrelationCandidate::list_by_case(&self.pool, tenant_id, case.id).await?;
 
-        Ok(case_to_detail(case, candidates))
+        case_to_detail(case, candidates)
     }
 
     /// List correlation cases for a tenant with filtering, sorting, and pagination.
@@ -157,7 +157,10 @@ impl CorrelationCaseService {
         let total = GovCorrelationCase::count_by_tenant(&self.pool, tenant_id, &filter).await?;
 
         Ok(CorrelationCaseListResponse {
-            items: cases.into_iter().map(case_to_summary).collect(),
+            items: cases
+                .into_iter()
+                .map(case_to_summary)
+                .collect::<Result<Vec<_>>>()?,
             total,
             limit,
             offset,
@@ -382,32 +385,35 @@ fn parse_trigger_type(s: &str) -> Result<GovCorrelationTrigger> {
     }
 }
 
+fn decimal_to_f64(value: rust_decimal::Decimal, field: &str) -> Result<f64> {
+    value
+        .to_string()
+        .parse()
+        .map_err(|_| GovernanceError::Validation(format!("Invalid stored {field} value")))
+}
+
 /// Convert a `GovCorrelationCase` database model into a `CorrelationCaseSummaryResponse`.
-fn case_to_summary(case: GovCorrelationCase) -> CorrelationCaseSummaryResponse {
-    CorrelationCaseSummaryResponse {
+fn case_to_summary(case: GovCorrelationCase) -> Result<CorrelationCaseSummaryResponse> {
+    Ok(CorrelationCaseSummaryResponse {
         id: case.id,
         connector_id: case.connector_id,
         connector_name: None, // Connector name requires a join; populated by caller if needed.
         account_identifier: case.account_identifier,
         status: format!("{:?}", case.status).to_lowercase(),
         trigger_type: format!("{:?}", case.trigger_type).to_lowercase(),
-        highest_confidence: case
-            .highest_confidence
-            .to_string()
-            .parse::<f64>()
-            .unwrap_or(0.0),
+        highest_confidence: decimal_to_f64(case.highest_confidence, "highest_confidence")?,
         candidate_count: case.candidate_count,
         assigned_to: case.assigned_to,
         created_at: case.created_at,
-    }
+    })
 }
 
 /// Convert a `GovCorrelationCase` and its candidates into a `CorrelationCaseDetailResponse`.
 fn case_to_detail(
     case: GovCorrelationCase,
     candidates: Vec<GovCorrelationCandidate>,
-) -> CorrelationCaseDetailResponse {
-    CorrelationCaseDetailResponse {
+) -> Result<CorrelationCaseDetailResponse> {
+    Ok(CorrelationCaseDetailResponse {
         id: case.id,
         connector_id: case.connector_id,
         connector_name: None,
@@ -415,40 +421,35 @@ fn case_to_detail(
         account_id: Some(case.account_id),
         status: format!("{:?}", case.status).to_lowercase(),
         trigger_type: format!("{:?}", case.trigger_type).to_lowercase(),
-        highest_confidence: case
-            .highest_confidence
-            .to_string()
-            .parse::<f64>()
-            .unwrap_or(0.0),
+        highest_confidence: decimal_to_f64(case.highest_confidence, "highest_confidence")?,
         candidate_count: case.candidate_count,
         assigned_to: case.assigned_to,
         account_attributes: case.account_attributes,
-        candidates: candidates.into_iter().map(candidate_to_detail).collect(),
+        candidates: candidates
+            .into_iter()
+            .map(candidate_to_detail)
+            .collect::<Result<Vec<_>>>()?,
         resolved_by: case.resolved_by,
         resolved_at: case.resolved_at,
         resolution_reason: case.resolution_reason,
         rules_snapshot: case.rules_snapshot,
         created_at: case.created_at,
         updated_at: case.updated_at,
-    }
+    })
 }
 
 /// Convert a `GovCorrelationCandidate` database model into a `CorrelationCandidateDetailResponse`.
-fn candidate_to_detail(c: GovCorrelationCandidate) -> CorrelationCandidateDetailResponse {
-    CorrelationCandidateDetailResponse {
+fn candidate_to_detail(c: GovCorrelationCandidate) -> Result<CorrelationCandidateDetailResponse> {
+    Ok(CorrelationCandidateDetailResponse {
         id: c.id,
         identity_id: c.identity_id,
         identity_display_name: c.identity_display_name,
         identity_attributes: c.identity_attributes,
-        aggregate_confidence: c
-            .aggregate_confidence
-            .to_string()
-            .parse::<f64>()
-            .unwrap_or(0.0),
+        aggregate_confidence: decimal_to_f64(c.aggregate_confidence, "aggregate_confidence")?,
         per_attribute_scores: c.per_attribute_scores,
         is_deactivated: c.is_deactivated,
         is_definitive_match: c.is_definitive_match,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -499,7 +500,7 @@ mod tests {
             updated_at: chrono::Utc::now(),
         };
 
-        let summary = case_to_summary(case.clone());
+        let summary = case_to_summary(case.clone()).unwrap();
 
         assert_eq!(summary.id, case.id);
         assert_eq!(summary.connector_id, case.connector_id);
@@ -551,7 +552,7 @@ mod tests {
             created_at: chrono::Utc::now(),
         }];
 
-        let detail = case_to_detail(case.clone(), candidates);
+        let detail = case_to_detail(case.clone(), candidates).unwrap();
 
         assert_eq!(detail.id, case.id);
         assert_eq!(detail.connector_id, case.connector_id);
@@ -593,7 +594,7 @@ mod tests {
             created_at: chrono::Utc::now(),
         };
 
-        let detail = candidate_to_detail(candidate.clone());
+        let detail = candidate_to_detail(candidate.clone()).unwrap();
 
         assert_eq!(detail.id, candidate.id);
         assert_eq!(detail.identity_id, candidate.identity_id);
@@ -602,6 +603,16 @@ mod tests {
         assert!(!detail.is_deactivated);
         assert!(detail.is_definitive_match);
         assert!(detail.per_attribute_scores.is_object());
+    }
+
+    #[test]
+    fn case_confidence_does_not_default_to_zero() {
+        let src = include_str!("correlation_case_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("decimal_to_f64(") && !production.contains("unwrap_or(0.0)"),
+            "correlation case/candidate confidence must not serialize as 0.0 on parse failure"
+        );
     }
 
     #[test]

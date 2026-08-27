@@ -229,8 +229,8 @@ impl CorrelationEngineService {
                     GovCorrelationThreshold::find_or_default(tenant_id, connector_id)
                 });
 
-        let auto_confirm = decimal_to_f64(thresholds.auto_confirm_threshold);
-        let manual_review = decimal_to_f64(thresholds.manual_review_threshold);
+        let auto_confirm = decimal_to_f64(thresholds.auto_confirm_threshold)?;
+        let manual_review = decimal_to_f64(thresholds.manual_review_threshold)?;
         let batch_size = i64::from(thresholds.batch_size);
 
         // 3. Iterate over identities (users) in batches.
@@ -266,7 +266,7 @@ impl CorrelationEngineService {
 
             for (identity_id, identity_attrs) in &identity_rows {
                 let score =
-                    self.score_candidate(&rules, account_attributes, identity_attrs, *identity_id);
+                    self.score_candidate(&rules, account_attributes, identity_attrs, *identity_id)?;
 
                 // Track candidates above review threshold.
                 if score.aggregate_confidence >= manual_review {
@@ -773,7 +773,7 @@ impl CorrelationEngineService {
         account_attributes: &serde_json::Value,
         identity_attributes: &serde_json::Value,
         identity_id: Uuid,
-    ) -> CandidateScore {
+    ) -> Result<CandidateScore> {
         let stored_identity_attributes = identity_attributes.clone();
         let mut attribute_scores: Vec<AttributeScore> = Vec::with_capacity(rules.len());
         let mut available_rule_ids: Vec<Uuid> = Vec::new();
@@ -787,7 +787,7 @@ impl CorrelationEngineService {
             let source_val = extract_attribute(account_attributes, source_attr);
             let target_val = extract_attribute(identity_attributes, target_attr);
 
-            let weight = decimal_to_f64(rule.weight);
+            let weight = decimal_to_f64(rule.weight)?;
 
             // Check for missing attributes.
             if source_val.is_empty() || target_val.is_empty() {
@@ -811,7 +811,7 @@ impl CorrelationEngineService {
 
             available_rule_ids.push(rule.id);
 
-            let score = compute_attribute_score(rule, &source_val, &target_val);
+            let score = compute_attribute_score(rule, &source_val, &target_val)?;
             attribute_scores.push(score);
 
             // Check for definitive match.
@@ -824,7 +824,7 @@ impl CorrelationEngineService {
         }
 
         // Redistribute weights for available (non-skipped) rules.
-        let redistributed = redistribute_weights(rules, &available_rule_ids);
+        let redistributed = redistribute_weights(rules, &available_rule_ids)?;
 
         // Second pass: compute weighted scores with redistributed weights.
         let mut aggregate_confidence = 0.0;
@@ -842,13 +842,13 @@ impl CorrelationEngineService {
         // Clamp to [0.0, 1.0].
         aggregate_confidence = aggregate_confidence.clamp(0.0, 1.0);
 
-        CandidateScore {
+        Ok(CandidateScore {
             identity_id,
             identity_attributes: stored_identity_attributes,
             aggregate_confidence,
             per_attribute_scores: attribute_scores,
             has_definitive_match,
-        }
+        })
     }
 
     // =========================================================================
@@ -1097,8 +1097,8 @@ fn compute_attribute_score(
     rule: &GovCorrelationRule,
     source_value: &str,
     target_value: &str,
-) -> AttributeScore {
-    let weight = decimal_to_f64(rule.weight);
+) -> Result<AttributeScore> {
+    let weight = decimal_to_f64(rule.weight)?;
     let strategy = format!("{:?}", rule.match_type).to_lowercase();
 
     // Normalize if requested.
@@ -1154,7 +1154,7 @@ fn compute_attribute_score(
     // Apply per-rule threshold: if the rule has a minimum threshold and the
     // raw similarity is below it, zero out the score.
     let (raw_similarity, per_rule_skipped) = if let Some(threshold) = rule.threshold {
-        let threshold_f64 = decimal_to_f64(threshold);
+        let threshold_f64 = decimal_to_f64(threshold)?;
         if raw_similarity < threshold_f64 {
             (0.0, true)
         } else {
@@ -1181,7 +1181,7 @@ fn compute_attribute_score(
         strategy
     };
 
-    AttributeScore {
+    Ok(AttributeScore {
         rule_id: rule.id,
         rule_name: rule.name.clone(),
         source_attribute: rule
@@ -1201,7 +1201,7 @@ fn compute_attribute_score(
         normalized: was_normalized,
         skipped: false,
         skip_reason,
-    }
+    })
 }
 
 // =============================================================================
@@ -1514,15 +1514,14 @@ pub fn normalize_attribute(value: &str) -> String {
 /// When some rules are skipped (e.g., due to missing attributes), their weight
 /// is proportionally redistributed among the remaining rules so that the total
 /// weight sums to 1.0 (or the original total, whichever is appropriate).
-#[must_use]
 pub fn redistribute_weights(
     all_rules: &[GovCorrelationRule],
     available_rule_ids: &[Uuid],
-) -> HashMap<Uuid, f64> {
+) -> Result<HashMap<Uuid, f64>> {
     let mut result = HashMap::new();
 
     if available_rule_ids.is_empty() {
-        return result;
+        return Ok(result);
     }
 
     // Sum of weights for available rules.
@@ -1530,6 +1529,8 @@ pub fn redistribute_weights(
         .iter()
         .filter(|r| available_rule_ids.contains(&r.id))
         .map(|r| decimal_to_f64(r.weight))
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
         .sum();
 
     if available_weight_sum <= 0.0 {
@@ -1538,11 +1539,16 @@ pub fn redistribute_weights(
         for id in available_rule_ids {
             result.insert(*id, equal);
         }
-        return result;
+        return Ok(result);
     }
 
     // Total weight from all rules (including skipped).
-    let total_weight: f64 = all_rules.iter().map(|r| decimal_to_f64(r.weight)).sum();
+    let total_weight: f64 = all_rules
+        .iter()
+        .map(|r| decimal_to_f64(r.weight))
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .sum();
 
     let scale = if total_weight > 0.0 {
         total_weight / available_weight_sum
@@ -1552,12 +1558,12 @@ pub fn redistribute_weights(
 
     for rule in all_rules {
         if available_rule_ids.contains(&rule.id) {
-            let w = decimal_to_f64(rule.weight) * scale;
+            let w = decimal_to_f64(rule.weight)? * scale;
             result.insert(rule.id, w);
         }
     }
 
-    result
+    Ok(result)
 }
 
 // =============================================================================
@@ -1584,9 +1590,11 @@ pub fn apply_thresholds(
 // Helpers
 // =============================================================================
 
-/// Convert a `Decimal` to `f64`.
-fn decimal_to_f64(d: Decimal) -> f64 {
-    d.to_f64().unwrap_or(0.0)
+/// Convert a `Decimal` to `f64`. Missing/unrepresentable values must not
+/// become 0.0 (that would auto-confirm every match).
+fn decimal_to_f64(d: Decimal) -> Result<f64> {
+    d.to_f64()
+        .ok_or_else(|| GovernanceError::Validation("Invalid stored decimal value".to_string()))
 }
 
 /// Extract a string attribute from a JSON object.
@@ -1634,17 +1642,19 @@ mod tests {
         );
 
         // Exact match should return 1.0.
-        let score = compute_attribute_score(&rule, "alice@example.com", "alice@example.com");
+        let score =
+            compute_attribute_score(&rule, "alice@example.com", "alice@example.com").unwrap();
         assert!(!score.skipped);
         assert!((score.raw_similarity - 1.0).abs() < f64::EPSILON);
         assert!((score.weighted_score - 0.5).abs() < 0.001);
 
         // Case-insensitive match.
-        let score = compute_attribute_score(&rule, "Alice@Example.COM", "alice@example.com");
+        let score =
+            compute_attribute_score(&rule, "Alice@Example.COM", "alice@example.com").unwrap();
         assert!((score.raw_similarity - 1.0).abs() < f64::EPSILON);
 
         // Mismatch should return 0.0.
-        let score = compute_attribute_score(&rule, "alice@example.com", "bob@example.com");
+        let score = compute_attribute_score(&rule, "alice@example.com", "bob@example.com").unwrap();
         assert!((score.raw_similarity - 0.0).abs() < f64::EPSILON);
         assert!((score.weighted_score - 0.0).abs() < f64::EPSILON);
     }
@@ -1766,7 +1776,7 @@ mod tests {
 
         // All rules available: weights should remain proportional.
         let all = vec![rule1_id, rule2_id, rule3_id];
-        let result = redistribute_weights(&rules, &all);
+        let result = redistribute_weights(&rules, &all).unwrap();
         assert_eq!(result.len(), 3);
         // Scale = 1.0 / 1.0 = 1.0, so weights unchanged.
         assert!((result[&rule1_id] - 0.40).abs() < 0.001);
@@ -1775,7 +1785,7 @@ mod tests {
 
         // Rule 3 skipped: redistribute its weight proportionally.
         let partial = vec![rule1_id, rule2_id];
-        let result = redistribute_weights(&rules, &partial);
+        let result = redistribute_weights(&rules, &partial).unwrap();
         assert_eq!(result.len(), 2);
         // Available sum = 0.70, total sum = 1.00, scale = 1.0 / 0.7 ~ 1.4286
         // Rule 1: 0.40 * (1.0 / 0.7) ~ 0.5714
@@ -1790,7 +1800,7 @@ mod tests {
 
         // No rules available: empty result.
         let empty: Vec<Uuid> = vec![];
-        let result = redistribute_weights(&rules, &empty);
+        let result = redistribute_weights(&rules, &empty).unwrap();
         assert!(result.is_empty());
     }
 
@@ -1807,7 +1817,7 @@ mod tests {
         );
 
         // Source is only 2 characters: should use exact fallback.
-        let score = compute_attribute_score(&rule, "AB", "AB");
+        let score = compute_attribute_score(&rule, "AB", "AB").unwrap();
         assert!((score.raw_similarity - 1.0).abs() < f64::EPSILON);
         assert_eq!(score.strategy, "exact_fallback");
         assert!(
@@ -1816,12 +1826,12 @@ mod tests {
         );
 
         // Short source, mismatch.
-        let score = compute_attribute_score(&rule, "AB", "CD");
+        let score = compute_attribute_score(&rule, "AB", "CD").unwrap();
         assert!((score.raw_similarity - 0.0).abs() < f64::EPSILON);
         assert_eq!(score.strategy, "exact_fallback");
 
         // Long enough strings should use the fuzzy algorithm.
-        let score = compute_attribute_score(&rule, "Alice", "Alica");
+        let score = compute_attribute_score(&rule, "Alice", "Alica").unwrap();
         assert!(score.raw_similarity > 0.0);
         assert_eq!(score.strategy, "fuzzy");
         assert!(score.skip_reason.is_none());
@@ -2001,7 +2011,7 @@ mod tests {
             Decimal::new(50, 2),
         );
 
-        let score = compute_attribute_score(&rule, "Alice Smith", "Alice Smyth");
+        let score = compute_attribute_score(&rule, "Alice Smith", "Alice Smyth").unwrap();
         assert!(
             score.raw_similarity > 0.7,
             "Should be similar: {}",
@@ -2020,19 +2030,25 @@ mod tests {
         );
 
         // "Robert" and "Rupert" have the same Soundex code.
-        let score = compute_attribute_score(&rule, "Robert", "Rupert");
+        let score = compute_attribute_score(&rule, "Robert", "Rupert").unwrap();
         assert!((score.raw_similarity - 1.0).abs() < f64::EPSILON);
 
         // "Alice" and "Bob" have different Soundex codes.
-        let score = compute_attribute_score(&rule, "Alice", "Bob");
+        let score = compute_attribute_score(&rule, "Alice", "Bob").unwrap();
         assert!((score.raw_similarity - 0.0).abs() < f64::EPSILON);
     }
 
     #[test]
     fn test_decimal_to_f64_conversion() {
-        assert!((decimal_to_f64(Decimal::new(85, 2)) - 0.85).abs() < f64::EPSILON);
-        assert!((decimal_to_f64(Decimal::new(0, 0)) - 0.0).abs() < f64::EPSILON);
-        assert!((decimal_to_f64(Decimal::new(100, 2)) - 1.0).abs() < f64::EPSILON);
+        assert!((decimal_to_f64(Decimal::new(85, 2)).unwrap() - 0.85).abs() < f64::EPSILON);
+        assert!((decimal_to_f64(Decimal::new(0, 0)).unwrap() - 0.0).abs() < f64::EPSILON);
+        assert!((decimal_to_f64(Decimal::new(100, 2)).unwrap() - 1.0).abs() < f64::EPSILON);
+        let src = include_str!("correlation_engine_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(0.0)"),
+            "correlation engine decimals must not become 0.0 (auto-confirm all)"
+        );
     }
 
     // =========================================================================

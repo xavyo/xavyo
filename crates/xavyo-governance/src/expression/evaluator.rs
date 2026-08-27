@@ -200,11 +200,11 @@ impl Evaluator {
 
             // Float comparisons
             (JsonValue::Number(n), Value::Float(b)) => {
-                let a = n.as_f64().unwrap_or(0.0);
+                let a = json_number_f64(n, attr_name)?;
                 Self::compare_floats(a, *b, op)
             }
             (JsonValue::Number(n), Value::Integer(b)) if n.is_f64() => {
-                let a = n.as_f64().unwrap();
+                let a = json_number_f64(n, attr_name)?;
                 Self::compare_floats(a, *b as f64, op)
             }
 
@@ -372,6 +372,14 @@ impl Evaluator {
     }
 }
 
+fn json_number_f64(n: &serde_json::Number, attr_name: &str) -> Result<f64, EvalError> {
+    n.as_f64().ok_or_else(|| EvalError::TypeMismatch {
+        attribute: attr_name.to_string(),
+        expected: "finite number".to_string(),
+        actual: "non-finite number".to_string(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -405,6 +413,18 @@ mod tests {
         assert!(eval("age < 30", &ctx).unwrap());
         assert!(eval("age <= 25", &ctx).unwrap());
         assert!(!eval("age > 25", &ctx).unwrap());
+    }
+
+    #[test]
+    fn float_compare_does_not_default_to_zero() {
+        let src = include_str!("evaluator.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("json_number_f64(") && !production.contains("unwrap_or(0.0)"),
+            "lifecycle expression float compare must not treat invalid numbers as 0.0"
+        );
+        let n = serde_json::Number::from(3);
+        assert!((json_number_f64(&n, "age").unwrap() - 3.0).abs() < f64::EPSILON);
     }
 
     #[test]
