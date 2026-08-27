@@ -86,22 +86,47 @@ impl MappedEntraUser {
                 .and_then(|v| v.get("id"))
                 .and_then(|v| v.as_str())
                 .map(String::from),
-            account_enabled: value
-                .get("accountEnabled")
-                .and_then(serde_json::Value::as_bool)
-                .unwrap_or(true),
-            created_at: value
-                .get("createdDateTime")
-                .and_then(|v| v.as_str())
-                .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
-                .map(|dt| dt.with_timezone(&Utc)),
-            last_sign_in: value
-                .get("signInActivity")
-                .and_then(|v| v.get("lastSignInDateTime"))
-                .and_then(|v| v.as_str())
-                .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
-                .map(|dt| dt.with_timezone(&Utc)),
+            account_enabled: json_bool(value, "accountEnabled")?,
+            created_at: optional_rfc3339_field(value, "createdDateTime")?,
+            last_sign_in: optional_nested_rfc3339(value, "signInActivity", "lastSignInDateTime")?,
         })
+    }
+}
+
+fn json_bool(value: &serde_json::Value, field: &str) -> EntraResult<bool> {
+    match value.get(field) {
+        None => Err(EntraError::Sync(format!("Missing {field}"))),
+        Some(v) => v
+            .as_bool()
+            .ok_or_else(|| EntraError::Sync(format!("{field} must be a boolean"))),
+    }
+}
+
+fn optional_rfc3339_field(
+    value: &serde_json::Value,
+    field: &str,
+) -> EntraResult<Option<DateTime<Utc>>> {
+    match value.get(field) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => {
+            let raw = v
+                .as_str()
+                .ok_or_else(|| EntraError::Sync(format!("{field} must be an RFC3339 timestamp")))?;
+            DateTime::parse_from_rfc3339(raw)
+                .map(|dt| Some(dt.with_timezone(&Utc)))
+                .map_err(|e| EntraError::Sync(format!("Invalid {field}: {e}")))
+        }
+    }
+}
+
+fn optional_nested_rfc3339(
+    value: &serde_json::Value,
+    parent: &str,
+    field: &str,
+) -> EntraResult<Option<DateTime<Utc>>> {
+    match value.get(parent) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(obj) => optional_rfc3339_field(obj, field),
     }
 }
 
@@ -273,7 +298,8 @@ mod tests {
     fn test_mapped_user_from_json_minimal() {
         let json = serde_json::json!({
             "id": "user-123",
-            "userPrincipalName": "john@example.com"
+            "userPrincipalName": "john@example.com",
+            "accountEnabled": true
         });
 
         let user = MappedEntraUser::from_json(&json).unwrap();
@@ -281,6 +307,7 @@ mod tests {
         assert_eq!(user.user_principal_name, "john@example.com");
         assert!(user.email.is_none());
         assert!(user.department.is_none());
+        assert!(user.account_enabled);
     }
 
     #[test]
@@ -293,5 +320,41 @@ mod tests {
 
         let user = MappedEntraUser::from_json(&json).unwrap();
         assert!(!user.account_enabled);
+    }
+
+    #[test]
+    fn mapped_user_does_not_fail_open_account_enabled_or_dates() {
+        let missing = serde_json::json!({
+            "id": "user-123",
+            "userPrincipalName": "john@example.com"
+        });
+        assert!(MappedEntraUser::from_json(&missing).is_err());
+        let not_bool = serde_json::json!({
+            "id": "user-123",
+            "userPrincipalName": "john@example.com",
+            "accountEnabled": "yes"
+        });
+        assert!(MappedEntraUser::from_json(&not_bool).is_err());
+        let bad_created = serde_json::json!({
+            "id": "user-123",
+            "userPrincipalName": "john@example.com",
+            "accountEnabled": true,
+            "createdDateTime": "not-a-date"
+        });
+        assert!(MappedEntraUser::from_json(&bad_created).is_err());
+        let bad_signin = serde_json::json!({
+            "id": "user-123",
+            "userPrincipalName": "john@example.com",
+            "accountEnabled": true,
+            "signInActivity": { "lastSignInDateTime": "yesterday" }
+        });
+        assert!(MappedEntraUser::from_json(&bad_signin).is_err());
+        let src = include_str!("sync.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(true)")
+                && !production.contains("parse_from_rfc3339(s).ok()"),
+            "Entra user sync must not treat missing accountEnabled as enabled or drop bad dates"
+        );
     }
 }

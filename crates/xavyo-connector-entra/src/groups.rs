@@ -54,15 +54,8 @@ impl MappedEntraGroup {
             })
             .unwrap_or_default();
 
-        let security_enabled = value
-            .get("securityEnabled")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false);
-
-        let mail_enabled = value
-            .get("mailEnabled")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false);
+        let security_enabled = json_bool(value, "securityEnabled")?;
+        let mail_enabled = json_bool(value, "mailEnabled")?;
 
         let is_dynamic = group_types.contains(&"DynamicMembership".to_string());
 
@@ -107,6 +100,15 @@ impl MappedEntraGroup {
         } else {
             EntraGroupType::Unknown
         }
+    }
+}
+
+fn json_bool(value: &serde_json::Value, field: &str) -> EntraResult<bool> {
+    match value.get(field) {
+        None => Err(EntraError::Sync(format!("Missing {field}"))),
+        Some(v) => v
+            .as_bool()
+            .ok_or_else(|| EntraError::Sync(format!("{field} must be a boolean"))),
     }
 }
 
@@ -281,5 +283,27 @@ mod tests {
         let group = MappedEntraGroup::from_json(&json).unwrap();
         assert_eq!(group.group_type, EntraGroupType::Security);
         assert!(group.is_dynamic);
+    }
+
+    #[test]
+    fn group_flags_do_not_silently_default() {
+        let missing = serde_json::json!({
+            "id": "group-123",
+            "displayName": "Group"
+        });
+        assert!(MappedEntraGroup::from_json(&missing).is_err());
+        let not_bool = serde_json::json!({
+            "id": "group-123",
+            "displayName": "Group",
+            "securityEnabled": "yes",
+            "mailEnabled": false
+        });
+        assert!(MappedEntraGroup::from_json(&not_bool).is_err());
+        let src = include_str!("groups.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(false)"),
+            "Entra group securityEnabled/mailEnabled must not silently become false"
+        );
     }
 }
