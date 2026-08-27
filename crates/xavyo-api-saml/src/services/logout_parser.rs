@@ -71,7 +71,8 @@ pub fn parse_logout_request_xml(xml: &str) -> SamlResult<ParsedLogoutRequest> {
                 }
             }
             Ok(Event::Text(ref e)) => {
-                let text = e.decode().unwrap_or_default().to_string();
+                let text =
+                    crate::xml::decode_xml_text(e).map_err(SamlError::InvalidLogoutRequest)?;
                 match current_element.as_str() {
                     "Issuer" => issuer = Some(text),
                     "NameID" => name_id = Some(text),
@@ -186,5 +187,16 @@ mod tests {
 
         let result = parse_logout_request_xml(xml);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn logout_text_does_not_default_to_empty_on_decode_error() {
+        let src = include_str!("logout_parser.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("decode_xml_text(")
+                && !production.contains("e.decode().unwrap_or_default()"),
+            "SAML LogoutRequest text must not become empty on decode failure"
+        );
     }
 }

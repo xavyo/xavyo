@@ -98,7 +98,8 @@ impl RequestParser {
                     }
                 }
                 Ok(Event::Text(e)) if in_issuer => {
-                    let issuer = e.decode().unwrap_or_default().to_string();
+                    let issuer =
+                        crate::xml::decode_xml_text(&e).map_err(SamlError::InvalidAuthnRequest)?;
                     if issuer.len() > MAX_ISSUER_LENGTH {
                         return Err(SamlError::InvalidAuthnRequest(
                             "Issuer exceeds maximum length".to_string(),
@@ -242,7 +243,9 @@ impl RequestParser {
                     }
                 }
                 Ok(Event::Text(e)) if in_issuer => {
-                    issuer = Some(e.decode().unwrap_or_default().to_string());
+                    issuer = Some(
+                        crate::xml::decode_xml_text(&e).map_err(SamlError::InvalidAuthnRequest)?,
+                    );
                 }
                 Ok(Event::End(e)) => {
                     let local_name = e.local_name();
@@ -397,6 +400,17 @@ mod tests {
         assert!(
             parsed.is_ok(),
             "Should accept IssueInstant within clock skew tolerance"
+        );
+    }
+
+    #[test]
+    fn issuer_text_does_not_default_to_empty_on_decode_error() {
+        let src = include_str!("request_parser.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("decode_xml_text(")
+                && !production.contains("e.decode().unwrap_or_default()"),
+            "SAML AuthnRequest issuer text must not become empty on decode failure"
         );
     }
 }

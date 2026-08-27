@@ -394,7 +394,8 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
                 }
             }
             Ok(Event::Text(e)) => {
-                let text = e.decode().unwrap_or_default();
+                let text = crate::xml::decode_xml_text(&e)
+                    .map_err(SamlError::SignatureValidationFailed)?;
                 if in_signed_info {
                     signed_info_content.push_str(&text);
                 } else if in_signature_value {
@@ -777,6 +778,17 @@ t6Rp
         assert!(
             err.to_string().contains("SHA-1"),
             "Error should mention SHA-1: {err}"
+        );
+    }
+
+    #[test]
+    fn signature_text_does_not_default_to_empty_on_decode_error() {
+        let src = include_str!("signature_validator.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("decode_xml_text(")
+                && !production.contains("e.decode().unwrap_or_default()"),
+            "SAML signature/digest text must not become empty on decode failure"
         );
     }
 }

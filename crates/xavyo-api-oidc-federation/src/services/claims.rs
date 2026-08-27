@@ -186,55 +186,35 @@ impl ClaimsService {
         };
 
         match transform {
-            "lowercase" => {
-                if let Some(s) = value.as_str() {
-                    Ok(Value::String(s.to_lowercase()))
-                } else {
-                    Ok(value.clone())
-                }
-            }
-            "uppercase" => {
-                if let Some(s) = value.as_str() {
-                    Ok(Value::String(s.to_uppercase()))
-                } else {
-                    Ok(value.clone())
-                }
-            }
-            "trim" => {
-                if let Some(s) = value.as_str() {
-                    Ok(Value::String(s.trim().to_string()))
-                } else {
-                    Ok(value.clone())
-                }
-            }
-            "first" => {
-                // Get first element if array
-                if let Some(arr) = value.as_array() {
-                    Ok(arr.first().cloned().unwrap_or(Value::Null))
-                } else {
-                    Ok(value.clone())
-                }
-            }
+            "lowercase" => Ok(Value::String(
+                require_claim_string(value, transform)?.to_lowercase(),
+            )),
+            "uppercase" => Ok(Value::String(
+                require_claim_string(value, transform)?.to_uppercase(),
+            )),
+            "trim" => Ok(Value::String(
+                require_claim_string(value, transform)?.trim().to_string(),
+            )),
+            "first" => first_claim_value(value),
             "join" => {
                 // Join array with comma. Non-string elements must not be dropped.
                 if let Some(arr) = value.as_array() {
                     Ok(Value::String(join_claim_strings(arr)?))
                 } else {
-                    Ok(value.clone())
+                    Err(FederationError::InvalidClaimMapping(
+                        "join transform requires an array".to_string(),
+                    ))
                 }
             }
             "split" => {
                 // Split string by comma (R8: cap at 100 elements to prevent DoS)
-                if let Some(s) = value.as_str() {
-                    let parts: Vec<Value> = s
-                        .split(',')
-                        .take(100)
-                        .map(|p| Value::String(p.trim().to_string()))
-                        .collect();
-                    Ok(Value::Array(parts))
-                } else {
-                    Ok(value.clone())
-                }
+                let s = require_claim_string(value, transform)?;
+                let parts: Vec<Value> = s
+                    .split(',')
+                    .take(100)
+                    .map(|p| Value::String(p.trim().to_string()))
+                    .collect();
+                Ok(Value::Array(parts))
             }
             _ => Err(FederationError::InvalidClaimMapping(format!(
                 "Unknown transform: {transform}"
@@ -312,6 +292,21 @@ impl ClaimsService {
         // Default to sub
         claims.sub.clone()
     }
+}
+
+fn require_claim_string<'a>(value: &'a Value, transform: &str) -> FederationResult<&'a str> {
+    value.as_str().ok_or_else(|| {
+        FederationError::InvalidClaimMapping(format!("{transform} transform requires a string"))
+    })
+}
+
+fn first_claim_value(value: &Value) -> FederationResult<Value> {
+    let arr = value.as_array().ok_or_else(|| {
+        FederationError::InvalidClaimMapping("first transform requires an array".to_string())
+    })?;
+    arr.first().cloned().ok_or_else(|| {
+        FederationError::InvalidClaimMapping("first transform on empty array".into())
+    })
 }
 
 /// Join claim array values. Non-string elements must not be dropped.
@@ -475,6 +470,41 @@ mod tests {
         assert!(
             !production.contains("filter_map(|v| v.as_str()"),
             "OIDC claim join/group mapping must not drop non-string array elements"
+        );
+    }
+
+    #[test]
+    fn claim_transforms_do_not_fail_open_on_wrong_type() {
+        assert_eq!(
+            require_claim_string(&Value::String("Ab".into()), "lowercase").unwrap(),
+            "Ab"
+        );
+        assert!(require_claim_string(&Value::Number(1.into()), "lowercase").is_err());
+        assert_eq!(
+            first_claim_value(&Value::Array(vec![Value::String("a".into())])).unwrap(),
+            Value::String("a".into())
+        );
+        assert!(first_claim_value(&Value::Array(vec![])).is_err());
+        assert!(first_claim_value(&Value::String("a".into())).is_err());
+
+        let src = include_str!("claims.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("require_claim_string(")
+                && production.contains("first_claim_value(")
+                && !production.contains("unwrap_or(Value::Null)"),
+            "OIDC claim transforms must not clone or null on the wrong type"
+        );
+        let apply = production
+            .split("fn apply_transform")
+            .nth(1)
+            .expect("apply_transform")
+            .split("fn validate_transform")
+            .next()
+            .expect("apply_transform body");
+        assert!(
+            !apply.contains("if let Some(s) = value.as_str()"),
+            "lowercase/uppercase/trim/split must not skip non-strings"
         );
     }
 }

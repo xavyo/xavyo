@@ -293,12 +293,14 @@ impl JwtClaims {
     ///
     /// If acting on behalf of someone, returns the donor's ID.
     /// Otherwise returns the user's own ID (sub).
-    #[must_use]
-    pub fn effective_user_id(&self) -> Option<Uuid> {
+    pub fn effective_user_id(&self) -> Result<Uuid, String> {
         if self.is_acting_as() {
             self.acting_as_user_id
+                .ok_or_else(|| "acting_as_user_id missing on delegated token".to_string())
         } else {
-            self.sub.parse().ok()
+            self.sub
+                .parse()
+                .map_err(|e| format!("invalid sub claim: {e}"))
         }
     }
 
@@ -825,7 +827,7 @@ mod tests {
         assert_eq!(claims.acting_as_user_id, Some(donor_id));
         assert_eq!(claims.acting_as_session_id, Some(session_id));
         assert_eq!(claims.actual_actor_id(), "attorney-123");
-        assert_eq!(claims.effective_user_id(), Some(donor_id));
+        assert_eq!(claims.effective_user_id().unwrap(), donor_id);
     }
 
     #[test]
@@ -835,7 +837,19 @@ mod tests {
 
         assert!(!claims.is_acting_as());
         assert_eq!(claims.actual_actor_id(), &user_id.to_string());
-        assert_eq!(claims.effective_user_id(), Some(user_id));
+        assert_eq!(claims.effective_user_id().unwrap(), user_id);
+    }
+
+    #[test]
+    fn effective_user_id_does_not_drop_invalid_sub() {
+        let claims = JwtClaims::builder().subject("not-a-uuid").build();
+        assert!(claims.effective_user_id().is_err());
+        let src = include_str!("claims.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("self.sub.parse().ok()"),
+            "invalid JWT sub must not silently become None"
+        );
     }
 
     #[test]

@@ -285,6 +285,9 @@ impl From<crate::services::JobServiceError> for ConnectorApiError {
             JobServiceError::AlreadyReplayed(id) => {
                 ConnectorApiError::Conflict(format!("DLQ entry {id} has already been replayed"))
             }
+            JobServiceError::InvalidStatus(status) => ConnectorApiError::Validation(format!(
+                "Invalid job status '{status}'. Must be one of: pending, in_progress, completed, failed, dead_letter, awaiting_system, resolved, cancelled"
+            )),
         }
     }
 }
