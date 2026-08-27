@@ -45,7 +45,7 @@ pub async fn create_user_handler(
         .create_user(tenant_id, &request, &claims.roles)
         .await?;
 
-    let actor_id = uuid::Uuid::parse_str(&claims.sub).map_err(|_| ApiUsersError::Unauthorized)?;
+    let actor_id = super::extract_user_id(&claims)?;
     user_service
         .record_audit_event(
             tenant_id,
@@ -66,7 +66,7 @@ pub async fn create_user_handler(
             event_id: uuid::Uuid::new_v4(),
             event_type: "user.created".to_string(),
             tenant_id: *tenant_id.as_uuid(),
-            actor_id: uuid::Uuid::parse_str(&claims.sub).ok(),
+            actor_id: Some(actor_id),
             timestamp: chrono::Utc::now(),
             data: serde_json::json!({
                 "user_id": response.id,
@@ -94,6 +94,11 @@ mod tests {
         assert!(
             !production.contains("tokio::spawn"),
             "must not fire-and-forget user.created audit"
+        );
+        assert!(
+            production.contains("extract_user_id(")
+                && !production.contains("parse_str(&claims.sub).ok()"),
+            "user create webhook must not drop a malformed JWT sub"
         );
     }
 }

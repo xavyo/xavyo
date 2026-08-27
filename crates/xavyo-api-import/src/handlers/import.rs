@@ -108,7 +108,7 @@ pub async fn create_import_job(
     if !claims.has_role("admin") {
         return Err(ImportError::Forbidden);
     }
-    let user_id = extract_user_id(&claims);
+    let user_id = Some(extract_user_id(&claims)?);
 
     let mut file_data: Option<Vec<u8>> = None;
     let mut file_name: Option<String> = None;
@@ -286,9 +286,9 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ImportError> {
         .ok_or(ImportError::Unauthorized)
 }
 
-/// Extract `user_id` from JWT claims (optional, for audit).
-fn extract_user_id(claims: &JwtClaims) -> Option<Uuid> {
-    Uuid::parse_str(&claims.sub).ok()
+/// JWT `sub` must be a real actor UUID for import-job attribution.
+fn extract_user_id(claims: &JwtClaims) -> Result<Uuid, ImportError> {
+    Uuid::parse_str(&claims.sub).map_err(|_| ImportError::Unauthorized)
 }
 
 #[cfg(test)]
@@ -362,5 +362,16 @@ mod tests {
     fn test_sanitize_filename_preserves_extension() {
         assert_eq!(sanitize_filename("data.csv"), "data.csv");
         assert_eq!(sanitize_filename("file.CSV"), "file.CSV");
+    }
+
+    #[test]
+    fn create_import_job_requires_actor_uuid() {
+        let src = include_str!("import.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("extract_user_id(")
+                && !production.contains("Uuid::parse_str(&claims.sub).ok()"),
+            "import job create must not drop a malformed JWT sub"
+        );
     }
 }

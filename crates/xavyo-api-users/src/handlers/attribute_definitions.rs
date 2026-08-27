@@ -51,7 +51,7 @@ pub async fn create_attribute_definition(
         "Creating attribute definition"
     );
 
-    let actor_id = uuid::Uuid::parse_str(&claims.sub).ok();
+    let actor_id = Some(super::extract_user_id(&claims)?);
     let response = service.create(tenant_id, actor_id, request).await?;
     Ok((StatusCode::CREATED, Json(response)))
 }
@@ -160,7 +160,7 @@ pub async fn update_attribute_definition(
         "Updating attribute definition"
     );
 
-    let actor_id = uuid::Uuid::parse_str(&claims.sub).ok();
+    let actor_id = Some(super::extract_user_id(&claims)?);
     let response = service.update(tenant_id, id, actor_id, request).await?;
     Ok(Json(response))
 }
@@ -208,7 +208,7 @@ pub async fn delete_attribute_definition(
         "Deleting attribute definition"
     );
 
-    let actor_id = uuid::Uuid::parse_str(&claims.sub).ok();
+    let actor_id = Some(super::extract_user_id(&claims)?);
     service.delete(tenant_id, id, force, actor_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -250,4 +250,18 @@ pub async fn seed_wellknown(
     );
 
     Ok(Json(response))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn attribute_definition_mutations_require_actor_uuid() {
+        let src = include_str!("attribute_definitions.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("extract_user_id(")
+                && !production.contains("parse_str(&claims.sub).ok()"),
+            "attribute-definition mutations must not drop a malformed JWT sub"
+        );
+    }
 }

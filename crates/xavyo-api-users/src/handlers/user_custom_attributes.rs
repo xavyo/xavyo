@@ -84,7 +84,7 @@ pub async fn set_user_custom_attributes(
         "Setting user custom attributes (full replace)"
     );
 
-    let actor_id = uuid::Uuid::parse_str(&claims.sub).ok();
+    let actor_id = Some(super::extract_user_id(&claims)?);
     let response = service
         .set_custom_attributes(tenant_id, user_id, actor_id, request)
         .await?;
@@ -130,7 +130,7 @@ pub async fn patch_user_custom_attributes(
         "Patching user custom attributes (merge)"
     );
 
-    let actor_id = uuid::Uuid::parse_str(&claims.sub).ok();
+    let actor_id = Some(super::extract_user_id(&claims)?);
     let response = service
         .patch_custom_attributes(tenant_id, user_id, actor_id, request)
         .await?;
@@ -169,7 +169,21 @@ pub async fn bulk_update_custom_attribute(
         "Bulk updating custom attribute"
     );
 
-    let actor_id = uuid::Uuid::parse_str(&claims.sub).ok();
+    let actor_id = Some(super::extract_user_id(&claims)?);
     let response = service.bulk_update(tenant_id, actor_id, request).await?;
     Ok(Json(response))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn custom_attribute_mutations_require_actor_uuid() {
+        let src = include_str!("user_custom_attributes.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("extract_user_id(")
+                && !production.contains("parse_str(&claims.sub).ok()"),
+            "custom-attribute mutations must not drop a malformed JWT sub"
+        );
+    }
 }

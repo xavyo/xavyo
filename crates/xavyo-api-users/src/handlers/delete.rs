@@ -43,8 +43,7 @@ pub async fn delete_user_handler(
     let user_id = UserId::from_uuid(user_uuid);
 
     // Parse caller ID for self-deactivation check
-    let caller_uuid = Uuid::parse_str(&claims.sub)
-        .map_err(|_| ApiUsersError::Internal("Invalid caller ID in claims".to_string()))?;
+    let caller_uuid = super::extract_user_id(&claims)?;
 
     tracing::info!(
         admin_id = %claims.sub,
@@ -73,7 +72,7 @@ pub async fn delete_user_handler(
             event_id: Uuid::new_v4(),
             event_type: "user.deleted".to_string(),
             tenant_id: *tenant_id.as_uuid(),
-            actor_id: Uuid::parse_str(&claims.sub).ok(),
+            actor_id: Some(caller_uuid),
             timestamp: chrono::Utc::now(),
             data: serde_json::json!({
                 "user_id": user_uuid,
@@ -99,6 +98,11 @@ mod tests {
         assert!(
             !production.contains("tokio::spawn"),
             "must not fire-and-forget user.deactivated audit"
+        );
+        assert!(
+            production.contains("extract_user_id(")
+                && !production.contains("parse_str(&claims.sub).ok()"),
+            "user delete webhook must not drop a malformed JWT sub"
         );
     }
 }

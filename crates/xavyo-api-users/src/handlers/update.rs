@@ -60,7 +60,7 @@ pub async fn update_user_handler(
         .update_user(tenant_id, user_id, &request, &claims.roles)
         .await?;
 
-    let actor_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiUsersError::Unauthorized)?;
+    let actor_id = super::extract_user_id(&claims)?;
     let action = match request.is_active {
         Some(false) => "user.disabled",
         Some(true) => "user.enabled",
@@ -91,7 +91,7 @@ pub async fn update_user_handler(
             event_id: Uuid::new_v4(),
             event_type: event_type.to_string(),
             tenant_id: *tenant_id.as_uuid(),
-            actor_id: Uuid::parse_str(&claims.sub).ok(),
+            actor_id: Some(actor_id),
             timestamp: chrono::Utc::now(),
             data: serde_json::json!({
                 "user_id": response.id,
@@ -119,6 +119,11 @@ mod tests {
         assert!(
             !production.contains("tokio::spawn"),
             "must not fire-and-forget user.updated audit"
+        );
+        assert!(
+            production.contains("extract_user_id(")
+                && !production.contains("parse_str(&claims.sub).ok()"),
+            "user update webhook must not drop a malformed JWT sub"
         );
     }
 }
