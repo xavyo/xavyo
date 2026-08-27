@@ -72,7 +72,7 @@ Criteria:
 
 | Crate | Status | Tests | Public Items | Notes |
 |-------|--------|-------|--------------|-------|
-| xavyo-connector-ldap | 🟢 stable | 239 | 31 | Most mature connector |
+| xavyo-connector-ldap | 🟢 stable | 253+ | 31 | Most mature connector; DN-required AD mapping + 253 unit tests in CI |
 | xavyo-connector-entra | 🟢 stable | 64 | 42 | Crate/API with rate limiting; no UI form |
 | xavyo-connector-rest | 🟢 stable | 114 | 7 | Matches CRATE.md: CRUD, rate limit, retry, SSRF. Crate/API; not a production UI path |
 | xavyo-connector-database | 🟡 beta | 51 | 4 | PostgreSQL CRUD + transactions; needs DB integration tests |

@@ -14,7 +14,7 @@ connector
 
 🟢 **stable**
 
-Production-ready with extensive test coverage (239 tests). Most mature connector implementation with full LDAP v3 support.
+Production-ready with extensive test coverage (253+ unit tests). Most mature connector implementation with full LDAP v3 support. AD mapping requires `distinguishedName`/`dn` on every entry (fail-closed).
 
 ## Dependencies
 
