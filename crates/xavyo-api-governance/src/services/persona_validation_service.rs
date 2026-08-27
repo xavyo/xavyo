@@ -129,8 +129,7 @@ impl PersonaValidationService {
                 .await?
                 .ok_or(GovernanceError::PersonaArchetypeNotFound(new_archetype_id))?;
 
-        let new_mappings: AttributeMappings =
-            serde_json::from_value(new_archetype.attribute_mappings.clone()).unwrap_or_default();
+        let new_mappings = parse_attribute_mappings(&new_archetype.attribute_mappings)?;
 
         let mut conflicts = vec![];
         let mut conflicting_archetypes = vec![];
@@ -142,9 +141,7 @@ impl PersonaValidationService {
                     .await?;
 
             if let Some(archetype) = existing_archetype {
-                let existing_mappings: AttributeMappings =
-                    serde_json::from_value(archetype.attribute_mappings.clone())
-                        .unwrap_or_default();
+                let existing_mappings = parse_attribute_mappings(&archetype.attribute_mappings)?;
 
                 // Check for computed attribute conflicts
                 let new_computed_targets: HashSet<_> =
@@ -355,10 +352,8 @@ impl PersonaValidationService {
             return Ok(None);
         };
 
-        let m1: AttributeMappings =
-            serde_json::from_value(a1.attribute_mappings.clone()).unwrap_or_default();
-        let m2: AttributeMappings =
-            serde_json::from_value(a2.attribute_mappings.clone()).unwrap_or_default();
+        let m1 = parse_attribute_mappings(&a1.attribute_mappings)?;
+        let m2 = parse_attribute_mappings(&a2.attribute_mappings)?;
 
         // Check computed attribute conflicts
         let t1: HashSet<_> = m1.computed.iter().map(|c| &c.target).collect();
@@ -418,6 +413,15 @@ impl PersonaValidationService {
     }
 }
 
+/// Parse persona archetype mappings. Corrupt JSON is a conflict-check error, not "no conflict".
+fn parse_attribute_mappings(value: &serde_json::Value) -> Result<AttributeMappings> {
+    serde_json::from_value(value.clone()).map_err(|e| {
+        GovernanceError::Validation(format!(
+            "Invalid persona archetype attribute mappings JSON: {e}"
+        ))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -456,5 +460,22 @@ mod tests {
         assert!(result.succeeded.is_empty());
         assert_eq!(result.failed.len(), 1);
         assert!(result.rolled_back);
+    }
+
+    #[test]
+    fn attribute_mappings_do_not_default_on_invalid_json() {
+        assert!(parse_attribute_mappings(&serde_json::json!("not-mappings")).is_err());
+        assert!(parse_attribute_mappings(&serde_json::json!({})).is_ok());
+        let src = include_str!("persona_validation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_attribute_mappings(")
+                && !production.contains(
+                    "from_value(new_archetype.attribute_mappings.clone()).unwrap_or_default()"
+                )
+                && !production
+                    .contains("from_value(a1.attribute_mappings.clone()).unwrap_or_default()"),
+            "persona conflict checks must fail closed on mapping JSON parse"
+        );
     }
 }

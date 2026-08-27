@@ -47,18 +47,21 @@ pub async fn list_bindings(
     let page_size = params.page_size.unwrap_or(50).min(100);
     let offset = (page - 1) * page_size;
 
-    let filter =
-        BindingFilter {
-            connector_id: params.connector_id,
-            script_id: params.script_id,
-            hook_phase: params.hook_phase.as_deref().and_then(|s| {
-                serde_json::from_value(serde_json::Value::String(s.to_string())).ok()
-            }),
-            operation_type: params.operation_type.as_deref().and_then(|s| {
-                serde_json::from_value(serde_json::Value::String(s.to_string())).ok()
-            }),
-            enabled: None,
-        };
+    let filter = BindingFilter {
+        connector_id: params.connector_id,
+        script_id: params.script_id,
+        hook_phase: params
+            .hook_phase
+            .as_deref()
+            .map(|s| parse_binding_enum("hook_phase", s))
+            .transpose()?,
+        operation_type: params
+            .operation_type
+            .as_deref()
+            .map(|s| parse_binding_enum("operation_type", s))
+            .transpose()?,
+        enabled: None,
+    };
 
     let (bindings, total) = state
         .script_binding_service
@@ -381,8 +384,19 @@ impl From<xavyo_db::models::GovScriptHookBinding> for BindingResponse {
     }
 }
 
+/// Parse a query enum. Unknown values are 400, not an unfiltered list.
+fn parse_binding_enum<T: serde::de::DeserializeOwned>(
+    field: &str,
+    value: &str,
+) -> Result<T, ApiGovernanceError> {
+    serde_json::from_value(serde_json::Value::String(value.to_string()))
+        .map_err(|_| ApiGovernanceError::Validation(format!("Invalid {field}: {value}")))
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn binding_mutations_do_not_swallow_audit_writes() {
         let src = include_str!("script_hook_bindings.rs");
@@ -396,6 +410,21 @@ mod tests {
                 && production.contains("record_unbound")
                 && production.contains(".await?;"),
             "script binding mutations must fail when script audit rows cannot be written"
+        );
+    }
+
+    #[test]
+    fn binding_list_rejects_unknown_filter_enums() {
+        assert!(parse_binding_enum::<GovHookPhase>("hook_phase", "before").is_ok());
+        assert!(parse_binding_enum::<GovHookPhase>("hook_phase", "nope").is_err());
+        assert!(parse_binding_enum::<ScriptOperationType>("operation_type", "create").is_ok());
+        assert!(parse_binding_enum::<ScriptOperationType>("operation_type", "nope").is_err());
+        let src = include_str!("script_hook_bindings.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_binding_enum(")
+                && !production.contains(".ok()\n            }),"),
+            "binding list must not treat invalid enums as unfiltered"
         );
     }
 }

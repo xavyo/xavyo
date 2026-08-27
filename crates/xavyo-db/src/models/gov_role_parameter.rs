@@ -370,12 +370,12 @@ impl GovRoleParameter {
         Ok(count > 0)
     }
 
-    /// Get the parsed constraints.
-    #[must_use]
-    pub fn get_constraints(&self) -> Option<ParameterConstraints> {
-        self.constraints
-            .as_ref()
-            .and_then(|c| serde_json::from_value(c.clone()).ok())
+    /// Get the parsed constraints. Corrupt JSON is an error, not empty constraints.
+    pub fn get_constraints(&self) -> Result<Option<ParameterConstraints>, serde_json::Error> {
+        match &self.constraints {
+            None => Ok(None),
+            Some(c) => serde_json::from_value(c.clone()).map(Some),
+        }
     }
 }
 
@@ -439,6 +439,34 @@ mod tests {
                 && !production.contains("to_value(c).ok()")
                 && !production.contains("to_value(constraints).ok()"),
             "role parameter persist must fail closed on JSON serialize"
+        );
+    }
+
+    #[test]
+    fn get_constraints_does_not_default_on_invalid_json() {
+        let mut param = GovRoleParameter {
+            id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            role_id: Uuid::new_v4(),
+            name: "x".to_string(),
+            display_name: None,
+            description: None,
+            parameter_type: ParameterType::String,
+            is_required: false,
+            default_value: None,
+            constraints: Some(serde_json::json!("not-constraints")),
+            display_order: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        assert!(param.get_constraints().is_err());
+        param.constraints = None;
+        assert!(param.get_constraints().unwrap().is_none());
+        let src = include_str!("gov_role_parameter.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("from_value(c.clone()).ok()"),
+            "role parameter constraints GET/validate must fail closed on JSON parse"
         );
     }
 }

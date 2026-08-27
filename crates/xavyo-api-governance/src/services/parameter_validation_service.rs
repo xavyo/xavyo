@@ -103,7 +103,19 @@ impl ParameterValidationService {
         param: &GovRoleParameter,
         value: &Value,
     ) -> ParameterValidationResult {
-        let constraints = param.get_constraints().unwrap_or_default();
+        let constraints = match param.get_constraints() {
+            Ok(Some(c)) => c,
+            Ok(None) => ParameterConstraints::default(),
+            Err(e) => {
+                return ParameterValidationResult {
+                    parameter_id: param.id,
+                    parameter_name: param.name.clone(),
+                    is_valid: false,
+                    errors: vec![format!("Invalid parameter constraints JSON: {e}")],
+                    normalized_value: None,
+                };
+            }
+        };
 
         let (is_valid, errors, normalized_value) = match param.parameter_type {
             ParameterType::String => self.validate_string(value, &constraints),
@@ -806,5 +818,34 @@ mod tests {
 
         let hash3 = ParameterValidationService::compute_parameter_hash(&params, &values3);
         assert_ne!(hash1, hash3);
+    }
+
+    #[test]
+    fn invalid_constraints_json_is_not_valid() {
+        let service = ParameterValidationService::new();
+        let param = GovRoleParameter {
+            id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            role_id: Uuid::new_v4(),
+            name: "broken".to_string(),
+            display_name: None,
+            description: None,
+            parameter_type: ParameterType::String,
+            is_required: false,
+            default_value: None,
+            constraints: Some(serde_json::json!("not-constraints")),
+            display_order: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let result = service.validate_parameter(&param, &Value::String("anything".to_string()));
+        assert!(!result.is_valid);
+        assert!(result.errors.iter().any(|e| e.contains("constraints JSON")));
+        let src = include_str!("parameter_validation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("get_constraints().unwrap_or_default()"),
+            "parameter validation must fail closed on constraint JSON parse"
+        );
     }
 }

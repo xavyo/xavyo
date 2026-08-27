@@ -181,11 +181,11 @@ pub async fn list_execution_logs(
         .as_deref()
         .and_then(|s| s.parse::<chrono::DateTime<chrono::Utc>>().ok());
 
-    // Parse status string into ExecutionStatus enum if provided.
     let execution_status = params
         .status
         .as_deref()
-        .and_then(|s| serde_json::from_value(serde_json::Value::String(s.to_string())).ok());
+        .map(|s| parse_query_enum("status", s))
+        .transpose()?;
 
     use xavyo_db::models::gov_script_execution_log::ExecutionLogFilter;
 
@@ -290,11 +290,11 @@ pub async fn list_script_audit_events(
     let limit = params.limit.unwrap_or(50).min(100);
     let offset = params.offset.unwrap_or(0);
 
-    // Parse the action string into ScriptAuditAction if provided.
     let action = params
         .action
         .as_deref()
-        .and_then(|s| serde_json::from_value(serde_json::Value::String(s.to_string())).ok());
+        .map(|s| parse_query_enum("action", s))
+        .transpose()?;
 
     let list_params = ListScriptAuditParams {
         script_id: params.script_id,
@@ -343,5 +343,36 @@ fn map_execution_log(
         duration_ms: log.duration_ms,
         executed_by: None, // schema does not currently capture actor — emit as null
         executed_at: log.executed_at,
+    }
+}
+
+/// Parse a query enum. Unknown values are 400, not an unfiltered list.
+fn parse_query_enum<T: serde::de::DeserializeOwned>(
+    field: &str,
+    value: &str,
+) -> Result<T, ApiGovernanceError> {
+    serde_json::from_value(serde_json::Value::String(value.to_string()))
+        .map_err(|_| ApiGovernanceError::Validation(format!("Invalid {field}: {value}")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use xavyo_db::models::gov_script_types::{ExecutionStatus, ScriptAuditAction};
+
+    #[test]
+    fn analytics_query_enums_reject_unknown_values() {
+        assert!(parse_query_enum::<ExecutionStatus>("status", "success").is_ok());
+        assert!(parse_query_enum::<ExecutionStatus>("status", "nope").is_err());
+        assert!(parse_query_enum::<ScriptAuditAction>("action", "created").is_ok());
+        assert!(parse_query_enum::<ScriptAuditAction>("action", "nope").is_err());
+        let src = include_str!("script_analytics.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_query_enum(")
+                && !production
+                    .contains("from_value(serde_json::Value::String(s.to_string())).ok()"),
+            "script analytics filters must not treat invalid enums as unfiltered"
+        );
     }
 }

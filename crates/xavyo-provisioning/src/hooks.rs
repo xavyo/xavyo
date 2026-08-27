@@ -300,12 +300,7 @@ impl HookExecutor for WebhookExecutor {
                 message: "Missing 'url' in webhook configuration".to_string(),
             })?;
 
-        // Get optional headers
-        let headers: HashMap<String, String> = definition
-            .config
-            .get("headers")
-            .and_then(|v| serde_json::from_value(v.clone()).ok())
-            .unwrap_or_default();
+        let headers = parse_webhook_hook_headers(&definition.config)?;
 
         debug!(
             hook_id = %definition.id,
@@ -378,6 +373,17 @@ fn parse_webhook_hook_body(text: &str) -> HookResult<serde_json::Value> {
 }
 
 /// Parse hook `variables`. Invalid JSON is an error, not an empty map.
+/// Parse webhook hook headers. Corrupt JSON is an error, not an empty map
+/// that drops configured Authorization headers.
+fn parse_webhook_hook_headers(config: &serde_json::Value) -> HookResult<HashMap<String, String>> {
+    match config.get("headers") {
+        None | Some(serde_json::Value::Null) => Ok(HashMap::new()),
+        Some(v) => serde_json::from_value(v.clone()).map_err(|e| HookError::InvalidConfiguration {
+            message: format!("Invalid webhook hook headers JSON: {e}"),
+        }),
+    }
+}
+
 fn parse_webhook_hook_variables(
     body: &serde_json::Value,
 ) -> HookResult<HashMap<String, serde_json::Value>> {
@@ -814,6 +820,26 @@ mod tests {
             production.contains("parse_webhook_hook_body(")
                 && !production.contains("unwrap_or_else(|_| serde_json::json!({}))"),
             "webhook hook GET/execute must fail closed on JSON parse"
+        );
+    }
+
+    #[test]
+    fn webhook_hook_headers_do_not_drop_on_invalid_json() {
+        let headers = parse_webhook_hook_headers(&serde_json::json!({
+            "headers": {"Authorization": "Bearer secret"}
+        }))
+        .unwrap();
+        assert_eq!(headers.get("Authorization").unwrap(), "Bearer secret");
+        assert!(parse_webhook_hook_headers(&serde_json::json!({"headers": "nope"})).is_err());
+        assert!(parse_webhook_hook_headers(&serde_json::json!({}))
+            .unwrap()
+            .is_empty());
+        let src = include_str!("hooks.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_webhook_hook_headers(")
+                && !production.contains("from_value(v.clone()).ok()"),
+            "webhook hook headers must fail closed on JSON parse"
         );
     }
 }

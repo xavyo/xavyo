@@ -64,9 +64,10 @@ fn map_version(
     }
 }
 
-/// Parse a status string to `GovScriptStatus`.
-fn parse_status(status: &str) -> Option<GovScriptStatus> {
-    serde_json::from_value(serde_json::Value::String(status.to_string())).ok()
+/// Parse a status string to `GovScriptStatus`. Unknown values are 400, not "all scripts".
+fn parse_status(status: &str) -> Result<GovScriptStatus, ApiGovernanceError> {
+    serde_json::from_value(serde_json::Value::String(status.to_string()))
+        .map_err(|_| ApiGovernanceError::Validation(format!("Invalid script status: {status}")))
 }
 
 /// Query parameters for comparing two script versions.
@@ -99,7 +100,7 @@ pub async fn list_scripts(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    let status = params.status.as_deref().and_then(parse_status);
+    let status = params.status.as_deref().map(parse_status).transpose()?;
     let page = params.page.unwrap_or(1).max(1);
     let page_size = params.page_size.unwrap_or(50).min(100);
     let offset = (page - 1) * page_size;
@@ -659,6 +660,21 @@ pub async fn compare_versions(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_status_rejects_unknown_values() {
+        assert_eq!(parse_status("active").unwrap(), GovScriptStatus::Active);
+        assert!(parse_status("nope").is_err());
+        let src = include_str!("provisioning_scripts.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("map(parse_status).transpose()?")
+                && !production.contains("and_then(parse_status)"),
+            "script list must not treat invalid status as unfiltered"
+        );
+    }
+
     #[test]
     fn script_mutations_do_not_swallow_audit_writes() {
         let src = include_str!("provisioning_scripts.rs");

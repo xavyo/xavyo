@@ -200,8 +200,7 @@ impl DlqService {
             .await?
             .ok_or(WebhookError::DlqEntryNotFound)?;
 
-        let attempt_history: Vec<AttemptRecord> =
-            serde_json::from_value(entry.attempt_history.clone()).unwrap_or_default();
+        let attempt_history = parse_attempt_history(&entry.attempt_history)?;
 
         Ok(DlqEntryDetail {
             id: entry.id,
@@ -422,6 +421,12 @@ fn extract_attempt_count(history: &serde_json::Value) -> i32 {
     history.as_array().map_or(0, |arr| arr.len() as i32)
 }
 
+/// Parse DLQ attempt history. Corrupt JSON is an error, not an empty list.
+fn parse_attempt_history(history: &serde_json::Value) -> Result<Vec<AttemptRecord>, WebhookError> {
+    serde_json::from_value(history.clone())
+        .map_err(|e| WebhookError::Validation(format!("Invalid DLQ attempt history JSON: {e}")))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -465,5 +470,28 @@ mod tests {
 
         assert_eq!(summary.attempt_count, 6);
         assert!(summary.replayed_at.is_none());
+    }
+
+    #[test]
+    fn parse_attempt_history_does_not_default_on_invalid_json() {
+        let ok = parse_attempt_history(&serde_json::json!([{
+            "attempt_number": 1,
+            "timestamp": "2024-01-15T10:30:00Z",
+            "error": "timeout",
+            "response_code": 504,
+            "latency_ms": 1000
+        }]))
+        .unwrap();
+        assert_eq!(ok.len(), 1);
+        assert_eq!(ok[0].attempt_number, 1);
+        assert!(parse_attempt_history(&serde_json::json!("not-history")).is_err());
+        let src = include_str!("dlq_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_attempt_history(")
+                && !production
+                    .contains("from_value(entry.attempt_history.clone()).unwrap_or_default()"),
+            "DLQ GET must fail closed on attempt history JSON parse"
+        );
     }
 }
