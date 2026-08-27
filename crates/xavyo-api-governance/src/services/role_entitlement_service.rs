@@ -182,7 +182,15 @@ impl RoleEntitlementService {
                 .await
             {
                 Ok(ea) => ea,
-                Err(_) => continue,
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        user_id = %user_id,
+                        "Failed to load effective access for SoD warning; treating as a violation"
+                    );
+                    violation_count += 1;
+                    continue;
+                }
             };
 
             let user_entitlements: std::collections::HashSet<Uuid> = effective
@@ -194,11 +202,22 @@ impl RoleEntitlementService {
             for rule in &rules {
                 if let Some(conflicting_id) = rule.get_conflicting_entitlement(entitlement_id) {
                     if user_entitlements.contains(&conflicting_id) {
-                        let has_exemption = GovSodExemption::has_active_exemption(
+                        let has_exemption = match GovSodExemption::has_active_exemption(
                             pool, tenant_id, rule.id, user_id,
                         )
                         .await
-                        .unwrap_or(false);
+                        {
+                            Ok(v) => v,
+                            Err(e) => {
+                                tracing::warn!(
+                                    error = %e,
+                                    user_id = %user_id,
+                                    rule_id = %rule.id,
+                                    "SoD exemption lookup failed; treating as no exemption"
+                                );
+                                false
+                            }
+                        };
 
                         if !has_exemption {
                             violation_count += 1;
@@ -279,5 +298,23 @@ mod tests {
     fn test_service_creation() {
         // This test just verifies the service can be instantiated
         // Real tests would require a database connection
+    }
+
+    #[test]
+    fn sod_warning_does_not_skip_on_access_or_exemption_error() {
+        let src = include_str!("role_entitlement_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let warn = production
+            .split("async fn warn_sod_for_role_members_bg")
+            .nth(1)
+            .expect("warn_sod_for_role_members_bg");
+        assert!(
+            !warn.contains("Err(_) => continue"),
+            "SoD warning must not skip a member when effective access cannot be loaded"
+        );
+        assert!(
+            !warn.contains("unwrap_or(false)"),
+            "SoD exemption lookup must not fail-open"
+        );
     }
 }

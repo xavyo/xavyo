@@ -683,18 +683,20 @@ impl PolicySimulationService {
 
                     let matched_conditions: Vec<ConditionMatch> = conditions
                         .iter()
-                        .map(|c| ConditionMatch {
-                            attribute: c
+                        .filter_map(|c| {
+                            let attribute = c
                                 .get("attribute")
                                 .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .to_string(),
-                            operator: c
+                                .filter(|s| !s.is_empty())?;
+                            let operator = c
                                 .get("operator")
                                 .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .to_string(),
-                            value: c.get("value").cloned().unwrap_or(serde_json::Value::Null),
+                                .filter(|s| !s.is_empty())?;
+                            Some(ConditionMatch {
+                                attribute: attribute.to_string(),
+                                operator: operator.to_string(),
+                                value: c.get("value").cloned().unwrap_or(serde_json::Value::Null),
+                            })
                         })
                         .collect();
 
@@ -754,14 +756,20 @@ impl PolicySimulationService {
         }
 
         for condition in conditions {
-            let attribute = condition
+            let Some(attribute) = condition
                 .get("attribute")
                 .and_then(|v| v.as_str())
-                .unwrap_or("");
-            let operator = condition
+                .filter(|s| !s.is_empty())
+            else {
+                return false;
+            };
+            let Some(operator) = condition
                 .get("operator")
                 .and_then(|v| v.as_str())
-                .unwrap_or("equals");
+                .filter(|s| !s.is_empty())
+            else {
+                return false;
+            };
             let expected = condition.get("value");
 
             // Resolve attribute value (F081: support custom_attributes.* and metadata.* prefixes)
@@ -992,14 +1000,20 @@ mod tests {
         }
 
         for condition in conditions {
-            let attribute = condition
+            let Some(attribute) = condition
                 .get("attribute")
                 .and_then(|v| v.as_str())
-                .unwrap_or("");
-            let operator = condition
+                .filter(|s| !s.is_empty())
+            else {
+                return false;
+            };
+            let Some(operator) = condition
                 .get("operator")
                 .and_then(|v| v.as_str())
-                .unwrap_or("equals");
+                .filter(|s| !s.is_empty())
+            else {
+                return false;
+            };
             let expected = condition.get("value");
             let actual = user_attrs.get(attribute);
 
@@ -1232,6 +1246,29 @@ mod tests {
 
         // Missing attribute should not match
         assert!(!evaluate_conditions_test(&conditions, &user_attrs));
+    }
+
+    #[test]
+    fn malformed_conditions_do_not_default_to_equals() {
+        let user_attrs = serde_json::json!({"department": "Engineering"});
+        assert!(!evaluate_conditions_test(
+            &[serde_json::json!({"operator": "equals", "value": "Engineering"})],
+            &user_attrs
+        ));
+        assert!(!evaluate_conditions_test(
+            &[serde_json::json!({"attribute": "department", "value": "Engineering"})],
+            &user_attrs
+        ));
+        let src = include_str!("policy_simulation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let eval = production
+            .split("fn evaluate_conditions(")
+            .nth(1)
+            .expect("evaluate_conditions");
+        assert!(
+            !eval.contains("unwrap_or(\"\")") && !eval.contains("unwrap_or(\"equals\")"),
+            "malformed policy conditions must not match as empty attribute or default equals"
+        );
     }
 
     // =========================================================================
