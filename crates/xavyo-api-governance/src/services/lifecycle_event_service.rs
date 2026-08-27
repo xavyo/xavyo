@@ -20,6 +20,40 @@ use crate::models::{
 };
 use crate::services::{AssignmentService, BirthrightPolicyService};
 
+/// Access snapshots must not persist a nil application id.
+pub fn snapshot_application_id(application_id: Uuid) -> Result<Uuid> {
+    if application_id.is_nil() {
+        Err(GovernanceError::Validation(
+            "access snapshot application_id must not be nil".into(),
+        ))
+    } else {
+        Ok(application_id)
+    }
+}
+
+/// Access snapshots must persist real entitlement/application names.
+pub fn snapshot_required_name(name: &str, field: &str) -> Result<String> {
+    if name.trim().is_empty() {
+        Err(GovernanceError::Validation(format!(
+            "access snapshot {field} must not be empty"
+        )))
+    } else {
+        Ok(name.to_string())
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct SnapshotAssignmentRow {
+    id: Uuid,
+    entitlement_id: Uuid,
+    entitlement_name: String,
+    entitlement_external_id: Option<String>,
+    application_id: Uuid,
+    application_name: String,
+    assigned_at: chrono::DateTime<Utc>,
+    assigned_by: Uuid,
+}
+
 /// Service for lifecycle event operations.
 pub struct LifecycleEventService {
     pool: PgPool,
@@ -749,28 +783,59 @@ impl LifecycleEventService {
         event_id: Uuid,
         snapshot_type: AccessSnapshotType,
     ) -> Result<GovAccessSnapshot> {
-        let assignments = self.get_user_assignments(tenant_id, user_id).await?;
+        let rows: Vec<SnapshotAssignmentRow> = sqlx::query_as(
+            r"
+            SELECT
+                ea.id,
+                ea.entitlement_id,
+                e.name AS entitlement_name,
+                e.external_id AS entitlement_external_id,
+                e.application_id,
+                a.name AS application_name,
+                ea.assigned_at,
+                ea.assigned_by
+            FROM gov_entitlement_assignments ea
+            JOIN gov_entitlements e
+              ON e.id = ea.entitlement_id AND e.tenant_id = ea.tenant_id
+            JOIN gov_applications a
+              ON a.id = e.application_id AND a.tenant_id = ea.tenant_id
+            WHERE ea.tenant_id = $1
+              AND ea.target_id = $2
+              AND ea.target_type = 'user'
+              AND ea.status = 'active'
+            ",
+        )
+        .bind(tenant_id)
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(GovernanceError::Database)?;
 
-        // Build snapshot content
-        let snapshot_assignments: Vec<SnapshotAssignment> = assignments
-            .iter()
-            .map(|a| SnapshotAssignment {
-                id: a.id,
-                entitlement_id: a.entitlement_id,
-                entitlement_name: String::new(), // Would need to fetch entitlement details
-                entitlement_external_id: None,
-                application_id: Uuid::nil(), // Would need to fetch from entitlement
-                application_name: String::new(),
+        let mut snapshot_assignments = Vec::with_capacity(rows.len());
+        for row in rows {
+            snapshot_assignments.push(SnapshotAssignment {
+                id: row.id,
+                entitlement_id: row.entitlement_id,
+                entitlement_name: snapshot_required_name(
+                    &row.entitlement_name,
+                    "entitlement_name",
+                )?,
+                entitlement_external_id: row.entitlement_external_id,
+                application_id: snapshot_application_id(row.application_id)?,
+                application_name: snapshot_required_name(
+                    &row.application_name,
+                    "application_name",
+                )?,
                 source: Some("assignment".to_string()),
-                policy_id: None, // Would need to track this
-                granted_at: a.assigned_at,
-                granted_by: Some(a.assigned_by),
-            })
-            .collect();
+                policy_id: None,
+                granted_at: row.assigned_at,
+                granted_by: Some(row.assigned_by),
+            });
+        }
 
         let content = SnapshotContent {
+            total_count: snapshot_assignments.len() as i32,
             assignments: snapshot_assignments,
-            total_count: assignments.len() as i32,
             snapshot_at: Some(Utc::now()),
         };
 
@@ -807,6 +872,38 @@ mod tests {
         assert!(
             !lookup.contains("list_by_event(&self.pool, event_id)"),
             "must not list lifecycle actions by event_id alone"
+        );
+    }
+
+    #[test]
+    fn access_snapshot_does_not_store_nil_application() {
+        assert!(super::snapshot_application_id(uuid::Uuid::nil()).is_err());
+        let id = uuid::Uuid::new_v4();
+        assert_eq!(super::snapshot_application_id(id).unwrap(), id);
+        assert!(super::snapshot_required_name("", "entitlement_name").is_err());
+        assert_eq!(
+            super::snapshot_required_name("Payroll", "entitlement_name").unwrap(),
+            "Payroll"
+        );
+
+        let src = include_str!("lifecycle_event_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let snapshot = production
+            .split("async fn create_access_snapshot")
+            .nth(1)
+            .expect("create_access_snapshot");
+        assert!(
+            snapshot.contains("snapshot_application_id(")
+                && snapshot.contains("snapshot_required_name(")
+                && snapshot.contains("JOIN gov_entitlements e")
+                && snapshot.contains("JOIN gov_applications a")
+                && snapshot.contains("e.tenant_id = ea.tenant_id")
+                && snapshot.contains("a.tenant_id = ea.tenant_id"),
+            "snapshots must join entitlements and applications on tenant_id"
+        );
+        assert!(
+            !snapshot.contains("Uuid::nil()") && !snapshot.contains("String::new()"),
+            "snapshots must not persist nil application ids or empty names"
         );
     }
 }

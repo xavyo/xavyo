@@ -107,6 +107,17 @@ struct DashboardStatsRow {
     avg_duration_ms: Option<f64>,
 }
 
+/// Empty sets may report 0ms; missing averages on real executions must not.
+pub fn avg_duration_or_empty(total: i64, avg: Option<f64>) -> Result<f64, sqlx::Error> {
+    match avg {
+        Some(v) => Ok(v),
+        None if total == 0 => Ok(0.0),
+        None => Err(sqlx::Error::Protocol(
+            "script execution average duration missing for a non-empty set".into(),
+        )),
+    }
+}
+
 /// Per-script aggregate statistics.
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct ScriptStats {
@@ -370,12 +381,13 @@ impl GovScriptExecutionLog {
         .fetch_one(pool)
         .await?;
 
+        let total_executions = row.total_executions.unwrap_or(0);
         Ok(DashboardStats {
-            total_executions: row.total_executions.unwrap_or(0),
+            total_executions,
             success_count: row.success_count.unwrap_or(0),
             failure_count: row.failure_count.unwrap_or(0),
             timeout_count: row.timeout_count.unwrap_or(0),
-            avg_duration_ms: row.avg_duration_ms.unwrap_or(0.0),
+            avg_duration_ms: avg_duration_or_empty(total_executions, row.avg_duration_ms)?,
         })
     }
 
@@ -404,16 +416,18 @@ impl GovScriptExecutionLog {
         .fetch_all(pool)
         .await?;
 
-        Ok(rows
-            .into_iter()
-            .map(|r| ScriptStats {
-                script_id: r.script_id,
-                total_executions: r.total_executions.unwrap_or(0),
-                success_count: r.success_count.unwrap_or(0),
-                failure_count: r.failure_count.unwrap_or(0),
-                avg_duration_ms: r.avg_duration_ms.unwrap_or(0.0),
+        rows.into_iter()
+            .map(|r| {
+                let total_executions = r.total_executions.unwrap_or(0);
+                Ok(ScriptStats {
+                    script_id: r.script_id,
+                    total_executions,
+                    success_count: r.success_count.unwrap_or(0),
+                    failure_count: r.failure_count.unwrap_or(0),
+                    avg_duration_ms: avg_duration_or_empty(total_executions, r.avg_duration_ms)?,
+                })
             })
-            .collect())
+            .collect()
     }
 
     /// Get daily trend aggregates for a specific script over a given number of days.
@@ -445,18 +459,20 @@ impl GovScriptExecutionLog {
         .fetch_all(pool)
         .await?;
 
-        Ok(rows
-            .into_iter()
+        rows.into_iter()
             .filter_map(|r| {
-                r.date.map(|d| DailyTrendRow {
-                    date: d,
-                    executions: r.executions.unwrap_or(0),
-                    successes: r.successes.unwrap_or(0),
-                    failures: r.failures.unwrap_or(0),
-                    avg_duration_ms: r.avg_duration_ms.unwrap_or(0.0),
+                r.date.map(|d| {
+                    let executions = r.executions.unwrap_or(0);
+                    Ok(DailyTrendRow {
+                        date: d,
+                        executions,
+                        successes: r.successes.unwrap_or(0),
+                        failures: r.failures.unwrap_or(0),
+                        avg_duration_ms: avg_duration_or_empty(executions, r.avg_duration_ms)?,
+                    })
                 })
             })
-            .collect())
+            .collect()
     }
 
     /// Get the error rate for a specific script since the given timestamp.
@@ -601,5 +617,19 @@ mod tests {
         assert_eq!(trend.executions, 20);
         assert_eq!(trend.successes, 18);
         assert_eq!(trend.failures, 2);
+    }
+
+    #[test]
+    fn script_avg_duration_does_not_invent_zero() {
+        assert_eq!(avg_duration_or_empty(0, None).unwrap(), 0.0);
+        assert_eq!(avg_duration_or_empty(4, Some(12.5)).unwrap(), 12.5);
+        assert!(avg_duration_or_empty(4, None).is_err());
+        let src = include_str!("gov_script_execution_log.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("avg_duration_or_empty(")
+                && production.matches("avg_duration_ms.unwrap_or(0.0)").count() == 0,
+            "script stats must not report 0ms when duration averages are missing"
+        );
     }
 }
