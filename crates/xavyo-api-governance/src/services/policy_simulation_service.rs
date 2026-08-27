@@ -22,6 +22,61 @@ pub struct SimulationLimits {
     pub chunk_size: usize,
 }
 
+/// Stored simulation policy name. Missing must not look like "Unnamed Policy".
+fn parse_simulation_policy_name(config: &serde_json::Value) -> Result<String> {
+    match config.get("name") {
+        Some(v) => {
+            let name = v.as_str().ok_or_else(|| {
+                GovernanceError::Validation("policy name must be a string".to_string())
+            })?;
+            if name.is_empty() {
+                Err(GovernanceError::Validation(
+                    "policy name must not be empty".to_string(),
+                ))
+            } else {
+                Ok(name.to_string())
+            }
+        }
+        None => Err(GovernanceError::Validation(
+            "policy name is required in policy_config".to_string(),
+        )),
+    }
+}
+
+/// Stored simulation conditions. A non-array must not look like no conditions.
+fn parse_simulation_conditions(config: &serde_json::Value) -> Result<Vec<serde_json::Value>> {
+    match config.get("conditions") {
+        None => Ok(Vec::new()),
+        Some(v) => v.as_array().cloned().ok_or_else(|| {
+            GovernanceError::Validation("conditions must be a JSON array".to_string())
+        }),
+    }
+}
+
+/// Stored entitlement IDs. Invalid entries must not be silently dropped.
+fn parse_simulation_entitlement_ids(config: &serde_json::Value) -> Result<Vec<Uuid>> {
+    let value = config.get("entitlement_ids").ok_or_else(|| {
+        GovernanceError::Validation("entitlement_ids is required in policy_config".to_string())
+    })?;
+    let arr = value.as_array().ok_or_else(|| {
+        GovernanceError::Validation("entitlement_ids must be a JSON array".to_string())
+    })?;
+    if arr.is_empty() {
+        return Err(GovernanceError::Validation(
+            "entitlement_ids is required in policy_config".to_string(),
+        ));
+    }
+    arr.iter()
+        .map(|v| {
+            v.as_str()
+                .and_then(|s| Uuid::parse_str(s).ok())
+                .ok_or_else(|| {
+                    GovernanceError::Validation("entitlement_ids must be UUID strings".to_string())
+                })
+        })
+        .collect()
+}
+
 impl Default for SimulationLimits {
     fn default() -> Self {
         Self {
@@ -521,34 +576,10 @@ impl PolicySimulationService {
     ) -> Result<(Vec<Uuid>, ImpactSummary, Vec<CreatePolicySimulationResult>)> {
         let config = &simulation.policy_config;
 
-        // Parse the birthright policy configuration
-        let policy_name = config
-            .get("name")
-            .and_then(|v| v.as_str())
-            .unwrap_or("Unnamed Policy")
-            .to_string();
-
-        let conditions: Vec<serde_json::Value> = config
-            .get("conditions")
-            .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
-
-        let entitlement_ids: Vec<Uuid> = config
-            .get("entitlement_ids")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str().and_then(|s| Uuid::parse_str(s).ok()))
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        if entitlement_ids.is_empty() {
-            return Err(GovernanceError::Validation(
-                "entitlement_ids is required in policy_config".to_string(),
-            ));
-        }
+        // Parse the birthright policy configuration. Corrupt IDs must not be dropped.
+        let policy_name = parse_simulation_policy_name(config)?;
+        let conditions = parse_simulation_conditions(config)?;
+        let entitlement_ids = parse_simulation_entitlement_ids(config)?;
 
         // Fetch entitlement details
         let mut entitlement_info: std::collections::HashMap<Uuid, String> =
@@ -917,6 +948,37 @@ mod tests {
                 "list_by_simulation(\n            &self.pool,\n            simulation_id,"
             ),
             "must not list policy results by simulation_id alone"
+        );
+    }
+
+    #[test]
+    fn parse_simulation_config_does_not_drop_or_invent() {
+        let id = Uuid::new_v4();
+        let ok = serde_json::json!({
+            "name": "Eng",
+            "conditions": [{"attribute": "department"}],
+            "entitlement_ids": [id.to_string()]
+        });
+        assert_eq!(parse_simulation_policy_name(&ok).unwrap(), "Eng");
+        assert_eq!(parse_simulation_conditions(&ok).unwrap().len(), 1);
+        assert_eq!(parse_simulation_entitlement_ids(&ok).unwrap(), vec![id]);
+        assert!(parse_simulation_policy_name(&serde_json::json!({})).is_err());
+        assert!(parse_simulation_conditions(&serde_json::json!({"conditions": "nope"})).is_err());
+        assert!(parse_simulation_entitlement_ids(&serde_json::json!({
+            "entitlement_ids": ["not-a-uuid"]
+        }))
+        .is_err());
+        assert!(parse_simulation_entitlement_ids(&serde_json::json!({
+            "entitlement_ids": [1]
+        }))
+        .is_err());
+        let src = include_str!("policy_simulation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(\"Unnamed Policy\")")
+                && !production
+                    .contains("filter_map(|v| v.as_str().and_then(|s| Uuid::parse_str(s).ok()))"),
+            "birthright simulation must not invent a name or drop invalid entitlement_ids"
         );
     }
 

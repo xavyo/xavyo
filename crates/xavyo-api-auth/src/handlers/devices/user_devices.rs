@@ -227,7 +227,7 @@ pub async fn rename_device(
         StatusCode::OK,
         Json(RenameDeviceResponse {
             id: device.id,
-            device_name: device.device_name.unwrap_or_default(),
+            device_name: renamed_device_name(device.device_name)?,
         }),
     ))
 }
@@ -259,4 +259,35 @@ pub async fn revoke_device(
         .await?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Stored device name after rename. NULL/empty must not look like a blank rename.
+fn renamed_device_name(name: Option<String>) -> Result<String, ApiAuthError> {
+    match name {
+        Some(n) if !n.is_empty() => Ok(n),
+        _ => Err(ApiAuthError::Internal(
+            "Renamed device is missing device_name".to_string(),
+        )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn renamed_device_name_does_not_default_missing() {
+        assert_eq!(
+            renamed_device_name(Some("Laptop".into())).unwrap(),
+            "Laptop"
+        );
+        assert!(renamed_device_name(None).is_err());
+        assert!(renamed_device_name(Some(String::new())).is_err());
+        let src = include_str!("user_devices.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("device_name.unwrap_or_default()"),
+            "device rename must not hide a missing name as empty"
+        );
+    }
 }
