@@ -23,6 +23,36 @@ fn required_hierarchy_depth(value: Option<(Option<i64>,)>, what: &str) -> ScimRe
         .ok_or_else(|| ScimError::Validation(format!("Could not determine {what}")))
 }
 
+/// RFC 7644 §3.4.2.3: omitted `sortBy`/`sortOrder` use defaults; invalid
+/// values must not silently become `display_name` / ascending.
+fn resolve_group_sort(
+    sort_by: Option<&str>,
+    sort_order: Option<&str>,
+) -> ScimResult<(&'static str, &'static str)> {
+    let column = match sort_by {
+        None => "display_name",
+        Some("displayName") => "display_name",
+        Some("externalId") => "external_id",
+        Some("id") => "id",
+        Some("meta.created") => "created_at",
+        Some(other) => {
+            return Err(ScimError::Validation(format!(
+                "Invalid sortBy '{other}'. Supported: displayName, externalId, id, meta.created"
+            )));
+        }
+    };
+    let order = match sort_order {
+        None | Some("ascending") => "ASC",
+        Some("descending") => "DESC",
+        Some(other) => {
+            return Err(ScimError::Validation(format!(
+                "Invalid sortOrder '{other}'. Must be ascending or descending"
+            )));
+        }
+    };
+    Ok((column, order))
+}
+
 /// Allowed `group_type` values.
 const ALLOWED_GROUP_TYPES: &[&str] = &[
     "organizational_unit",
@@ -413,15 +443,10 @@ impl GroupService {
         }
 
         // Apply sorting (column names are from a hardcoded allowlist — quote for defense-in-depth)
-        let sort_column = match pagination.sort_by.as_deref() {
-            Some("displayName") => "display_name",
-            Some("externalId") => "external_id",
-            _ => "display_name",
-        };
-        let sort_order = match pagination.sort_order.as_deref() {
-            Some("descending") => "DESC",
-            _ => "ASC",
-        };
+        let (sort_column, sort_order) = resolve_group_sort(
+            pagination.sort_by.as_deref(),
+            pagination.sort_order.as_deref(),
+        )?;
         base_query.push_str(&format!(" ORDER BY \"{sort_column}\" {sort_order}"));
 
         // Apply pagination.
@@ -962,6 +987,43 @@ mod tests {
         assert!(
             !production.contains("JOIN subtree s ON g.parent_id = s.id\n"),
             "must not join subtree by parent_id alone"
+        );
+    }
+
+    #[test]
+    fn invalid_group_sort_is_rejected() {
+        assert_eq!(
+            resolve_group_sort(None, None).unwrap(),
+            ("display_name", "ASC")
+        );
+        assert_eq!(
+            resolve_group_sort(Some("externalId"), Some("descending")).unwrap(),
+            ("external_id", "DESC")
+        );
+        let err = resolve_group_sort(Some("members"), None).unwrap_err();
+        assert!(
+            matches!(err, ScimError::Validation(ref msg) if msg.contains("sortBy")),
+            "got {err:?}"
+        );
+        let err = resolve_group_sort(None, Some("DESC")).unwrap_err();
+        assert!(
+            matches!(err, ScimError::Validation(ref msg) if msg.contains("sortOrder")),
+            "got {err:?}"
+        );
+        let src = include_str!("group_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_groups")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn").next())
+            .expect("list_groups");
+        assert!(
+            list.contains("resolve_group_sort("),
+            "SCIM group list must not silently default invalid sortBy/sortOrder"
+        );
+        assert!(
+            !list.contains("_ => \"display_name\"") && !list.contains("_ => \"ASC\""),
+            "invalid SCIM group sort must not fall through to display_name/ASC"
         );
     }
 

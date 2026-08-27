@@ -1299,10 +1299,10 @@ impl SearchOp for RestConnector {
 
         let page_info = page.unwrap_or_default();
         let pagination_params = self.build_pagination_params(&page_info);
-        let filter_params = filter
-            .as_ref()
-            .map(|f| self.filter_to_query_params(f))
-            .unwrap_or_default();
+        let filter_params = match filter.as_ref() {
+            Some(f) => self.filter_to_query_params(f)?,
+            None => Vec::new(),
+        };
 
         let retry_config = &self.config.retry;
         let verbosity = &self.config.log_verbosity;
@@ -1442,22 +1442,26 @@ impl SearchOp for RestConnector {
 }
 
 impl RestConnector {
-    /// Convert filter to query parameters (basic implementation).
-    fn filter_to_query_params(&self, filter: &Filter) -> Vec<(String, String)> {
+    /// Convert filter to query parameters.
+    ///
+    /// Unsupported filter variants must not be dropped: a search that silently
+    /// omits `GreaterThan` / `Or` / `Not` would return unfiltered results.
+    fn filter_to_query_params(&self, filter: &Filter) -> ConnectorResult<Vec<(String, String)>> {
         match filter {
-            Filter::Equals { attribute, value } => {
-                vec![(attribute.clone(), value.clone())]
-            }
+            Filter::Equals { attribute, value } => Ok(vec![(attribute.clone(), value.clone())]),
             Filter::Contains { attribute, value } => {
-                // Some APIs support search parameter
-                vec![(format!("{attribute}_contains"), value.clone())]
+                Ok(vec![(format!("{attribute}_contains"), value.clone())])
             }
-            Filter::And { filters } => filters
-                .iter()
-                .flat_map(|f| self.filter_to_query_params(f))
-                .collect(),
-            // Other filter types would need API-specific handling
-            _ => Vec::new(),
+            Filter::And { filters } => {
+                let mut params = Vec::new();
+                for f in filters {
+                    params.extend(self.filter_to_query_params(f)?);
+                }
+                Ok(params)
+            }
+            other => Err(ConnectorError::InvalidData {
+                message: format!("REST connector does not support this search filter: {other:?}"),
+            }),
         }
     }
 }
@@ -1608,8 +1612,56 @@ mod tests {
             value: "john".to_string(),
         };
 
-        let params = connector.filter_to_query_params(&filter);
+        let params = connector.filter_to_query_params(&filter).unwrap();
         assert_eq!(params, vec![("username".to_string(), "john".to_string())]);
+    }
+
+    #[test]
+    fn unsupported_rest_filter_is_rejected() {
+        let config = RestConfig::new("https://api.example.com");
+        let connector = RestConnector::new(config).unwrap();
+
+        let unsupported = Filter::GreaterThan {
+            attribute: "age".to_string(),
+            value: "21".to_string(),
+        };
+        let err = connector.filter_to_query_params(&unsupported).unwrap_err();
+        assert!(
+            matches!(err, ConnectorError::InvalidData { .. }),
+            "got {err:?}"
+        );
+
+        let mixed_and = Filter::And {
+            filters: vec![
+                Filter::Equals {
+                    attribute: "username".to_string(),
+                    value: "john".to_string(),
+                },
+                Filter::StartsWith {
+                    attribute: "email".to_string(),
+                    value: "j".to_string(),
+                },
+            ],
+        };
+        assert!(
+            connector.filter_to_query_params(&mixed_and).is_err(),
+            "AND must not drop unsupported child filters"
+        );
+
+        let src = include_str!("connector.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let filter_fn = production
+            .split("fn filter_to_query_params")
+            .nth(1)
+            .expect("filter_to_query_params");
+        assert!(
+            !filter_fn.contains("_ => Vec::new()"),
+            "unsupported REST filters must not become an empty query"
+        );
+        assert!(
+            production.contains("self.filter_to_query_params(f)?"),
+            "REST search must propagate unsupported filter errors"
+        );
     }
 
     #[test]
