@@ -188,31 +188,30 @@ impl IdentityMergeService {
 
         let attribute_comparison = self.compare_attributes(&identity_a, &identity_b);
 
-        let rule_matches = candidate
-            .get_rule_matches()
-            .map(|rm| {
-                rm.matches
-                    .iter()
-                    .map(|m| RuleMatchResponse {
-                        rule_id: m.rule_id,
-                        rule_name: m.rule_name.clone(),
-                        attribute: m.attribute.clone(),
-                        similarity: m.similarity,
-                        weighted_score: m.weighted_score,
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
+        let rule_matches = match candidate.get_rule_matches() {
+            Ok(rm) => rm
+                .matches
+                .iter()
+                .map(|m| RuleMatchResponse {
+                    rule_id: m.rule_id,
+                    rule_name: m.rule_name.clone(),
+                    attribute: m.attribute.clone(),
+                    similarity: m.similarity,
+                    weighted_score: m.weighted_score,
+                })
+                .collect(),
+            Err(_) => {
+                return Err(GovernanceError::Validation(
+                    "Invalid stored rule_matches value".to_string(),
+                ));
+            }
+        };
 
         Ok(DuplicateDetailResponse {
             id: candidate.id,
             identity_a_id: candidate.identity_a_id,
             identity_b_id: candidate.identity_b_id,
-            confidence_score: candidate
-                .confidence_score
-                .to_string()
-                .parse::<f64>()
-                .unwrap_or(0.0),
+            confidence_score: decimal_to_f64(candidate.confidence_score, "confidence_score")?,
             identity_a,
             identity_b,
             attribute_comparison,
@@ -1428,6 +1427,13 @@ pub(crate) fn merge_identity_json<T: serde::Serialize>(value: &T) -> Result<serd
     serde_json::to_value(value).map_err(|e| GovernanceError::Validation(e.to_string()))
 }
 
+fn decimal_to_f64(value: rust_decimal::Decimal, field: &str) -> Result<f64> {
+    value
+        .to_string()
+        .parse()
+        .map_err(|_| GovernanceError::Validation(format!("Invalid stored {field} value")))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1530,6 +1536,18 @@ mod tests {
                 && !production.contains("to_value(&target_summary).unwrap_or_default()")
                 && !production.contains("to_value(&merged_preview).unwrap_or_default()"),
             "identity merge persist must fail closed on JSON serialize"
+        );
+    }
+
+    #[test]
+    fn duplicate_detail_does_not_fail_open_on_confidence_or_rule_matches() {
+        let src = include_str!("identity_merge_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("decimal_to_f64(")
+                && !production.contains("unwrap_or(0.0)")
+                && !production.contains("unwrap_or_default()"),
+            "duplicate detail must not invent 0.0 confidence or empty rule matches"
         );
     }
 }

@@ -145,32 +145,11 @@ impl IdentityCorrelationRuleService {
             .await
             .map_err(GovernanceError::Database)?;
 
-        // Filter to only tenant-wide rules and convert to CorrelationRuleConfig
-        let configs: Vec<CorrelationRuleConfig> = rules
+        rules
             .into_iter()
             .filter(|r| r.connector_id.is_none())
-            .map(|r| self.to_detection_config(&r))
-            .collect();
-
-        Ok(configs)
-    }
-
-    /// Convert a `GovCorrelationRule` to a `CorrelationRuleConfig` for detection.
-    fn to_detection_config(&self, rule: &GovCorrelationRule) -> CorrelationRuleConfig {
-        let fuzzy = matches!(
-            rule.match_type,
-            GovMatchType::Fuzzy | GovMatchType::Phonetic
-        );
-
-        CorrelationRuleConfig {
-            id: rule.id,
-            name: rule.name.clone(),
-            source_field: rule.attribute.clone(),
-            target_field: rule.attribute.clone(),
-            weight: rule.weight.to_f64().unwrap_or(1.0),
-            threshold: rule.threshold.map_or(0.7, |t| t.to_f64().unwrap_or(0.7)),
-            fuzzy,
-        }
+            .map(|r| to_detection_config(&r))
+            .collect()
     }
 
     /// Validate rule configuration.
@@ -196,9 +175,8 @@ impl IdentityCorrelationRuleService {
             ));
         }
 
-        // Threshold must be between 0.0 and 1.0
         if let Some(t) = threshold {
-            let t_f64 = t.to_f64().unwrap_or(0.0);
+            let t_f64 = decimal_to_f64(t, "threshold")?;
             if !(0.0..=1.0).contains(&t_f64) {
                 return Err(GovernanceError::Validation(
                     "Threshold must be between 0.0 and 1.0".to_string(),
@@ -206,9 +184,8 @@ impl IdentityCorrelationRuleService {
             }
         }
 
-        // Weight must be positive
         if let Some(w) = weight {
-            let w_f64 = w.to_f64().unwrap_or(0.0);
+            let w_f64 = decimal_to_f64(w, "weight")?;
             if w_f64 <= 0.0 {
                 return Err(GovernanceError::Validation(
                     "Weight must be a positive number".to_string(),
@@ -218,6 +195,32 @@ impl IdentityCorrelationRuleService {
 
         Ok(())
     }
+}
+
+fn decimal_to_f64(value: Decimal, field: &str) -> Result<f64> {
+    value
+        .to_f64()
+        .ok_or_else(|| GovernanceError::Validation(format!("Invalid stored {field} value")))
+}
+
+fn to_detection_config(rule: &GovCorrelationRule) -> Result<CorrelationRuleConfig> {
+    let fuzzy = matches!(
+        rule.match_type,
+        GovMatchType::Fuzzy | GovMatchType::Phonetic
+    );
+
+    Ok(CorrelationRuleConfig {
+        id: rule.id,
+        name: rule.name.clone(),
+        source_field: rule.attribute.clone(),
+        target_field: rule.attribute.clone(),
+        weight: decimal_to_f64(rule.weight, "weight")?,
+        threshold: match rule.threshold {
+            Some(t) => decimal_to_f64(t, "threshold")?,
+            None => 0.7,
+        },
+        fuzzy,
+    })
 }
 
 #[cfg(test)]
@@ -246,9 +249,8 @@ mod tests {
             ));
         }
 
-        // Threshold must be between 0.0 and 1.0
         if let Some(t) = threshold {
-            let t_f64 = t.to_f64().unwrap_or(0.0);
+            let t_f64 = decimal_to_f64(t, "threshold")?;
             if !(0.0..=1.0).contains(&t_f64) {
                 return Err(GovernanceError::Validation(
                     "Threshold must be between 0.0 and 1.0".to_string(),
@@ -256,9 +258,8 @@ mod tests {
             }
         }
 
-        // Weight must be positive
         if let Some(w) = weight {
-            let w_f64 = w.to_f64().unwrap_or(0.0);
+            let w_f64 = decimal_to_f64(w, "weight")?;
             if w_f64 <= 0.0 {
                 return Err(GovernanceError::Validation(
                     "Weight must be a positive number".to_string(),
@@ -352,5 +353,18 @@ mod tests {
         );
 
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn detection_decimals_do_not_default() {
+        let src = include_str!("identity_correlation_rule_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("decimal_to_f64(")
+                && !production.contains("unwrap_or(0.0)")
+                && !production.contains("unwrap_or(1.0)")
+                && !production.contains("unwrap_or(0.7)"),
+            "identity correlation detection must not invent 1.0 weight or 0.7 threshold"
+        );
     }
 }

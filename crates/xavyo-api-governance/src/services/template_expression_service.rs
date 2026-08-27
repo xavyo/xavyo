@@ -606,7 +606,8 @@ impl TemplateExpressionService {
                         Ok(Value::String(format!("{}{}", value_to_string(l), r)))
                     }
                     (Value::Number(l), Value::Number(r)) => {
-                        let result = l.as_f64().unwrap_or(0.0) + r.as_f64().unwrap_or(0.0);
+                        let result = value_to_f64(&Value::Number(l.clone()))?
+                            + value_to_f64(&Value::Number(r.clone()))?;
                         Ok(serde_json::json!(result))
                     }
                     _ => Err(ExpressionError::TypeError(format!(
@@ -1340,6 +1341,12 @@ mod tests {
         let expr = svc.parse("${age} + 5").unwrap();
         let result = svc.evaluate(&expr, &ctx).unwrap();
         assert_eq!(result, serde_json::json!(35.0));
+        let src = include_str!("template_expression_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(0.0)"),
+            "template expression Add must not treat invalid numbers as 0.0"
+        );
 
         let expr = svc.parse("${age} - 10").unwrap();
         let result = svc.evaluate(&expr, &ctx).unwrap();
