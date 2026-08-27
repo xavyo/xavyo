@@ -425,7 +425,7 @@ pub async fn trigger_reconciliation(
         return Err(ConnectorApiError::Forbidden);
     }
     let tenant_id = extract_tenant_id(&claims)?;
-    let actor_id = Uuid::parse_str(&claims.sub).ok();
+    let actor_id = Some(extract_user_id(&claims)?);
 
     let run = state
         .reconciliation_service
@@ -796,7 +796,7 @@ pub async fn remediate_discrepancy(
         return Err(ConnectorApiError::Forbidden);
     }
     let tenant_id = extract_tenant_id(&claims)?;
-    let user_id = Uuid::parse_str(&claims.sub).ok();
+    let user_id = Some(extract_user_id(&claims)?);
 
     let result = state
         .reconciliation_service
@@ -842,7 +842,7 @@ pub async fn bulk_remediate_discrepancies(
         return Err(ConnectorApiError::Forbidden);
     }
     let tenant_id = extract_tenant_id(&claims)?;
-    let user_id = Uuid::parse_str(&claims.sub).ok();
+    let user_id = Some(extract_user_id(&claims)?);
 
     // Limit to 100 items
     if request.items.len() > 100 {
@@ -891,12 +891,7 @@ pub async fn ignore_discrepancy(
         return Err(ConnectorApiError::Forbidden);
     }
     let tenant_id = extract_tenant_id(&claims)?;
-    let user_id = Uuid::parse_str(&claims.sub).ok();
-    if user_id.is_none() {
-        return Err(ConnectorApiError::Unauthorized {
-            message: "JWT sub must be a user UUID".to_string(),
-        });
-    }
+    let user_id = Some(extract_user_id(&claims)?);
 
     state
         .reconciliation_service
@@ -1321,6 +1316,12 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiError> {
         })
 }
 
+fn extract_user_id(claims: &JwtClaims) -> Result<Uuid, ApiError> {
+    Uuid::parse_str(&claims.sub).map_err(|_| ConnectorApiError::Unauthorized {
+        message: "Invalid user ID in claims".to_string(),
+    })
+}
+
 /// Map reconciliation service errors to API errors with proper status codes.
 fn parse_run_statistics(value: serde_json::Value) -> Result<ReconciliationStatistics, ApiError> {
     serde_json::from_value(value)
@@ -1386,6 +1387,17 @@ mod tests {
         assert!(
             !production.contains("from_value(run.statistics.clone()).unwrap_or_default()"),
             "reconciliation statistics GET must fail closed on JSON parse"
+        );
+    }
+
+    #[test]
+    fn recon_mutations_require_actor_uuid() {
+        let src = include_str!("reconciliation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("extract_user_id(")
+                && !production.contains("Uuid::parse_str(&claims.sub).ok()"),
+            "reconciliation mutations must not drop a malformed JWT sub"
         );
     }
 }

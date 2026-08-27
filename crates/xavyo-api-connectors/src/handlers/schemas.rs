@@ -429,7 +429,7 @@ pub async fn trigger_schema_discovery(
     use xavyo_db::models::TriggeredBy;
 
     let tenant_id = extract_tenant_id(&claims)?;
-    let user_id = Uuid::parse_str(&claims.sub).ok();
+    let user_id = Some(extract_user_id(&claims)?);
 
     // Trigger async discovery
     let discovery_status = state
@@ -1046,4 +1046,24 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid> {
         .ok_or(crate::error::ConnectorApiError::Validation(
             "Missing tenant_id in claims".to_string(),
         ))
+}
+
+fn extract_user_id(claims: &JwtClaims) -> Result<Uuid> {
+    Uuid::parse_str(&claims.sub).map_err(|_| crate::error::ConnectorApiError::Unauthorized {
+        message: "Invalid user ID in claims".to_string(),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn schema_discovery_requires_actor_uuid() {
+        let src = include_str!("schemas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("extract_user_id(")
+                && !production.contains("Uuid::parse_str(&claims.sub).ok()"),
+            "schema discovery must not drop a malformed JWT sub"
+        );
+    }
 }
