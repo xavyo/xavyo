@@ -75,7 +75,10 @@ impl CorrelationRuleService {
                 .await?;
 
         Ok(CorrelationRuleListResponse {
-            items: rules.into_iter().map(rule_to_response).collect(),
+            items: rules
+                .into_iter()
+                .map(rule_to_response)
+                .collect::<Result<Vec<_>>>()?,
             total,
             limit,
             offset,
@@ -98,7 +101,7 @@ impl CorrelationRuleService {
             return Err(GovernanceError::CorrelationRuleNotFound(id));
         }
 
-        Ok(rule_to_response(rule))
+        rule_to_response(rule)
     }
 
     /// Create a new correlation rule for a connector.
@@ -169,7 +172,7 @@ impl CorrelationRuleService {
             "Correlation rule created"
         );
 
-        Ok(rule_to_response(rule))
+        rule_to_response(rule)
     }
 
     /// Update an existing correlation rule.
@@ -260,7 +263,7 @@ impl CorrelationRuleService {
             "Correlation rule updated"
         );
 
-        Ok(rule_to_response(rule))
+        rule_to_response(rule)
     }
 
     /// Delete a correlation rule.
@@ -377,8 +380,15 @@ impl CorrelationRuleService {
 // =============================================================================
 
 /// Convert a `GovCorrelationRule` database model into a `CorrelationRuleResponse`.
-fn rule_to_response(rule: GovCorrelationRule) -> CorrelationRuleResponse {
-    CorrelationRuleResponse {
+fn decimal_to_f64(value: Decimal, field: &str) -> Result<f64> {
+    value
+        .to_string()
+        .parse()
+        .map_err(|_| GovernanceError::Validation(format!("Invalid stored {field} value")))
+}
+
+fn rule_to_response(rule: GovCorrelationRule) -> Result<CorrelationRuleResponse> {
+    Ok(CorrelationRuleResponse {
         id: rule.id,
         tenant_id: rule.tenant_id,
         connector_id: rule.connector_id,
@@ -393,8 +403,9 @@ fn rule_to_response(rule: GovCorrelationRule) -> CorrelationRuleResponse {
         }),
         threshold: rule
             .threshold
-            .map(|t| t.to_string().parse::<f64>().unwrap_or(0.0)),
-        weight: rule.weight.to_string().parse::<f64>().unwrap_or(0.0),
+            .map(|t| decimal_to_f64(t, "threshold"))
+            .transpose()?,
+        weight: decimal_to_f64(rule.weight, "weight")?,
         expression: rule.expression,
         tier: rule.tier,
         is_definitive: rule.is_definitive,
@@ -403,7 +414,7 @@ fn rule_to_response(rule: GovCorrelationRule) -> CorrelationRuleResponse {
         priority: rule.priority,
         created_at: rule.created_at,
         updated_at: rule.updated_at,
-    }
+    })
 }
 
 /// Parse a match type string into a `GovMatchType` enum value.
@@ -675,7 +686,7 @@ mod tests {
             updated_at: chrono::Utc::now(),
         };
 
-        let response = rule_to_response(rule.clone());
+        let response = rule_to_response(rule.clone()).unwrap();
 
         assert_eq!(response.id, rule.id);
         assert_eq!(response.tenant_id, rule.tenant_id);
@@ -718,12 +729,24 @@ mod tests {
             updated_at: chrono::Utc::now(),
         };
 
-        let response = rule_to_response(rule);
+        let response = rule_to_response(rule).unwrap();
 
         assert_eq!(response.match_type, "fuzzy");
         assert_eq!(response.algorithm, Some("jaro_winkler".to_string()));
         assert!((response.threshold.unwrap() - 0.85).abs() < f64::EPSILON);
         assert!((response.weight - 0.30).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn connector_correlation_decimals_do_not_default() {
+        let d = Decimal::new(50, 2);
+        assert!((decimal_to_f64(d, "weight").unwrap() - 0.50).abs() < f64::EPSILON);
+        let src = include_str!("correlation_rule_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("decimal_to_f64(") && !production.contains("unwrap_or(0.0)"),
+            "connector correlation threshold/weight must not serialize as 0.0 on parse failure"
+        );
     }
 
     #[test]

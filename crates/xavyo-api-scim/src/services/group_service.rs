@@ -639,21 +639,27 @@ impl GroupService {
                         "urn:ietf:params:scim:schemas:extension:xavyo:2.0:Group:parentExternalId",
                     ) || p == "parentExternalId" =>
                     {
-                        if let Some(ext_id) = value.as_str() {
-                            if let Some(parent) =
-                                Group::find_by_external_id(&self.pool, tenant_id, ext_id).await?
-                            {
-                                // Validate hierarchy before applying
-                                self.validate_hierarchy(tenant_id, Some(group_id), parent.id)
-                                    .await?;
-                                group.parent_id = Some(parent.id);
-                            } else {
-                                return Err(ScimError::NotFound(format!(
-                                    "Parent group with externalId {ext_id} not found"
-                                )));
+                        match value {
+                            serde_json::Value::Null => group.parent_id = None,
+                            serde_json::Value::String(ext_id) => {
+                                if let Some(parent) =
+                                    Group::find_by_external_id(&self.pool, tenant_id, ext_id)
+                                        .await?
+                                {
+                                    self.validate_hierarchy(tenant_id, Some(group_id), parent.id)
+                                        .await?;
+                                    group.parent_id = Some(parent.id);
+                                } else {
+                                    return Err(ScimError::NotFound(format!(
+                                        "Parent group with externalId {ext_id} not found"
+                                    )));
+                                }
                             }
-                        } else if value.is_null() {
-                            group.parent_id = None;
+                            _ => {
+                                return Err(ScimError::Validation(
+                                    "parentExternalId must be a string".to_string(),
+                                ));
+                            }
                         }
                     }
                     _ => {
@@ -868,6 +874,11 @@ mod tests {
                 && production.contains("patch_string(")
                 && !production.contains(".filter_map(|m|"),
             "group PATCH members/displayName must fail closed, not drop invalid entries"
+        );
+        assert!(
+            production.contains("parentExternalId must be a string")
+                && !production.contains("if let Some(ext_id) = value.as_str()"),
+            "parentExternalId non-string must not no-op"
         );
     }
 

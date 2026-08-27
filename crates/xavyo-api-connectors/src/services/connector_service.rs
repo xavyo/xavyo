@@ -535,14 +535,17 @@ impl ConnectorService {
             ldap_config = ldap_config.with_ssl();
         }
 
-        // Apply password (try both "bind_password" and "password" keys for flexibility)
-        if let Some(pwd) = credentials
+        let pwd = credentials
             .get("bind_password")
             .or_else(|| credentials.get("password"))
             .and_then(|v| v.as_str())
-        {
-            ldap_config = ldap_config.with_password(pwd);
-        }
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| {
+                ConnectorApiError::InvalidConfiguration(
+                    "Missing 'bind_password' in LDAP credentials".to_string(),
+                )
+            })?;
+        ldap_config = ldap_config.with_password(pwd);
 
         Ok(ldap_config)
     }
@@ -663,11 +666,7 @@ impl ConnectorService {
             .transpose()?
             .unwrap_or(DatabaseDriver::PostgreSQL);
 
-        // Get credentials
-        let username = credentials
-            .get("username")
-            .and_then(|v| v.as_str())
-            .unwrap_or("postgres");
+        let username = required_str(credentials, "username")?;
 
         let mut db_config = DatabaseConfig::new(driver, host, database, username);
 
@@ -676,10 +675,7 @@ impl ConnectorService {
             db_config = db_config.with_port(port as u16);
         }
 
-        // Apply password
-        if let Some(pwd) = credentials.get("password").and_then(|v| v.as_str()) {
-            db_config = db_config.with_password(pwd);
-        }
+        db_config = db_config.with_password(required_str(credentials, "password")?);
 
         Ok(db_config)
     }
@@ -701,40 +697,36 @@ impl ConnectorService {
 
         let mut rest_config = RestConfig::new(base_url);
 
-        // Apply authentication based on auth_type
-        let auth_type = credentials.get("auth_type").and_then(|v| v.as_str());
+        let auth_type = credentials
+            .get("auth_type")
+            .or_else(|| config.get("auth_type"))
+            .and_then(|v| v.as_str());
 
         match auth_type {
             Some("basic") => {
-                let username = credentials.get("username").and_then(|v| v.as_str());
-                let password = credentials.get("password").and_then(|v| v.as_str());
-                if let (Some(user), Some(pwd)) = (username, password) {
-                    rest_config = rest_config.with_basic_auth(user, pwd);
-                }
+                rest_config = rest_config.with_basic_auth(
+                    required_str(credentials, "username")?,
+                    required_str(credentials, "password")?,
+                );
             }
             Some("bearer") => {
-                if let Some(token) = credentials.get("token").and_then(|v| v.as_str()) {
-                    rest_config = rest_config.with_bearer_token(token);
-                }
+                rest_config = rest_config.with_bearer_token(required_str(credentials, "token")?);
             }
             Some("api_key") => {
-                if let Some(key) = credentials.get("api_key").and_then(|v| v.as_str()) {
-                    rest_config = rest_config.with_api_key(key);
-                }
+                rest_config = rest_config.with_api_key(required_str(credentials, "api_key")?);
             }
             Some("oauth2") => {
-                let token_url = credentials.get("token_url").and_then(|v| v.as_str());
-                let client_id = credentials.get("client_id").and_then(|v| v.as_str());
-                let client_secret = credentials
-                    .get("client_secret")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
-                if let (Some(url), Some(id)) = (token_url, client_id) {
-                    rest_config = rest_config.with_oauth2(url, id, client_secret);
-                }
+                rest_config = rest_config.with_oauth2(
+                    required_str(credentials, "token_url")?,
+                    required_str(credentials, "client_id")?,
+                    required_str(credentials, "client_secret")?,
+                );
             }
-            _ => {
-                // No authentication or unknown type
+            None | Some("none") => {}
+            Some(other) => {
+                return Err(ConnectorApiError::InvalidConfiguration(format!(
+                    "Unknown REST auth_type '{other}'"
+                )));
             }
         }
 
@@ -968,6 +960,21 @@ mod tests {
                 && !production.contains("unwrap_or(true)")
                 && production.contains("json_bool_field("),
             "use_ad_features/use_entra_features/AD flags must not treat non-bools as defaults"
+        );
+        assert!(
+            !production.contains("unwrap_or(\"postgres\")")
+                && !production.contains("unwrap_or(\"\")"),
+            "database/LDAP/REST must not invent postgres users or empty secrets"
+        );
+        assert!(
+            !production.contains("if let (Some(user), Some(pwd))")
+                && !production.contains("if let Some(token)")
+                && production.contains("required_str(credentials, \"token\")"),
+            "REST auth_type must fail closed when credentials are missing"
+        );
+        assert!(
+            production.contains("Missing 'bind_password' in LDAP credentials"),
+            "LDAP must require bind_password instead of anonymous bind"
         );
     }
 }
