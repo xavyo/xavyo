@@ -343,7 +343,7 @@ impl TicketSyncService {
             })?;
 
         // Map external status to our status category
-        let new_category = map_ticket_status_to_category(&status_response.status);
+        let new_category = map_ticket_status_to_category(&status_response.status)?;
         let old_category = ticket.status_category;
 
         // Check if status actually changed
@@ -554,14 +554,7 @@ impl TicketSyncService {
         };
 
         // Map the webhook status to our status category
-        let new_category = match payload.status.to_lowercase().as_str() {
-            "open" | "new" | "pending" => TicketStatusCategory::Open,
-            "in_progress" | "active" | "working" => TicketStatusCategory::InProgress,
-            "resolved" | "done" | "completed" => TicketStatusCategory::Resolved,
-            "closed" => TicketStatusCategory::Closed,
-            "cancelled" | "canceled" | "rejected" => TicketStatusCategory::Rejected,
-            _ => TicketStatusCategory::Open,
-        };
+        let new_category = parse_webhook_status(&payload.status)?;
 
         let old_category = ticket.status_category;
 
@@ -636,15 +629,33 @@ impl TicketSyncService {
 }
 
 /// Map our `TicketStatus` to `TicketStatusCategory` for storage.
-fn map_ticket_status_to_category(status: &TicketStatus) -> TicketStatusCategory {
+///
+/// Unknown provider statuses must not be stored as Open.
+fn map_ticket_status_to_category(status: &TicketStatus) -> Result<TicketStatusCategory> {
     match status {
-        TicketStatus::Open => TicketStatusCategory::Open,
-        TicketStatus::InProgress => TicketStatusCategory::InProgress,
-        TicketStatus::Pending => TicketStatusCategory::Pending,
-        TicketStatus::Resolved => TicketStatusCategory::Resolved,
-        TicketStatus::Closed => TicketStatusCategory::Closed,
-        TicketStatus::Cancelled => TicketStatusCategory::Rejected,
-        TicketStatus::Unknown(_) => TicketStatusCategory::Open,
+        TicketStatus::Open => Ok(TicketStatusCategory::Open),
+        TicketStatus::InProgress => Ok(TicketStatusCategory::InProgress),
+        TicketStatus::Pending => Ok(TicketStatusCategory::Pending),
+        TicketStatus::Resolved => Ok(TicketStatusCategory::Resolved),
+        TicketStatus::Closed => Ok(TicketStatusCategory::Closed),
+        TicketStatus::Cancelled => Ok(TicketStatusCategory::Rejected),
+        TicketStatus::Unknown(s) => Err(GovernanceError::Validation(format!(
+            "Unknown ticket status '{s}'"
+        ))),
+    }
+}
+
+/// Webhook status strings. Unknown values must not be stored as Open.
+fn parse_webhook_status(status: &str) -> Result<TicketStatusCategory> {
+    match status.to_lowercase().as_str() {
+        "open" | "new" | "pending" => Ok(TicketStatusCategory::Open),
+        "in_progress" | "active" | "working" => Ok(TicketStatusCategory::InProgress),
+        "resolved" | "done" | "completed" => Ok(TicketStatusCategory::Resolved),
+        "closed" => Ok(TicketStatusCategory::Closed),
+        "cancelled" | "canceled" | "rejected" => Ok(TicketStatusCategory::Rejected),
+        other => Err(GovernanceError::Validation(format!(
+            "Unknown ticket status '{other}'"
+        ))),
     }
 }
 
@@ -716,20 +727,43 @@ mod tests {
     #[test]
     fn test_status_mapping() {
         assert_eq!(
-            map_ticket_status_to_category(&TicketStatus::Open),
+            map_ticket_status_to_category(&TicketStatus::Open).unwrap(),
             TicketStatusCategory::Open
         );
         assert_eq!(
-            map_ticket_status_to_category(&TicketStatus::InProgress),
+            map_ticket_status_to_category(&TicketStatus::InProgress).unwrap(),
             TicketStatusCategory::InProgress
         );
         assert_eq!(
-            map_ticket_status_to_category(&TicketStatus::Resolved),
+            map_ticket_status_to_category(&TicketStatus::Resolved).unwrap(),
             TicketStatusCategory::Resolved
         );
         assert_eq!(
-            map_ticket_status_to_category(&TicketStatus::Cancelled),
+            map_ticket_status_to_category(&TicketStatus::Cancelled).unwrap(),
             TicketStatusCategory::Rejected
+        );
+    }
+
+    #[test]
+    fn unknown_ticket_status_does_not_become_open() {
+        assert!(map_ticket_status_to_category(&TicketStatus::Unknown("foo".into())).is_err());
+        assert_eq!(
+            parse_webhook_status("resolved").unwrap(),
+            TicketStatusCategory::Resolved
+        );
+        assert_eq!(
+            parse_webhook_status("cancelled").unwrap(),
+            TicketStatusCategory::Rejected
+        );
+        assert!(parse_webhook_status("bogus").is_err());
+        assert!(parse_webhook_status("").is_err());
+
+        let src = include_str!("ticket_sync_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_webhook_status(")
+                && !production.contains("_ => TicketStatusCategory::Open"),
+            "unknown webhook/provider ticket status must not be stored as Open"
         );
     }
 
