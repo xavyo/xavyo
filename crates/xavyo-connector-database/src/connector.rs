@@ -25,6 +25,15 @@ use xavyo_connector::types::ConnectorType;
 
 use crate::config::DatabaseConfig;
 
+fn require_schema_ident(value: String, field: &str) -> ConnectorResult<String> {
+    if value.is_empty() {
+        return Err(ConnectorError::SchemaDiscoveryFailed {
+            message: format!("{field} must not be empty"),
+        });
+    }
+    Ok(value)
+}
+
 /// Database Connector for provisioning to relational databases.
 ///
 /// Currently supports `PostgreSQL`. Support for other databases (`MySQL`, MSSQL, Oracle)
@@ -522,8 +531,18 @@ impl DatabaseConnector {
         let secondary_id_columns = ["username", "email", "login", "external_id", "employee_id"];
 
         for row in rows {
-            let column_name: String = row.try_get("column_name").unwrap_or_default();
-            let data_type: String = row.try_get("data_type").unwrap_or_default();
+            let column_name: String =
+                row.try_get("column_name")
+                    .map_err(|e| ConnectorError::SchemaDiscoveryFailed {
+                        message: format!("column_name missing for table {table_name}: {e}"),
+                    })?;
+            let data_type: String =
+                row.try_get("data_type")
+                    .map_err(|e| ConnectorError::SchemaDiscoveryFailed {
+                        message: format!("data_type missing for column {column_name}: {e}"),
+                    })?;
+            let column_name = require_schema_ident(column_name, "column_name")?;
+            let data_type = require_schema_ident(data_type, "data_type")?;
             let is_nullable: String = row
                 .try_get("is_nullable")
                 .unwrap_or_else(|_| "YES".to_string());
@@ -1023,6 +1042,22 @@ mod tests {
         assert!(
             production.contains("database_password(") && !production.contains("unwrap_or(\"\")"),
             "database connection must not bind with an empty password"
+        );
+    }
+
+    #[test]
+    fn schema_ident_rejects_empty_column_names() {
+        assert!(require_schema_ident(String::new(), "column_name").is_err());
+        assert_eq!(
+            require_schema_ident("id".into(), "column_name").unwrap(),
+            "id"
+        );
+        let src = include_str!("connector.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("try_get(\"column_name\").unwrap_or_default()")
+                && !production.contains("try_get(\"data_type\").unwrap_or_default()"),
+            "schema discovery must not invent empty column names"
         );
     }
 

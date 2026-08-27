@@ -158,25 +158,12 @@ pub fn map_ad_user(entry: &AttributeSet) -> Option<MappedUser> {
         attrs.insert("dn".to_string(), serde_json::Value::String(dn.clone()));
     }
 
-    // Group memberships (multi-valued)
+    // Group memberships (multi-valued). Non-string DNs must not be dropped —
+    // that would make the user look like they have fewer groups.
     if let Some(member_of) = entry.get("memberOf") {
-        match member_of {
-            AttributeValue::Array(arr) => {
-                let dns: Vec<serde_json::Value> = arr
-                    .iter()
-                    .filter_map(|v| {
-                        v.as_string()
-                            .map(|s| serde_json::Value::String(s.to_string()))
-                    })
-                    .collect();
-                if !dns.is_empty() {
-                    attrs.insert("member_of_dns".to_string(), serde_json::Value::Array(dns));
-                }
-            }
-            AttributeValue::String(s) => {
-                attrs.insert("member_of_dns".to_string(), serde_json::json!([s]));
-            }
-            _ => {}
+        let dns = member_of_dns(member_of)?;
+        if !dns.is_empty() {
+            attrs.insert("member_of_dns".to_string(), serde_json::Value::Array(dns));
         }
     }
 
@@ -349,6 +336,24 @@ fn set_if_present(attrs: &mut HashMap<String, serde_json::Value>, key: &str, val
         if !v.is_empty() {
             attrs.insert(key.to_string(), serde_json::Value::String(v.to_string()));
         }
+    }
+}
+
+/// Parse `memberOf` DNs. Mixed-type arrays must not silently drop memberships.
+fn member_of_dns(value: &AttributeValue) -> Option<Vec<serde_json::Value>> {
+    match value {
+        AttributeValue::Array(arr) => arr
+            .iter()
+            .map(|v| {
+                v.as_string()
+                    .map(|s| serde_json::Value::String(s.to_string()))
+            })
+            .collect(),
+        AttributeValue::String(s) if !s.is_empty() => {
+            Some(vec![serde_json::Value::String(s.clone())])
+        }
+        AttributeValue::String(_) => Some(Vec::new()),
+        _ => None,
     }
 }
 
@@ -830,6 +835,25 @@ mod tests {
         assert_eq!(
             member_of[0].as_str().unwrap(),
             "CN=Developers,OU=Groups,DC=example,DC=com"
+        );
+    }
+
+    #[test]
+    fn map_ad_user_member_of_does_not_drop_non_strings() {
+        let mut entry = sample_ad_user_entry();
+        entry.set(
+            "memberOf",
+            AttributeValue::Array(vec![
+                AttributeValue::String("CN=Developers,OU=Groups,DC=example,DC=com".to_string()),
+                AttributeValue::Integer(1),
+            ]),
+        );
+        assert!(map_ad_user(&entry).is_none());
+        let src = include_str!("sync.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("filter_map(|v| {"),
+            "AD user memberOf must not drop non-string DNs"
         );
     }
 

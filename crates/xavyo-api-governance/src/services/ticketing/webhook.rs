@@ -27,6 +27,76 @@ pub struct WebhookProvider {
     custom_headers: Vec<(String, String)>,
 }
 
+fn optional_config_string(
+    mappings: Option<&serde_json::Value>,
+    key: &str,
+) -> TicketingResult<Option<String>> {
+    match mappings.and_then(|c| c.get(key)) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => v
+            .as_str()
+            .map(|s| Some(s.to_string()))
+            .ok_or_else(|| TicketingError::InvalidConfiguration(format!("{key} must be a string"))),
+    }
+}
+
+fn json_string_field(value: &serde_json::Value, field: &str) -> TicketingResult<String> {
+    value
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| {
+            TicketingError::InvalidConfiguration(format!("{field} must be a non-empty string"))
+        })
+}
+
+fn parse_webhook_auth(credentials: &serde_json::Value) -> TicketingResult<WebhookAuth> {
+    if credentials.get("bearer_token").is_some() {
+        return Ok(WebhookAuth::Bearer(json_string_field(
+            credentials,
+            "bearer_token",
+        )?));
+    }
+    if credentials.get("username").is_some() || credentials.get("password").is_some() {
+        return Ok(WebhookAuth::Basic {
+            username: json_string_field(credentials, "username")?,
+            password: json_string_field(credentials, "password")?,
+        });
+    }
+    if credentials.get("api_key").is_some() || credentials.get("api_key_header").is_some() {
+        return Ok(WebhookAuth::ApiKey {
+            header: json_string_field(credentials, "api_key_header")?,
+            value: json_string_field(credentials, "api_key")?,
+        });
+    }
+    Ok(WebhookAuth::None)
+}
+
+fn parse_custom_headers(
+    mappings: Option<&serde_json::Value>,
+) -> TicketingResult<Vec<(String, String)>> {
+    match mappings.and_then(|c| c.get("headers")) {
+        None | Some(serde_json::Value::Null) => Ok(Vec::new()),
+        Some(v) => {
+            let obj = v.as_object().ok_or_else(|| {
+                TicketingError::InvalidConfiguration("headers must be an object".into())
+            })?;
+            obj.iter()
+                .map(|(k, val)| {
+                    val.as_str()
+                        .map(|s| (k.clone(), s.to_string()))
+                        .ok_or_else(|| {
+                            TicketingError::InvalidConfiguration(format!(
+                                "header '{k}' must be a string"
+                            ))
+                        })
+                })
+                .collect()
+        }
+    }
+}
+
 /// Webhook authentication methods.
 enum WebhookAuth {
     None,
@@ -43,48 +113,9 @@ impl WebhookProvider {
     ) -> TicketingResult<Self> {
         let create_url = config.endpoint_url.clone();
 
-        let status_url = config
-            .field_mappings
-            .as_ref()
-            .and_then(|c| c.get("status_url"))
-            .and_then(|v| v.as_str())
-            .map(std::string::ToString::to_string);
-
-        // Determine authentication method
-        let auth = if let Some(bearer) = credentials.get("bearer_token").and_then(|v| v.as_str()) {
-            WebhookAuth::Bearer(bearer.to_string())
-        } else if let (Some(username), Some(password)) = (
-            credentials.get("username").and_then(|v| v.as_str()),
-            credentials.get("password").and_then(|v| v.as_str()),
-        ) {
-            WebhookAuth::Basic {
-                username: username.to_string(),
-                password: password.to_string(),
-            }
-        } else if let (Some(header), Some(value)) = (
-            credentials.get("api_key_header").and_then(|v| v.as_str()),
-            credentials.get("api_key").and_then(|v| v.as_str()),
-        ) {
-            WebhookAuth::ApiKey {
-                header: header.to_string(),
-                value: value.to_string(),
-            }
-        } else {
-            WebhookAuth::None
-        };
-
-        // Parse custom headers from field_mappings
-        let custom_headers = config
-            .field_mappings
-            .as_ref()
-            .and_then(|c| c.get("headers"))
-            .and_then(|v| v.as_object())
-            .map(|obj| {
-                obj.iter()
-                    .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
-                    .collect()
-            })
-            .unwrap_or_default();
+        let status_url = optional_config_string(config.field_mappings.as_ref(), "status_url")?;
+        let auth = parse_webhook_auth(credentials)?;
+        let custom_headers = parse_custom_headers(config.field_mappings.as_ref())?;
 
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(30))
@@ -455,6 +486,49 @@ mod tests {
 
         let provider = WebhookProvider::new(&config, &credentials).unwrap();
         assert_eq!(provider.custom_headers.len(), 2);
+    }
+
+    #[test]
+    fn webhook_headers_reject_non_strings() {
+        let mut config = test_config();
+        config.field_mappings = Some(serde_json::json!({
+            "headers": { "X-Custom-Header": 1 }
+        }));
+        let err = WebhookProvider::new(&config, &serde_json::json!({}))
+            .err()
+            .expect("non-string header");
+        assert!(matches!(err, TicketingError::InvalidConfiguration(_)));
+        let src = include_str!("webhook.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("filter_map(|(k, v)| v.as_str()"),
+            "webhook headers must not drop non-string values"
+        );
+    }
+
+    #[test]
+    fn webhook_auth_does_not_fail_open_on_typed_credentials() {
+        let config = test_config();
+        assert!(WebhookProvider::new(&config, &serde_json::json!({"bearer_token": true})).is_err());
+        assert!(WebhookProvider::new(&config, &serde_json::json!({"username": "alice"})).is_err());
+        let src = include_str!("webhook.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_webhook_auth("),
+            "webhook auth must fail closed when credential types are wrong"
+        );
+    }
+
+    #[test]
+    fn webhook_status_url_must_be_a_string() {
+        let mut config = test_config();
+        config.field_mappings = Some(serde_json::json!({ "status_url": 1 }));
+        assert!(WebhookProvider::new(&config, &serde_json::json!({})).is_err());
+        config.field_mappings = Some(serde_json::json!({
+            "status_url": "https://example.com/tickets/{ticket_id}"
+        }));
+        let provider = WebhookProvider::new(&config, &serde_json::json!({})).unwrap();
+        assert!(provider.status_url.is_some());
     }
 
     #[test]

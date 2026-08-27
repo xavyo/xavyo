@@ -15,6 +15,18 @@ use uuid::Uuid;
 use super::change::{InboundCorrelationCandidate, InboundCorrelationResult};
 use super::error::{SyncError, SyncResult};
 
+/// Stringify a JSON scalar for correlation. Array first-elements that are
+/// numbers/bools must not be dropped (the scalar path already stringifies them).
+fn json_scalar_string(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::String(s) => Some(s.clone()),
+        serde_json::Value::Number(n) => Some(n.to_string()),
+        serde_json::Value::Bool(b) => Some(b.to_string()),
+        serde_json::Value::Array(arr) => arr.first().and_then(json_scalar_string),
+        _ => None,
+    }
+}
+
 /// Configuration for an inbound correlation rule.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InboundCorrelationRule {
@@ -140,15 +152,7 @@ impl DatabaseInboundCorrelator {
 
     /// Extract attribute value from JSON.
     fn get_attribute_value(attrs: &serde_json::Value, attr_name: &str) -> Option<String> {
-        match attrs.get(attr_name) {
-            Some(serde_json::Value::String(s)) => Some(s.clone()),
-            Some(serde_json::Value::Number(n)) => Some(n.to_string()),
-            Some(serde_json::Value::Bool(b)) => Some(b.to_string()),
-            Some(serde_json::Value::Array(arr)) => arr
-                .first()
-                .and_then(|v| v.as_str().map(std::string::ToString::to_string)),
-            _ => None,
-        }
+        json_scalar_string(attrs.get(attr_name)?)
     }
 
     /// Build search conditions for a rule.
@@ -456,6 +460,26 @@ mod tests {
         assert_eq!(
             DatabaseInboundCorrelator::get_attribute_value(&attrs, "email"),
             None
+        );
+    }
+
+    #[test]
+    fn correlation_array_keeps_numeric_first_element() {
+        let attrs = serde_json::json!({"employee_id": [42, 7]});
+        assert_eq!(
+            DatabaseInboundCorrelator::get_attribute_value(&attrs, "employee_id"),
+            Some("42".to_string())
+        );
+        let object_first = serde_json::json!({"email": [{"x": 1}, "a@b.com"]});
+        assert_eq!(
+            DatabaseInboundCorrelator::get_attribute_value(&object_first, "email"),
+            None
+        );
+        let src = include_str!("correlator.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("v.as_str().map(std::string::ToString::to_string)"),
+            "inbound correlation must not drop numeric array values"
         );
     }
 
