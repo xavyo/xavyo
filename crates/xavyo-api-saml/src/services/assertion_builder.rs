@@ -399,7 +399,7 @@ pub(crate) fn canonicalize_xml(xml: &str) -> SamlResult<String> {
                 output.push('>');
             }
             Ok(Event::Text(ref e)) => {
-                let text = e.unescape().map_err(|err| {
+                let text = e.decode().map_err(|err| {
                     SamlError::AssertionGenerationFailed(format!("XML unescape error: {err}"))
                 })?;
                 c14n_escape_text(&mut output, &text);
@@ -445,8 +445,10 @@ fn write_c14n_start_tag(
         let key = std::str::from_utf8(attr.key.as_ref()).map_err(|err| {
             SamlError::AssertionGenerationFailed(format!("Invalid UTF-8 in attribute name: {err}"))
         })?;
-        let value = attr.unescape_value().map_err(|err| {
-            SamlError::AssertionGenerationFailed(format!("XML attribute unescape error: {err}"))
+        let value = attr
+            .normalized_value(quick_xml::XmlVersion::Implicit1_0)
+            .map_err(|err| {
+            SamlError::AssertionGenerationFailed(format!("XML attribute decode error: {err}"))
         })?;
 
         if key == "xmlns" || key.starts_with("xmlns:") {

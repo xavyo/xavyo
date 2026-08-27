@@ -46,7 +46,7 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio",
 uuid = { version = "1.6", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1.0"
-anyhow = "1.0"
+anyhow = "1.0.103"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "registry"] }
 dotenvy = "0.15"
