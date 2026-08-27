@@ -26,7 +26,10 @@ pub const TEST_DATABASE_URL_ENV: &str = "TEST_DATABASE_URL";
 /// Uses `TEST_DATABASE_URL` environment variable, falls back to default test database.
 pub async fn get_test_pool() -> PgPool {
     let database_url = std::env::var(TEST_DATABASE_URL_ENV)
-        .unwrap_or_else(|_| "postgres://xavyo:xavyo@localhost:5432/xavyo_test".to_string());
+        .or_else(|_| std::env::var("DATABASE_URL"))
+        .unwrap_or_else(|_| {
+            "postgres://xavyo:xavyo_test_password@localhost:5432/xavyo_test".to_string()
+        });
 
     PgPoolOptions::new()
         .max_connections(5)
@@ -34,6 +37,25 @@ pub async fn get_test_pool() -> PgPool {
         .connect(&database_url)
         .await
         .expect("Failed to connect to test database")
+}
+
+/// Create a test tenant with a specific ID.
+pub async fn create_test_tenant_with_id(pool: &PgPool, tenant_id: Uuid) {
+    let slug = format!("test-tenant-{}", &tenant_id.to_string()[..8]);
+
+    sqlx::query(
+        r#"
+        INSERT INTO tenants (id, name, slug, settings, created_at)
+        VALUES ($1, $2, $3, '{}', NOW())
+        ON CONFLICT (id) DO NOTHING
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(&slug)
+    .bind(&slug)
+    .execute(pool)
+    .await
+    .expect("Failed to create test tenant");
 }
 
 /// Create a test tenant and return its ID.

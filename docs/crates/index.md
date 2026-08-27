@@ -61,7 +61,7 @@ REST endpoints exposed to clients.
 | [xavyo-api-governance](../../crates/xavyo-api-governance/CRATE.md) | IGA workflows and reporting | 🟢 stable |
 | [xavyo-api-connectors](../../crates/xavyo-api-connectors/CRATE.md) | Connector management API | 🟡 beta |
 | [xavyo-api-tenants](../../crates/xavyo-api-tenants/CRATE.md) | Tenant provisioning API | 🟢 stable |
-| [xavyo-api-authorization](../../crates/xavyo-api-authorization/CRATE.md) | Authorization policy API | 🟡 beta |
+| [xavyo-api-authorization](../../crates/xavyo-api-authorization/CRATE.md) | Authorization policy API | 🟢 stable |
 | [xavyo-api-import](../../crates/xavyo-api-import/CRATE.md) | Bulk user import API | 🟢 stable |
 | [xavyo-api-oidc-federation](../../crates/xavyo-api-oidc-federation/CRATE.md) | OIDC federation endpoints | 🟢 stable |
 | [xavyo-api-nhi](../../crates/xavyo-api-nhi/CRATE.md) | Non-human identity API | 🟢 stable |

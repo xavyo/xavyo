@@ -16,8 +16,8 @@
 mod common;
 
 use common::{
-    create_test_policy, create_test_policy_with_conditions, unique_policy_name, user_claims,
-    TestFixture,
+    create_test_policy, create_test_policy_with_conditions, create_test_tenant_with_id,
+    create_test_user, unique_policy_name, user_claims, TestFixture,
 };
 use uuid::Uuid;
 use xavyo_api_authorization::models::policy::{
@@ -251,15 +251,31 @@ async fn test_create_policy_without_auth() {
         conditions: None,
     };
 
-    // Use a non-existent tenant - the policy will be created but isolated
+    // Use an isolated tenant with its own user — service-level tenant isolation
     let fake_tenant = Uuid::new_v4();
-    let result = service
-        .create_policy(fake_tenant, request, fixture.admin_user_id)
-        .await;
+    create_test_tenant_with_id(&fixture.pool, fake_tenant).await;
+    let fake_user = create_test_user(&fixture.pool, fake_tenant, "isolated@test.com").await;
 
-    // This tests tenant isolation - the policy is created in a different tenant
-    // In real handler tests, we'd check for 401 without proper auth
-    assert!(result.is_ok()); // Service creates it but it's isolated
+    let result = service.create_policy(fake_tenant, request, fake_user).await;
+
+    // Policy is created in the other tenant and not visible from the fixture tenant
+    assert!(result.is_ok());
+
+    sqlx::query("DELETE FROM authorization_policies WHERE tenant_id = $1")
+        .bind(fake_tenant)
+        .execute(&fixture.pool)
+        .await
+        .ok();
+    sqlx::query("DELETE FROM users WHERE tenant_id = $1")
+        .bind(fake_tenant)
+        .execute(&fixture.pool)
+        .await
+        .ok();
+    sqlx::query("DELETE FROM tenants WHERE id = $1")
+        .bind(fake_tenant)
+        .execute(&fixture.pool)
+        .await
+        .ok();
 
     fixture.cleanup().await;
 }
