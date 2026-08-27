@@ -209,6 +209,24 @@ impl GovMicroCertification {
         .await
     }
 
+    /// Count pending certifications for a primary reviewer.
+    pub async fn count_pending_by_reviewer(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        reviewer_id: Uuid,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar(
+            r"
+            SELECT COUNT(*) FROM gov_micro_certifications
+            WHERE tenant_id = $1 AND reviewer_id = $2 AND status = 'pending'
+            ",
+        )
+        .bind(tenant_id)
+        .bind(reviewer_id)
+        .fetch_one(pool)
+        .await
+    }
+
     /// Find all pending certifications for a backup reviewer (escalated only).
     pub async fn find_pending_by_backup_reviewer(
         pool: &sqlx::PgPool,
@@ -231,6 +249,25 @@ impl GovMicroCertification {
         .bind(limit)
         .bind(offset)
         .fetch_all(pool)
+        .await
+    }
+
+    /// Count pending escalated certifications for a backup reviewer.
+    pub async fn count_pending_by_backup_reviewer(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        backup_reviewer_id: Uuid,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar(
+            r"
+            SELECT COUNT(*) FROM gov_micro_certifications
+            WHERE tenant_id = $1 AND backup_reviewer_id = $2
+              AND status = 'pending' AND escalated = true
+            ",
+        )
+        .bind(tenant_id)
+        .bind(backup_reviewer_id)
+        .fetch_one(pool)
         .await
     }
 
@@ -1103,5 +1140,35 @@ mod tests {
         let filter = MicroCertificationFilter::default();
         assert!(filter.status.is_none());
         assert!(filter.reviewer_id.is_none());
+    }
+
+    #[test]
+    fn pending_counts_match_pending_find_filters() {
+        let src = include_str!("gov_micro_certification.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let primary = production
+            .split("pub async fn count_pending_by_reviewer")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("count_pending_by_reviewer");
+        assert!(
+            primary.contains("SELECT COUNT(*)")
+                && primary.contains("tenant_id = $1")
+                && primary.contains("reviewer_id = $2")
+                && primary.contains("status = 'pending'"),
+            "pending reviewer count must match find_pending_by_reviewer filters"
+        );
+        let backup = production
+            .split("pub async fn count_pending_by_backup_reviewer")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("count_pending_by_backup_reviewer");
+        assert!(
+            backup.contains("SELECT COUNT(*)")
+                && backup.contains("backup_reviewer_id = $2")
+                && backup.contains("status = 'pending'")
+                && backup.contains("escalated = true"),
+            "pending backup-reviewer count must match find_pending_by_backup_reviewer filters"
+        );
     }
 }

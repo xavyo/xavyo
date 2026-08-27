@@ -481,6 +481,18 @@ impl MetaRoleMatchingService {
         .map_err(GovernanceError::Database)
     }
 
+    /// Count inheritances for a meta-role (same filters as list).
+    pub async fn count_inheritances_by_meta_role(
+        &self,
+        tenant_id: Uuid,
+        meta_role_id: Uuid,
+        status: Option<InheritanceStatus>,
+    ) -> Result<i64> {
+        GovMetaRoleInheritance::count_by_meta_role(&self.pool, tenant_id, meta_role_id, status)
+            .await
+            .map_err(GovernanceError::Database)
+    }
+
     /// List inheritances for a child role.
     pub async fn list_inheritances_by_child_role(
         &self,
@@ -725,6 +737,17 @@ mod tests {
         assert!(
             !production.contains("Ok(true)"),
             "NotIn must not return true when the criterion is not an array"
+        );
+    }
+
+    #[test]
+    fn inheritance_list_exposes_matching_count() {
+        let src = include_str!("meta_role_matching_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("count_inheritances_by_meta_role")
+                && production.contains("count_by_meta_role("),
+            "meta-role inheritance list must expose a count matching list filters"
         );
     }
 

@@ -45,18 +45,13 @@ pub async fn list_snapshots(
         snapshot_type: query.snapshot_type,
     };
 
-    let snapshots = GovAccessSnapshot::list_by_tenant(
-        state.lifecycle_event_service.pool(),
-        tenant_id,
-        &filter,
-        limit,
-        offset,
-    )
-    .await
-    .map_err(|e| ApiGovernanceError::Internal(e.to_string()))?;
-
-    // Count total (simplified - in production would use a count query)
-    let total = snapshots.len() as i64;
+    let pool = state.lifecycle_event_service.pool();
+    let snapshots = GovAccessSnapshot::list_by_tenant(pool, tenant_id, &filter, limit, offset)
+        .await
+        .map_err(|e| ApiGovernanceError::Internal(e.to_string()))?;
+    let total = GovAccessSnapshot::count_by_tenant(pool, tenant_id, &filter)
+        .await
+        .map_err(|e| ApiGovernanceError::Internal(e.to_string()))?;
     let page = if limit > 0 { offset / limit } else { 0 };
 
     Ok(Json(AccessSnapshotListResponse {
@@ -164,4 +159,22 @@ pub async fn list_user_snapshots(
         page,
         page_size: limit,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn list_snapshots_uses_filtered_count_not_page_length() {
+        let src = include_str!("access_snapshots.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_snapshots")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_snapshots");
+        assert!(
+            list.contains("count_by_tenant") && !list.contains("snapshots.len() as i64"),
+            "GET /governance/access-snapshots must report the filtered total, not the page length"
+        );
+    }
 }

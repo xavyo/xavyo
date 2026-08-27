@@ -958,12 +958,10 @@ pub async fn get_persona_audit(
     // Verify persona exists
     let _ = state.persona_service.get(tenant_id, id).await?;
 
-    let events = state
+    let (events, total) = state
         .persona_audit_service
         .list_for_persona(tenant_id, id, limit, offset)
         .await?;
-
-    let total = events.len() as i64;
 
     Ok(Json(PersonaAuditListResponse {
         items: events
@@ -1137,12 +1135,10 @@ pub async fn list_context_sessions(
     let limit = query.limit.unwrap_or(50).min(100);
     let offset = query.offset.unwrap_or(0).max(0);
 
-    let sessions = state
+    let (sessions, total) = state
         .persona_session_service
         .get_session_history(tenant_id, user_id, limit, offset)
         .await?;
-
-    let total = sessions.len() as i64;
     let items: Vec<ContextSessionSummary> =
         sessions.into_iter().map(std::convert::Into::into).collect();
 
@@ -1344,6 +1340,40 @@ mod tests {
         assert!(
             !ctx.contains(".await.ok()") && ctx.contains("persona_service.get("),
             "persona current-context must not treat lookup errors as no active persona"
+        );
+    }
+
+    #[test]
+    fn persona_audit_list_uses_count_not_page_length() {
+        let src = include_str!("personas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let audit = production
+            .split("pub async fn get_persona_audit")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_persona_audit");
+        assert!(
+            audit.contains("list_for_persona(")
+                && audit.contains("let (events, total)")
+                && !audit.contains("events.len() as i64"),
+            "GET /governance/personas/{{id}}/audit must report the filtered total, not the page length"
+        );
+    }
+
+    #[test]
+    fn context_sessions_list_uses_count_not_page_length() {
+        let src = include_str!("personas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let sessions = production
+            .split("pub async fn list_context_sessions")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_context_sessions");
+        assert!(
+            sessions.contains("get_session_history(")
+                && sessions.contains("let (sessions, total)")
+                && !sessions.contains("sessions.len() as i64"),
+            "GET /governance/context/sessions must report the filtered total, not the page length"
         );
     }
 }
