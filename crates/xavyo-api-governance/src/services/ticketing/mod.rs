@@ -53,6 +53,9 @@ pub enum TicketingError {
 
     #[error("JSON serialization error: {0}")]
     JsonError(#[from] serde_json::Error),
+
+    #[error("Operation not supported: {0}")]
+    NotSupported(String),
 }
 
 /// Request to create a ticket in an external system.
@@ -408,5 +411,11 @@ mod tests {
         assert!(TicketStatus::Resolved.is_success());
         assert!(!TicketStatus::Closed.is_success());
         assert!(!TicketStatus::Open.is_success());
+    }
+
+    #[test]
+    fn not_supported_is_not_success() {
+        let err = TicketingError::NotSupported("comments".into());
+        assert!(err.to_string().contains("comments"));
     }
 }

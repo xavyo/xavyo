@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use xavyo_db::models::{GroupMembership, ScimAttributeMapping, User};
 
-use crate::error::{is_unique_violation, ScimError, ScimResult};
+use crate::error::{is_unique_violation, unsupported_patch_path, ScimError, ScimResult};
 use crate::models::{
     CreateScimUserRequest, ReplaceScimUserRequest, ScimPagination, ScimPatchOp, ScimPatchRequest,
     ScimUser, ScimUserGroup, ScimUserListResponse,
@@ -446,7 +446,7 @@ impl UserService {
 
         // Apply each operation
         for op in &request.operations {
-            self.apply_patch_op(&mut user, op)?;
+            Self::apply_patch_op(&mut user, op)?;
         }
 
         // Check for email conflicts if userName was changed
@@ -514,7 +514,7 @@ impl UserService {
     }
 
     /// Apply a single patch operation to a user.
-    fn apply_patch_op(&self, user: &mut User, op: &ScimPatchOp) -> ScimResult<()> {
+    fn apply_patch_op(user: &mut User, op: &ScimPatchOp) -> ScimResult<()> {
         let op_type = op.op.to_lowercase();
         let path = op.path.as_deref().unwrap_or("");
 
@@ -605,7 +605,7 @@ impl UserService {
                                 obj.insert(custom_key, value.clone());
                             }
                         } else {
-                            tracing::warn!("Unknown patch path: {}", path);
+                            return Err(unsupported_patch_path(path));
                         }
                     }
                 }
@@ -630,7 +630,7 @@ impl UserService {
                             obj.remove(&custom_key);
                         }
                     } else {
-                        tracing::warn!("Cannot remove path: {}", path);
+                        return Err(unsupported_patch_path(path));
                     }
                 }
             },
@@ -706,59 +706,6 @@ impl UserService {
 mod tests {
     use super::*;
 
-    // Helper function to test patch operation logic without needing a pool
-    fn apply_test_patch_op(user: &mut User, op: &ScimPatchOp) -> ScimResult<()> {
-        let op_lower = op.op.to_lowercase();
-        let path = op.path.as_deref().unwrap_or("");
-        let value = op.value.as_ref();
-
-        match op_lower.as_str() {
-            "replace" | "add" => {
-                let value = value.ok_or_else(|| {
-                    ScimError::InvalidPatchOp("Value required for replace/add".to_string())
-                })?;
-
-                match path {
-                    "active" => {
-                        user.is_active = value.as_bool().unwrap_or(true);
-                    }
-                    "displayName" | "displayname" => {
-                        user.display_name = value.as_str().map(|s| s.to_string());
-                    }
-                    "externalId" | "externalid" => {
-                        user.external_id = value.as_str().map(|s| s.to_string());
-                    }
-                    "userName" | "username" => {
-                        if let Some(email) = value.as_str() {
-                            if !email.contains('@') || !email.contains('.') {
-                                return Err(ScimError::Validation(
-                                    "userName must be a valid email address".to_string(),
-                                ));
-                            }
-                            user.email = email.to_string();
-                        }
-                    }
-                    "name.givenName" | "name.givenname" => {
-                        user.first_name = value.as_str().map(|s| s.to_string());
-                    }
-                    "name.familyName" | "name.familyname" => {
-                        user.last_name = value.as_str().map(|s| s.to_string());
-                    }
-                    _ => {}
-                }
-            }
-            "remove" => match path {
-                "displayName" | "displayname" => user.display_name = None,
-                "externalId" | "externalid" => user.external_id = None,
-                "name.givenName" | "name.givenname" => user.first_name = None,
-                "name.familyName" | "name.familyname" => user.last_name = None,
-                _ => {}
-            },
-            _ => return Err(ScimError::InvalidPatchOp(format!("Unknown op: {}", op.op))),
-        }
-        Ok(())
-    }
-
     #[test]
     fn test_patch_op_replace_active() {
         use chrono::Utc;
@@ -808,8 +755,92 @@ mod tests {
             value: Some(serde_json::json!(false)),
         };
 
-        apply_test_patch_op(&mut user, &op).unwrap();
+        UserService::apply_patch_op(&mut user, &op).unwrap();
         assert!(!user.is_active);
+    }
+
+    fn sample_user() -> User {
+        use chrono::Utc;
+        User {
+            id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            email: "test@example.com".to_string(),
+            password_hash: "".to_string(),
+            display_name: Some("Test".to_string()),
+            is_active: true,
+            email_verified: true,
+            email_verified_at: Some(Utc::now()),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            external_id: Some("ext".to_string()),
+            first_name: Some("Test".to_string()),
+            last_name: Some("User".to_string()),
+            scim_provisioned: true,
+            scim_last_sync: Some(Utc::now()),
+            failed_login_count: 0,
+            last_failed_login_at: None,
+            locked_at: None,
+            locked_until: None,
+            lockout_reason: None,
+            password_changed_at: None,
+            password_expires_at: None,
+            must_change_password: false,
+            avatar_url: None,
+            lifecycle_state_id: None,
+            manager_id: None,
+            custom_attributes: serde_json::json!({}),
+            archetype_id: None,
+            archetype_custom_attrs: serde_json::json!({}),
+        }
+    }
+
+    #[test]
+    fn unknown_user_patch_path_is_not_success() {
+        let mut user = sample_user();
+        let op = ScimPatchOp {
+            op: "replace".to_string(),
+            path: Some("title".to_string()),
+            value: Some(serde_json::json!("ignored")),
+        };
+        let err = UserService::apply_patch_op(&mut user, &op).expect_err("must fail closed");
+        assert!(
+            matches!(err, ScimError::InvalidPatchOp(ref msg) if msg.contains("title")),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn unknown_user_remove_path_is_not_success() {
+        let mut user = sample_user();
+        let op = ScimPatchOp {
+            op: "remove".to_string(),
+            path: Some("title".to_string()),
+            value: None,
+        };
+        let err = UserService::apply_patch_op(&mut user, &op).expect_err("must fail closed");
+        assert!(
+            matches!(err, ScimError::InvalidPatchOp(ref msg) if msg.contains("title")),
+            "got {err:?}"
+        );
+        assert_eq!(user.display_name.as_deref(), Some("Test"));
+    }
+
+    #[test]
+    fn user_patch_unknown_path_is_not_a_no_op() {
+        let src = include_str!("user_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("unsupported_patch_path(path)"),
+            "unknown user PATCH paths must fail closed"
+        );
+        assert!(
+            !production.contains("tracing::warn!(\"Unknown patch path"),
+            "must not no-op unknown user PATCH paths"
+        );
+        assert!(
+            !production.contains("tracing::warn!(\"Cannot remove path"),
+            "must not no-op unknown user remove paths"
+        );
     }
 
     #[test]
