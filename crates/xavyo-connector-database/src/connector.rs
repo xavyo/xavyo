@@ -606,36 +606,29 @@ impl DatabaseConnector {
 
     /// Convert SQL data type to `AttributeDataType`.
     fn sql_type_to_attribute_type(&self, sql_type: &str) -> AttributeDataType {
+        // Use the leading type token so "json"/"interval"/"point" are not
+        // treated as integer because they contain the letters "int".
         let lower = sql_type.to_lowercase();
+        let base = lower
+            .split(|c: char| c == '(' || c.is_whitespace())
+            .next()
+            .unwrap_or(&lower);
 
-        if lower.contains("int") || lower.contains("serial") {
-            if lower.contains("big") {
-                AttributeDataType::Long
-            } else {
+        match base {
+            "bigint" | "int8" | "bigserial" => AttributeDataType::Long,
+            "int" | "int2" | "int4" | "integer" | "smallint" | "serial" => {
                 AttributeDataType::Integer
             }
-        } else if lower.contains("float")
-            || lower.contains("double")
-            || lower.contains("real")
-            || lower.contains("decimal")
-            || lower.contains("numeric")
-        {
-            // Use Long for decimal since there's no Float variant
-            AttributeDataType::Long
-        } else if lower.contains("bool") {
-            AttributeDataType::Boolean
-        } else if lower.contains("bytea") || lower.contains("blob") || lower.contains("binary") {
-            AttributeDataType::Binary
-        } else if lower.contains("uuid") {
-            AttributeDataType::Uuid
-        } else if lower.contains("timestamp") || lower.contains("datetime") {
-            AttributeDataType::DateTime
-        } else if lower.contains("date") {
-            AttributeDataType::Date
-        } else if lower.contains("time") {
-            AttributeDataType::Timestamp
-        } else {
-            AttributeDataType::String
+            "float" | "float4" | "float8" | "double" | "real" | "decimal" | "numeric" => {
+                AttributeDataType::Long
+            }
+            "bool" | "boolean" => AttributeDataType::Boolean,
+            "bytea" | "blob" | "binary" => AttributeDataType::Binary,
+            "uuid" => AttributeDataType::Uuid,
+            "timestamp" | "timestamptz" | "datetime" => AttributeDataType::DateTime,
+            "date" => AttributeDataType::Date,
+            "time" | "timetz" => AttributeDataType::Timestamp,
+            _ => AttributeDataType::String,
         }
     }
 }
@@ -1425,8 +1418,8 @@ mod tests {
         );
         let connector = DatabaseConnector::new(config).unwrap();
 
-        // Unknown types should default to String
-        // Note: "json" contains "int" substring, so it matches integer - this is a known behavior
+        // Unknown types should default to String. Types that merely contain
+        // the letters "int" (json, interval, point) must not become Integer.
         assert_eq!(
             connector.sql_type_to_attribute_type("array"),
             AttributeDataType::String
@@ -1446,6 +1439,30 @@ mod tests {
         assert_eq!(
             connector.sql_type_to_attribute_type("xml"),
             AttributeDataType::String
+        );
+        assert_eq!(
+            connector.sql_type_to_attribute_type("json"),
+            AttributeDataType::String
+        );
+        assert_eq!(
+            connector.sql_type_to_attribute_type("jsonb"),
+            AttributeDataType::String
+        );
+        assert_eq!(
+            connector.sql_type_to_attribute_type("interval"),
+            AttributeDataType::String
+        );
+        assert_eq!(
+            connector.sql_type_to_attribute_type("point"),
+            AttributeDataType::String
+        );
+        assert_eq!(
+            connector.sql_type_to_attribute_type("int"),
+            AttributeDataType::Integer
+        );
+        assert_eq!(
+            connector.sql_type_to_attribute_type("integer"),
+            AttributeDataType::Integer
         );
     }
 

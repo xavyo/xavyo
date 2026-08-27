@@ -216,6 +216,81 @@ impl GovTemplateApplicationEvent {
         q.bind(limit).bind(offset).fetch_all(pool).await
     }
 
+    /// Count events matching the filter.
+    pub async fn count_with_filter(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        filter: &ApplicationEventFilter,
+    ) -> Result<i64, sqlx::Error> {
+        let mut query = String::from(
+            "SELECT COUNT(*) FROM gov_template_application_events WHERE tenant_id = $1",
+        );
+        let mut param_count = 1;
+
+        if filter.template_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND template_id = ${param_count}"));
+        }
+        if filter.object_type.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND object_type = ${param_count}"));
+        }
+        if filter.object_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND object_id = ${param_count}"));
+        }
+        if filter.operation.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND operation = ${param_count}"));
+        }
+        if filter.actor_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND actor_id = ${param_count}"));
+        }
+        if filter.from_date.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
+        }
+        if filter.to_date.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
+        }
+        if let Some(has_errors) = filter.has_validation_errors {
+            if has_errors {
+                query.push_str(" AND validation_errors IS NOT NULL");
+            } else {
+                query.push_str(" AND validation_errors IS NULL");
+            }
+        }
+        let _ = param_count;
+
+        let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
+
+        if let Some(template_id) = filter.template_id {
+            q = q.bind(template_id);
+        }
+        if let Some(object_type) = filter.object_type {
+            q = q.bind(object_type);
+        }
+        if let Some(object_id) = filter.object_id {
+            q = q.bind(object_id);
+        }
+        if let Some(operation) = filter.operation {
+            q = q.bind(operation);
+        }
+        if let Some(actor_id) = filter.actor_id {
+            q = q.bind(actor_id);
+        }
+        if let Some(from_date) = filter.from_date {
+            q = q.bind(from_date);
+        }
+        if let Some(to_date) = filter.to_date {
+            q = q.bind(to_date);
+        }
+
+        q.fetch_one(pool).await
+    }
+
     /// List recent events for a tenant.
     pub async fn list_recent(
         pool: &sqlx::PgPool,
@@ -372,6 +447,17 @@ mod tests {
         assert!(filter.from_date.is_none());
         assert!(filter.to_date.is_none());
         assert!(filter.has_validation_errors.is_none());
+    }
+
+    #[test]
+    fn application_event_list_has_matching_count() {
+        let src = include_str!("gov_template_application_event.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("pub async fn count_with_filter")
+                && production.contains("pub async fn list_with_filter"),
+            "application events must expose COUNT alongside paginated list"
+        );
     }
 
     #[test]

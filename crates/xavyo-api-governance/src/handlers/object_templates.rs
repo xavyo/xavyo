@@ -14,9 +14,9 @@ use validator::Validate;
 
 use xavyo_auth::JwtClaims;
 use xavyo_db::models::{
-    CreateGovObjectTemplate, CreateGovTemplateRule, CreateGovTemplateScope, ObjectTemplateFilter,
-    TemplateObjectType, TemplateRuleFilter, TemplateScopeType, UpdateGovObjectTemplate,
-    UpdateGovTemplateRule,
+    ApplicationEventFilter, CreateGovObjectTemplate, CreateGovTemplateRule, CreateGovTemplateScope,
+    ObjectTemplateFilter, TemplateObjectType, TemplateRuleFilter, TemplateScopeType,
+    UpdateGovObjectTemplate, UpdateGovTemplateRule,
 };
 
 use crate::error::{ApiGovernanceError, ApiResult};
@@ -925,7 +925,7 @@ pub async fn list_application_events_by_template(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path(template_id): Path<Uuid>,
-    Query(_query): Query<ListApplicationEventsQuery>,
+    Query(query): Query<ListApplicationEventsQuery>,
 ) -> ApiResult<Json<ApplicationEventListResponse>> {
     let tenant_id = *claims
         .tenant_id()
@@ -938,9 +938,18 @@ pub async fn list_application_events_by_template(
         .get(tenant_id, template_id)
         .await?;
 
-    let events = state
+    let limit = query.limit.unwrap_or(50).min(100);
+    let offset = query.offset.unwrap_or(0).max(0);
+    let filter = ApplicationEventFilter {
+        template_id: Some(template_id),
+        object_type: query.object_type,
+        object_id: query.object_id,
+        ..ApplicationEventFilter::default()
+    };
+
+    let (events, total) = state
         .template_application_service
-        .list_events_by_template(tenant_id, template_id)
+        .list_application_events(tenant_id, filter, limit, offset)
         .await?;
 
     let items: Vec<ApplicationEventResponse> = events
@@ -950,9 +959,9 @@ pub async fn list_application_events_by_template(
 
     Ok(Json(ApplicationEventListResponse {
         items,
-        total: 0, // Events don't have pagination yet
-        limit: 100,
-        offset: 0,
+        total,
+        limit,
+        offset,
     }))
 }
 
@@ -977,16 +986,24 @@ pub async fn list_application_events_by_object(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path((object_type, object_id)): Path<(TemplateObjectType, Uuid)>,
-    Query(_query): Query<ListApplicationEventsQuery>,
+    Query(query): Query<ListApplicationEventsQuery>,
 ) -> ApiResult<Json<ApplicationEventListResponse>> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    let events = state
+    let limit = query.limit.unwrap_or(50).min(100);
+    let offset = query.offset.unwrap_or(0).max(0);
+    let filter = ApplicationEventFilter {
+        object_type: Some(object_type),
+        object_id: Some(object_id),
+        ..ApplicationEventFilter::default()
+    };
+
+    let (events, total) = state
         .template_application_service
-        .list_events_by_object(tenant_id, object_type, object_id)
+        .list_application_events(tenant_id, filter, limit, offset)
         .await?;
 
     let items: Vec<ApplicationEventResponse> = events
@@ -996,9 +1013,9 @@ pub async fn list_application_events_by_object(
 
     Ok(Json(ApplicationEventListResponse {
         items,
-        total: 0, // Events don't have pagination yet
-        limit: 100,
-        offset: 0,
+        total,
+        limit,
+        offset,
     }))
 }
 
@@ -1474,4 +1491,20 @@ pub async fn simulate_template(
         computed_values: result.computed_values,
         affected_count: result.affected_count,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn application_event_lists_honor_pagination_and_report_real_totals() {
+        let src = include_str!("object_templates.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("Query(_query)")
+                && !production.contains("total: 0, // Events don't have pagination yet")
+                && production.contains("list_application_events(")
+                && production.contains("query.limit.unwrap_or(50)"),
+            "application event lists must honor query pagination and return a real total"
+        );
+    }
 }

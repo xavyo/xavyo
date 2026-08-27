@@ -216,7 +216,9 @@ fn build_hook_context_from_json(data: &serde_json::Value, tenant_id: Uuid) -> Re
     let object_class = data
         .get("object_class")
         .and_then(|v| v.as_str())
-        .unwrap_or("user")
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| GovernanceError::Validation("object_class is required".to_string()))?
         .to_string();
 
     let target_uid = data
@@ -267,7 +269,8 @@ mod tests {
             &serde_json::json!({
                 "connector_id": "not-a-uuid",
                 "user_id": Uuid::new_v4().to_string(),
-                "operation_type": "create"
+                "operation_type": "create",
+                "object_class": "user"
             }),
             tenant
         )
@@ -276,7 +279,8 @@ mod tests {
             &serde_json::json!({
                 "connector_id": Uuid::new_v4().to_string(),
                 "user_id": Uuid::new_v4().to_string(),
-                "operation_type": "upsert"
+                "operation_type": "upsert",
+                "object_class": "user"
             }),
             tenant
         )
@@ -286,7 +290,27 @@ mod tests {
                 "connector_id": Uuid::new_v4().to_string(),
                 "user_id": Uuid::new_v4().to_string(),
                 "operation_type": "create",
+                "object_class": "user",
                 "variables": "nope"
+            }),
+            tenant
+        )
+        .is_err());
+        assert!(build_hook_context_from_json(
+            &serde_json::json!({
+                "connector_id": Uuid::new_v4().to_string(),
+                "user_id": Uuid::new_v4().to_string(),
+                "operation_type": "create"
+            }),
+            tenant
+        )
+        .is_err());
+        assert!(build_hook_context_from_json(
+            &serde_json::json!({
+                "connector_id": Uuid::new_v4().to_string(),
+                "user_id": Uuid::new_v4().to_string(),
+                "operation_type": "create",
+                "object_class": "  "
             }),
             tenant
         )
@@ -296,7 +320,8 @@ mod tests {
             &serde_json::json!({
                 "connector_id": Uuid::new_v4().to_string(),
                 "user_id": Uuid::new_v4().to_string(),
-                "operation_type": "delete"
+                "operation_type": "delete",
+                "object_class": "group"
             }),
             tenant,
         )
@@ -305,13 +330,15 @@ mod tests {
             ctx.operation_type,
             xavyo_connector::types::OperationType::Delete
         );
+        assert_eq!(ctx.object_class, "group");
 
         let src = include_str!("script_execution_service.rs");
         let production = src.split("mod tests").next().expect("production source");
         assert!(
             !production.contains("unwrap_or_else(Uuid::new_v4)")
-                && !production.contains("_ => OperationType::Create"),
-            "script dry-run must not invent actors or treat unknown ops as Create"
+                && !production.contains("_ => OperationType::Create")
+                && !production.contains("unwrap_or(\"user\")"),
+            "script dry-run must not invent actors, object_class, or treat unknown ops as Create"
         );
     }
 }

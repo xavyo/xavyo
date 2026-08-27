@@ -1071,19 +1071,64 @@ pub async fn calculate_metrics(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    let role_ids = request.role_ids.unwrap_or_default();
+    let role_ids = require_role_ids(request.role_ids)?;
     let metrics = state
         .metrics_service
         .calculate_metrics_for_roles(tenant_id, &role_ids)
         .await?;
 
-    Ok(Json(RoleMetricsListResponse {
-        items: metrics
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect::<Result<Vec<_>, _>>()?,
-        total: role_ids.len() as i64,
+    let items: Vec<RoleMetricsResponse> = metrics
+        .into_iter()
+        .map(TryInto::try_into)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(Json(role_metrics_list(items)))
+}
+
+/// Reject empty or omitted `role_ids` rather than calculating metrics for nobody
+/// and reporting `total` as the request size.
+fn require_role_ids(role_ids: Option<Vec<Uuid>>) -> ApiResult<Vec<Uuid>> {
+    let role_ids = role_ids.unwrap_or_default();
+    if role_ids.is_empty() {
+        return Err(ApiGovernanceError::Validation(
+            "role_ids is required".to_string(),
+        ));
+    }
+    Ok(role_ids)
+}
+
+fn role_metrics_list(items: Vec<RoleMetricsResponse>) -> RoleMetricsListResponse {
+    let total = items.len() as i64;
+    RoleMetricsListResponse {
+        items,
+        total,
         page: 0,
-        page_size: role_ids.len() as i64,
-    }))
+        page_size: total,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn calculate_metrics_rejects_empty_role_ids() {
+        assert!(require_role_ids(None).is_err());
+        assert!(require_role_ids(Some(vec![])).is_err());
+        let id = Uuid::new_v4();
+        assert_eq!(require_role_ids(Some(vec![id])).unwrap(), vec![id]);
+    }
+
+    #[test]
+    fn calculate_metrics_total_is_returned_item_count() {
+        let response = role_metrics_list(vec![]);
+        assert_eq!(response.total, 0);
+        assert_eq!(response.page_size, 0);
+        let src = include_str!("role_mining.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("items.len() as i64")
+                && !production.contains("role_ids.len() as i64"),
+            "metrics list total must be the returned item count, not the requested role_ids length"
+        );
+    }
 }
