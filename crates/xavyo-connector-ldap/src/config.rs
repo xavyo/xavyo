@@ -285,6 +285,15 @@ impl ConnectorConfig for LdapConfig {
             });
         }
 
+        match &self.bind_password {
+            Some(password) if !password.is_empty() => {}
+            _ => {
+                return Err(ConnectorError::InvalidConfiguration {
+                    message: "bind_password is required".to_string(),
+                });
+            }
+        }
+
         if self.use_ssl && self.use_starttls {
             return Err(ConnectorError::InvalidConfiguration {
                 message: "cannot use both SSL and STARTTLS".to_string(),
@@ -519,8 +528,16 @@ mod tests {
             "ldap.example.com",
             "dc=example,dc=com",
             "cn=admin,dc=example,dc=com",
-        );
+        )
+        .with_password("secret");
         assert!(config.validate().is_ok());
+
+        let missing_password = LdapConfig::new(
+            "ldap.example.com",
+            "dc=example,dc=com",
+            "cn=admin,dc=example,dc=com",
+        );
+        assert!(missing_password.validate().is_err());
 
         let empty_host = LdapConfig::new("", "dc=example,dc=com", "cn=admin,dc=example,dc=com");
         assert!(empty_host.validate().is_err());

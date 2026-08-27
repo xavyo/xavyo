@@ -106,7 +106,7 @@ impl DatabaseConnector {
 
     /// Create a new connection pool.
     async fn create_pool(&self) -> ConnectorResult<PgPool> {
-        let url = self.build_connection_url();
+        let url = self.build_connection_url()?;
 
         debug!(driver = %self.config.driver.as_str(), host = %self.config.host, "Creating database connection pool");
 
@@ -138,8 +138,8 @@ impl DatabaseConnector {
     }
 
     /// Build the connection URL for `SQLx`.
-    fn build_connection_url(&self) -> String {
-        let password = self.config.password.as_deref().unwrap_or("");
+    fn build_connection_url(&self) -> ConnectorResult<String> {
+        let password = database_password(self.config.password.as_deref())?;
         let port = self.config.effective_port();
 
         let mut url = format!(
@@ -155,7 +155,7 @@ impl DatabaseConnector {
             url.push_str(&format!("&options=-c%20search_path={schema}"));
         }
 
-        url
+        Ok(url)
     }
 
     /// Get the table name for an object class.
@@ -936,6 +936,14 @@ impl SearchOp for DatabaseConnector {
     }
 }
 
+fn database_password(password: Option<&str>) -> ConnectorResult<&str> {
+    password
+        .filter(|p| !p.is_empty())
+        .ok_or_else(|| ConnectorError::InvalidConfiguration {
+            message: "database password is required".to_string(),
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -997,12 +1005,25 @@ mod tests {
         .with_port(5433);
 
         let connector = DatabaseConnector::new(config).unwrap();
-        let url = connector.build_connection_url();
+        let url = connector.build_connection_url().unwrap();
 
         assert!(url.starts_with("postgres://"));
         assert!(url.contains("db.example.com"));
         assert!(url.contains("5433"));
         assert!(url.contains("identity_db"));
+    }
+
+    #[test]
+    fn database_url_does_not_use_empty_password() {
+        assert!(database_password(None).is_err());
+        assert!(database_password(Some("")).is_err());
+        assert_eq!(database_password(Some("secret")).unwrap(), "secret");
+        let src = include_str!("connector.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("database_password(") && !production.contains("unwrap_or(\"\")"),
+            "database connection must not bind with an empty password"
+        );
     }
 
     #[test]

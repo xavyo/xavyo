@@ -115,7 +115,7 @@ impl LdapConnector {
 
         // Perform bind
         let bind_dn = &self.config.bind_dn;
-        let bind_password = self.config.bind_password.as_deref().unwrap_or("");
+        let bind_password = ldap_bind_password(self.config.bind_password.as_deref())?;
 
         debug!(bind_dn = %bind_dn, "Performing LDAP bind");
 
@@ -1272,6 +1272,15 @@ impl std::fmt::Debug for LdapConnector {
     }
 }
 
+/// Bind password for a named DN. Missing/empty must not become an anonymous bind.
+fn ldap_bind_password(password: Option<&str>) -> ConnectorResult<&str> {
+    password
+        .filter(|p| !p.is_empty())
+        .ok_or_else(|| ConnectorError::InvalidConfiguration {
+            message: "bind_password is required".to_string(),
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1421,7 +1430,8 @@ mod tests {
             "ldap.example.com",
             "dc=example,dc=com",
             "cn=admin,dc=example,dc=com",
-        );
+        )
+        .with_password("secret");
         let connector = LdapConnector::new(config).unwrap();
         let mut attrs = AttributeSet::new();
         attrs.set(
@@ -1495,6 +1505,20 @@ mod tests {
     // =========================================================================
     // Schema Discovery Tests (T014 - LDAP subschema subentry parsing)
     // =========================================================================
+
+    #[test]
+    fn ldap_bind_does_not_anonymous_on_missing_password() {
+        assert!(ldap_bind_password(None).is_err());
+        assert!(ldap_bind_password(Some("")).is_err());
+        assert_eq!(ldap_bind_password(Some("secret")).unwrap(), "secret");
+        let src = include_str!("connector.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("ldap_bind_password(")
+                && !production.contains("bind_password.as_deref().unwrap_or(\"\")"),
+            "LDAP bind must not use an empty password when none is configured"
+        );
+    }
 
     /// Helper to create a connector for testing schema parsing.
     fn test_connector() -> LdapConnector {

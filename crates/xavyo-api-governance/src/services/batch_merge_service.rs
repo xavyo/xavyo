@@ -94,8 +94,7 @@ impl BatchMergeService {
     ) -> Result<BatchMergePreview> {
         let filter = DuplicateCandidateFilter {
             status: Some(GovDuplicateStatus::Pending),
-            min_confidence: min_confidence
-                .map(|c| rust_decimal::Decimal::try_from(c * 100.0).unwrap_or_default()),
+            min_confidence: min_confidence.map(min_confidence_decimal).transpose()?,
             ..Default::default()
         };
 
@@ -172,7 +171,8 @@ impl BatchMergeService {
                 status: Some(GovDuplicateStatus::Pending),
                 min_confidence: request
                     .min_confidence
-                    .map(|c| rust_decimal::Decimal::try_from(c * 100.0).unwrap_or_default()),
+                    .map(min_confidence_decimal)
+                    .transpose()?,
                 ..Default::default()
             };
             GovDuplicateCandidate::list_by_tenant(&self.pool, tenant_id, &filter, 1000, 0)
@@ -381,6 +381,11 @@ pub(crate) fn merge_direction_from_created_at(
     })
 }
 
+fn min_confidence_decimal(value: f64) -> Result<rust_decimal::Decimal> {
+    rust_decimal::Decimal::try_from(value * 100.0)
+        .map_err(|_| GovernanceError::Validation(format!("Invalid min_confidence value: {value}")))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -422,12 +427,20 @@ mod tests {
         let src = include_str!("batch_merge_service.rs");
         let production = src.split("mod tests").next().expect("production source");
         assert!(
-            !production.contains("parse().unwrap_or(0.0)"),
+            !production.contains("parse().unwrap_or(0.0)")
+                && !production.contains("unwrap_or_default()"),
             "unparseable merge confidence must not silently become 0.0"
         );
         assert!(
             production.contains("to_f64"),
             "confidence must convert via Decimal::to_f64"
+        );
+        assert!(min_confidence_decimal(0.8).is_ok());
+        assert!(min_confidence_decimal(f64::NAN).is_err());
+        assert!(min_confidence_decimal(f64::INFINITY).is_err());
+        assert!(
+            production.contains("min_confidence_decimal("),
+            "preview min_confidence must fail closed on NaN/Inf"
         );
     }
 

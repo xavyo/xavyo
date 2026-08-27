@@ -313,7 +313,10 @@ impl CorrelationAuditService {
             GovCorrelationAuditEvent::count_by_tenant(&self.pool, tenant_id, filter).await?;
 
         Ok(CorrelationAuditListResponse {
-            items: events.into_iter().map(audit_event_to_response).collect(),
+            items: events
+                .into_iter()
+                .map(audit_event_to_response)
+                .collect::<Result<Vec<_>>>()?,
             total,
             limit,
             offset,
@@ -330,7 +333,7 @@ impl CorrelationAuditService {
             .await?
             .ok_or(GovernanceError::CorrelationAuditEventNotFound(event_id))?;
 
-        Ok(audit_event_to_response(event))
+        audit_event_to_response(event)
     }
 }
 
@@ -340,8 +343,15 @@ impl CorrelationAuditService {
 
 /// Convert a `GovCorrelationAuditEvent` database model into a
 /// `CorrelationAuditEventResponse` DTO.
-fn audit_event_to_response(e: GovCorrelationAuditEvent) -> CorrelationAuditEventResponse {
-    CorrelationAuditEventResponse {
+fn decimal_to_f64(value: rust_decimal::Decimal, field: &str) -> Result<f64> {
+    value
+        .to_string()
+        .parse()
+        .map_err(|_| GovernanceError::Validation(format!("Invalid stored {field} value")))
+}
+
+fn audit_event_to_response(e: GovCorrelationAuditEvent) -> Result<CorrelationAuditEventResponse> {
+    Ok(CorrelationAuditEventResponse {
         id: e.id,
         connector_id: e.connector_id,
         account_id: e.account_id,
@@ -351,7 +361,8 @@ fn audit_event_to_response(e: GovCorrelationAuditEvent) -> CorrelationAuditEvent
         outcome: format!("{:?}", e.outcome).to_lowercase(),
         confidence_score: e
             .confidence_score
-            .map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)),
+            .map(|d| decimal_to_f64(d, "confidence_score"))
+            .transpose()?,
         candidate_count: e.candidate_count,
         candidates_summary: e.candidates_summary,
         rules_snapshot: e.rules_snapshot,
@@ -360,7 +371,7 @@ fn audit_event_to_response(e: GovCorrelationAuditEvent) -> CorrelationAuditEvent
         actor_id: e.actor_id,
         reason: e.reason,
         created_at: e.created_at,
-    }
+    })
 }
 
 /// Parse an event type string into a `GovCorrelationEventType` enum value.
@@ -463,7 +474,7 @@ mod tests {
         let identity_id = event.identity_id;
         let event_id = event.id;
 
-        let response = audit_event_to_response(event);
+        let response = audit_event_to_response(event).unwrap();
 
         assert_eq!(response.id, event_id);
         assert_eq!(response.account_id, account_id);
@@ -502,7 +513,7 @@ mod tests {
             created_at: chrono::Utc::now(),
         };
 
-        let response = audit_event_to_response(event);
+        let response = audit_event_to_response(event).unwrap();
 
         assert_eq!(response.event_type, "manualreviewed");
         assert_eq!(response.outcome, "manualconfirmed");
@@ -534,13 +545,23 @@ mod tests {
             created_at: chrono::Utc::now(),
         };
 
-        let response = audit_event_to_response(event);
+        let response = audit_event_to_response(event).unwrap();
 
         assert_eq!(response.event_type, "casereassigned");
         assert_eq!(response.outcome, "deferredtoreview");
         assert!(response.confidence_score.is_none());
         assert!(response.account_id.is_none());
         assert!(response.identity_id.is_none());
+    }
+
+    #[test]
+    fn audit_confidence_does_not_default_to_zero() {
+        let src = include_str!("correlation_audit_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("decimal_to_f64(") && !production.contains("unwrap_or(0.0)"),
+            "correlation audit confidence must not serialize as 0.0 on parse failure"
+        );
     }
 
     #[test]
