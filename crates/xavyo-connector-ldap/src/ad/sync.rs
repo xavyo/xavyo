@@ -916,7 +916,10 @@ mod tests {
     fn test_map_ad_user_cn_fallback_display_name() {
         let mut entry = AttributeSet::new();
         entry.set("objectGUID", AttributeValue::Binary(vec![0x01; 16]));
-        entry.set("distinguishedName", "CN=John Doe,OU=Users,DC=example,DC=com");
+        entry.set(
+            "distinguishedName",
+            "CN=John Doe,OU=Users,DC=example,DC=com",
+        );
         entry.set("cn", "John Doe");
         // No displayName set
 
@@ -1445,7 +1448,10 @@ mod tests {
             {
                 let mut e = AttributeSet::new();
                 e.set("objectGUID", AttributeValue::Binary(vec![0xAA; 16]));
-                e.set("distinguishedName", "CN=GoodUser,OU=Users,DC=example,DC=com");
+                e.set(
+                    "distinguishedName",
+                    "CN=GoodUser,OU=Users,DC=example,DC=com",
+                );
                 e.set("sAMAccountName", "good_user");
                 e
             },
