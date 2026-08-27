@@ -14,8 +14,8 @@ use xavyo_db::{
     CreateGovMetaRole, CreateGovMetaRoleConstraint, CreateGovMetaRoleCriteria,
     CreateGovMetaRoleEntitlement, CreateGovMetaRoleEvent, GovMetaRole, GovMetaRoleConstraint,
     GovMetaRoleCriteria, GovMetaRoleEntitlement, GovMetaRoleEvent, GovMetaRoleInheritance,
-    MetaRoleEventStats, MetaRoleEventType, MetaRoleFilter, MetaRoleStatus, UpdateGovMetaRole,
-    SUPPORTED_CONSTRAINT_TYPES, SUPPORTED_CRITERIA_FIELDS,
+    MetaRoleEventFilter, MetaRoleEventStats, MetaRoleEventType, MetaRoleFilter, MetaRoleStatus,
+    UpdateGovMetaRole, SUPPORTED_CONSTRAINT_TYPES, SUPPORTED_CRITERIA_FIELDS,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -634,9 +634,30 @@ impl MetaRoleService {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<GovMetaRoleEvent>> {
-        GovMetaRoleEvent::list_by_meta_role(&self.pool, tenant_id, meta_role_id, limit, offset)
+        let filter = MetaRoleEventFilter {
+            meta_role_id: Some(meta_role_id),
+            ..Default::default()
+        };
+        self.list_events_filtered(tenant_id, &filter, limit, offset)
             .await
-            .map_err(GovernanceError::Database)
+            .map(|(events, _)| events)
+    }
+
+    /// List events with advertised filters and an accurate total.
+    pub async fn list_events_filtered(
+        &self,
+        tenant_id: Uuid,
+        filter: &MetaRoleEventFilter,
+        limit: i64,
+        offset: i64,
+    ) -> Result<(Vec<GovMetaRoleEvent>, i64)> {
+        let events = GovMetaRoleEvent::list_by_tenant(&self.pool, tenant_id, filter, limit, offset)
+            .await
+            .map_err(GovernanceError::Database)?;
+        let total = GovMetaRoleEvent::count_by_tenant(&self.pool, tenant_id, filter)
+            .await
+            .map_err(GovernanceError::Database)?;
+        Ok((events, total))
     }
 }
 

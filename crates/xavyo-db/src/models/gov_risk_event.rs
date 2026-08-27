@@ -241,6 +241,93 @@ impl GovRiskEvent {
         Ok(result.rows_affected() > 0)
     }
 
+    /// List events for a tenant with advertised filters.
+    pub async fn list_with_filter(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        filter: &RiskEventFilter,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        let mut query = String::from("SELECT * FROM gov_risk_events WHERE tenant_id = $1");
+        let mut param_count = 1;
+
+        if filter.user_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND user_id = ${param_count}"));
+        }
+        if filter.factor_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND factor_id = ${param_count}"));
+        }
+        if filter.event_type.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND event_type = ${param_count}"));
+        }
+        if !filter.include_expired {
+            query.push_str(" AND (expires_at IS NULL OR expires_at > NOW())");
+        }
+
+        query.push_str(&format!(
+            " ORDER BY created_at DESC LIMIT ${} OFFSET ${}",
+            param_count + 1,
+            param_count + 2
+        ));
+
+        let mut q = sqlx::query_as::<_, Self>(&query).bind(tenant_id);
+        if let Some(user_id) = filter.user_id {
+            q = q.bind(user_id);
+        }
+        if let Some(factor_id) = filter.factor_id {
+            q = q.bind(factor_id);
+        }
+        if let Some(ref event_type) = filter.event_type {
+            q = q.bind(event_type);
+        }
+
+        q.bind(limit).bind(offset).fetch_all(pool).await
+    }
+
+    /// Count events for a tenant with advertised filters.
+    pub async fn count_with_filter(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        filter: &RiskEventFilter,
+    ) -> Result<i64, sqlx::Error> {
+        let mut query = String::from("SELECT COUNT(*) FROM gov_risk_events WHERE tenant_id = $1");
+        let mut param_count = 1;
+
+        if filter.user_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND user_id = ${param_count}"));
+        }
+        if filter.factor_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND factor_id = ${param_count}"));
+        }
+        if filter.event_type.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND event_type = ${param_count}"));
+        }
+        if !filter.include_expired {
+            query.push_str(" AND (expires_at IS NULL OR expires_at > NOW())");
+        }
+
+        let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
+        if let Some(user_id) = filter.user_id {
+            q = q.bind(user_id);
+        }
+        if let Some(factor_id) = filter.factor_id {
+            q = q.bind(factor_id);
+        }
+        if let Some(ref event_type) = filter.event_type {
+            q = q.bind(event_type);
+        }
+
+        let _ = param_count;
+        q.fetch_one(pool).await
+    }
+
     /// Delete all expired events for a tenant.
     pub async fn cleanup_expired(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
@@ -315,5 +402,26 @@ mod tests {
 
         assert!(input.value.is_none());
         assert!(input.factor_id.is_none());
+    }
+
+    #[test]
+    fn list_and_count_apply_event_type_and_factor_id() {
+        let src = include_str!("gov_risk_event.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_with_filter")
+            .nth(1)
+            .expect("list_with_filter");
+        let count = production
+            .split("pub async fn count_with_filter")
+            .nth(1)
+            .expect("count_with_filter");
+        assert!(
+            list.contains("AND factor_id = $")
+                && list.contains("AND event_type = $")
+                && count.contains("AND factor_id = $")
+                && count.contains("AND event_type = $"),
+            "risk event list/count must apply advertised event_type and factor_id filters in SQL"
+        );
     }
 }
