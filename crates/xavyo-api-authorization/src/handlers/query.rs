@@ -11,6 +11,7 @@ use axum::{
 use uuid::Uuid;
 use xavyo_auth::JwtClaims;
 use xavyo_authorization::AuthorizationRequest;
+use xavyo_db::UserRole;
 
 use crate::error::{ApiAuthorizationError, ApiResult};
 use crate::models::query::{
@@ -18,6 +19,15 @@ use crate::models::query::{
 };
 use crate::router::AuthorizationState;
 use crate::services::AuthorizationAudit;
+
+/// Roles for a target user. Lookup errors must not evaluate as "no roles".
+pub(crate) async fn target_user_roles(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    user_id: Uuid,
+) -> ApiResult<Vec<String>> {
+    Ok(UserRole::get_user_roles(pool, user_id, tenant_id).await?)
+}
 
 /// Check if the current user can perform an action on a resource type.
 ///
@@ -105,11 +115,10 @@ pub async fn admin_check_handler(
         delegation: None,
     };
 
-    // Note: for admin check, we pass empty roles since the target user's roles
-    // are resolved from the entitlement system, not from the admin's JWT.
+    let roles = target_user_roles(&state.pdp_pool, tenant_id, query.user_id).await?;
     let decision = state
         .pdp
-        .evaluate(&state.pdp_pool, request.clone(), &[], None)
+        .evaluate(&state.pdp_pool, request.clone(), &roles, None)
         .await;
 
     AuthorizationAudit::emit_decision(&decision, &request, &state.audit_verbosity);
@@ -163,7 +172,10 @@ pub async fn bulk_check_handler(
 
     // Determine subject: explicit user_id or caller
     let (subject_id, roles) = if let Some(uid) = request.user_id {
-        (uid, vec![])
+        (
+            uid,
+            target_user_roles(&state.pdp_pool, tenant_id, uid).await?,
+        )
     } else {
         let uid = Uuid::parse_str(&claims.sub).map_err(|_| ApiAuthorizationError::Unauthorized)?;
         (uid, claims.roles.clone())
@@ -192,4 +204,35 @@ pub async fn bulk_check_handler(
     }
 
     Ok(Json(BulkCheckResponse { results }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn admin_and_bulk_check_load_target_user_roles() {
+        let src = include_str!("query.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("target_user_roles("),
+            "admin/bulk check must load the target user's roles"
+        );
+        let admin = production
+            .split("pub async fn admin_check_handler")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("admin_check_handler");
+        assert!(
+            admin.contains("target_user_roles(") && !admin.contains("&[]"),
+            "GET /admin/authorization/check must not evaluate the target with empty roles"
+        );
+        let bulk = production
+            .split("pub async fn bulk_check_handler")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("bulk_check_handler");
+        assert!(
+            bulk.contains("target_user_roles(") && !bulk.contains("vec![]"),
+            "POST /admin/authorization/bulk-check must not evaluate another user with empty roles"
+        );
+    }
 }
