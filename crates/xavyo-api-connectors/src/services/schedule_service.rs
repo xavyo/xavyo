@@ -11,7 +11,9 @@ use thiserror::Error;
 use tracing::{debug, info, instrument};
 use uuid::Uuid;
 
-use xavyo_db::models::{ScheduleType, SchemaRefreshSchedule, UpsertSchedule};
+use xavyo_db::models::{
+    required_schedule_type, ScheduleType, SchemaRefreshSchedule, UpsertSchedule,
+};
 
 /// Errors that can occur during schedule operations.
 #[derive(Error, Debug)]
@@ -216,7 +218,8 @@ impl ScheduleService {
         error_message: Option<String>,
     ) -> ScheduleResult<()> {
         // Compute next run time
-        let schedule_type = schedule.get_schedule_type();
+        let schedule_type = required_schedule_type(&schedule.schedule_type)
+            .map_err(ScheduleError::ConfigurationError)?;
         let next_run_at = if schedule.enabled {
             compute_next_run_at(
                 &schedule_type,
@@ -476,6 +479,10 @@ mod tests {
         assert!(
             lookup.contains("schedule.tenant_id"),
             "schema refresh run update must pass tenant_id"
+        );
+        assert!(
+            lookup.contains("required_schedule_type(") && !lookup.contains("unwrap_or_default()"),
+            "unknown schedule types must not run as Interval"
         );
     }
 }

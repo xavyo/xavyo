@@ -425,7 +425,9 @@ pub use provisioning_operation::{
 pub use connector_schema_version::{
     ConnectorSchemaVersion, CreateSchemaVersion, SchemaVersionSummary, TriggeredBy,
 };
-pub use schema_refresh_schedule::{ScheduleType, SchemaRefreshSchedule, UpsertSchedule};
+pub use schema_refresh_schedule::{
+    required_schedule_type, ScheduleType, SchemaRefreshSchedule, UpsertSchedule,
+};
 
 // Provisioning Consistency exports (F047)
 pub use conflict_record::{

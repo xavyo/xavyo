@@ -40,6 +40,11 @@ impl ScheduleType {
     }
 }
 
+/// Unknown stored schedule types must not become Interval.
+pub fn required_schedule_type(raw: &str) -> Result<ScheduleType, String> {
+    ScheduleType::parse_str(raw).ok_or_else(|| format!("Invalid schedule type: {raw}"))
+}
+
 impl std::fmt::Display for ScheduleType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_str())
@@ -243,21 +248,20 @@ impl SchemaRefreshSchedule {
     }
 
     /// Get schedule type as enum.
-    #[must_use]
-    pub fn get_schedule_type(&self) -> ScheduleType {
-        ScheduleType::parse_str(&self.schedule_type).unwrap_or_default()
+    pub fn get_schedule_type(&self) -> Result<ScheduleType, String> {
+        required_schedule_type(&self.schedule_type)
     }
 
     /// Check if this is an interval schedule.
     #[must_use]
     pub fn is_interval(&self) -> bool {
-        self.get_schedule_type() == ScheduleType::Interval
+        matches!(self.get_schedule_type(), Ok(ScheduleType::Interval))
     }
 
     /// Check if this is a cron schedule.
     #[must_use]
     pub fn is_cron(&self) -> bool {
-        self.get_schedule_type() == ScheduleType::Cron
+        matches!(self.get_schedule_type(), Ok(ScheduleType::Cron))
     }
 }
 
@@ -276,6 +280,15 @@ mod tests {
         );
         assert_eq!(ScheduleType::parse_str("CRON"), Some(ScheduleType::Cron));
         assert_eq!(ScheduleType::parse_str("unknown"), None);
+        assert!(required_schedule_type("unknown").is_err());
+        assert_eq!(required_schedule_type("cron").unwrap(), ScheduleType::Cron);
+        let src = include_str!("schema_refresh_schedule.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("required_schedule_type(")
+                && !production.contains("unwrap_or_default()"),
+            "unknown stored schedule types must not become Interval"
+        );
     }
 
     #[test]

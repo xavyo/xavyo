@@ -23,7 +23,7 @@ use uuid::Uuid;
 
 use xavyo_db::models::{
     CreateGovMergeOperation, GovArchivedIdentity, GovDuplicateCandidate, GovEntitlementStrategy,
-    GovMergeAudit, GovMergeOperation,
+    GovMergeAudit, GovMergeOperation, GovSodRule,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -33,6 +33,17 @@ use crate::models::{
     MergePreviewResponse, MergeSodCheckResponse, MergeSodViolationResponse, RuleMatchResponse,
 };
 use crate::services::SodEnforcementService;
+
+/// Merge SoD responses must not advertise `Uuid::nil()` as a rule id.
+pub fn merge_sod_rule_id(rule_id: Uuid) -> Result<Uuid> {
+    if rule_id.is_nil() {
+        Err(GovernanceError::Validation(
+            "merge SoD violation must include a real rule_id".into(),
+        ))
+    } else {
+        Ok(rule_id)
+    }
+}
 
 /// Result of a merge execution.
 #[derive(Debug, Clone)]
@@ -781,14 +792,14 @@ impl IdentityMergeService {
                 for ent_b in source_only_entitlements.iter().skip(i + 1) {
                     // Check if there's a SoD rule between these two entitlements
                     let has_rule = self
-                        .check_sod_rule_exists(tenant_id, ent_a.id, ent_b.id)
+                        .find_inter_source_sod_rule(tenant_id, ent_a.id, ent_b.id)
                         .await?;
 
-                    if has_rule {
+                    if let Some(rule) = has_rule {
                         all_violations.push(MergeSodViolationResponse {
-                            rule_id: Uuid::nil(), // Rule details not fetched for inter-source conflicts
-                            rule_name: "Source entitlement conflict".to_string(),
-                            severity: "medium".to_string(),
+                            rule_id: merge_sod_rule_id(rule.id)?,
+                            rule_name: rule.name,
+                            severity: format!("{:?}", rule.severity).to_lowercase(),
                             entitlement_being_added: ent_a.id,
                             conflicting_entitlement_id: ent_b.id,
                             has_exemption: false,
@@ -805,34 +816,22 @@ impl IdentityMergeService {
         })
     }
 
-    /// Check if a `SoD` rule exists between two entitlements.
-    async fn check_sod_rule_exists(
+    /// Load the active `SoD` rule between two entitlements, if any.
+    async fn find_inter_source_sod_rule(
         &self,
         tenant_id: Uuid,
         entitlement_a_id: Uuid,
         entitlement_b_id: Uuid,
-    ) -> Result<bool> {
-        let result = sqlx::query_scalar::<_, bool>(
-            r"
-            SELECT EXISTS (
-                SELECT 1 FROM gov_sod_rules
-                WHERE tenant_id = $1
-                AND is_active = true
-                AND (
-                    (entitlement_a_id = $2 AND entitlement_b_id = $3)
-                    OR (entitlement_a_id = $3 AND entitlement_b_id = $2)
-                )
-            )
-            ",
+    ) -> Result<Option<GovSodRule>> {
+        let rule = GovSodRule::find_by_entitlement_pair(
+            &self.pool,
+            tenant_id,
+            entitlement_a_id,
+            entitlement_b_id,
         )
-        .bind(tenant_id)
-        .bind(entitlement_a_id)
-        .bind(entitlement_b_id)
-        .fetch_one(&self.pool)
         .await
         .map_err(GovernanceError::Database)?;
-
-        Ok(result)
+        Ok(rule.filter(GovSodRule::is_active))
     }
 
     async fn preview_entitlement_consolidation(
@@ -1548,6 +1547,37 @@ mod tests {
                 && !production.contains("unwrap_or(0.0)")
                 && !production.contains("unwrap_or_default()"),
             "duplicate detail must not invent 0.0 confidence or empty rule matches"
+        );
+    }
+
+    #[test]
+    fn inter_source_sod_does_not_advertise_nil_rule_id() {
+        assert!(merge_sod_rule_id(Uuid::nil()).is_err());
+        let id = Uuid::new_v4();
+        assert_eq!(merge_sod_rule_id(id).unwrap(), id);
+
+        let src = include_str!("identity_merge_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let sod = production
+            .split("async fn check_merge_sod_violations")
+            .nth(1)
+            .and_then(|s| s.split("async fn find_inter_source_sod_rule").next())
+            .expect("check_merge_sod_violations");
+        assert!(
+            sod.contains("find_inter_source_sod_rule(")
+                && sod.contains("merge_sod_rule_id(")
+                && !sod.contains("Uuid::nil()"),
+            "inter-source SoD must not advertise Uuid::nil as the rule id"
+        );
+        let lookup = production
+            .split("async fn find_inter_source_sod_rule")
+            .nth(1)
+            .expect("find_inter_source_sod_rule");
+        assert!(
+            lookup.contains("GovSodRule::find_by_entitlement_pair(")
+                && !lookup.contains("entitlement_a_id =")
+                && !lookup.contains("is_active = true"),
+            "inter-source SoD must query first/second entitlement columns"
         );
     }
 }

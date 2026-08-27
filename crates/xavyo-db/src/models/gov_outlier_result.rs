@@ -67,6 +67,23 @@ pub struct OutlierResultFilter {
     pub max_score: Option<f64>,
 }
 
+/// Empty analyses may report 0; missing scores on a non-empty analysis must not.
+pub fn summary_scores(
+    total_users: i64,
+    avg: Option<f64>,
+    max: Option<f64>,
+) -> Result<(f64, f64), sqlx::Error> {
+    if total_users == 0 {
+        return Ok((0.0, 0.0));
+    }
+    match (avg, max) {
+        (Some(avg_score), Some(max_score)) => Ok((avg_score, max_score)),
+        _ => Err(sqlx::Error::Protocol(
+            "outlier summary missing scores for a non-empty analysis".into(),
+        )),
+    }
+}
+
 /// Summary statistics for outlier results.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutlierResultSummary {
@@ -253,13 +270,14 @@ impl GovOutlierResult {
         .fetch_one(pool)
         .await?;
 
+        let (avg_score, max_score) = summary_scores(row.0, row.4, row.5)?;
         Ok(OutlierResultSummary {
             total_users: row.0,
             outlier_count: row.1,
             normal_count: row.2,
             unclassifiable_count: row.3,
-            avg_score: row.4.unwrap_or(0.0),
-            max_score: row.5.unwrap_or(0.0),
+            avg_score,
+            max_score,
         })
     }
 
@@ -523,6 +541,26 @@ mod tests {
         assert!(
             !production.contains("JOIN gov_outlier_analyses a ON r.analysis_id = a.id\n"),
             "must not join analyses by id alone"
+        );
+    }
+
+    #[test]
+    fn outlier_summary_does_not_invent_zero_scores() {
+        assert_eq!(summary_scores(0, None, None).unwrap(), (0.0, 0.0));
+        assert_eq!(
+            summary_scores(2, Some(10.0), Some(20.0)).unwrap(),
+            (10.0, 20.0)
+        );
+        assert!(summary_scores(2, None, Some(20.0)).is_err());
+        let src = include_str!("gov_outlier_result.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let summary = production
+            .split("pub async fn get_summary")
+            .nth(1)
+            .expect("get_summary");
+        assert!(
+            summary.contains("summary_scores(") && !summary.contains("unwrap_or(0.0)"),
+            "non-empty outlier analyses must not report avg/max 0.0 on NULL"
         );
     }
 }

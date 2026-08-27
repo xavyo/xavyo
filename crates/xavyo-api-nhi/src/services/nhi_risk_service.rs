@@ -25,6 +25,22 @@ pub fn inactivity_days(
     }
 }
 
+/// Missing grouped averages must not become score 0 (low risk).
+pub fn grouped_avg_score(count: i64, avg: Option<f64>) -> Result<f64, NhiApiError> {
+    match avg {
+        Some(score) => Ok(score),
+        None if count == 0 => Ok(0.0),
+        None => Err(NhiApiError::Internal(
+            "NHI type has identities but no risk scores".into(),
+        )),
+    }
+}
+
+/// NULL `risk_score` is unscored, not low.
+pub fn unscored_risk_level() -> &'static str {
+    "unscored"
+}
+
 /// Individual risk factor with score and weight.
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -250,19 +266,22 @@ impl NhiRiskService {
         .await
         .map_err(NhiApiError::Database)?
         .into_iter()
-        .map(|(t, c, a)| TypeRiskSummary {
-            nhi_type: t,
-            count: c,
-            avg_score: a.unwrap_or(0.0),
+        .map(|(t, c, a)| {
+            Ok::<_, NhiApiError>(TypeRiskSummary {
+                nhi_type: t,
+                count: c,
+                avg_score: grouped_avg_score(c, a)?,
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
         let by_level: Vec<LevelRiskSummary> = sqlx::query_as::<_, (String, i64)>(
             r"SELECT
                 CASE
-                    WHEN COALESCE(risk_score, 0) <= 25 THEN 'low'
-                    WHEN COALESCE(risk_score, 0) <= 50 THEN 'medium'
-                    WHEN COALESCE(risk_score, 0) <= 75 THEN 'high'
+                    WHEN risk_score IS NULL THEN 'unscored'
+                    WHEN risk_score <= 25 THEN 'low'
+                    WHEN risk_score <= 50 THEN 'medium'
+                    WHEN risk_score <= 75 THEN 'high'
                     ELSE 'critical'
                 END AS level,
                 COUNT(*)
@@ -393,6 +412,28 @@ mod tests {
         assert!(
             inactivity.contains("inactivity_days(") && !inactivity.contains("unwrap_or(0)"),
             "missing last_activity_at must not score as 0 days inactive"
+        );
+    }
+
+    #[test]
+    fn risk_summary_does_not_treat_null_as_low() {
+        assert_eq!(grouped_avg_score(0, None).unwrap(), 0.0);
+        assert_eq!(grouped_avg_score(3, Some(40.0)).unwrap(), 40.0);
+        assert!(grouped_avg_score(3, None).is_err());
+        assert_eq!(unscored_risk_level(), "unscored");
+
+        let src = include_str!("nhi_risk_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let summary = production
+            .split("pub async fn summary")
+            .nth(1)
+            .expect("summary");
+        assert!(
+            summary.contains("grouped_avg_score(")
+                && summary.contains("WHEN risk_score IS NULL THEN 'unscored'")
+                && !summary.contains("COALESCE(risk_score, 0)")
+                && !summary.contains("unwrap_or(0.0)"),
+            "NULL NHI risk scores must not classify as low or average 0"
         );
     }
 }
