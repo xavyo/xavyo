@@ -49,6 +49,12 @@ pub struct DevicePolicyService {
     pool: PgPool,
 }
 
+/// Stored device-policy JSON must parse; corrupt values must not become defaults.
+pub fn parse_stored_device_policy(value: serde_json::Value) -> Result<DevicePolicy, ApiAuthError> {
+    serde_json::from_value(value)
+        .map_err(|e| ApiAuthError::Validation(format!("Invalid stored device policy JSON: {e}")))
+}
+
 impl DevicePolicyService {
     /// Create a new device policy service.
     #[must_use]
@@ -78,9 +84,7 @@ impl DevicePolicyService {
 
         if let Some((policies,)) = result {
             if let Some(device_policy) = policies.get(DEVICE_POLICY_KEY) {
-                if let Ok(policy) = serde_json::from_value(device_policy.clone()) {
-                    return Ok(policy);
-                }
+                return parse_stored_device_policy(device_policy.clone());
             }
         }
 
@@ -207,5 +211,25 @@ mod tests {
         let response: DevicePolicyResponse = policy.into();
         assert!(response.allow_trusted_device_mfa_bypass);
         assert_eq!(response.trusted_device_duration_days, 14);
+    }
+
+    #[test]
+    fn stored_device_policy_does_not_default_on_invalid_json() {
+        assert!(parse_stored_device_policy(serde_json::json!("not-an-object")).is_err());
+        let ok = parse_stored_device_policy(serde_json::json!({
+            "allow_trusted_device_mfa_bypass": true,
+            "trusted_device_duration_days": 7
+        }))
+        .unwrap();
+        assert!(ok.allow_trusted_device_mfa_bypass);
+        assert_eq!(ok.trusted_device_duration_days, 7);
+
+        let src = include_str!("device_policy_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_stored_device_policy(")
+                && !production.contains("if let Ok(policy) = serde_json::from_value"),
+            "corrupt device policy JSON must not silently become DevicePolicy::default"
+        );
     }
 }

@@ -336,8 +336,13 @@ impl IntoResponse for OAuthError {
 fn dpop_nonce_header(nonce: &str) -> (HeaderName, HeaderValue) {
     (
         HeaderName::from_static("dpop-nonce"),
-        HeaderValue::from_str(nonce).unwrap_or(HeaderValue::from_static("")),
+        dpop_nonce_header_value(nonce),
     )
+}
+
+/// DPoP nonce is RFC 9449 base64url; never send an empty header on parse failure.
+pub(crate) fn dpop_nonce_header_value(nonce: &str) -> HeaderValue {
+    HeaderValue::from_str(nonce).unwrap_or_else(|_| HeaderValue::from_static("invalid"))
 }
 
 #[cfg(test)]
@@ -423,5 +428,21 @@ mod tests {
         assert!(www.starts_with("DPoP "));
         assert!(www.contains("error=\"use_dpop_nonce\""));
         assert!(www.contains("algs="));
+    }
+
+    #[test]
+    fn dpop_nonce_header_is_never_empty() {
+        assert_eq!(dpop_nonce_header_value("abc").to_str().unwrap(), "abc");
+        assert_ne!(
+            dpop_nonce_header_value("not a token\n").to_str().unwrap(),
+            ""
+        );
+        let src = include_str!("error.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("dpop_nonce_header_value(")
+                && !production.contains("HeaderValue::from_static(\"\")"),
+            "DPoP-Nonce must not be an empty header on parse failure"
+        );
     }
 }

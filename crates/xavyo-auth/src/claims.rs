@@ -596,7 +596,7 @@ impl JwtClaimsBuilder {
     ///
     /// # Defaults
     ///
-    /// - `sub`: Empty string if not set
+    /// - `sub`: Empty string if not set — `encode_token` / jwt_auth reject that
     /// - `iss`: "xavyo" if not set
     /// - `aud`: Empty vec if not set
     /// - `exp`: 1 hour from now if not set
@@ -618,7 +618,7 @@ impl JwtClaimsBuilder {
         };
 
         JwtClaims {
-            sub: self.sub.unwrap_or_default(),
+            sub: required_jwt_subject(self.sub).unwrap_or_default(),
             iss: self.iss.unwrap_or_else(|| "xavyo".to_string()),
             aud: self.aud,
             exp: self.exp.unwrap_or(now + 3600), // Default: 1 hour
@@ -646,6 +646,17 @@ impl JwtClaimsBuilder {
     }
 }
 
+/// Empty subjects must not be minted; they would hash into a fake service account.
+pub fn required_jwt_subject(sub: Option<String>) -> Option<String> {
+    sub.filter(|s| !s.is_empty())
+}
+
+/// True when `sub` can be used as a JWT subject at a trust boundary.
+#[must_use]
+pub fn jwt_subject_is_usable(sub: &str) -> bool {
+    !sub.is_empty()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -660,6 +671,19 @@ mod tests {
         assert_eq!(claims.sub, "user-123");
         assert_eq!(claims.iss, "test-issuer");
         assert!(!claims.jti.is_empty());
+    }
+
+    #[test]
+    fn empty_jwt_subject_is_not_usable() {
+        assert!(required_jwt_subject(None).is_none());
+        assert!(required_jwt_subject(Some(String::new())).is_none());
+        assert_eq!(
+            required_jwt_subject(Some("user-123".into())).as_deref(),
+            Some("user-123")
+        );
+        assert!(!jwt_subject_is_usable(""));
+        assert!(jwt_subject_is_usable("user-123"));
+        assert!(JwtClaims::builder().build().sub.is_empty());
     }
 
     #[test]
