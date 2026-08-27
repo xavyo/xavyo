@@ -615,43 +615,25 @@ impl GroupService {
 
                 match path {
                     "displayName" | "displayname" => {
-                        if let Some(name) = value.as_str() {
-                            group.display_name = name.to_string();
-                        }
+                        group.display_name = patch_string(value, "displayName")?;
                     }
                     "externalId" | "externalid" => {
-                        group.external_id = value.as_str().map(std::string::ToString::to_string);
+                        group.external_id = patch_optional_string(value, "externalId")?;
                     }
                     "members" => {
-                        // Replace all members — validate they belong to the same tenant
-                        if let Some(members) = value.as_array() {
-                            let member_ids: Vec<Uuid> = members
-                                .iter()
-                                .filter_map(|m| {
-                                    m.get("value")
-                                        .and_then(|v| v.as_str())
-                                        .and_then(|s| s.parse().ok())
-                                })
-                                .collect();
-                            self.validate_members_tenant(tenant_id, &member_ids).await?;
-                            GroupMembership::set_members(
-                                &self.pool,
-                                tenant_id,
-                                group_id,
-                                &member_ids,
-                            )
+                        let member_ids = member_ids_from_patch_value(value)?;
+                        self.validate_members_tenant(tenant_id, &member_ids).await?;
+                        GroupMembership::set_members(&self.pool, tenant_id, group_id, &member_ids)
                             .await?;
-                        }
                     }
                     // F071: Hierarchy extension paths
                     p if p.starts_with(
                         "urn:ietf:params:scim:schemas:extension:xavyo:2.0:Group:groupType",
                     ) || p == "groupType" =>
                     {
-                        if let Some(gt) = value.as_str() {
-                            Self::validate_group_type(gt)?;
-                            group.group_type = gt.to_string();
-                        }
+                        let gt = patch_string(value, "groupType")?;
+                        Self::validate_group_type(&gt)?;
+                        group.group_type = gt;
                     }
                     p if p.starts_with(
                         "urn:ietf:params:scim:schemas:extension:xavyo:2.0:Group:parentExternalId",
@@ -681,62 +663,43 @@ impl GroupService {
             }
             "add" => {
                 if path.starts_with("members") || path.is_empty() {
-                    // Add members — validate they belong to the same tenant
-                    if let Some(value) = &op.value {
-                        let members = if let Some(arr) = value.as_array() {
-                            arr.clone()
-                        } else {
-                            vec![value.clone()]
-                        };
-
-                        // For empty path, verify we actually have member-like values
-                        if path.is_empty() {
-                            let has_member_values =
-                                members.iter().any(|m| m.get("value").is_some());
-                            if !has_member_values {
-                                return Err(ScimError::InvalidPatchOp(
-                                    "Add with empty path on Group requires member values with 'value' field".to_string(),
-                                ));
-                            }
+                    let value = op.value.as_ref().ok_or_else(|| {
+                        ScimError::InvalidPatchOp("Value required for add members".to_string())
+                    })?;
+                    let members_json = if value.is_array() {
+                        value.clone()
+                    } else {
+                        serde_json::json!([value])
+                    };
+                    if path.is_empty() {
+                        let has_member_values = members_json
+                            .as_array()
+                            .is_some_and(|m| m.iter().any(|item| item.get("value").is_some()));
+                        if !has_member_values {
+                            return Err(ScimError::InvalidPatchOp(
+                                "Add with empty path on Group requires member values with 'value' field".to_string(),
+                            ));
                         }
+                    }
+                    let member_uuids = member_ids_from_patch_value(&members_json)?;
+                    self.validate_members_tenant(tenant_id, &member_uuids)
+                        .await?;
 
-                        // Collect and validate all member IDs first
-                        let member_uuids: Vec<Uuid> = members
-                            .iter()
-                            .filter_map(|m| {
-                                m.get("value")
-                                    .and_then(|v| v.as_str())
-                                    .and_then(|s| s.parse::<Uuid>().ok())
-                            })
-                            .collect();
-                        self.validate_members_tenant(tenant_id, &member_uuids)
-                            .await?;
-
-                        for member in members {
-                            if let Some(user_id) = member
-                                .get("value")
-                                .and_then(|v| v.as_str())
-                                .and_then(|s| s.parse::<Uuid>().ok())
-                            {
-                                if let Err(e) = GroupMembership::add_member(
-                                    &self.pool, tenant_id, group_id, user_id,
-                                )
+                    for user_id in member_uuids {
+                        if let Err(e) =
+                            GroupMembership::add_member(&self.pool, tenant_id, group_id, user_id)
                                 .await
-                                {
-                                    // Duplicate memberships are silently ignored (idempotent),
-                                    // but other errors (e.g. FK violation for non-existent user) propagate.
-                                    let err_str = e.to_string();
-                                    let is_duplicate = err_str
-                                        .contains("duplicate key value violates unique constraint");
-                                    if !is_duplicate {
-                                        tracing::error!(
-                                            "Failed to add member {user_id}: {err_str}"
-                                        );
-                                        return Err(ScimError::Validation(format!(
-                                            "Failed to add member {user_id}"
-                                        )));
-                                    }
-                                }
+                        {
+                            // Duplicate memberships are silently ignored (idempotent),
+                            // but other errors (e.g. FK violation for non-existent user) propagate.
+                            let err_str = e.to_string();
+                            let is_duplicate =
+                                err_str.contains("duplicate key value violates unique constraint");
+                            if !is_duplicate {
+                                tracing::error!("Failed to add member {user_id}: {err_str}");
+                                return Err(ScimError::Validation(format!(
+                                    "Failed to add member {user_id}"
+                                )));
                             }
                         }
                     }
@@ -763,6 +726,39 @@ impl GroupService {
 
         Ok(())
     }
+}
+
+fn patch_string(value: &serde_json::Value, field: &str) -> ScimResult<String> {
+    value
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| ScimError::Validation(format!("{field} must be a string")))
+}
+
+fn patch_optional_string(value: &serde_json::Value, field: &str) -> ScimResult<Option<String>> {
+    match value {
+        serde_json::Value::Null => Ok(None),
+        serde_json::Value::String(s) => Ok(Some(s.clone())),
+        _ => Err(ScimError::Validation(format!("{field} must be a string"))),
+    }
+}
+
+/// Replace-members PATCH values. Invalid entries must not be dropped.
+fn member_ids_from_patch_value(value: &serde_json::Value) -> ScimResult<Vec<Uuid>> {
+    let members = value
+        .as_array()
+        .ok_or_else(|| ScimError::InvalidPatchOp("members must be an array".to_string()))?;
+    members
+        .iter()
+        .map(|m| {
+            let raw = m.get("value").and_then(|v| v.as_str()).ok_or_else(|| {
+                ScimError::InvalidPatchOp("members[].value must be a string UUID".to_string())
+            })?;
+            raw.parse()
+                .map_err(|_| ScimError::InvalidPatchOp(format!("invalid member id: {raw}")))
+        })
+        .collect()
 }
 
 /// Parse member ID from a remove-members PATCH path. Unparseable paths fail.
@@ -840,6 +836,39 @@ mod tests {
 
         let invalid = parse_member_filter_path("members");
         assert_eq!(invalid, None);
+    }
+
+    #[test]
+    fn group_patch_does_not_drop_invalid_members_or_display_name() {
+        assert!(patch_string(&serde_json::json!(1), "displayName").is_err());
+        assert_eq!(
+            patch_string(&serde_json::json!("Team"), "displayName").unwrap(),
+            "Team"
+        );
+
+        let uuid = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+        assert_eq!(
+            member_ids_from_patch_value(&serde_json::json!([{"value": uuid.to_string()}])).unwrap(),
+            vec![uuid]
+        );
+        assert!(
+            member_ids_from_patch_value(&serde_json::json!({"value": uuid.to_string()})).is_err()
+        );
+        assert!(member_ids_from_patch_value(&serde_json::json!([
+            {"value": uuid.to_string()},
+            {"value": "not-a-uuid"}
+        ]))
+        .is_err());
+        assert!(member_ids_from_patch_value(&serde_json::json!([{"display": "x"}])).is_err());
+
+        let src = include_str!("group_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("member_ids_from_patch_value(")
+                && production.contains("patch_string(")
+                && !production.contains(".filter_map(|m|"),
+            "group PATCH members/displayName must fail closed, not drop invalid entries"
+        );
     }
 
     #[test]

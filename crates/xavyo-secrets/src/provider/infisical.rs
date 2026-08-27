@@ -183,7 +183,11 @@ impl InfisicalSecretProvider {
             })?
             .to_string();
 
-        let expires_in = json["expiresIn"].as_i64().unwrap_or(7200);
+        let expires_in = crate::dynamic::require_positive_ttl(
+            "infisical",
+            "expiresIn",
+            json["expiresIn"].as_i64(),
+        )?;
         let expires_at = chrono::Utc::now() + chrono::Duration::seconds(expires_in);
 
         tracing::info!(
@@ -247,7 +251,11 @@ impl InfisicalSecretProvider {
             })?
             .to_string();
 
-        let expires_in = json["expiresIn"].as_i64().unwrap_or(7200);
+        let expires_in = crate::dynamic::require_positive_ttl(
+            "infisical",
+            "expiresIn",
+            json["expiresIn"].as_i64(),
+        )?;
         let expires_at = chrono::Utc::now() + chrono::Duration::seconds(expires_in);
 
         tracing::info!(
@@ -557,6 +565,10 @@ mod tests {
         assert!(
             !production.contains("Don't fail on revocation errors"),
             "must not treat revoke HTTP errors as success"
+        );
+        assert!(
+            production.contains("require_positive_ttl(") && !production.contains("unwrap_or(7200)"),
+            "Infisical must not invent a 7200s token lifetime"
         );
     }
 }

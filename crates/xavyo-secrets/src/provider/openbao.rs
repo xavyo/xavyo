@@ -297,7 +297,11 @@ impl OpenBaoSecretProvider {
                     detail: format!("Invalid renewal response: {e}"),
                 })?;
 
-        let new_ttl = json["auth"]["lease_duration"].as_u64().unwrap_or(3600);
+        let new_ttl = crate::dynamic::require_positive_ttl(
+            "openbao",
+            "lease_duration",
+            json["auth"]["lease_duration"].as_i64(),
+        )? as u64;
         Ok(new_ttl)
     }
 
@@ -397,10 +401,12 @@ impl DynamicSecretProvider for OpenBaoSecretProvider {
                 .map(std::string::ToString::to_string),
         )?;
 
-        let lease_duration = json
-            .get("lease_duration")
-            .and_then(serde_json::Value::as_i64)
-            .unwrap_or(i64::from(request.ttl_seconds));
+        let lease_duration = crate::dynamic::require_positive_ttl(
+            "openbao",
+            "lease_duration",
+            json.get("lease_duration")
+                .and_then(serde_json::Value::as_i64),
+        )?;
 
         tracing::info!(
             role = %role_name,
@@ -537,6 +543,12 @@ mod tests {
         assert!(
             !production.contains("Don't fail on revocation errors"),
             "must not treat revoke HTTP errors as success"
+        );
+        assert!(
+            production.contains("require_positive_ttl(")
+                && !production.contains("unwrap_or(3600)")
+                && !production.contains("unwrap_or(i64::from(request.ttl_seconds))"),
+            "OpenBao must not invent a TTL when lease_duration is missing"
         );
     }
 }

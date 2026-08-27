@@ -5,6 +5,8 @@
 //!
 //! Reference: <https://learn.microsoft.com/en-us/troubleshoot/windows-server/active-directory/useraccountcontrol-manipulate>
 
+use xavyo_connector::operation::AttributeValue;
+
 /// Logon script is executed.
 pub const SCRIPT: u32 = 0x0001;
 
@@ -74,6 +76,20 @@ impl UserAccountControl {
     #[must_use]
     pub fn from_value(value: u32) -> Self {
         Self { value }
+    }
+
+    /// Parse UAC from an LDAP attribute.
+    ///
+    /// Missing, non-numeric, or out-of-range values return `None` so callers
+    /// cannot treat an unknown account-control mask as `NORMAL_ACCOUNT`.
+    #[must_use]
+    pub fn from_attribute(value: Option<&AttributeValue>) -> Option<Self> {
+        let raw = match value {
+            Some(AttributeValue::Integer(i)) if *i >= 0 && *i <= i64::from(u32::MAX) => *i as u32,
+            Some(AttributeValue::String(s)) => s.parse().ok()?,
+            _ => return None,
+        };
+        Some(Self::from_value(raw))
     }
 
     /// Build a new UAC value starting from zero.
@@ -334,6 +350,30 @@ mod tests {
         assert!(uac.password_never_expires());
         assert!(!uac.is_disabled());
         assert!(uac.is_active());
+    }
+
+    #[test]
+    fn from_attribute_does_not_default_to_normal_account() {
+        assert!(UserAccountControl::from_attribute(None).is_none());
+        assert!(UserAccountControl::from_attribute(Some(&AttributeValue::Null)).is_none());
+        assert!(
+            UserAccountControl::from_attribute(Some(&AttributeValue::String(
+                "not-a-number".into()
+            )))
+            .is_none()
+        );
+        assert!(UserAccountControl::from_attribute(Some(&AttributeValue::Integer(-1))).is_none());
+
+        let from_int = UserAccountControl::from_attribute(Some(&AttributeValue::Integer(0x202)))
+            .expect("integer UAC");
+        assert!(from_int.is_disabled());
+        assert_eq!(from_int.value, 0x202);
+
+        let from_str =
+            UserAccountControl::from_attribute(Some(&AttributeValue::String("512".into())))
+                .expect("string UAC");
+        assert!(!from_str.is_disabled());
+        assert_eq!(from_str.value, 512);
     }
 
     #[test]

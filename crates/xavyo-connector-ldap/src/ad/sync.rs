@@ -333,21 +333,13 @@ fn extract_object_guid(entry: &AttributeSet) -> Option<String> {
 }
 
 /// Parse userAccountControl from an entry and return (`is_active`, `raw_value`).
+///
+/// Missing or unparseable UAC is treated as inactive so a disabled account
+/// cannot fail-open as provisioned/active.
 fn parse_uac(entry: &AttributeSet) -> (bool, Option<u32>) {
-    match entry.get("userAccountControl") {
-        Some(AttributeValue::Integer(i)) => {
-            let uac = UserAccountControl::from_value(*i as u32);
-            (uac.is_active(), Some(uac.value))
-        }
-        Some(AttributeValue::String(s)) => {
-            if let Ok(val) = s.parse::<u32>() {
-                let uac = UserAccountControl::from_value(val);
-                (uac.is_active(), Some(uac.value))
-            } else {
-                (true, None) // Default to active if unparseable
-            }
-        }
-        _ => (true, None), // Default to active if not present
+    match UserAccountControl::from_attribute(entry.get("userAccountControl")) {
+        Some(uac) => (uac.is_active(), Some(uac.value)),
+        None => (false, None),
     }
 }
 
@@ -788,14 +780,33 @@ mod tests {
     }
 
     #[test]
-    fn test_map_ad_user_no_uac_defaults_active() {
+    fn test_map_ad_user_no_uac_is_inactive() {
         let mut entry = AttributeSet::new();
         entry.set("objectGUID", AttributeValue::Binary(vec![0x01; 16]));
         entry.set("sAMAccountName", "test");
 
         let mapped = map_ad_user(&entry).unwrap();
-        assert!(mapped.is_active); // Default to active
+        assert!(!mapped.is_active);
         assert!(mapped.uac_value.is_none());
+    }
+
+    #[test]
+    fn parse_uac_does_not_fail_open_to_active() {
+        let mut entry = AttributeSet::new();
+        assert_eq!(parse_uac(&entry), (false, None));
+        entry.set("userAccountControl", "garbage");
+        assert_eq!(parse_uac(&entry), (false, None));
+        entry.set("userAccountControl", AttributeValue::Integer(514));
+        assert_eq!(parse_uac(&entry), (false, Some(514)));
+        entry.set("userAccountControl", AttributeValue::Integer(512));
+        assert_eq!(parse_uac(&entry), (true, Some(512)));
+
+        let src = include_str!("sync.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("(true, None)") && production.contains("from_attribute("),
+            "missing/unparseable userAccountControl must not default to active"
+        );
     }
 
     #[test]
@@ -876,7 +887,7 @@ mod tests {
 
         let mapped = map_ad_user(&entry).unwrap();
         assert!(!mapped.external_id.is_empty());
-        assert!(mapped.is_active); // Default
+        assert!(!mapped.is_active);
         assert!(!mapped.attributes.contains_key("username"));
         assert!(!mapped.attributes.contains_key("email"));
     }

@@ -410,79 +410,8 @@ impl Provisioner {
                     async move { client.get_user(&id).await }
                 })
                 .await?;
-            // Apply the patch operations to the fetched user and PUT back.
             let mut updated = current;
-            for op in &patch.operations {
-                if op.op == "remove" {
-                    if let Some(ref path) = op.path {
-                        match path.as_str() {
-                            "displayName" => updated.display_name = None,
-                            "name.givenName" => {
-                                if let Some(ref mut name) = updated.name {
-                                    name.given_name = None;
-                                }
-                            }
-                            "name.familyName" => {
-                                if let Some(ref mut name) = updated.name {
-                                    name.family_name = None;
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                    continue;
-                }
-                if let Some(ref path) = op.path {
-                    match path.as_str() {
-                        "active" => {
-                            if let Some(ref v) = op.value {
-                                updated.active = v.as_bool().unwrap_or(updated.active);
-                            }
-                        }
-                        "displayName" => {
-                            if let Some(ref v) = op.value {
-                                updated.display_name =
-                                    v.as_str().map(std::string::ToString::to_string);
-                            }
-                        }
-                        "userName" => {
-                            if let Some(ref v) = op.value {
-                                if let Some(s) = v.as_str() {
-                                    updated.user_name = s.to_string();
-                                }
-                            }
-                        }
-                        "name.givenName" => {
-                            if let Some(ref v) = op.value {
-                                let name = updated.name.get_or_insert_with(Default::default);
-                                name.given_name = v.as_str().map(std::string::ToString::to_string);
-                            }
-                        }
-                        "name.familyName" => {
-                            if let Some(ref v) = op.value {
-                                let name = updated.name.get_or_insert_with(Default::default);
-                                name.family_name = v.as_str().map(std::string::ToString::to_string);
-                            }
-                        }
-                        p if p.contains("emails") => {
-                            if let Some(ref v) = op.value {
-                                if let Some(s) = v.as_str() {
-                                    if updated.emails.is_empty() {
-                                        updated.emails.push(xavyo_scim_types::ScimEmail {
-                                            value: s.to_string(),
-                                            email_type: Some("work".to_string()),
-                                            primary: true,
-                                        });
-                                    } else {
-                                        updated.emails[0].value = s.to_string();
-                                    }
-                                }
-                            }
-                        }
-                        _ => {} // Other paths pass through unchanged.
-                    }
-                }
-            }
+            apply_put_fallback_ops(&mut updated, &patch.operations)?;
             self.retry_policy
                 .execute("scim_put_user", || {
                     let u = updated.clone();
@@ -1374,6 +1303,91 @@ pub(crate) fn scim_provisioning_log_recorded<T, E>(result: Result<T, E>) -> Resu
     result
 }
 
+fn patch_bool(value: &serde_json::Value, field: &str) -> ScimClientResult<bool> {
+    value
+        .as_bool()
+        .ok_or_else(|| ScimClientError::ParseError(format!("{field} must be a boolean")))
+}
+
+fn patch_str<'a>(value: &'a serde_json::Value, field: &str) -> ScimClientResult<&'a str> {
+    value
+        .as_str()
+        .ok_or_else(|| ScimClientError::ParseError(format!("{field} must be a string")))
+}
+
+/// Apply PATCH ops locally before PUT. Invalid types and unknown paths must
+/// not no-op — that would PUT the unchanged user and look like success.
+pub(crate) fn apply_put_fallback_ops(
+    updated: &mut xavyo_scim_types::ScimUser,
+    operations: &[xavyo_scim_types::ScimPatchOp],
+) -> ScimClientResult<()> {
+    for op in operations {
+        let path = op.path.as_deref().unwrap_or("");
+        if op.op == "remove" {
+            match path {
+                "displayName" => updated.display_name = None,
+                "name.givenName" => {
+                    if let Some(ref mut name) = updated.name {
+                        name.given_name = None;
+                    }
+                }
+                "name.familyName" => {
+                    if let Some(ref mut name) = updated.name {
+                        name.family_name = None;
+                    }
+                }
+                _ => {
+                    return Err(ScimClientError::ParseError(format!(
+                        "unsupported PATCH remove path for PUT fallback: {path}"
+                    )));
+                }
+            }
+            continue;
+        }
+        let value = op
+            .value
+            .as_ref()
+            .ok_or_else(|| ScimClientError::ParseError(format!("PATCH {path} requires a value")))?;
+        match path {
+            "active" => {
+                updated.active = patch_bool(value, "active")?;
+            }
+            "displayName" => {
+                updated.display_name = Some(patch_str(value, "displayName")?.to_string());
+            }
+            "userName" => {
+                updated.user_name = patch_str(value, "userName")?.to_string();
+            }
+            "name.givenName" => {
+                let name = updated.name.get_or_insert_with(Default::default);
+                name.given_name = Some(patch_str(value, "name.givenName")?.to_string());
+            }
+            "name.familyName" => {
+                let name = updated.name.get_or_insert_with(Default::default);
+                name.family_name = Some(patch_str(value, "name.familyName")?.to_string());
+            }
+            p if p.contains("emails") => {
+                let s = patch_str(value, "emails")?;
+                if updated.emails.is_empty() {
+                    updated.emails.push(xavyo_scim_types::ScimEmail {
+                        value: s.to_string(),
+                        email_type: Some("work".to_string()),
+                        primary: true,
+                    });
+                } else {
+                    updated.emails[0].value = s.to_string();
+                }
+            }
+            _ => {
+                return Err(ScimClientError::ParseError(format!(
+                    "unsupported PATCH path for PUT fallback: {path}"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1423,6 +1437,37 @@ mod tests {
         assert!(
             !production.contains("Failed to write SCIM provisioning log entry"),
             "must not report SCIM success when the audit row was not written"
+        );
+    }
+
+    #[test]
+    fn put_fallback_does_not_keep_active_on_invalid_bool() {
+        let mut user = xavyo_scim_types::ScimUser::new("a@example.com");
+        user.active = true;
+        let ops = vec![xavyo_scim_types::ScimPatchOp {
+            op: "replace".into(),
+            path: Some("active".into()),
+            value: Some(serde_json::json!("false")),
+        }];
+        let err = apply_put_fallback_ops(&mut user, &ops).expect_err("must fail closed");
+        assert!(err.to_string().contains("boolean"), "got {err}");
+        assert!(user.active, "must not apply a partial invalid PATCH");
+
+        let ok_ops = vec![xavyo_scim_types::ScimPatchOp {
+            op: "replace".into(),
+            path: Some("active".into()),
+            value: Some(serde_json::json!(false)),
+        }];
+        apply_put_fallback_ops(&mut user, &ok_ops).unwrap();
+        assert!(!user.active);
+
+        let src = include_str!("provisioner.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("apply_put_fallback_ops(")
+                && production.contains("patch_bool(")
+                && !production.contains("unwrap_or(updated.active)"),
+            "PUT fallback must not keep the old active flag on a non-bool PATCH"
         );
     }
 }
