@@ -116,6 +116,39 @@ impl std::str::FromStr for DynamicProviderType {
     }
 }
 
+/// Generated credentials must include a lease id so they can be revoked.
+pub(crate) fn require_lease_id(
+    provider: &str,
+    name: &str,
+    lease_id: Option<String>,
+) -> Result<String, SecretError> {
+    match lease_id {
+        Some(id) if !id.trim().is_empty() => Ok(id),
+        _ => Err(SecretError::InvalidValue {
+            name: name.to_string(),
+            detail: format!("{provider} credential response missing lease_id"),
+        }),
+    }
+}
+
+/// Lease revoke HTTP status. 404 means already gone; other errors must not
+/// look like a successful revocation.
+pub(crate) fn lease_revocation_http_status(
+    provider: &str,
+    lease_id: &str,
+    status: u16,
+    body: &str,
+) -> Result<(), SecretError> {
+    if (200..300).contains(&status) || status == 404 {
+        Ok(())
+    } else {
+        Err(SecretError::ProviderUnavailable {
+            provider: provider.to_string(),
+            detail: format!("Failed to revoke lease '{lease_id}': HTTP {status}: {body}"),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -159,6 +192,31 @@ mod tests {
         assert!(json.contains("dynamic_abc123"));
         assert!(json.contains("lease-456"));
         assert!(json.contains("300"));
+    }
+
+    #[test]
+    fn require_lease_id_does_not_succeed_when_missing() {
+        assert_eq!(
+            require_lease_id("openbao", "role", Some("lease-1".into())).unwrap(),
+            "lease-1"
+        );
+        assert!(require_lease_id("openbao", "role", None).is_err());
+        assert!(require_lease_id("infisical", "secret", Some("".into())).is_err());
+        assert!(require_lease_id("infisical", "secret", Some("   ".into())).is_err());
+    }
+
+    #[test]
+    fn lease_revocation_http_status_does_not_succeed_on_error() {
+        assert!(lease_revocation_http_status("infisical", "l1", 200, "").is_ok());
+        assert!(lease_revocation_http_status("openbao", "l1", 204, "").is_ok());
+        assert!(lease_revocation_http_status("infisical", "l1", 404, "gone").is_ok());
+        let err = lease_revocation_http_status("openbao", "l1", 500, "boom").unwrap_err();
+        assert!(
+            matches!(err, SecretError::ProviderUnavailable { ref provider, ref detail }
+                if provider == "openbao" && detail.contains("500")),
+            "got {err:?}"
+        );
+        assert!(lease_revocation_http_status("infisical", "l1", 401, "denied").is_err());
     }
 
     #[test]

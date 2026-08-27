@@ -7,7 +7,10 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::dynamic::{DynamicCredential, DynamicCredentialRequest, DynamicSecretProvider};
+use crate::dynamic::{
+    lease_revocation_http_status, require_lease_id, DynamicCredential, DynamicCredentialRequest,
+    DynamicSecretProvider,
+};
 use crate::SecretError;
 
 /// Authentication method for Infisical.
@@ -358,10 +361,14 @@ impl DynamicSecretProvider for InfisicalSecretProvider {
             detail: "Missing 'lease' in Infisical response".to_string(),
         })?;
 
-        let lease_id = lease
-            .get("id")
-            .and_then(|v| v.as_str())
-            .map(std::string::ToString::to_string);
+        let lease_id = require_lease_id(
+            "infisical",
+            &secret_name,
+            lease
+                .get("id")
+                .and_then(|v| v.as_str())
+                .map(std::string::ToString::to_string),
+        )?;
 
         let credentials = infisical_lease_data(lease, &secret_name)?;
 
@@ -381,7 +388,7 @@ impl DynamicSecretProvider for InfisicalSecretProvider {
 
         Ok(DynamicCredential {
             credentials,
-            lease_id,
+            lease_id: Some(lease_id),
             ttl_seconds: ttl as i32,
         })
     }
@@ -408,19 +415,12 @@ impl DynamicSecretProvider for InfisicalSecretProvider {
 
         if resp.status().is_success() {
             tracing::info!(lease_id = lease_id, "Infisical: Successfully revoked lease");
+            Ok(())
         } else {
             let status = resp.status();
             let body_text = resp.text().await.unwrap_or_default();
-            tracing::warn!(
-                lease_id = lease_id,
-                status = %status,
-                body = %body_text,
-                "Infisical: Lease revocation returned non-success status"
-            );
-            // Don't fail on revocation errors - the lease may have already expired
+            lease_revocation_http_status("infisical", lease_id, status.as_u16(), &body_text)
         }
-
-        Ok(())
     }
 
     async fn health_check(&self) -> Result<bool, SecretError> {
@@ -542,6 +542,21 @@ mod tests {
             production.contains("infisical_lease_data(")
                 && !production.contains("unwrap_or(serde_json::json!({}))"),
             "dynamic credentials must fail closed when lease data is missing"
+        );
+    }
+
+    #[test]
+    fn infisical_revoke_and_generate_do_not_fail_open() {
+        let src = include_str!("infisical.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("lease_revocation_http_status(")
+                && production.contains("require_lease_id("),
+            "Infisical must fail closed on revoke errors and missing lease ids"
+        );
+        assert!(
+            !production.contains("Don't fail on revocation errors"),
+            "must not treat revoke HTTP errors as success"
         );
     }
 }

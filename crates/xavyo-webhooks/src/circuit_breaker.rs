@@ -356,9 +356,8 @@ impl CircuitBreaker {
     }
 
     /// Save the circuit breaker state to the database.
-    pub async fn save(&self, pool: &PgPool) -> Result<(), sqlx::Error> {
-        let recent_failures_json = serde_json::to_value(&self.recent_failures)
-            .unwrap_or_else(|_| serde_json::Value::Array(vec![]));
+    pub async fn save(&self, pool: &PgPool) -> Result<(), WebhookError> {
+        let recent_failures_json = serialize_recent_failures(&self.recent_failures)?;
 
         WebhookCircuitBreakerState::upsert(
             pool,
@@ -406,6 +405,15 @@ pub(crate) fn persisted_recent_failures(
 ) -> Result<Vec<FailureRecord>, WebhookError> {
     serde_json::from_value(value).map_err(|e| {
         WebhookError::Internal(format!("invalid circuit breaker failure history: {e}"))
+    })
+}
+
+/// Serialize failure history. Serialize errors must not persist an empty list.
+pub(crate) fn serialize_recent_failures(
+    failures: &[FailureRecord],
+) -> Result<serde_json::Value, WebhookError> {
+    serde_json::to_value(failures).map_err(|e| {
+        WebhookError::Internal(format!("failed to serialize circuit breaker failures: {e}"))
     })
 }
 
@@ -813,5 +821,12 @@ mod tests {
             !production.contains("unwrap_or_default()") && !production.contains("Ok(true)"),
             "must not treat unknown state as Closed or cache-miss as allow"
         );
+        assert!(
+            production.contains("serialize_recent_failures(")
+                && !production.contains("unwrap_or_else(|_| serde_json::Value::Array(vec![]))"),
+            "saving the circuit must not drop failure history"
+        );
+        let serialized = serialize_recent_failures(&[]).expect("empty list serializes");
+        assert_eq!(serialized, serde_json::json!([]));
     }
 }

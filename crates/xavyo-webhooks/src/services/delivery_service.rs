@@ -355,8 +355,7 @@ impl DeliveryService {
             }
         }
 
-        let request_headers_json =
-            serde_json::to_value(headers_to_map(&headers)).unwrap_or_default();
+        let request_headers_json = serialize_request_headers(headers_to_map(&headers));
 
         // Execute HTTP POST
         let start = Instant::now();
@@ -811,6 +810,13 @@ fn headers_to_map(
     map
 }
 
+/// Persist request headers as JSON. Do not drop them to `{}` on serialize error.
+fn serialize_request_headers(
+    headers: serde_json::Map<String, serde_json::Value>,
+) -> serde_json::Value {
+    serde_json::Value::Object(headers)
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -907,6 +913,15 @@ mod tests {
         let map = headers_to_map(&headers);
         assert_eq!(map.get("content-type").unwrap(), "application/json");
         assert_eq!(map.get("x-custom").unwrap(), "test-value");
+        let json = serialize_request_headers(map);
+        assert_eq!(json["content-type"], "application/json");
+        let src = include_str!("delivery_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("serialize_request_headers(")
+                && !production.contains("to_value(headers_to_map(&headers)).unwrap_or_default()"),
+            "delivery headers must not be dropped to empty JSON"
+        );
     }
 
     #[test]
