@@ -56,11 +56,7 @@ impl MappedEntraUser {
                 .ok_or_else(|| EntraError::Sync("Missing userPrincipalName".into()))?
                 .to_string(),
             email: value.get("mail").and_then(|v| v.as_str()).map(String::from),
-            display_name: value
-                .get("displayName")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string(),
+            display_name: json_string(value, "displayName")?,
             given_name: value
                 .get("givenName")
                 .and_then(|v| v.as_str())
@@ -91,6 +87,15 @@ impl MappedEntraUser {
             last_sign_in: optional_nested_rfc3339(value, "signInActivity", "lastSignInDateTime")?,
         })
     }
+}
+
+fn json_string(value: &serde_json::Value, field: &str) -> EntraResult<String> {
+    value
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| EntraError::Sync(format!("Missing or non-string {field}")))
 }
 
 fn json_bool(value: &serde_json::Value, field: &str) -> EntraResult<bool> {
@@ -299,6 +304,7 @@ mod tests {
         let json = serde_json::json!({
             "id": "user-123",
             "userPrincipalName": "john@example.com",
+            "displayName": "John",
             "accountEnabled": true
         });
 
@@ -315,6 +321,7 @@ mod tests {
         let json = serde_json::json!({
             "id": "user-123",
             "userPrincipalName": "disabled@example.com",
+            "displayName": "Disabled",
             "accountEnabled": false
         });
 
@@ -356,5 +363,16 @@ mod tests {
                 && !production.contains("parse_from_rfc3339(s).ok()"),
             "Entra user sync must not treat missing accountEnabled as enabled or drop bad dates"
         );
+        assert!(
+            production.contains("json_string(value, \"displayName\")")
+                && !production.contains("unwrap_or_default()"),
+            "Entra user displayName must not silently become empty"
+        );
+        let missing_name = serde_json::json!({
+            "id": "user-123",
+            "userPrincipalName": "john@example.com",
+            "accountEnabled": true
+        });
+        assert!(MappedEntraUser::from_json(&missing_name).is_err());
     }
 }

@@ -1002,13 +1002,10 @@ impl RestConnector {
         required: bool,
     ) -> ConnectorResult<SchemaAttribute> {
         // Determine data type from JSON Schema type
-        let json_type = prop
-            .get("type")
-            .and_then(|t| t.as_str())
-            .unwrap_or("string");
+        let json_type = Self::openapi_type(prop)?;
         let format = prop.get("format").and_then(|f| f.as_str());
 
-        let data_type = self.json_schema_type_to_attribute_type(json_type, format);
+        let data_type = self.json_schema_type_to_attribute_type(json_type, format)?;
 
         let mut attr = SchemaAttribute::new(name, name, data_type);
 
@@ -1060,6 +1057,20 @@ impl RestConnector {
         }
 
         Ok(attr)
+    }
+
+    /// OpenAPI `type` must be a non-empty string. Missing types must not become `string`.
+    fn openapi_type(prop: &Value) -> ConnectorResult<&str> {
+        match prop.get("type") {
+            None | Some(Value::Null) => Err(ConnectorError::InvalidConfiguration {
+                message: "OpenAPI property 'type' is required".to_string(),
+            }),
+            Some(v) => v.as_str().filter(|s| !s.is_empty()).ok_or_else(|| {
+                ConnectorError::InvalidConfiguration {
+                    message: "OpenAPI property 'type' must be a string".to_string(),
+                }
+            }),
+        }
     }
 
     fn json_schema_bool(prop: &Value, field: &str) -> ConnectorResult<bool> {
@@ -1119,8 +1130,8 @@ impl RestConnector {
         &self,
         json_type: &str,
         format: Option<&str>,
-    ) -> AttributeDataType {
-        match (json_type, format) {
+    ) -> ConnectorResult<AttributeDataType> {
+        Ok(match (json_type, format) {
             ("string", Some("uuid")) => AttributeDataType::Uuid,
             ("string", Some("date-time")) => AttributeDataType::DateTime,
             ("string", Some("date")) => AttributeDataType::Date,
@@ -1138,8 +1149,12 @@ impl RestConnector {
             ("boolean", _) => AttributeDataType::Boolean,
             ("array", _) => AttributeDataType::String, // Array items handled separately
             ("object", _) => AttributeDataType::String, // Nested objects as JSON string
-            _ => AttributeDataType::String,
-        }
+            _ => {
+                return Err(ConnectorError::InvalidConfiguration {
+                    message: format!("unsupported OpenAPI type '{json_type}'"),
+                })
+            }
+        })
     }
 }
 
@@ -1729,91 +1744,130 @@ mod tests {
 
         // String types
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("string", None),
+            connector
+                .json_schema_type_to_attribute_type("string", None)
+                .unwrap(),
             AttributeDataType::String
         );
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("string", Some("email")),
+            connector
+                .json_schema_type_to_attribute_type("string", Some("email"))
+                .unwrap(),
             AttributeDataType::String
         );
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("string", Some("uri")),
+            connector
+                .json_schema_type_to_attribute_type("string", Some("uri"))
+                .unwrap(),
             AttributeDataType::String
         );
 
         // UUID format
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("string", Some("uuid")),
+            connector
+                .json_schema_type_to_attribute_type("string", Some("uuid"))
+                .unwrap(),
             AttributeDataType::Uuid
         );
 
         // Date/Time formats
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("string", Some("date-time")),
+            connector
+                .json_schema_type_to_attribute_type("string", Some("date-time"))
+                .unwrap(),
             AttributeDataType::DateTime
         );
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("string", Some("date")),
+            connector
+                .json_schema_type_to_attribute_type("string", Some("date"))
+                .unwrap(),
             AttributeDataType::Date
         );
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("string", Some("time")),
+            connector
+                .json_schema_type_to_attribute_type("string", Some("time"))
+                .unwrap(),
             AttributeDataType::Timestamp
         );
 
         // Binary formats
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("string", Some("binary")),
+            connector
+                .json_schema_type_to_attribute_type("string", Some("binary"))
+                .unwrap(),
             AttributeDataType::Binary
         );
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("string", Some("byte")),
+            connector
+                .json_schema_type_to_attribute_type("string", Some("byte"))
+                .unwrap(),
             AttributeDataType::Binary
         );
 
         // Integer types
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("integer", None),
+            connector
+                .json_schema_type_to_attribute_type("integer", None)
+                .unwrap(),
             AttributeDataType::Integer
         );
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("integer", Some("int32")),
+            connector
+                .json_schema_type_to_attribute_type("integer", Some("int32"))
+                .unwrap(),
             AttributeDataType::Integer
         );
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("integer", Some("int64")),
+            connector
+                .json_schema_type_to_attribute_type("integer", Some("int64"))
+                .unwrap(),
             AttributeDataType::Long
         );
 
         // Number types (mapped to Long)
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("number", None),
+            connector
+                .json_schema_type_to_attribute_type("number", None)
+                .unwrap(),
             AttributeDataType::Long
         );
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("number", Some("float")),
+            connector
+                .json_schema_type_to_attribute_type("number", Some("float"))
+                .unwrap(),
             AttributeDataType::Long
         );
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("number", Some("double")),
+            connector
+                .json_schema_type_to_attribute_type("number", Some("double"))
+                .unwrap(),
             AttributeDataType::Long
         );
 
         // Boolean
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("boolean", None),
+            connector
+                .json_schema_type_to_attribute_type("boolean", None)
+                .unwrap(),
             AttributeDataType::Boolean
         );
 
-        // Complex types default to String
+        // Complex types map to String
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("array", None),
+            connector
+                .json_schema_type_to_attribute_type("array", None)
+                .unwrap(),
             AttributeDataType::String
         );
         assert_eq!(
-            connector.json_schema_type_to_attribute_type("object", None),
+            connector
+                .json_schema_type_to_attribute_type("object", None)
+                .unwrap(),
             AttributeDataType::String
         );
+        assert!(connector
+            .json_schema_type_to_attribute_type("mystery", None)
+            .is_err());
     }
 
     #[test]
@@ -1973,6 +2027,16 @@ mod tests {
                 && production.contains("openapi_required_props(")
                 && production.contains("openapi_enum_strings("),
             "OpenAPI readOnly/writeOnly/required/enum must not drop or fail-open"
+        );
+        assert!(
+            production.contains("openapi_type(") && !production.contains("unwrap_or(\"string\")"),
+            "OpenAPI property type must not default to string"
+        );
+        assert!(RestConnector::openapi_type(&serde_json::json!({})).is_err());
+        assert!(RestConnector::openapi_type(&serde_json::json!({"type": 1})).is_err());
+        assert_eq!(
+            RestConnector::openapi_type(&serde_json::json!({"type": "integer"})).unwrap(),
+            "integer"
         );
         assert!(
             !production.contains("filter_map(|v| v.as_str())"),

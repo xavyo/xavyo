@@ -13,6 +13,18 @@ use xavyo_nhi::NhiType;
 
 use crate::error::NhiApiError;
 
+/// Never-seen NHIs must score as fully inactive, not 0 days.
+pub fn inactivity_days(
+    last_activity_at: Option<chrono::DateTime<Utc>>,
+    now: chrono::DateTime<Utc>,
+    threshold_days: i64,
+) -> i64 {
+    match last_activity_at {
+        Some(at) => (now - at).num_days(),
+        None => threshold_days.max(0),
+    }
+}
+
 /// Individual risk factor with score and weight.
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -143,10 +155,7 @@ impl NhiRiskService {
 
     fn inactivity_factor(identity: &NhiIdentity) -> RiskFactor {
         let threshold = i64::from(identity.inactivity_threshold_days.unwrap_or(90));
-        let days_inactive = identity
-            .last_activity_at
-            .map(|la| (Utc::now() - la).num_days())
-            .unwrap_or(0);
+        let days_inactive = inactivity_days(identity.last_activity_at, Utc::now(), threshold);
         let score = if threshold > 0 {
             ((days_inactive as f64 / threshold as f64) * 100.0).min(100.0)
         } else {
@@ -281,6 +290,8 @@ impl NhiRiskService {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn risk_factors_do_not_fail_open_on_query_errors() {
         let src = include_str!("nhi_risk_service.rs");
@@ -362,6 +373,26 @@ mod tests {
         assert!(
             !compute.contains("let _ = NhiIdentity::update_risk_score"),
             "must not swallow risk score persist errors"
+        );
+    }
+
+    #[test]
+    fn never_active_nhi_is_not_scored_as_zero_inactivity() {
+        let now = Utc::now();
+        assert_eq!(inactivity_days(None, now, 90), 90);
+        assert_eq!(inactivity_days(Some(now), now, 90), 0);
+        let src = include_str!("nhi_risk_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let inactivity = production
+            .split("fn inactivity_factor")
+            .nth(1)
+            .expect("inactivity_factor")
+            .split("fn blast_radius_factor")
+            .next()
+            .expect("inactivity_factor body");
+        assert!(
+            inactivity.contains("inactivity_days(") && !inactivity.contains("unwrap_or(0)"),
+            "missing last_activity_at must not score as 0 days inactive"
         );
     }
 }

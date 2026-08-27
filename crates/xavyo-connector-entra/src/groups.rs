@@ -58,11 +58,7 @@ impl MappedEntraGroup {
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| EntraError::Sync("Missing group id".into()))?
                 .to_string(),
-            display_name: value
-                .get("displayName")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string(),
+            display_name: json_string(value, "displayName")?,
             description: value
                 .get("description")
                 .and_then(|v| v.as_str())
@@ -92,6 +88,15 @@ impl MappedEntraGroup {
             EntraGroupType::Unknown
         }
     }
+}
+
+fn json_string(value: &serde_json::Value, field: &str) -> EntraResult<String> {
+    value
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| EntraError::Sync(format!("Missing or non-string {field}")))
 }
 
 fn json_string_array(value: &serde_json::Value, field: &str) -> EntraResult<Vec<String>> {
@@ -314,6 +319,17 @@ mod tests {
             !production.contains("unwrap_or(false)"),
             "Entra group securityEnabled/mailEnabled must not silently become false"
         );
+        assert!(
+            production.contains("json_string(value, \"displayName\")")
+                && !production.contains("unwrap_or_default()"),
+            "Entra group displayName must not silently become empty"
+        );
+        let missing_name = serde_json::json!({
+            "id": "group-123",
+            "securityEnabled": true,
+            "mailEnabled": false
+        });
+        assert!(MappedEntraGroup::from_json(&missing_name).is_err());
     }
 
     #[test]
