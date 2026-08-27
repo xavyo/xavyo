@@ -995,11 +995,7 @@ impl MiningService {
             ));
         }
 
-        let new_status = match action {
-            "accept" => PrivilegeFlagStatus::Accepted,
-            "remediate" => PrivilegeFlagStatus::Remediated,
-            _ => PrivilegeFlagStatus::Reviewed,
-        };
+        let new_status = parse_privilege_review_action(action)?;
 
         let input = UpdateExcessivePrivilegeStatus {
             status: new_status,
@@ -1100,6 +1096,17 @@ impl MiningService {
         );
 
         Ok(suggestion)
+    }
+}
+
+/// Unknown review actions must not silently mark a flag as reviewed.
+fn parse_privilege_review_action(action: &str) -> Result<PrivilegeFlagStatus> {
+    match action {
+        "accept" => Ok(PrivilegeFlagStatus::Accepted),
+        "remediate" => Ok(PrivilegeFlagStatus::Remediated),
+        other => Err(GovernanceError::InvalidMiningParameters(format!(
+            "Invalid privilege review action '{other}'. Must be one of: accept, remediate"
+        ))),
     }
 }
 
@@ -1355,6 +1362,29 @@ mod tests {
         assert!(
             !run_job.contains("let _ = GovRoleMiningJob::fail"),
             "must not swallow mining job fail persist"
+        );
+    }
+
+    #[test]
+    fn unknown_privilege_review_action_does_not_mark_reviewed() {
+        assert_eq!(
+            parse_privilege_review_action("accept").unwrap(),
+            PrivilegeFlagStatus::Accepted
+        );
+        assert_eq!(
+            parse_privilege_review_action("remediate").unwrap(),
+            PrivilegeFlagStatus::Remediated
+        );
+        assert!(parse_privilege_review_action("reviewed").is_err());
+        assert!(parse_privilege_review_action("dismiss").is_err());
+        assert!(parse_privilege_review_action("").is_err());
+
+        let src = include_str!("mining_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_privilege_review_action(")
+                && !production.contains("_ => PrivilegeFlagStatus::Reviewed"),
+            "unknown privilege review action must not silently mark Reviewed"
         );
     }
 }

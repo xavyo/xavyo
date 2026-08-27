@@ -835,22 +835,8 @@ impl NhiCertificationService {
 
         let row = row.ok_or(GovernanceError::CampaignNotFound(campaign_id))?;
 
-        let status = match row.4.as_str() {
-            "draft" => NhiCertCampaignStatus::Draft,
-            "active" => NhiCertCampaignStatus::Active,
-            "overdue" => NhiCertCampaignStatus::Overdue,
-            "completed" => NhiCertCampaignStatus::Completed,
-            "cancelled" => NhiCertCampaignStatus::Cancelled,
-            _ => NhiCertCampaignStatus::Draft,
-        };
-
-        let reviewer_type = match row.5.as_str() {
-            "owner" => NhiCertReviewerType::Owner,
-            "backup_owner" => NhiCertReviewerType::BackupOwner,
-            "specific_users" => NhiCertReviewerType::SpecificUsers,
-            "owner_manager" => NhiCertReviewerType::OwnerManager,
-            _ => NhiCertReviewerType::Owner,
-        };
+        let status = parse_campaign_status(&row.4)?;
+        let reviewer_type = parse_reviewer_type(&row.5)?;
 
         let specific_reviewers = parse_reviewers(row.6)?;
 
@@ -966,30 +952,13 @@ impl NhiCertificationService {
         let campaigns = rows
             .into_iter()
             .map(|row| {
-                let status = match row.4.as_str() {
-                    "draft" => NhiCertCampaignStatus::Draft,
-                    "active" => NhiCertCampaignStatus::Active,
-                    "overdue" => NhiCertCampaignStatus::Overdue,
-                    "completed" => NhiCertCampaignStatus::Completed,
-                    "cancelled" => NhiCertCampaignStatus::Cancelled,
-                    _ => NhiCertCampaignStatus::Draft,
-                };
-
-                let reviewer_type = match row.5.as_str() {
-                    "owner" => NhiCertReviewerType::Owner,
-                    "backup_owner" => NhiCertReviewerType::BackupOwner,
-                    "specific_users" => NhiCertReviewerType::SpecificUsers,
-                    "owner_manager" => NhiCertReviewerType::OwnerManager,
-                    _ => NhiCertReviewerType::Owner,
-                };
-
                 Ok(NhiCertificationCampaign {
                     id: row.0,
                     tenant_id: row.1,
                     name: row.2,
                     description: row.3,
-                    status,
-                    reviewer_type,
+                    status: parse_campaign_status(&row.4)?,
+                    reviewer_type: parse_reviewer_type(&row.5)?,
                     specific_reviewers: parse_reviewers(row.6)?,
                     deadline: row.7,
                     created_by: row.8,
@@ -1132,20 +1101,8 @@ impl NhiCertificationService {
 
         let row = row.ok_or(GovernanceError::MicroCertificationNotFound(item_id))?;
 
-        let status = match row.5.as_str() {
-            "pending" => NhiCertificationStatus::Pending,
-            "certified" => NhiCertificationStatus::Certified,
-            "revoked" => NhiCertificationStatus::Revoked,
-            "expired" => NhiCertificationStatus::Expired,
-            _ => NhiCertificationStatus::Pending,
-        };
-
-        let decision = row.6.as_ref().map(|d| match d.as_str() {
-            "certify" => NhiCertificationDecision::Certify,
-            "revoke" => NhiCertificationDecision::Revoke,
-            "delegate" => NhiCertificationDecision::Delegate,
-            _ => NhiCertificationDecision::Certify,
-        });
+        let status = parse_item_status(&row.5)?;
+        let decision = row.6.as_ref().map(|d| parse_item_decision(d)).transpose()?;
 
         Ok(NhiCertificationItem {
             id: row.0,
@@ -1286,38 +1243,23 @@ impl NhiCertificationService {
         let items = rows
             .into_iter()
             .map(|row| {
-                let status = match row.5.as_str() {
-                    "pending" => NhiCertificationStatus::Pending,
-                    "certified" => NhiCertificationStatus::Certified,
-                    "revoked" => NhiCertificationStatus::Revoked,
-                    "expired" => NhiCertificationStatus::Expired,
-                    _ => NhiCertificationStatus::Pending,
-                };
-
-                let decision = row.6.as_ref().map(|d| match d.as_str() {
-                    "certify" => NhiCertificationDecision::Certify,
-                    "revoke" => NhiCertificationDecision::Revoke,
-                    "delegate" => NhiCertificationDecision::Delegate,
-                    _ => NhiCertificationDecision::Certify,
-                });
-
-                NhiCertificationItem {
+                Ok(NhiCertificationItem {
                     id: row.0,
                     tenant_id: row.1,
                     campaign_id: row.2,
                     nhi_id: row.3,
                     reviewer_id: row.4,
-                    status,
-                    decision,
+                    status: parse_item_status(&row.5)?,
+                    decision: row.6.as_ref().map(|d| parse_item_decision(d)).transpose()?,
                     decided_by: row.7,
                     decided_at: row.8,
                     comment: row.9,
                     delegated_by: row.10,
                     original_reviewer_id: row.11,
                     created_at: row.12,
-                }
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
 
         Ok((items, total))
     }
@@ -1551,6 +1493,54 @@ fn parse_reviewers(value: Option<serde_json::Value>) -> Result<Option<Vec<Uuid>>
     }
 }
 
+fn parse_campaign_status(s: &str) -> Result<NhiCertCampaignStatus> {
+    match s {
+        "draft" => Ok(NhiCertCampaignStatus::Draft),
+        "active" => Ok(NhiCertCampaignStatus::Active),
+        "overdue" => Ok(NhiCertCampaignStatus::Overdue),
+        "completed" => Ok(NhiCertCampaignStatus::Completed),
+        "cancelled" => Ok(NhiCertCampaignStatus::Cancelled),
+        other => Err(GovernanceError::Validation(format!(
+            "Invalid NHI campaign status '{other}'"
+        ))),
+    }
+}
+
+fn parse_reviewer_type(s: &str) -> Result<NhiCertReviewerType> {
+    match s {
+        "owner" => Ok(NhiCertReviewerType::Owner),
+        "backup_owner" => Ok(NhiCertReviewerType::BackupOwner),
+        "specific_users" => Ok(NhiCertReviewerType::SpecificUsers),
+        "owner_manager" => Ok(NhiCertReviewerType::OwnerManager),
+        other => Err(GovernanceError::Validation(format!(
+            "Invalid NHI reviewer type '{other}'"
+        ))),
+    }
+}
+
+fn parse_item_status(s: &str) -> Result<NhiCertificationStatus> {
+    match s {
+        "pending" => Ok(NhiCertificationStatus::Pending),
+        "certified" => Ok(NhiCertificationStatus::Certified),
+        "revoked" => Ok(NhiCertificationStatus::Revoked),
+        "expired" => Ok(NhiCertificationStatus::Expired),
+        other => Err(GovernanceError::Validation(format!(
+            "Invalid NHI certification status '{other}'"
+        ))),
+    }
+}
+
+fn parse_item_decision(s: &str) -> Result<NhiCertificationDecision> {
+    match s {
+        "certify" => Ok(NhiCertificationDecision::Certify),
+        "revoke" => Ok(NhiCertificationDecision::Revoke),
+        "delegate" => Ok(NhiCertificationDecision::Delegate),
+        other => Err(GovernanceError::Validation(format!(
+            "Invalid NHI certification decision '{other}'"
+        ))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1667,6 +1657,44 @@ mod tests {
         assert!(
             production.contains("parse_reviewers(") && !production.contains("from_value(v).ok()"),
             "NHI campaign load must fail closed on reviewer JSON parse"
+        );
+    }
+
+    #[test]
+    fn stored_nhi_cert_enums_do_not_fail_open() {
+        assert_eq!(
+            parse_campaign_status("completed").unwrap(),
+            NhiCertCampaignStatus::Completed
+        );
+        assert!(parse_campaign_status("bogus").is_err());
+        assert_eq!(
+            parse_reviewer_type("specific_users").unwrap(),
+            NhiCertReviewerType::SpecificUsers
+        );
+        assert!(parse_reviewer_type("admin").is_err());
+        assert_eq!(
+            parse_item_status("revoked").unwrap(),
+            NhiCertificationStatus::Revoked
+        );
+        assert!(parse_item_status("approved").is_err());
+        assert_eq!(
+            parse_item_decision("revoke").unwrap(),
+            NhiCertificationDecision::Revoke
+        );
+        assert!(parse_item_decision("approve").is_err());
+
+        let src = include_str!("nhi_certification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_campaign_status(")
+                && production.contains("parse_reviewer_type(")
+                && production.contains("parse_item_status(")
+                && production.contains("parse_item_decision(")
+                && !production.contains("_ => NhiCertCampaignStatus::Draft")
+                && !production.contains("_ => NhiCertReviewerType::Owner")
+                && !production.contains("_ => NhiCertificationStatus::Pending")
+                && !production.contains("_ => NhiCertificationDecision::Certify"),
+            "unknown stored NHI cert enums must not become draft/owner/pending/certify"
         );
     }
 }
