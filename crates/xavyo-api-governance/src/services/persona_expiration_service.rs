@@ -12,7 +12,7 @@ use tracing::info;
 use uuid::Uuid;
 
 use xavyo_db::models::{
-    GovPersona, GovPersonaArchetype, GovPersonaAuditEvent, GovPersonaSession,
+    GovPersona, GovPersonaArchetype, GovPersonaAuditEvent, GovPersonaSession, LifecyclePolicy,
     PersonaAuditEventFilter, PersonaAuditEventType, PersonaStatus,
 };
 use xavyo_governance::error::{GovernanceError, Result};
@@ -36,6 +36,31 @@ pub(crate) fn expiration_notification_sent() -> bool {
 pub fn reject_unapproved_persona_extension(requires_approval: bool, is_owner: bool) -> Result<()> {
     if requires_approval && !is_owner {
         Err(GovernanceError::PersonaExtensionRequiresApproval)
+    } else {
+        Ok(())
+    }
+}
+
+/// Fail closed: unreadable lifecycle JSON must not skip max-validity enforcement.
+pub fn required_lifecycle_policy(
+    parsed: std::result::Result<LifecyclePolicy, serde_json::Error>,
+) -> Result<LifecyclePolicy> {
+    parsed.map_err(|e| GovernanceError::InvalidLifecyclePolicy(e.to_string()))
+}
+
+/// Reject an extension that would push the persona past `max_validity_days`.
+pub fn enforce_max_validity_days(
+    policy: &LifecyclePolicy,
+    persona_id: Uuid,
+    created_at: DateTime<Utc>,
+    new_valid_until: DateTime<Utc>,
+) -> Result<()> {
+    let max_valid_until = created_at + Duration::days(i64::from(policy.max_validity_days));
+    if new_valid_until > max_valid_until {
+        Err(GovernanceError::PersonaExtensionExceedsMax {
+            persona_id,
+            max_days: policy.max_validity_days,
+        })
     } else {
         Ok(())
     }
@@ -406,14 +431,13 @@ impl PersonaExpirationService {
                 .await
                 .map_err(GovernanceError::Database)?;
 
-        let requires_approval = if let Some(ref arch) = archetype {
-            // Parse lifecycle_policy and check extension_requires_approval
-            arch.parse_lifecycle_policy()
-                .map(|policy| policy.extension_requires_approval)
-                .unwrap_or(true) // Default to requiring approval if parsing fails
-        } else {
-            true // Default to requiring approval if archetype not found
-        };
+        let arch = archetype.ok_or_else(|| {
+            GovernanceError::InvalidLifecyclePolicy(
+                "persona archetype is required to enforce extension policy".into(),
+            )
+        })?;
+        let policy = required_lifecycle_policy(arch.parse_lifecycle_policy())?;
+        let requires_approval = policy.extension_requires_approval;
 
         // If approval is required and actor is not the persona owner, check authorization
         // Note: In a full implementation, this would integrate with an approval workflow.
@@ -431,20 +455,7 @@ impl PersonaExpirationService {
             current_valid_until + Duration::days(i64::from(extension_days))
         };
 
-        // Check max_validity_days constraint from lifecycle_policy
-        if let Some(ref arch) = archetype {
-            if let Ok(policy) = arch.parse_lifecycle_policy() {
-                let max_duration = Duration::days(i64::from(policy.max_validity_days));
-                let persona_created_at = persona.created_at;
-                let max_valid_until = persona_created_at + max_duration;
-                if new_valid_until > max_valid_until {
-                    return Err(GovernanceError::PersonaExtensionExceedsMax {
-                        persona_id,
-                        max_days: policy.max_validity_days,
-                    });
-                }
-            }
-        }
+        enforce_max_validity_days(&policy, persona_id, persona.created_at, new_valid_until)?;
 
         // Update the persona
         let _ = GovPersona::extend_validity(&self.pool, tenant_id, persona_id, new_valid_until)
@@ -611,6 +622,42 @@ mod tests {
     fn owner_can_self_extend_when_approval_required() {
         assert!(reject_unapproved_persona_extension(true, true).is_ok());
         assert!(reject_unapproved_persona_extension(false, false).is_ok());
+    }
+
+    #[test]
+    fn unreadable_lifecycle_policy_does_not_skip_max_validity() {
+        let err = required_lifecycle_policy(serde_json::from_str::<LifecyclePolicy>("not-json"))
+            .expect_err("fail closed");
+        assert!(matches!(err, GovernanceError::InvalidLifecyclePolicy(_)));
+
+        let policy = LifecyclePolicy {
+            max_validity_days: 30,
+            ..Default::default()
+        };
+        let created = Utc::now();
+        let too_far = created + Duration::days(31);
+        let err = enforce_max_validity_days(&policy, Uuid::new_v4(), created, too_far)
+            .expect_err("must enforce max");
+        assert!(matches!(
+            err,
+            GovernanceError::PersonaExtensionExceedsMax { max_days: 30, .. }
+        ));
+        assert!(enforce_max_validity_days(
+            &policy,
+            Uuid::new_v4(),
+            created,
+            created + Duration::days(30)
+        )
+        .is_ok());
+
+        let src = include_str!("persona_expiration_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("required_lifecycle_policy(")
+                && production.contains("enforce_max_validity_days(")
+                && !production.contains("if let Ok(policy) = arch.parse_lifecycle_policy()"),
+            "max_validity_days must not be skipped when lifecycle_policy JSON is unreadable"
+        );
     }
 
     #[test]

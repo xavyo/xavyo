@@ -37,9 +37,21 @@
 //! | `pad_left(str, len, char)` | Pad string left | `pad_left("42", 5, "0")` |
 //! | `pad_right(str, len, char)` | Pad string right | `pad_right("42", 5, "0")` |
 
-use rhai::{Dynamic, Engine, Scope};
+use rhai::{Dynamic, Engine, EvalAltResult, Scope};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
+
+/// Fail closed: invalid integers must not become 0 in provisioning transforms.
+pub fn parse_transform_int(s: &str) -> Result<i64, String> {
+    s.parse::<i64>()
+        .map_err(|_| format!("to_int: cannot parse '{s}' as integer"))
+}
+
+/// Fail closed: invalid floats must not become 0.0 in provisioning transforms.
+pub fn parse_transform_float(s: &str) -> Result<f64, String> {
+    s.parse::<f64>()
+        .map_err(|_| format!("to_float: cannot parse '{s}' as float"))
+}
 
 /// Configuration for the transformation engine.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -405,10 +417,14 @@ impl TransformEngine {
         engine.register_fn("is_map", |val: Dynamic| val.is_map());
         engine.register_fn("is_null", |val: Dynamic| val.is_unit());
 
-        // Type conversion
+        // Type conversion — invalid numbers must fail the script, not become 0.
         engine.register_fn("to_string", |val: Dynamic| val.to_string());
-        engine.register_fn("to_int", |s: &str| -> i64 { s.parse().unwrap_or(0) });
-        engine.register_fn("to_float", |s: &str| -> f64 { s.parse().unwrap_or(0.0) });
+        engine.register_fn("to_int", |s: &str| -> Result<i64, Box<EvalAltResult>> {
+            parse_transform_int(s).map_err(|e| e.into())
+        });
+        engine.register_fn("to_float", |s: &str| -> Result<f64, Box<EvalAltResult>> {
+            parse_transform_float(s).map_err(|e| e.into())
+        });
         engine.register_fn("to_bool", |s: &str| -> bool {
             matches!(s.to_lowercase().as_str(), "true" | "yes" | "1" | "on")
         });
@@ -942,6 +958,35 @@ mod tests {
 
         let result = engine.evaluate_expression(r#"to_bool("true")"#, &serde_json::Value::Null);
         assert_eq!(result.unwrap(), serde_json::json!(true));
+    }
+
+    #[test]
+    fn to_int_and_to_float_fail_closed_on_invalid_input() {
+        assert_eq!(parse_transform_int("42").unwrap(), 42);
+        assert!(parse_transform_int("not-a-number").is_err());
+        assert!(parse_transform_int("").is_err());
+        assert!((parse_transform_float("3.14").unwrap() - 3.14).abs() < 0.001);
+        assert!(parse_transform_float("nope").is_err());
+
+        let engine = TransformEngine::new();
+        assert!(engine
+            .evaluate_expression(r#"to_int("abc")"#, &serde_json::Value::Null)
+            .is_err());
+        assert!(engine
+            .evaluate_expression(r#"to_float("abc")"#, &serde_json::Value::Null)
+            .is_err());
+
+        let src = include_str!("transform.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(0)") && !production.contains("unwrap_or(0.0)"),
+            "to_int/to_float must not coerce invalid strings to 0"
+        );
+        assert!(
+            production.contains("parse_transform_int(")
+                && production.contains("parse_transform_float("),
+            "transforms must use fail-closed numeric parsers"
+        );
     }
 
     // ==================== Validation Tests ====================
