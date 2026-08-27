@@ -105,7 +105,7 @@ async fn bootstrap_admin_user(pool: &PgPool) {
         }
     };
 
-    // Insert user (idempotent via ON CONFLICT)
+    // Insert user (idempotent via case-insensitive unique index users_tenant_email_ci_unique)
     let result = sqlx::query(
         r"
         INSERT INTO users (
@@ -116,7 +116,7 @@ async fn bootstrap_admin_user(pool: &PgPool) {
             gen_random_uuid(), $1, $2, $3, 'Admin',
             true, true, NOW(), NOW(), NOW()
         )
-        ON CONFLICT (tenant_id, email) DO NOTHING
+        ON CONFLICT (tenant_id, (lower(email))) DO NOTHING
         ",
     )
     .bind(SYSTEM_TENANT_ID)
@@ -128,38 +128,52 @@ async fn bootstrap_admin_user(pool: &PgPool) {
     match result {
         Ok(r) if r.rows_affected() > 0 => {
             info!(email = %admin_email, "bootstrap.admin.created: Admin user created");
-
-            // Fetch the user ID for role assignment
-            let user_id: Result<(uuid::Uuid,), _> =
-                sqlx::query_as("SELECT id FROM users WHERE tenant_id = $1 AND email = $2")
-                    .bind(SYSTEM_TENANT_ID)
-                    .bind(&admin_email)
-                    .fetch_one(pool)
-                    .await;
-
-            if let Ok((uid,)) = user_id {
-                // Assign super_admin role
-                let _ = sqlx::query(
-                    r"
-                    INSERT INTO user_roles (user_id, role_name, created_at)
-                    VALUES ($1, 'super_admin', NOW())
-                    ON CONFLICT (user_id, role_name) DO NOTHING
-                    ",
-                )
-                .bind(uid)
-                .execute(pool)
-                .await;
-
-                info!(email = %admin_email, role = "super_admin", "bootstrap.admin.role: Admin role assigned");
-            }
         }
         Ok(_) => {
             info!(email = %admin_email, "bootstrap.admin.exists: Admin user already exists");
         }
         Err(e) => {
             error!(error = %e, email = %admin_email, "Failed to create admin user");
+            return;
         }
     }
+
+    // Ensure super_admin role even when the user already existed (idempotent restarts)
+    let uid = match sqlx::query_as::<_, (uuid::Uuid,)>(
+        "SELECT id FROM users WHERE tenant_id = $1 AND lower(email) = lower($2)",
+    )
+    .bind(SYSTEM_TENANT_ID)
+    .bind(&admin_email)
+    .fetch_optional(pool)
+    .await
+    {
+        Ok(Some((uid,))) => uid,
+        Ok(None) => {
+            error!(email = %admin_email, "Admin user missing after bootstrap insert");
+            return;
+        }
+        Err(e) => {
+            error!(error = %e, email = %admin_email, "Failed to look up bootstrap admin user");
+            return;
+        }
+    };
+
+    if let Err(e) = sqlx::query(
+        r"
+        INSERT INTO user_roles (user_id, role_name, created_at)
+        VALUES ($1, 'super_admin', NOW())
+        ON CONFLICT (user_id, role_name) DO NOTHING
+        ",
+    )
+    .bind(uid)
+    .execute(pool)
+    .await
+    {
+        error!(error = %e, email = %admin_email, "Failed to assign super_admin role");
+        return;
+    }
+
+    info!(email = %admin_email, role = "super_admin", "bootstrap.admin.role: Admin role assigned");
 }
 
 /// Runs bootstrap and returns a boolean indicating success.
