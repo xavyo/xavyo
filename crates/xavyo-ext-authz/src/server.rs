@@ -22,6 +22,23 @@ use crate::response::{
     build_allow_response, build_deny_response, build_fail_open_response, AllowMetadata,
 };
 
+/// Resolve the NHI identity to look up for an ext_authz check.
+///
+/// Delegated tokens (`act` present) must name a valid actor UUID. Falling
+/// back to the subject would evaluate lifecycle and risk against the wrong
+/// identity.
+fn delegated_nhi_lookup_id(
+    act: Option<&xavyo_auth::ActorClaim>,
+    subject_id: Uuid,
+) -> Result<Uuid, ExtAuthzError> {
+    match act {
+        None => Ok(subject_id),
+        Some(act) => Uuid::parse_str(&act.sub).map_err(|_| {
+            ExtAuthzError::AuthorizationDenied("delegated token has invalid actor sub claim".into())
+        }),
+    }
+}
+
 /// The ext_authz gRPC service implementation.
 pub struct ExtAuthzService {
     pool: Arc<PgPool>,
@@ -101,11 +118,10 @@ impl ExtAuthzService {
         // Step 3: Lookup NHI identity (with cache)
         // For delegated tokens (act claim present), the NHI is the ACTOR, not the subject.
         // The subject is the principal (user or NHI being represented).
-        let nhi_lookup_id = if let Some(ref act) = ctx.act {
-            Uuid::parse_str(&act.sub).unwrap_or(ctx.subject_id)
-        } else {
-            ctx.subject_id
-        };
+        // A malformed actor sub must not fall back to the subject — that would
+        // evaluate lifecycle/risk against the wrong identity.
+        let nhi_lookup_id =
+            delegated_nhi_lookup_id(ctx.act.as_ref(), ctx.subject_id).map_err(ctx_err)?;
 
         let cached = self
             .nhi_cache
@@ -158,15 +174,8 @@ impl ExtAuthzService {
                 .map_err(|e| ctx_err(e.into()))?;
 
             // Parse the actor NHI ID from the act claim — must be a valid UUID.
-            let actor_nhi_id = ctx
-                .act
-                .as_ref()
-                .and_then(|a| Uuid::parse_str(&a.sub).ok())
-                .ok_or_else(|| {
-                    ctx_err(ExtAuthzError::AuthorizationDenied(
-                        "delegated token has invalid actor sub claim".into(),
-                    ))
-                })?;
+            let actor_nhi_id =
+                delegated_nhi_lookup_id(ctx.act.as_ref(), ctx.subject_id).map_err(ctx_err)?;
 
             match grant {
                 Some(g) if g.is_active() => {
@@ -260,7 +269,7 @@ impl ExtAuthzService {
             requires_human_approval,
             decision_id: decision.decision_id,
             is_delegated: ctx.act.is_some(),
-            actor_nhi_id: ctx.act.as_ref().and_then(|a| Uuid::parse_str(&a.sub).ok()),
+            actor_nhi_id: ctx.act.is_some().then_some(nhi_lookup_id),
             delegation_id: ctx.delegation_id,
             delegation_depth: ctx.delegation_depth,
             principal_type: delegation_principal_type,
@@ -336,5 +345,49 @@ impl Authorization for ExtAuthzService {
                 Ok(Response::new(build_deny_response(&err, ctx.as_ref())))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn actor(sub: &str) -> xavyo_auth::ActorClaim {
+        xavyo_auth::ActorClaim {
+            sub: sub.to_string(),
+            nhi_type: None,
+            act: None,
+        }
+    }
+
+    #[test]
+    fn non_delegated_lookup_uses_subject() {
+        let subject = Uuid::new_v4();
+        assert_eq!(delegated_nhi_lookup_id(None, subject).unwrap(), subject);
+    }
+
+    #[test]
+    fn delegated_lookup_uses_actor_uuid() {
+        let subject = Uuid::new_v4();
+        let actor_id = Uuid::new_v4();
+        let act = actor(&actor_id.to_string());
+        assert_eq!(
+            delegated_nhi_lookup_id(Some(&act), subject).unwrap(),
+            actor_id
+        );
+    }
+
+    #[test]
+    fn delegated_lookup_rejects_malformed_actor_sub() {
+        let subject = Uuid::new_v4();
+        let act = actor("not-a-uuid");
+        let err = delegated_nhi_lookup_id(Some(&act), subject).unwrap_err();
+        assert!(matches!(err, ExtAuthzError::AuthorizationDenied(_)));
+        let src = include_str!("server.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(ctx.subject_id)"),
+            "malformed act.sub must not fall back to the subject NHI"
+        );
     }
 }

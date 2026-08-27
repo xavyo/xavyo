@@ -324,19 +324,7 @@ impl LdapConnector {
                 ),
             })?;
 
-        let naming_str = match naming_value {
-            AttributeValue::String(s) => s.clone(),
-            AttributeValue::Array(arr) => arr
-                .first()
-                .and_then(|v| v.as_string())
-                .map(std::string::ToString::to_string)
-                .unwrap_or_default(),
-            _ => {
-                return Err(ConnectorError::InvalidData {
-                    message: format!("Naming attribute must be a string, got {naming_value:?}"),
-                })
-            }
-        };
+        let naming_str = naming_attribute_string(naming_value)?;
 
         // SECURITY: Escape the naming value per RFC 4514 to prevent LDAP injection.
         // This protects against malicious values like "cn=admin,dc=evil,dc=com"
@@ -348,6 +336,38 @@ impl LdapConnector {
             naming_attr, escaped_value, self.config.base_dn
         ))
     }
+}
+
+/// Extract a non-empty naming-attribute string for DN construction.
+///
+/// An empty or non-string value must not become `cn=,dc=...` — that would
+/// create (or look up) an entry under a forged empty RDN.
+fn naming_attribute_string(naming_value: &AttributeValue) -> ConnectorResult<String> {
+    let s = match naming_value {
+        AttributeValue::String(s) => s.clone(),
+        AttributeValue::Array(arr) => {
+            let first = arr.first().ok_or_else(|| ConnectorError::InvalidData {
+                message: "Naming attribute array is empty".to_string(),
+            })?;
+            first
+                .as_string()
+                .map(str::to_string)
+                .ok_or_else(|| ConnectorError::InvalidData {
+                    message: format!("Naming attribute must be a string, got {first:?}"),
+                })?
+        }
+        other => {
+            return Err(ConnectorError::InvalidData {
+                message: format!("Naming attribute must be a string, got {other:?}"),
+            })
+        }
+    };
+    if s.is_empty() {
+        return Err(ConnectorError::InvalidData {
+            message: "Naming attribute must not be empty".to_string(),
+        });
+    }
+    Ok(s)
 }
 
 #[async_trait]
@@ -1381,6 +1401,41 @@ mod tests {
     fn test_escape_dn_value_nul() {
         // NUL character must be hex-escaped
         assert_eq!(LdapConnector::escape_dn_value("a\0b"), "a\\00b");
+    }
+
+    #[test]
+    fn naming_attribute_rejects_empty_and_non_string() {
+        assert_eq!(
+            naming_attribute_string(&AttributeValue::String("Jane".into())).unwrap(),
+            "Jane"
+        );
+        assert!(naming_attribute_string(&AttributeValue::String(String::new())).is_err());
+        assert!(naming_attribute_string(&AttributeValue::Array(vec![])).is_err());
+        assert!(
+            naming_attribute_string(&AttributeValue::Array(vec![AttributeValue::Integer(1)]))
+                .is_err()
+        );
+        assert!(naming_attribute_string(&AttributeValue::Boolean(true)).is_err());
+
+        let config = LdapConfig::new(
+            "ldap.example.com",
+            "dc=example,dc=com",
+            "cn=admin,dc=example,dc=com",
+        );
+        let connector = LdapConnector::new(config).unwrap();
+        let mut attrs = AttributeSet::new();
+        attrs.set(
+            "cn",
+            AttributeValue::Array(vec![AttributeValue::Integer(1)]),
+        );
+        assert!(connector.build_dn("inetOrgPerson", &attrs).is_err());
+
+        let src = include_str!("connector.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or_default()"),
+            "LDAP naming attribute must not become an empty DN"
+        );
     }
 
     #[test]

@@ -3,7 +3,40 @@
 use serde::{Deserialize, Serialize};
 use tracing::{info, instrument};
 
-use crate::{EntraConnector, EntraResult};
+use crate::{EntraConnector, EntraError, EntraResult};
+
+fn json_string(value: &serde_json::Value, field: &str) -> EntraResult<String> {
+    value
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
+        .ok_or_else(|| EntraError::Sync(format!("Missing or non-string {field}")))
+}
+
+fn json_i64(value: &serde_json::Value, field: &str) -> EntraResult<i64> {
+    value
+        .get(field)
+        .and_then(serde_json::Value::as_i64)
+        .ok_or_else(|| EntraError::Sync(format!("Missing or non-integer {field}")))
+}
+
+fn parse_subscribed_sku(value: &serde_json::Value) -> EntraResult<EntraLicense> {
+    let enabled_units = match value.get("prepaidUnits") {
+        None | Some(serde_json::Value::Null) => 0,
+        Some(prepaid) => json_i64(prepaid, "enabled")?,
+    };
+    Ok(EntraLicense {
+        sku_id: json_string(value, "skuId")?,
+        sku_part_number: json_string(value, "skuPartNumber")?,
+        display_name: None,
+        consumed_units: json_i64(value, "consumedUnits")?,
+        enabled_units,
+    })
+}
+
+fn parse_license_sku_id(value: &serde_json::Value) -> EntraResult<String> {
+    json_string(value, "skuId")
+}
 
 /// Entra directory role.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -137,21 +170,9 @@ impl EntraConnector {
 
         let licenses: Vec<EntraLicense> = response
             .value
-            .into_iter()
-            .filter_map(|v| {
-                Some(EntraLicense {
-                    sku_id: v.get("skuId")?.as_str()?.to_string(),
-                    sku_part_number: v.get("skuPartNumber")?.as_str()?.to_string(),
-                    display_name: None, // Not available in API response
-                    consumed_units: v.get("consumedUnits")?.as_i64()?,
-                    enabled_units: v
-                        .get("prepaidUnits")
-                        .and_then(|pu| pu.get("enabled"))
-                        .and_then(serde_json::Value::as_i64)
-                        .unwrap_or(0),
-                })
-            })
-            .collect();
+            .iter()
+            .map(parse_subscribed_sku)
+            .collect::<EntraResult<_>>()?;
 
         info!("Found {} subscribed SKUs", licenses.len());
 
@@ -176,9 +197,9 @@ impl EntraConnector {
 
         let sku_ids: Vec<String> = response
             .value
-            .into_iter()
-            .filter_map(|v| v.get("skuId")?.as_str().map(String::from))
-            .collect();
+            .iter()
+            .map(parse_license_sku_id)
+            .collect::<EntraResult<_>>()?;
 
         Ok(UserLicenses {
             user_id: user_id.to_string(),
@@ -215,5 +236,47 @@ mod tests {
 
         assert_eq!(license.sku_part_number, "ENTERPRISEPACK");
         assert_eq!(license.consumed_units, 50);
+    }
+
+    #[test]
+    fn subscribed_sku_does_not_drop_partial_records() {
+        let ok = serde_json::json!({
+            "skuId": "sku-1",
+            "skuPartNumber": "ENTERPRISEPACK",
+            "consumedUnits": 50,
+            "prepaidUnits": { "enabled": 100 }
+        });
+        let license = parse_subscribed_sku(&ok).unwrap();
+        assert_eq!(license.sku_id, "sku-1");
+        assert_eq!(license.enabled_units, 100);
+
+        let missing_sku = serde_json::json!({
+            "skuPartNumber": "ENTERPRISEPACK",
+            "consumedUnits": 50
+        });
+        assert!(parse_subscribed_sku(&missing_sku).is_err());
+
+        let src = include_str!("roles.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("filter_map"),
+            "Entra subscribed SKUs must not drop incomplete license records"
+        );
+    }
+
+    #[test]
+    fn user_license_sku_id_must_be_a_string() {
+        assert_eq!(
+            parse_license_sku_id(&serde_json::json!({"skuId": "sku-1"})).unwrap(),
+            "sku-1"
+        );
+        assert!(parse_license_sku_id(&serde_json::json!({"skuId": 1})).is_err());
+        assert!(parse_license_sku_id(&serde_json::json!({})).is_err());
+        let src = include_str!("roles.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("filter_map(|v| v.get(\"skuId\")"),
+            "Entra user licenses must not drop non-string skuId values"
+        );
     }
 }

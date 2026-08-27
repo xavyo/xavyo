@@ -159,7 +159,7 @@ fn extract_claims_from_struct(s: &prost_types::Struct) -> Result<JwtClaims, ExtA
     let tid = get_string_field(s, "tid")
         .ok_or_else(|| ExtAuthzError::JwtExtraction("missing 'tid' claim".into()))?;
 
-    let roles = get_string_list_field(s, "roles").unwrap_or_default();
+    let roles = get_string_list_field(s, "roles")?;
 
     // Delegation fields
     let act = get_struct_field_as_json(s, "act");
@@ -202,14 +202,7 @@ fn decode_jwt_payload(token: &str) -> Result<JwtClaims, ExtAuthzError> {
         .ok_or_else(|| ExtAuthzError::JwtExtraction("missing 'tid' in JWT payload".into()))?
         .to_string();
 
-    let roles = payload["roles"]
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect()
-        })
-        .unwrap_or_default();
+    let roles = json_string_list(&payload["roles"], "roles")?;
 
     // Delegation fields
     let act = if payload["act"].is_object() {
@@ -357,26 +350,45 @@ fn prost_struct_to_json(s: &prost_types::Struct) -> serde_json::Value {
     serde_json::Value::Object(map)
 }
 
+/// Parse a JWT claim that must be a string array (missing/null → empty).
+fn json_string_list(value: &serde_json::Value, field: &str) -> Result<Vec<String>, ExtAuthzError> {
+    match value {
+        serde_json::Value::Null => Ok(Vec::new()),
+        serde_json::Value::Array(arr) => arr
+            .iter()
+            .map(|item| {
+                item.as_str().map(str::to_string).ok_or_else(|| {
+                    ExtAuthzError::JwtExtraction(format!("{field} must be an array of strings"))
+                })
+            })
+            .collect(),
+        _ => Err(ExtAuthzError::JwtExtraction(format!(
+            "{field} must be an array of strings"
+        ))),
+    }
+}
+
 /// Helper: get a list of strings from a protobuf Struct field.
-fn get_string_list_field(s: &prost_types::Struct, key: &str) -> Option<Vec<String>> {
-    s.fields.get(key).and_then(|v| {
-        if let Some(prost_types::value::Kind::ListValue(list)) = &v.kind {
-            Some(
-                list.values
-                    .iter()
-                    .filter_map(|v| {
-                        if let Some(prost_types::value::Kind::StringValue(s)) = &v.kind {
-                            Some(s.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect(),
-            )
-        } else {
-            None
-        }
-    })
+fn get_string_list_field(s: &prost_types::Struct, key: &str) -> Result<Vec<String>, ExtAuthzError> {
+    let Some(v) = s.fields.get(key) else {
+        return Ok(Vec::new());
+    };
+    match &v.kind {
+        None | Some(prost_types::value::Kind::NullValue(_)) => Ok(Vec::new()),
+        Some(prost_types::value::Kind::ListValue(list)) => list
+            .values
+            .iter()
+            .map(|item| match &item.kind {
+                Some(prost_types::value::Kind::StringValue(s)) => Ok(s.clone()),
+                _ => Err(ExtAuthzError::JwtExtraction(format!(
+                    "{key} must be an array of strings"
+                ))),
+            })
+            .collect(),
+        _ => Err(ExtAuthzError::JwtExtraction(format!(
+            "{key} must be an array of strings"
+        ))),
+    }
 }
 
 #[cfg(test)]
@@ -496,6 +508,40 @@ mod tests {
         assert!(claims.roles.is_empty());
     }
 
+    fn jwt_with_payload(payload: serde_json::Value) -> String {
+        use base64::Engine;
+        let payload_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(serde_json::to_vec(&payload).unwrap());
+        format!("header.{payload_b64}.sig")
+    }
+
+    #[test]
+    fn jwt_roles_reject_non_string_items() {
+        let token = jwt_with_payload(serde_json::json!({
+            "sub": "550e8400-e29b-41d4-a716-446655440000",
+            "tid": "660e8400-e29b-41d4-a716-446655440000",
+            "roles": ["admin", 1]
+        }));
+        let err = decode_jwt_payload(&token).unwrap_err();
+        assert!(err.to_string().contains("roles"));
+        let src = include_str!("request.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("filter_map(|v| v.as_str()"),
+            "JWT roles must not drop non-string array items"
+        );
+    }
+
+    #[test]
+    fn jwt_roles_reject_non_array_claim() {
+        let token = jwt_with_payload(serde_json::json!({
+            "sub": "550e8400-e29b-41d4-a716-446655440000",
+            "tid": "660e8400-e29b-41d4-a716-446655440000",
+            "roles": "admin"
+        }));
+        assert!(decode_jwt_payload(&token).is_err());
+    }
+
     #[test]
     fn test_extract_claims_from_struct() {
         let mut fields = BTreeMap::new();
@@ -542,6 +588,48 @@ mod tests {
             "tid".to_string(),
             prost_types::Value {
                 kind: Some(prost_types::value::Kind::StringValue("tid-val".to_string())),
+            },
+        );
+        let s = prost_types::Struct { fields };
+        assert!(extract_claims_from_struct(&s).is_err());
+    }
+
+    #[test]
+    fn metadata_roles_reject_non_string_items() {
+        let mut fields = BTreeMap::new();
+        fields.insert(
+            "sub".to_string(),
+            prost_types::Value {
+                kind: Some(prost_types::value::Kind::StringValue(
+                    "550e8400-e29b-41d4-a716-446655440000".to_string(),
+                )),
+            },
+        );
+        fields.insert(
+            "tid".to_string(),
+            prost_types::Value {
+                kind: Some(prost_types::value::Kind::StringValue(
+                    "660e8400-e29b-41d4-a716-446655440000".to_string(),
+                )),
+            },
+        );
+        fields.insert(
+            "roles".to_string(),
+            prost_types::Value {
+                kind: Some(prost_types::value::Kind::ListValue(
+                    prost_types::ListValue {
+                        values: vec![
+                            prost_types::Value {
+                                kind: Some(prost_types::value::Kind::StringValue(
+                                    "admin".to_string(),
+                                )),
+                            },
+                            prost_types::Value {
+                                kind: Some(prost_types::value::Kind::NumberValue(1.0)),
+                            },
+                        ],
+                    },
+                )),
             },
         );
         let s = prost_types::Struct { fields };
