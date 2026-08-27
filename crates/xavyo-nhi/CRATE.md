@@ -107,8 +107,8 @@ pub fn calculate_risk_score(factors: &RiskFactors) -> u32;
 /// Convert score to risk level
 pub fn calculate_risk_level(score: u32) -> NhiRiskLevel;
 
-/// Convert risk level name to representative score
-pub fn risk_level_to_score(risk_level: &str) -> u32;
+/// Convert risk level name to representative score (`None` if unknown)
+pub fn risk_level_to_score(risk_level: &str) -> Option<u32>;
 
 /// Clamp score to 0-100 range
 pub fn normalize_score(score: i32) -> u32;

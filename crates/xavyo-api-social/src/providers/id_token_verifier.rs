@@ -335,11 +335,9 @@ impl IdTokenVerifier {
                         reason: format!("Failed to build RSA decoding key: {e}"),
                     }
                 })?;
-                let alg = match jwk.alg.as_deref() {
-                    Some("RS384") => Algorithm::RS384,
-                    Some("RS512") => Algorithm::RS512,
-                    _ => Algorithm::RS256, // Google and Microsoft both use RS256
-                };
+                let alg = rsa_jwk_algorithm(jwk.alg.as_deref()).map_err(|reason| {
+                    SocialError::IdTokenVerificationFailed { provider, reason }
+                })?;
                 Ok((key, alg))
             }
             "EC" => {
@@ -363,10 +361,9 @@ impl IdTokenVerifier {
                         reason: format!("Failed to build EC decoding key: {e}"),
                     }
                 })?;
-                let alg = match jwk.alg.as_deref() {
-                    Some("ES384") => Algorithm::ES384,
-                    _ => Algorithm::ES256,
-                };
+                let alg = ec_jwk_algorithm(jwk.alg.as_deref()).map_err(|reason| {
+                    SocialError::IdTokenVerificationFailed { provider, reason }
+                })?;
                 Ok((key, alg))
             }
             other => Err(SocialError::IdTokenVerificationFailed {
@@ -396,6 +393,25 @@ impl IdTokenVerifier {
         } else {
             ProviderType::Microsoft
         }
+    }
+}
+
+/// Unknown RSA JWK `alg` values (including `none`/`HS256`) must not become RS256.
+fn rsa_jwk_algorithm(alg: Option<&str>) -> Result<Algorithm, String> {
+    match alg {
+        None | Some("RS256") => Ok(Algorithm::RS256),
+        Some("RS384") => Ok(Algorithm::RS384),
+        Some("RS512") => Ok(Algorithm::RS512),
+        Some(other) => Err(format!("Unsupported RSA JWK alg '{other}'")),
+    }
+}
+
+/// Unknown EC JWK `alg` values must not become ES256.
+fn ec_jwk_algorithm(alg: Option<&str>) -> Result<Algorithm, String> {
+    match alg {
+        None | Some("ES256") => Ok(Algorithm::ES256),
+        Some("ES384") => Ok(Algorithm::ES384),
+        Some(other) => Err(format!("Unsupported EC JWK alg '{other}'")),
     }
 }
 
@@ -508,5 +524,28 @@ mod tests {
         assert!(claims.aud.contains("my-client-id"));
         assert_eq!(claims.email, Some("user@example.com".to_string()));
         assert_eq!(claims.email_verified, Some(true));
+    }
+
+    #[test]
+    fn unknown_jwk_alg_does_not_default_to_rs256_or_es256() {
+        assert_eq!(rsa_jwk_algorithm(None).unwrap(), Algorithm::RS256);
+        assert_eq!(rsa_jwk_algorithm(Some("RS256")).unwrap(), Algorithm::RS256);
+        assert_eq!(rsa_jwk_algorithm(Some("RS384")).unwrap(), Algorithm::RS384);
+        assert!(rsa_jwk_algorithm(Some("none")).is_err());
+        assert!(rsa_jwk_algorithm(Some("HS256")).is_err());
+        assert_eq!(ec_jwk_algorithm(None).unwrap(), Algorithm::ES256);
+        assert_eq!(ec_jwk_algorithm(Some("ES384")).unwrap(), Algorithm::ES384);
+        assert!(ec_jwk_algorithm(Some("none")).is_err());
+        assert!(ec_jwk_algorithm(Some("HS256")).is_err());
+
+        let src = include_str!("id_token_verifier.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("rsa_jwk_algorithm(")
+                && production.contains("ec_jwk_algorithm(")
+                && !production.contains("_ => Algorithm::RS256")
+                && !production.contains("_ => Algorithm::ES256"),
+            "unknown social JWK alg must not default to RS256/ES256"
+        );
     }
 }
