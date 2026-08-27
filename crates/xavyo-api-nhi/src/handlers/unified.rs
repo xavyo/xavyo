@@ -125,27 +125,18 @@ pub async fn list_nhis(
     let limit = query.limit.unwrap_or(20).clamp(1, 100);
     let offset = query.offset.unwrap_or(0).max(0);
 
-    let filter = NhiIdentityFilter {
+    let mut filter = NhiIdentityFilter {
         nhi_type: query.nhi_type,
         lifecycle_state: query.lifecycle_state,
         owner_id: query.owner_id,
+        ids: None,
     };
 
     // Admin/super_admin see all NHIs; non-admin users only see permitted ones
-    if claims.has_role("admin") || claims.has_role("super_admin") {
-        let data = NhiIdentity::list(&state.pool, tenant_uuid, &filter, limit, offset).await?;
-        let total = NhiIdentity::count(&state.pool, tenant_uuid, &filter).await?;
-        Ok(Json(PaginatedResponse {
-            data,
-            total,
-            limit,
-            offset,
-        }))
-    } else {
+    if !(claims.has_role("admin") || claims.has_role("super_admin")) {
         let user_id = Uuid::parse_str(&claims.sub)
             .map_err(|_| NhiApiError::BadRequest("Invalid user ID".into()))?;
 
-        // Get distinct NHI IDs this user has any non-expired permission for
         let user_perms =
             NhiUserPermission::list_by_user(&state.pool, tenant_uuid, user_id, 10000, 0).await?;
         let mut permitted_nhi_ids: Vec<Uuid> = user_perms.iter().map(|p| p.nhi_id).collect();
@@ -161,30 +152,17 @@ pub async fn list_nhis(
             }));
         }
 
-        // Fetch all matching NHIs then filter to permitted ones
-        // Use a generous fetch limit to account for filtering
-        let fetch_limit = (limit + offset) * 10; // Over-fetch to compensate for filtering
-        let all_data =
-            NhiIdentity::list(&state.pool, tenant_uuid, &filter, fetch_limit.min(10000), 0).await?;
-        let filtered: Vec<NhiIdentity> = all_data
-            .into_iter()
-            .filter(|nhi| permitted_nhi_ids.binary_search(&nhi.id).is_ok())
-            .collect();
-
-        let total = filtered.len() as i64;
-        let data: Vec<NhiIdentity> = filtered
-            .into_iter()
-            .skip(offset as usize)
-            .take(limit as usize)
-            .collect();
-
-        Ok(Json(PaginatedResponse {
-            data,
-            total,
-            limit,
-            offset,
-        }))
+        filter.ids = Some(permitted_nhi_ids);
     }
+
+    let data = NhiIdentity::list(&state.pool, tenant_uuid, &filter, limit, offset).await?;
+    let total = NhiIdentity::count(&state.pool, tenant_uuid, &filter).await?;
+    Ok(Json(PaginatedResponse {
+        data,
+        total,
+        limit,
+        offset,
+    }))
 }
 
 /// GET /nhi/{id} — Get a specific NHI by ID with type-specific extension data.
@@ -319,6 +297,24 @@ mod tests {
         assert!(
             get_nhi.contains("Unsupported NHI type"),
             "unknown NHI type must fail closed"
+        );
+    }
+
+    #[test]
+    fn list_nhis_counts_permitted_ids_not_overfetch_window() {
+        let src = include_str!("unified.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_nhis")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_nhis");
+        assert!(
+            list.contains("filter.ids")
+                && list.contains("NhiIdentity::count(")
+                && !list.contains("filtered.len() as i64")
+                && !list.contains("fetch_limit"),
+            "GET /nhi must count permitted matching rows, not the over-fetch window length"
         );
     }
 }

@@ -70,6 +70,8 @@ pub struct NhiIdentityFilter {
     pub nhi_type: Option<NhiType>,
     pub lifecycle_state: Option<NhiLifecycleState>,
     pub owner_id: Option<Uuid>,
+    /// When set, restrict to these identity IDs (permission-scoped lists).
+    pub ids: Option<Vec<Uuid>>,
 }
 
 impl NhiIdentity {
@@ -152,6 +154,10 @@ impl NhiIdentity {
             query.push_str(&format!(" AND owner_id = ${param_idx}"));
             param_idx += 1;
         }
+        if filter.ids.is_some() {
+            query.push_str(&format!(" AND id = ANY(${param_idx})"));
+            param_idx += 1;
+        }
 
         query.push_str(&format!(
             " ORDER BY created_at DESC LIMIT ${} OFFSET ${}",
@@ -169,6 +175,9 @@ impl NhiIdentity {
         }
         if let Some(owner_id) = filter.owner_id {
             q = q.bind(owner_id);
+        }
+        if let Some(ref ids) = filter.ids {
+            q = q.bind(ids);
         }
 
         q.bind(limit).bind(offset).fetch_all(pool).await
@@ -198,6 +207,10 @@ impl NhiIdentity {
         }
         if filter.owner_id.is_some() {
             query.push_str(&format!(" AND owner_id = ${param_idx}"));
+            param_idx += 1;
+        }
+        if filter.ids.is_some() {
+            query.push_str(&format!(" AND id = ANY(${param_idx})"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -210,6 +223,9 @@ impl NhiIdentity {
         }
         if let Some(owner_id) = filter.owner_id {
             q = q.bind(owner_id);
+        }
+        if let Some(ref ids) = filter.ids {
+            q = q.bind(ids);
         }
 
         q.fetch_one(pool).await
@@ -475,5 +491,30 @@ mod tests {
         assert!(filter.nhi_type.is_none());
         assert!(filter.lifecycle_state.is_none());
         assert!(filter.owner_id.is_none());
+        assert!(filter.ids.is_none());
+    }
+
+    #[test]
+    fn list_and_count_restrict_to_permitted_ids() {
+        let src = include_str!("nhi_identity.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list(")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list");
+        assert!(
+            list.contains("id = ANY(") && list.contains("filter.ids"),
+            "NHI identity list must restrict to permitted IDs when set"
+        );
+        let count = production
+            .split("pub async fn count(")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("count");
+        assert!(
+            count.contains("id = ANY(") && count.contains("filter.ids"),
+            "NHI identity count must restrict to permitted IDs when set"
+        );
     }
 }

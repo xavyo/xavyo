@@ -101,6 +101,8 @@ pub struct NhiToolFilter {
     pub provider_verified: Option<bool>,
     pub lifecycle_state: Option<NhiLifecycleState>,
     pub owner_id: Option<Uuid>,
+    /// When set, restrict to these identity IDs (permission-scoped lists).
+    pub ids: Option<Vec<Uuid>>,
 }
 
 const TOOL_JOIN_SELECT: &str = r"
@@ -242,6 +244,10 @@ impl NhiTool {
             query.push_str(&format!(" AND i.owner_id = ${param_idx}"));
             param_idx += 1;
         }
+        if filter.ids.is_some() {
+            query.push_str(&format!(" AND i.id = ANY(${param_idx})"));
+            param_idx += 1;
+        }
 
         query.push_str(&format!(
             " ORDER BY i.name ASC LIMIT ${} OFFSET ${}",
@@ -265,6 +271,9 @@ impl NhiTool {
         }
         if let Some(owner_id) = filter.owner_id {
             q = q.bind(owner_id);
+        }
+        if let Some(ref ids) = filter.ids {
+            q = q.bind(ids);
         }
 
         q.bind(limit).bind(offset).fetch_all(pool).await

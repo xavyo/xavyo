@@ -629,4 +629,21 @@ mod tests {
             "invalid PoA event type must be 400, not an unfiltered audit list"
         );
     }
+
+    #[test]
+    fn poa_audit_trail_uses_service_total() {
+        let src = include_str!("power_of_attorney.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let trail = production
+            .split("pub async fn get_poa_audit_trail")
+            .nth(1)
+            .and_then(|s| s.split("fn ").next())
+            .expect("get_poa_audit_trail");
+        assert!(
+            trail.contains("list_poa_audit_events(")
+                && trail.contains("let (events, total)")
+                && !trail.contains("events.len() as i64"),
+            "GET PoA audit trail must use the service total, not the page length"
+        );
+    }
 }
