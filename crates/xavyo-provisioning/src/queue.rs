@@ -64,6 +64,10 @@ pub enum QueueError {
     /// Serialization error.
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
+
+    /// Stored operation type or status is not a known enum value.
+    #[error("Invalid queued operation: {0}")]
+    InvalidData(String),
 }
 
 /// Result type for queue operations.
@@ -552,7 +556,7 @@ impl OperationQueue {
         let operations: Vec<QueuedOperation> = rows
             .into_iter()
             .map(|row| row_to_operation(&row, now))
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
 
         debug!(
             count = operations.len(),
@@ -633,7 +637,7 @@ impl OperationQueue {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(|r| row_to_operation(&r, now)))
+        row.map(|r| row_to_operation(&r, now)).transpose()
     }
 
     /// Mark an operation as completed successfully.
@@ -1048,10 +1052,9 @@ impl OperationQueue {
                 .await?
         };
 
-        Ok(rows
-            .into_iter()
+        rows.into_iter()
             .map(|r| row_to_operation(&r, now))
-            .collect())
+            .collect()
     }
 
     /// Calculate backoff delay with jitter.
@@ -1122,21 +1125,25 @@ impl OperationQueue {
 }
 
 /// Convert a database row to a `QueuedOperation`.
-fn row_to_operation(row: &sqlx::postgres::PgRow, now: DateTime<Utc>) -> QueuedOperation {
+fn row_to_operation(
+    row: &sqlx::postgres::PgRow,
+    now: DateTime<Utc>,
+) -> QueueResult<QueuedOperation> {
     let operation_type_str: String = row.get("operation_type");
     let status_str: String = row.get("status");
 
-    QueuedOperation {
+    Ok(QueuedOperation {
         id: row.get("id"),
         tenant_id: row.get("tenant_id"),
         connector_id: row.get("connector_id"),
         user_id: row.get("user_id"),
         operation_type: OperationType::from_str(&operation_type_str)
-            .unwrap_or(OperationType::Create),
+            .map_err(|e| QueueError::InvalidData(e.to_string()))?,
         object_class: row.get("object_class"),
         target_uid: row.get("target_uid"),
         payload: row.get("payload"),
-        status: OperationStatus::from_str(&status_str).unwrap_or(OperationStatus::Pending),
+        status: OperationStatus::from_str(&status_str)
+            .map_err(|e| QueueError::InvalidData(e.to_string()))?,
         retry_count: row.get("retry_count"),
         max_retries: row.get("max_retries"),
         next_retry_at: row.get("next_retry_at"),
@@ -1150,7 +1157,7 @@ fn row_to_operation(row: &sqlx::postgres::PgRow, now: DateTime<Utc>) -> QueuedOp
         resolution_notes: row.try_get("resolution_notes").ok().flatten(),
         resolved_by: row.try_get("resolved_by").ok().flatten(),
         resolved_at: row.try_get("resolved_at").ok().flatten(),
-    }
+    })
 }
 
 /// Queue statistics.
@@ -1431,5 +1438,20 @@ mod tests {
 
         assert_eq!(op.idempotency_key, Some("test-key-123".to_string()));
         assert_eq!(op.max_retries, 10); // Updated default
+    }
+
+    #[test]
+    fn row_to_operation_does_not_default_unknown_type_or_status() {
+        let src = include_str!("queue.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(OperationType::Create)")
+                && !production.contains("unwrap_or(OperationStatus::Pending)"),
+            "unknown queued operation type/status must not silently become create/pending"
+        );
+        assert!(OperationType::from_str("delete").is_ok());
+        assert!(OperationType::from_str("explode").is_err());
+        assert!(OperationStatus::from_str("pending").is_ok());
+        assert!(OperationStatus::from_str("bogus").is_err());
     }
 }

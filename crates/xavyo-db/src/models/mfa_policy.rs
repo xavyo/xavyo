@@ -28,7 +28,12 @@ impl TenantMfaPolicy {
             .fetch_one(executor)
             .await?;
 
-        let mfa_policy = row.0.parse().unwrap_or_default();
+        let mfa_policy = row.0.parse().map_err(|e: String| {
+            sqlx::Error::Decode(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                e,
+            )))
+        })?;
 
         Ok(Self {
             tenant_id,
@@ -69,5 +74,22 @@ mod tests {
             mfa_policy: MfaPolicy::Required,
         };
         assert_eq!(policy.mfa_policy, MfaPolicy::Required);
+    }
+
+    #[test]
+    fn tenant_mfa_policy_get_does_not_default_to_optional() {
+        let src = include_str!("mfa_policy.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or_default()"),
+            "unknown MFA policy must not silently become Optional"
+        );
+        assert!(
+            "required".parse::<MfaPolicy>().unwrap() == MfaPolicy::Required
+                && "optional".parse::<MfaPolicy>().unwrap() == MfaPolicy::Optional
+                && "disabled".parse::<MfaPolicy>().unwrap() == MfaPolicy::Disabled
+                && "nope".parse::<MfaPolicy>().is_err(),
+            "MFA policy parse must fail closed on unknown values"
+        );
     }
 }

@@ -40,9 +40,10 @@ pub struct UpsertCircuitBreakerState {
 
 impl WebhookCircuitBreakerState {
     /// Get the circuit state as an enum.
-    #[must_use]
-    pub fn circuit_state(&self) -> CircuitState {
-        self.state.parse().unwrap_or(CircuitState::Closed)
+    ///
+    /// Unknown stored values must not fail-open to Closed.
+    pub fn circuit_state(&self) -> Result<CircuitState, String> {
+        self.state.parse()
     }
 
     /// Upsert circuit breaker state (insert or update).
@@ -153,5 +154,16 @@ mod tests {
             let parsed: CircuitState = s.parse().unwrap();
             assert_eq!(parsed, state);
         }
+    }
+
+    #[test]
+    fn circuit_state_does_not_fail_open_to_closed() {
+        let src = include_str!("webhook_circuit_breaker.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(CircuitState::Closed)"),
+            "unknown webhook circuit state must not silently close the breaker"
+        );
+        assert!("bogus".parse::<CircuitState>().is_err());
     }
 }

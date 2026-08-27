@@ -482,8 +482,14 @@ struct ReconciliationRunRow {
 
 impl ReconciliationRunRow {
     fn into_info(self) -> ReconciliationResult<ReconciliationRunInfo> {
-        let mode = self.mode.parse().unwrap_or(ReconciliationMode::Full);
-        let status = self.status.parse().unwrap_or(RunStatus::Pending);
+        let mode = self
+            .mode
+            .parse()
+            .map_err(ReconciliationError::Serialization)?;
+        let status = self
+            .status
+            .parse()
+            .map_err(ReconciliationError::Serialization)?;
         let checkpoint = match self.checkpoint {
             Some(v) => Some(
                 serde_json::from_value(v)
@@ -638,6 +644,11 @@ mod tests {
         assert!(
             !into_info.contains("from_value(v).ok()") && !into_info.contains("unwrap_or_default()"),
             "reconciliation run load must fail closed on checkpoint/statistics JSON parse"
+        );
+        assert!(
+            !into_info.contains("unwrap_or(ReconciliationMode::Full)")
+                && !into_info.contains("unwrap_or(RunStatus::Pending)"),
+            "reconciliation run load must not silently default mode/status"
         );
         assert!(
             into_info.contains("ReconciliationError::Serialization"),

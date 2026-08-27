@@ -215,7 +215,7 @@ impl SyncConfigService {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(SyncConfigRow::into_config))
+        result.map(SyncConfigRow::into_config).transpose()
     }
 
     /// Create or update sync configuration.
@@ -257,7 +257,7 @@ impl SyncConfigService {
         .fetch_one(&self.pool)
         .await?;
 
-        Ok(result.into_config())
+        result.into_config()
     }
 
     /// Enable sync for a connector.
@@ -313,7 +313,7 @@ impl SyncConfigService {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(SyncConfigRow::into_config).collect())
+        rows.into_iter().map(SyncConfigRow::into_config).collect()
     }
 
     /// Delete sync configuration.
@@ -350,22 +350,25 @@ struct SyncConfigRow {
 }
 
 impl SyncConfigRow {
-    fn into_config(self) -> SyncConfig {
-        SyncConfig {
+    fn into_config(self) -> SyncResult<SyncConfig> {
+        Ok(SyncConfig {
             id: self.id,
             tenant_id: self.tenant_id,
             connector_id: self.connector_id,
             enabled: self.enabled,
-            sync_mode: self.sync_mode.parse().unwrap_or(SyncMode::Polling),
+            sync_mode: self
+                .sync_mode
+                .parse()
+                .map_err(|e| SyncError::Configuration { message: e })?,
             polling_interval_secs: self.polling_interval_secs,
             rate_limit_per_minute: self.rate_limit_per_minute,
             batch_size: self.batch_size,
             conflict_resolution: self
                 .conflict_resolution
                 .parse()
-                .unwrap_or(ConflictResolution::InboundWins),
+                .map_err(|e| SyncError::Configuration { message: e })?,
             auto_create_identity: self.auto_create_identity,
-        }
+        })
     }
 }
 
@@ -427,5 +430,18 @@ mod tests {
         let mut config = SyncConfig::default();
         config.polling_interval_secs = 120;
         assert_eq!(config.polling_interval(), Duration::from_secs(120));
+    }
+
+    #[test]
+    fn into_config_does_not_default_unknown_mode_or_conflict() {
+        let src = include_str!("config.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(SyncMode::Polling)")
+                && !production.contains("unwrap_or(ConflictResolution::InboundWins)"),
+            "unknown stored sync mode/conflict must not silently default"
+        );
+        assert!("nope".parse::<SyncMode>().is_err());
+        assert!("overwrite".parse::<ConflictResolution>().is_err());
     }
 }
