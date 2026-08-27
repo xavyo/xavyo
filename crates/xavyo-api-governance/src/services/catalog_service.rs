@@ -1317,7 +1317,7 @@ impl CatalogService {
                         &self.pool, tenant_id, rule.id, user_id,
                     )
                     .await
-                    .unwrap_or(false);
+                    .map_err(GovernanceError::Database)?;
 
                     if !has_exemption {
                         // Avoid duplicate violations (same rule reported from both sides)
@@ -1514,6 +1514,22 @@ mod tests {
             production.contains("catalog_sod_json(")
                 && !production.contains("to_value(&validation.sod_violations).unwrap_or_default()"),
             "catalog SoD persist must fail closed on JSON serialize"
+        );
+    }
+
+    #[test]
+    fn catalog_sod_exemption_lookup_does_not_fail_open() {
+        let src = include_str!("catalog_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let window = production
+            .split("async fn check_sod_violations")
+            .nth(1)
+            .expect("check_sod_violations");
+        assert!(
+            window.contains("has_active_exemption")
+                && window.contains("map_err(GovernanceError::Database)")
+                && !window.contains("unwrap_or(false)"),
+            "catalog SoD exemption lookup must fail closed, not report fake violations"
         );
     }
 }

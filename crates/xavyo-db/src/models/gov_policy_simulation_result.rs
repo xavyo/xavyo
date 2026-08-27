@@ -297,15 +297,15 @@ impl GovPolicySimulationResult {
     }
 
     /// Parse `SoD` violation details.
-    #[must_use]
-    pub fn parse_sod_details(&self) -> Option<SodViolationDetails> {
-        serde_json::from_value(self.details.clone()).ok()
+    /// Corrupt JSON must not look like missing SoD details.
+    pub fn parse_sod_details(&self) -> Result<SodViolationDetails, serde_json::Error> {
+        serde_json::from_value(self.details.clone())
     }
 
     /// Parse birthright change details.
-    #[must_use]
-    pub fn parse_birthright_details(&self) -> Option<BirthrightChangeDetails> {
-        serde_json::from_value(self.details.clone()).ok()
+    /// Corrupt JSON must not look like missing birthright details.
+    pub fn parse_birthright_details(&self) -> Result<BirthrightChangeDetails, serde_json::Error> {
+        serde_json::from_value(self.details.clone())
     }
 }
 
@@ -386,5 +386,26 @@ mod tests {
         assert!(filter.impact_type.is_none());
         assert!(filter.severity.is_none());
         assert!(filter.user_id.is_none());
+    }
+
+    #[test]
+    fn parse_sod_and_birthright_do_not_default_on_invalid_json() {
+        let result = GovPolicySimulationResult {
+            id: Uuid::new_v4(),
+            simulation_id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            impact_type: ImpactType::Violation,
+            details: serde_json::json!("not-details"),
+            severity: None,
+            created_at: Utc::now(),
+        };
+        assert!(result.parse_sod_details().is_err());
+        assert!(result.parse_birthright_details().is_err());
+        let src = include_str!("gov_policy_simulation_result.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("from_value(self.details.clone()).ok()"),
+            "policy simulation details must fail closed on JSON parse"
+        );
     }
 }

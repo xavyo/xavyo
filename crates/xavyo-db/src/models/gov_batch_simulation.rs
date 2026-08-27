@@ -440,9 +440,9 @@ impl GovBatchSimulation {
     }
 
     /// Parse the change specification.
-    #[must_use]
-    pub fn parse_change_spec(&self) -> Option<ChangeSpec> {
-        serde_json::from_value(self.change_spec.clone()).ok()
+    /// Corrupt JSON must not look like a missing spec.
+    pub fn parse_change_spec(&self) -> Result<ChangeSpec, serde_json::Error> {
+        serde_json::from_value(self.change_spec.clone())
     }
 
     /// Parse the impact summary.
@@ -598,13 +598,15 @@ mod tests {
         };
         assert!(simulation.parse_filter_criteria().is_err());
         assert!(simulation.parse_impact_summary().is_err());
+        assert!(simulation.parse_change_spec().is_err());
         assert!(simulation.has_scope_warning());
         let src = include_str!("gov_batch_simulation.rs");
         let production = src.split("mod tests").next().expect("production source");
         assert!(
             !production.contains("from_value(self.filter_criteria.clone()).unwrap_or_default()")
                 && !production
-                    .contains("from_value(self.impact_summary.clone()).unwrap_or_default()"),
+                    .contains("from_value(self.impact_summary.clone()).unwrap_or_default()")
+                && !production.contains("from_value(self.change_spec.clone()).ok()"),
             "batch simulation GET must fail closed on JSON parse"
         );
     }

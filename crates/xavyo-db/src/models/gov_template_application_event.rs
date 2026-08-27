@@ -329,9 +329,9 @@ impl GovTemplateApplicationEvent {
     }
 
     /// Get the rules applied as a Vec of UUIDs.
-    #[must_use]
-    pub fn get_rules_applied(&self) -> Option<Vec<Uuid>> {
-        serde_json::from_value(self.rules_applied.clone()).ok()
+    /// Corrupt JSON must not look like "no rules applied".
+    pub fn get_rules_applied(&self) -> Result<Vec<Uuid>, serde_json::Error> {
+        serde_json::from_value(self.rules_applied.clone())
     }
 }
 
@@ -372,5 +372,33 @@ mod tests {
         assert!(filter.from_date.is_none());
         assert!(filter.to_date.is_none());
         assert!(filter.has_validation_errors.is_none());
+    }
+
+    #[test]
+    fn get_rules_applied_does_not_default_on_invalid_json() {
+        let rule_id = Uuid::new_v4();
+        let mut event = GovTemplateApplicationEvent {
+            id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            template_id: None,
+            template_version_id: None,
+            object_type: TemplateObjectType::User,
+            object_id: Uuid::new_v4(),
+            operation: TemplateOperation::Create,
+            rules_applied: serde_json::json!("not-uuids"),
+            changes_made: serde_json::json!({}),
+            validation_errors: None,
+            actor_id: None,
+            created_at: Utc::now(),
+        };
+        assert!(event.get_rules_applied().is_err());
+        event.rules_applied = serde_json::json!([rule_id]);
+        assert_eq!(event.get_rules_applied().unwrap(), vec![rule_id]);
+        let src = include_str!("gov_template_application_event.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("from_value(self.rules_applied.clone()).ok()"),
+            "template application rules_applied must fail closed on JSON parse"
+        );
     }
 }

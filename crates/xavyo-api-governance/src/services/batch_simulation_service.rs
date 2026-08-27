@@ -317,10 +317,10 @@ impl BatchSimulationService {
         }
 
         // Parse the change specification to know what operation to apply
-        let change_spec = simulation.parse_change_spec().ok_or_else(|| {
-            GovernanceError::Validation(
-                "Cannot apply simulation: invalid change specification".to_string(),
-            )
+        let change_spec = simulation.parse_change_spec().map_err(|e| {
+            GovernanceError::Validation(format!(
+                "Cannot apply simulation: invalid change specification: {e}"
+            ))
         })?;
 
         // Fetch all affected results in batches and apply changes
@@ -956,8 +956,8 @@ impl BatchSimulationService {
         simulation: &GovBatchSimulation,
         user_ids: &[Uuid],
     ) -> Result<(Vec<CreateBatchSimulationResult>, BatchImpactSummary)> {
-        let change_spec = simulation.parse_change_spec().ok_or_else(|| {
-            GovernanceError::Validation("Invalid change specification".to_string())
+        let change_spec = simulation.parse_change_spec().map_err(|e| {
+            GovernanceError::Validation(format!("Invalid change specification: {e}"))
         })?;
 
         let mut results = Vec::with_capacity(user_ids.len());
