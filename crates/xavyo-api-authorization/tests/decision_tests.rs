@@ -13,7 +13,7 @@
 
 mod common;
 
-use common::{admin_claims, create_test_policy, unique_policy_name, user_claims, TestFixture};
+use common::{admin_claims, unique_policy_name, user_claims, TestFixture};
 use std::sync::Arc;
 use uuid::Uuid;
 use xavyo_api_authorization::models::policy::CreatePolicyRequest;
