@@ -493,8 +493,11 @@ impl FromStr for DeprovisionAction {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
+            "none" => Ok(DeprovisionAction::None),
             "disable" => Ok(DeprovisionAction::Disable),
             "delete" => Ok(DeprovisionAction::Delete),
+            "move" => Ok(DeprovisionAction::Move),
+            "rename" => Ok(DeprovisionAction::Rename),
             _ => Err(ParseDeprovisionActionError(s.to_string())),
         }
     }
@@ -508,7 +511,7 @@ impl fmt::Display for ParseDeprovisionActionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "invalid deprovision action '{}', expected one of: disable, delete",
+            "invalid deprovision action '{}', expected one of: none, disable, delete, move, rename",
             self.0
         )
     }
@@ -710,5 +713,21 @@ mod tests {
             "delete".parse::<DeprovisionAction>().unwrap(),
             DeprovisionAction::Delete
         );
+        assert_eq!(
+            "none".parse::<DeprovisionAction>().unwrap(),
+            DeprovisionAction::None
+        );
+        assert_eq!(
+            "move".parse::<DeprovisionAction>().unwrap(),
+            DeprovisionAction::Move
+        );
+        assert_eq!(
+            "RENAME".parse::<DeprovisionAction>().unwrap(),
+            DeprovisionAction::Rename
+        );
+        assert!("unknown".parse::<DeprovisionAction>().is_err());
+        assert_eq!(DeprovisionAction::None.as_str(), "none");
+        assert_eq!(DeprovisionAction::Move.as_str(), "move");
+        assert_eq!(DeprovisionAction::Rename.as_str(), "rename");
     }
 }

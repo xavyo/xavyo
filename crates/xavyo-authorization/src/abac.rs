@@ -45,9 +45,20 @@ pub fn evaluate_abac_condition(
             }
             "greater_than" => compare_values(user_val, value, |a, b| a > b),
             "less_than" => compare_values(user_val, value, |a, b| a < b),
-            _ => false, // Unknown operator = condition not satisfied
+            _ => false,
         },
     }
+}
+
+/// Operators the ABAC evaluator can actually apply.
+///
+/// Unknown operators must not be treated as "unsatisfied" by deny policies.
+#[must_use]
+pub(crate) fn is_known_operator(operator: &str) -> bool {
+    matches!(
+        operator,
+        "equals" | "not_equals" | "contains" | "in_list" | "greater_than" | "less_than"
+    )
 }
 
 /// Compare two JSON values numerically using the given comparison function.
@@ -223,6 +234,15 @@ mod tests {
             "unknown_op",
             &json!("engineering")
         ));
+        assert!(!is_known_operator("unknown_op"));
+        assert!(!is_known_operator("regex"));
+        assert!(is_known_operator("equals"));
+        let src = include_str!("abac.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("pub(crate) fn is_known_operator"),
+            "callers must be able to distinguish unknown operators from unsatisfied equals"
+        );
     }
 
     #[test]

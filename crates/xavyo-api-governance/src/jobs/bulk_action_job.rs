@@ -424,10 +424,9 @@ impl BulkActionJob {
             Err(ExpressionError::Parse(e)) => {
                 Err(BulkActionJobError::Processing(format!("Parse error: {e}")))
             }
-            Err(ExpressionError::Eval(_)) => {
-                // Treat eval errors as non-match
-                Ok(false)
-            }
+            Err(ExpressionError::Eval(e)) => Err(BulkActionJobError::Processing(format!(
+                "Expression evaluation failed: {e}"
+            ))),
         }
     }
 
@@ -576,6 +575,24 @@ mod tests {
         assert_eq!(stats1.skipped, 13);
         assert_eq!(stats1.failures, 12);
         assert_eq!(stats1.cancelled, 1);
+    }
+
+    #[test]
+    fn expression_eval_error_does_not_skip_user() {
+        let src = include_str!("bulk_action_job.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let eval = production
+            .split("eval_expression(expression")
+            .nth(1)
+            .expect("eval_expression");
+        assert!(
+            !eval.contains("Treat eval errors as non-match") && !eval.contains("Ok(false)"),
+            "expression eval errors must fail the bulk action, not skip the user"
+        );
+        assert!(
+            eval.contains("Expression evaluation failed"),
+            "eval errors must surface as processing failures"
+        );
     }
 
     #[test]
