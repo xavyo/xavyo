@@ -34,6 +34,16 @@ fn require_schema_ident(value: String, field: &str) -> ConnectorResult<String> {
     Ok(value)
 }
 
+/// Missing/invalid nullability must not treat a NOT NULL column as optional.
+fn require_is_nullable(value: String, column_name: &str) -> ConnectorResult<String> {
+    match value.as_str() {
+        "YES" | "NO" => Ok(value),
+        _ => Err(ConnectorError::SchemaDiscoveryFailed {
+            message: format!("invalid is_nullable '{value}' for column {column_name}"),
+        }),
+    }
+}
+
 /// Database Connector for provisioning to relational databases.
 ///
 /// Currently supports `PostgreSQL`. Support for other databases (`MySQL`, MSSQL, Oracle)
@@ -543,9 +553,12 @@ impl DatabaseConnector {
                     })?;
             let column_name = require_schema_ident(column_name, "column_name")?;
             let data_type = require_schema_ident(data_type, "data_type")?;
-            let is_nullable: String = row
-                .try_get("is_nullable")
-                .unwrap_or_else(|_| "YES".to_string());
+            let is_nullable: String =
+                row.try_get("is_nullable")
+                    .map_err(|e| ConnectorError::SchemaDiscoveryFailed {
+                        message: format!("is_nullable missing for column {column_name}: {e}"),
+                    })?;
+            let is_nullable = require_is_nullable(is_nullable, &column_name)?;
             let column_default: Option<String> = row.try_get("column_default").ok();
 
             let attr_type = self.sql_type_to_attribute_type(&data_type);
@@ -1058,6 +1071,21 @@ mod tests {
             !production.contains("try_get(\"column_name\").unwrap_or_default()")
                 && !production.contains("try_get(\"data_type\").unwrap_or_default()"),
             "schema discovery must not invent empty column names"
+        );
+    }
+
+    #[test]
+    fn schema_discovery_does_not_treat_missing_nullable_as_yes() {
+        assert_eq!(require_is_nullable("NO".into(), "id").unwrap(), "NO");
+        assert_eq!(require_is_nullable("YES".into(), "name").unwrap(), "YES");
+        assert!(require_is_nullable(String::new(), "id").is_err());
+        assert!(require_is_nullable("maybe".into(), "id").is_err());
+        let src = include_str!("connector.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("require_is_nullable(")
+                && !production.contains("unwrap_or_else(|_| \"YES\".to_string())"),
+            "missing is_nullable must not default to YES"
         );
     }
 
