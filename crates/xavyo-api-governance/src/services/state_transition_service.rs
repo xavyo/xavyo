@@ -1353,7 +1353,7 @@ impl StateTransitionService {
     /// Queries the `gov_scheduled_transitions` table (via JOIN with
     /// `gov_state_transition_requests`) and enriches each record with
     /// state/transition names from the associated transition request.
-    async fn get_pending_schedules_for_object(
+    pub(crate) async fn get_pending_schedules_for_object(
         &self,
         tenant_id: Uuid,
         object_id: Uuid,

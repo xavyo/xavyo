@@ -96,7 +96,7 @@ pub async fn handle_webhook_callback(
         ))
     })?;
 
-    // Verify the webhook secret
+    // Verify the webhook secret. A missing configured secret must not fail open.
     let provided_secret = query.secret.or_else(|| {
         headers
             .get("x-webhook-secret")
@@ -104,18 +104,15 @@ pub async fn handle_webhook_callback(
             .map(std::string::ToString::to_string)
     });
 
-    if let Some(expected_secret) = &config.webhook_callback_secret {
-        let expected_str = String::from_utf8_lossy(expected_secret);
-        match provided_secret {
-            Some(s) if s == expected_str.as_ref() => {}
-            _ => {
-                tracing::warn!(
-                    configuration_id = %configuration_id,
-                    "Webhook callback with invalid or missing secret"
-                );
-                return Err(ApiGovernanceError::Unauthorized);
-            }
-        }
+    if !webhook_callback_authorized(
+        config.webhook_callback_secret.as_deref(),
+        provided_secret.as_deref(),
+    ) {
+        tracing::warn!(
+            configuration_id = %configuration_id,
+            "Webhook callback with invalid or missing secret"
+        );
+        return Err(ApiGovernanceError::Unauthorized);
     }
 
     // Process the webhook
@@ -263,4 +260,41 @@ pub struct SingleTicketSyncResponse {
     pub ticket_id: Uuid,
     pub was_updated: bool,
     pub synced_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Ticketing webhook auth. Missing or empty configured secrets must refuse.
+pub(crate) fn webhook_callback_authorized(
+    expected_secret: Option<&[u8]>,
+    provided_secret: Option<&str>,
+) -> bool {
+    let Some(expected) = expected_secret.filter(|s| !s.is_empty()) else {
+        return false;
+    };
+    let Some(provided) = provided_secret else {
+        return false;
+    };
+    provided.as_bytes() == expected
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn webhook_callback_does_not_fail_open_without_secret() {
+        assert!(!webhook_callback_authorized(None, Some("guess")));
+        assert!(!webhook_callback_authorized(Some(b""), Some("guess")));
+        assert!(!webhook_callback_authorized(Some(b"secret"), None));
+        assert!(!webhook_callback_authorized(Some(b"secret"), Some("wrong")));
+        assert!(webhook_callback_authorized(Some(b"secret"), Some("secret")));
+
+        let src = include_str!("ticketing_webhook.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("webhook_callback_authorized(")
+                && !production
+                    .contains("if let Some(expected_secret) = &config.webhook_callback_secret"),
+            "ticketing webhook must not skip auth when no callback secret is stored"
+        );
+    }
 }

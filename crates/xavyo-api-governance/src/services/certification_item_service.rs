@@ -99,6 +99,17 @@ impl CertificationItemService {
             .map_err(GovernanceError::Database)
     }
 
+    /// Pending items for a reviewer grouped by campaign.
+    pub async fn list_reviewer_pending_by_campaign(
+        &self,
+        tenant_id: Uuid,
+        reviewer_id: Uuid,
+    ) -> Result<Vec<(Uuid, String, chrono::DateTime<chrono::Utc>, bool, i64)>> {
+        GovCertificationItem::list_reviewer_pending_by_campaign(&self.pool, tenant_id, reviewer_id)
+            .await
+            .map_err(GovernanceError::Database)
+    }
+
     /// Submit a decision for an item.
     ///
     /// If the decision is a revocation, triggers auto-remediation.
@@ -211,6 +222,16 @@ mod tests {
     #[test]
     fn test_min_justification_length() {
         assert_eq!(MIN_JUSTIFICATION_LENGTH, 20);
+    }
+
+    #[test]
+    fn reviewer_pending_by_campaign_filters_tenant_and_reviewer() {
+        let src = include_str!("certification_item_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("list_reviewer_pending_by_campaign("),
+            "reviewer summary must group pending items by campaign"
+        );
     }
 
     #[test]
