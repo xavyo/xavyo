@@ -476,11 +476,18 @@ impl AdConnector {
                     identifier: uid.value().to_string(),
                 })?;
 
-        let uac_str = entry.get_string("userAccountControl").unwrap_or("512"); // Default: NORMAL_ACCOUNT
-
-        uac_str.parse::<u32>().map_err(|_| {
-            ConnectorError::operation_failed(format!("Invalid userAccountControl value: {uac_str}"))
+        Self::uac_from_entry(&entry).ok_or_else(|| {
+            ConnectorError::operation_failed(format!(
+                "Missing or invalid userAccountControl for {}",
+                uid.value()
+            ))
         })
+    }
+
+    /// Parse UAC for disable/enable/`is_disabled`. Missing values must not
+    /// become `NORMAL_ACCOUNT` (512).
+    pub(crate) fn uac_from_entry(entry: &AttributeSet) -> Option<u32> {
+        UserAccountControl::from_attribute(entry.get("userAccountControl")).map(|uac| uac.value)
     }
 }
 
@@ -750,5 +757,28 @@ mod tests {
         let info = parsed.server_info.unwrap();
         assert_eq!(info.dns_host_name, Some("dc01.example.com".to_string()));
         assert_eq!(info.highest_committed_usn, Some("12345678".to_string()));
+    }
+
+    #[test]
+    fn read_uac_does_not_default_to_normal_account() {
+        let empty = AttributeSet::new();
+        assert!(AdConnector::uac_from_entry(&empty).is_none());
+
+        let mut integer_uac = AttributeSet::new();
+        integer_uac.set("userAccountControl", AttributeValue::Integer(514));
+        assert_eq!(AdConnector::uac_from_entry(&integer_uac), Some(514));
+
+        let mut string_uac = AttributeSet::new();
+        string_uac.set("userAccountControl", "512");
+        assert_eq!(AdConnector::uac_from_entry(&string_uac), Some(512));
+
+        let src = include_str!("connector.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("uac_from_entry(")
+                && production.contains("from_attribute(")
+                && !production.contains("unwrap_or(\"512\")"),
+            "missing userAccountControl must not become NORMAL_ACCOUNT"
+        );
     }
 }

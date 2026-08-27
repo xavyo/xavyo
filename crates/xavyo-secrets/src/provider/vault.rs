@@ -260,7 +260,11 @@ impl VaultSecretProvider {
                     detail: format!("Invalid renewal response: {e}"),
                 })?;
 
-        let new_ttl = json["auth"]["lease_duration"].as_u64().unwrap_or(3600);
+        let new_ttl = crate::dynamic::require_positive_ttl(
+            "vault",
+            "lease_duration",
+            json["auth"]["lease_duration"].as_i64(),
+        )? as u64;
         Ok(new_ttl)
     }
 
@@ -410,6 +414,10 @@ mod tests {
             production.contains("serde_json::to_string(secret_data)")
                 && !production.contains("to_string(secret_data).unwrap_or_default()"),
             "Vault secret load must fail closed when secret data cannot serialize"
+        );
+        assert!(
+            production.contains("require_positive_ttl(") && !production.contains("unwrap_or(3600)"),
+            "Vault token renewal must not invent a 3600s TTL"
         );
     }
 }

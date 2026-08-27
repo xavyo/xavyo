@@ -526,7 +526,7 @@ impl UserService {
 
                 match path {
                     "displayName" | "displayname" => {
-                        user.display_name = value.as_str().map(std::string::ToString::to_string);
+                        user.display_name = patch_optional_string(value, "displayName")?;
                     }
                     "active" => {
                         user.is_active = value.as_bool().ok_or_else(|| {
@@ -534,24 +534,22 @@ impl UserService {
                         })?;
                     }
                     "externalId" | "externalid" => {
-                        user.external_id = value.as_str().map(std::string::ToString::to_string);
+                        user.external_id = patch_optional_string(value, "externalId")?;
                     }
                     "name.givenName" | "name.givenname" => {
-                        user.first_name = value.as_str().map(std::string::ToString::to_string);
+                        user.first_name = patch_optional_string(value, "name.givenName")?;
                     }
                     "name.familyName" | "name.familyname" => {
-                        user.last_name = value.as_str().map(std::string::ToString::to_string);
+                        user.last_name = patch_optional_string(value, "name.familyName")?;
                     }
                     "userName" | "username" => {
-                        if let Some(email) = value.as_str() {
-                            // Basic email format validation
-                            if !email.contains('@') || !email.contains('.') {
-                                return Err(ScimError::Validation(
-                                    "userName must be a valid email address".to_string(),
-                                ));
-                            }
-                            user.email = email.to_string();
+                        let email = patch_string(value, "userName")?;
+                        if !email.contains('@') || !email.contains('.') {
+                            return Err(ScimError::Validation(
+                                "userName must be a valid email address".to_string(),
+                            ));
                         }
+                        user.email = email;
                     }
                     "" => {
                         // No path means the value is an object with multiple attributes
@@ -565,7 +563,7 @@ impl UserService {
                             }
                             if let Some(display_name) = obj.get("displayName") {
                                 user.display_name =
-                                    display_name.as_str().map(std::string::ToString::to_string);
+                                    patch_optional_string(display_name, "displayName")?;
                             }
                             // Handle enterprise extension attributes in bulk patch (F081)
                             let enterprise_uri =
@@ -699,6 +697,21 @@ impl UserService {
         revoke_user_sessions_and_refresh_tokens(&self.pool, tenant_id, user_id).await?;
 
         Ok(())
+    }
+}
+
+fn patch_string(value: &serde_json::Value, field: &str) -> ScimResult<String> {
+    value
+        .as_str()
+        .map(str::to_string)
+        .ok_or_else(|| ScimError::Validation(format!("{field} must be a string")))
+}
+
+fn patch_optional_string(value: &serde_json::Value, field: &str) -> ScimResult<Option<String>> {
+    match value {
+        serde_json::Value::Null => Ok(None),
+        serde_json::Value::String(s) => Ok(Some(s.clone())),
+        _ => Err(ScimError::Validation(format!("{field} must be a string"))),
     }
 }
 
@@ -836,6 +849,52 @@ mod tests {
         assert!(
             !production.contains("tracing::warn!(\"Unknown patch path"),
             "must not no-op unknown user PATCH paths"
+        );
+    }
+
+    #[test]
+    fn user_patch_string_fields_do_not_silently_skip() {
+        assert!(patch_string(&serde_json::json!(123), "userName").is_err());
+        assert!(patch_optional_string(&serde_json::json!(true), "displayName").is_err());
+        assert_eq!(
+            patch_optional_string(&serde_json::Value::Null, "displayName").unwrap(),
+            None
+        );
+        assert_eq!(
+            patch_string(&serde_json::json!("a@b.com"), "userName").unwrap(),
+            "a@b.com"
+        );
+
+        let mut user = sample_user();
+        let op = ScimPatchOp {
+            op: "replace".to_string(),
+            path: Some("displayName".to_string()),
+            value: Some(serde_json::json!(42)),
+        };
+        let err = UserService::apply_patch_op(&mut user, &op).expect_err("must fail closed");
+        assert!(
+            matches!(err, ScimError::Validation(ref msg) if msg.contains("displayName")),
+            "got {err:?}"
+        );
+        assert_eq!(user.display_name.as_deref(), Some("Test"));
+
+        let op = ScimPatchOp {
+            op: "replace".to_string(),
+            path: Some("userName".to_string()),
+            value: Some(serde_json::json!(false)),
+        };
+        let err = UserService::apply_patch_op(&mut user, &op).expect_err("must fail closed");
+        assert!(
+            matches!(err, ScimError::Validation(ref msg) if msg.contains("userName")),
+            "got {err:?}"
+        );
+        assert_eq!(user.email, "test@example.com");
+
+        let src = include_str!("user_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("patch_string(") && production.contains("patch_optional_string("),
+            "user PATCH string fields must fail closed on non-strings"
         );
         assert!(
             !production.contains("tracing::warn!(\"Cannot remove path"),

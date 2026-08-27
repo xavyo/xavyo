@@ -132,6 +132,23 @@ pub(crate) fn require_lease_id(
     }
 }
 
+/// Token or lease TTL from a provider response. Missing or non-positive
+/// values must not be treated as a default lifetime.
+#[cfg(feature = "vault-provider")]
+pub(crate) fn require_positive_ttl(
+    provider: &str,
+    field: &str,
+    ttl: Option<i64>,
+) -> Result<i64, SecretError> {
+    match ttl {
+        Some(n) if n > 0 => Ok(n),
+        _ => Err(SecretError::InvalidValue {
+            name: field.to_string(),
+            detail: format!("{provider} response missing a positive {field}"),
+        }),
+    }
+}
+
 /// Lease revoke HTTP status. 404 means already gone; other errors must not
 /// look like a successful revocation.
 #[cfg(feature = "vault-provider")]
@@ -206,6 +223,13 @@ mod tests {
         assert!(require_lease_id("openbao", "role", None).is_err());
         assert!(require_lease_id("infisical", "secret", Some("".into())).is_err());
         assert!(require_lease_id("infisical", "secret", Some("   ".into())).is_err());
+        assert_eq!(
+            require_positive_ttl("vault", "lease_duration", Some(3600)).unwrap(),
+            3600
+        );
+        assert!(require_positive_ttl("vault", "lease_duration", None).is_err());
+        assert!(require_positive_ttl("openbao", "lease_duration", Some(0)).is_err());
+        assert!(require_positive_ttl("infisical", "expiresIn", Some(-1)).is_err());
     }
 
     #[test]
