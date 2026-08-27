@@ -1,0 +1,23 @@
+name: Config Validation
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+  SQLX_OFFLINE: true
+
+jobs:
+  production-config:
+    name: Production config rejection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev protobuf-compiler
+      - uses: Swatinem/rust-cache@v2
+      - run: bash scripts/validate-production-config.sh

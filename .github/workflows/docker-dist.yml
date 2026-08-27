@@ -1,0 +1,25 @@
+name: Docker Dist Validation
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: '0 3 * * *'
+
+jobs:
+  validate-compose:
+    name: Validate docker-compose.dist.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate compose file syntax
+        run: docker compose -f docker/docker-compose.dist.yml config --quiet
+
+      - name: Check required env vars documented
+        run: |
+          grep -q 'XAVYO_SIEM_ENCRYPTION_KEY' docker/.env.dist.example
+          grep -q 'XAVYO_TICKETING_ENCRYPTION_KEY' docker/.env.dist.example
+          grep -q 'ADMIN_PASSWORD' docker/.env.dist.example
