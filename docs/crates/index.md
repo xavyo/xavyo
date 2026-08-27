@@ -33,7 +33,7 @@ Business logic independent of HTTP transport.
 | [xavyo-secrets](../../crates/xavyo-secrets/CRATE.md) | External secret providers | 🟢 stable |
 | [xavyo-scim-client](../../crates/xavyo-scim-client/CRATE.md) | Outbound SCIM provisioning | 🟢 stable |
 | [xavyo-scim-types](../../crates/xavyo-scim-types/CRATE.md) | Shared SCIM 2.0 DTOs (RFC 7643/7644) | 🟢 stable |
-| [xavyo-ext-authz](../../crates/xavyo-ext-authz/CRATE.md) | Envoy ext_authz v3 gRPC server for AgentGateway | 🟡 beta |
+| [xavyo-ext-authz](../../crates/xavyo-ext-authz/CRATE.md) | Envoy ext_authz v3 gRPC server for AgentGateway | 🟢 stable |
 
 ## Connector Layer
 
@@ -44,7 +44,7 @@ Identity source implementations.
 | [xavyo-connector-ldap](../../crates/xavyo-connector-ldap/CRATE.md) | LDAP/Active Directory connector | 🟢 stable |
 | [xavyo-connector-entra](../../crates/xavyo-connector-entra/CRATE.md) | Microsoft Entra ID connector (crate/API; no UI form) | 🟢 stable |
 | [xavyo-connector-rest](../../crates/xavyo-connector-rest/CRATE.md) | Generic REST API connector (crate/API; not a production UI path) | 🟢 stable |
-| [xavyo-connector-database](../../crates/xavyo-connector-database/CRATE.md) | SQL database connector (crate/API; not a production UI path) | 🟡 beta |
+| [xavyo-connector-database](../../crates/xavyo-connector-database/CRATE.md) | SQL database connector (crate/API; not a production UI path) | 🟢 stable |
 
 ## API Layer
 
@@ -59,7 +59,7 @@ REST endpoints exposed to clients.
 | [xavyo-api-saml](../../crates/xavyo-api-saml/CRATE.md) | SAML 2.0 IdP endpoints | 🟢 stable |
 | [xavyo-api-social](../../crates/xavyo-api-social/CRATE.md) | Social login providers | 🟢 stable |
 | [xavyo-api-governance](../../crates/xavyo-api-governance/CRATE.md) | IGA workflows and reporting | 🟢 stable |
-| [xavyo-api-connectors](../../crates/xavyo-api-connectors/CRATE.md) | Connector management API | 🟡 beta |
+| [xavyo-api-connectors](../../crates/xavyo-api-connectors/CRATE.md) | Connector management API | 🟢 stable |
 | [xavyo-api-tenants](../../crates/xavyo-api-tenants/CRATE.md) | Tenant provisioning API | 🟢 stable |
 | [xavyo-api-authorization](../../crates/xavyo-api-authorization/CRATE.md) | Authorization policy API | 🟢 stable |
 | [xavyo-api-import](../../crates/xavyo-api-import/CRATE.md) | Bulk user import API | 🟢 stable |
