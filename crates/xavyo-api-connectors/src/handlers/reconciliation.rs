@@ -705,21 +705,23 @@ pub async fn list_discrepancies(
 
     let discrepancies: Vec<DiscrepancyResponse> = discrepancies
         .into_iter()
-        .map(|d| DiscrepancyResponse {
-            id: d.id,
-            run_id: d.run_id,
-            discrepancy_type: d.discrepancy_type.clone(),
-            identity_id: d.identity_id,
-            external_uid: d.external_uid,
-            mismatched_attributes: d.mismatched_attributes,
-            resolution_status: d.resolution_status,
-            resolved_action: d.resolved_action,
-            resolved_by: d.resolved_by,
-            resolved_at: d.resolved_at,
-            detected_at: d.detected_at,
-            suggested_actions: get_suggested_actions(&d.discrepancy_type),
+        .map(|d| {
+            Ok(DiscrepancyResponse {
+                id: d.id,
+                run_id: d.run_id,
+                discrepancy_type: d.discrepancy_type.clone(),
+                identity_id: d.identity_id,
+                external_uid: d.external_uid,
+                mismatched_attributes: d.mismatched_attributes,
+                resolution_status: d.resolution_status,
+                resolved_action: d.resolved_action,
+                resolved_by: d.resolved_by,
+                resolved_at: d.resolved_at,
+                detected_at: d.detected_at,
+                suggested_actions: get_suggested_actions(&d.discrepancy_type)?,
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, ApiError>>()?;
 
     Ok(Json(ListDiscrepanciesResponse {
         discrepancies,
@@ -769,7 +771,7 @@ pub async fn get_discrepancy(
         resolved_by: d.resolved_by,
         resolved_at: d.resolved_at,
         detected_at: d.detected_at,
-        suggested_actions: get_suggested_actions(&d.discrepancy_type),
+        suggested_actions: get_suggested_actions(&d.discrepancy_type)?,
     }))
 }
 
@@ -1440,25 +1442,42 @@ fn map_reconciliation_error(err: ReconciliationServiceError) -> ApiError {
 }
 
 /// Get suggested actions for a discrepancy type.
-fn get_suggested_actions(discrepancy_type: &str) -> Vec<String> {
+fn get_suggested_actions(discrepancy_type: &str) -> Result<Vec<String>, ApiError> {
     match discrepancy_type {
-        "missing" => vec!["create".to_string()],
-        "orphan" => vec!["link".to_string(), "delete".to_string()],
-        "mismatch" => vec!["update".to_string()],
-        "collision" => vec!["link".to_string()],
-        "unlinked" => vec!["link".to_string()],
-        "deleted" => vec![
+        "missing" => Ok(vec!["create".to_string()]),
+        "orphan" => Ok(vec!["link".to_string(), "delete".to_string()]),
+        "mismatch" => Ok(vec!["update".to_string()]),
+        "collision" => Ok(vec!["link".to_string()]),
+        "unlinked" => Ok(vec!["link".to_string()]),
+        "deleted" => Ok(vec![
             "create".to_string(),
             "unlink".to_string(),
             "inactivate_identity".to_string(),
-        ],
-        _ => vec![],
+        ]),
+        other => Err(ApiError::bad_request(format!(
+            "Unknown discrepancy type '{other}'"
+        ))),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unknown_discrepancy_type_does_not_suggest_empty() {
+        assert_eq!(
+            get_suggested_actions("orphan").unwrap(),
+            vec!["link".to_string(), "delete".to_string()]
+        );
+        assert!(get_suggested_actions("bogus").is_err());
+        let src = include_str!("reconciliation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("_ => vec![]") && production.contains("Unknown discrepancy type"),
+            "unknown discrepancy types must not advertise empty suggested actions"
+        );
+    }
 
     #[test]
     fn omitted_enabled_deserializes_to_none() {

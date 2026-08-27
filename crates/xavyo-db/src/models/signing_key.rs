@@ -148,7 +148,11 @@ impl SigningKey {
         let (rotated_at, revoked_at) = match new_state {
             "retiring" => (Some(now), None),
             "revoked" => (None, Some(now)),
-            _ => (None, None),
+            other => {
+                return Err(sqlx::Error::Protocol(format!(
+                    "invalid signing key state '{other}', expected retiring or revoked"
+                )));
+            }
         };
 
         // Build update dynamically based on new state
@@ -167,7 +171,7 @@ impl SigningKey {
             .bind(tenant_id)
             .fetch_optional(executor)
             .await
-        } else if new_state == "revoked" {
+        } else {
             sqlx::query_as(
                 r"
                 UPDATE signing_keys
@@ -178,20 +182,6 @@ impl SigningKey {
             )
             .bind(new_state)
             .bind(revoked_at)
-            .bind(kid)
-            .bind(tenant_id)
-            .fetch_optional(executor)
-            .await
-        } else {
-            sqlx::query_as(
-                r"
-                UPDATE signing_keys
-                SET state = $1
-                WHERE kid = $2 AND tenant_id = $3
-                RETURNING *
-                ",
-            )
-            .bind(new_state)
             .bind(kid)
             .bind(tenant_id)
             .fetch_optional(executor)
@@ -220,5 +210,20 @@ mod tests {
         assert!(!input.kid.is_empty());
         assert_eq!(input.algorithm, "RS256");
         assert!(input.created_by.is_some());
+    }
+
+    #[test]
+    fn unknown_signing_key_state_does_not_update() {
+        let src = include_str!("signing_key.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let update = production
+            .split("pub async fn update_state")
+            .nth(1)
+            .expect("update_state");
+        assert!(
+            update.contains("invalid signing key state")
+                && !update.contains("SET state = $1\n                WHERE kid = $2"),
+            "unknown signing key state must not be persisted"
+        );
     }
 }

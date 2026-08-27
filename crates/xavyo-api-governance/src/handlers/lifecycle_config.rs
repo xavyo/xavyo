@@ -462,18 +462,7 @@ pub async fn get_transition_conditions(
         )));
     }
 
-    // Parse conditions from JSON
-    let conditions: Vec<TransitionCondition> = match &transition.conditions {
-        Some(serde_json::Value::Array(arr)) if !arr.is_empty() => {
-            serde_json::from_value(serde_json::Value::Array(arr.clone())).map_err(|e| {
-                crate::error::ApiGovernanceError::Internal(format!(
-                    "Failed to parse conditions: {}",
-                    e
-                ))
-            })?
-        }
-        _ => Vec::new(),
-    };
+    let conditions = parse_transition_conditions(transition.conditions.as_ref())?;
 
     Ok(Json(GetTransitionConditionsResponse {
         transition_id,
@@ -1014,6 +1003,22 @@ mod tests {
         assert!(
             !production.contains("to_state.map(|s| s.name).unwrap_or_default()"),
             "user lifecycle status must not hide a missing to-state as an empty name"
+        );
+    }
+
+    #[test]
+    fn get_transition_conditions_does_not_empty_on_invalid_json() {
+        let src = include_str!("lifecycle_config.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let get_conds = production
+            .split("async fn get_transition_conditions")
+            .nth(1)
+            .and_then(|s| s.split("async fn ").next())
+            .expect("get_transition_conditions");
+        assert!(
+            get_conds.contains("parse_transition_conditions(")
+                && !get_conds.contains("_ => Vec::new()"),
+            "GET transition conditions must not treat invalid JSON as no conditions"
         );
     }
 }
