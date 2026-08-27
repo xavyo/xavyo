@@ -965,7 +965,7 @@ mod tests {
         assert_eq!(parse_transform_int("42").unwrap(), 42);
         assert!(parse_transform_int("not-a-number").is_err());
         assert!(parse_transform_int("").is_err());
-        assert!((parse_transform_float("3.14").unwrap() - 3.14).abs() < 0.001);
+        assert!((parse_transform_float("2.5").unwrap() - 2.5).abs() < 0.001);
         assert!(parse_transform_float("nope").is_err());
 
         let engine = TransformEngine::new();
