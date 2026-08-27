@@ -788,6 +788,7 @@ mod tests {
     fn test_map_ad_user_no_uac_is_inactive() {
         let mut entry = AttributeSet::new();
         entry.set("objectGUID", AttributeValue::Binary(vec![0x01; 16]));
+        entry.set("distinguishedName", "CN=Test,OU=Users,DC=example,DC=com");
         entry.set("sAMAccountName", "test");
 
         let mapped = map_ad_user(&entry).unwrap();
@@ -904,6 +905,7 @@ mod tests {
     fn test_map_ad_user_objectguid_as_string() {
         let mut entry = AttributeSet::new();
         entry.set("objectGUID", "some-guid-string");
+        entry.set("distinguishedName", "CN=Test,OU=Users,DC=example,DC=com");
         entry.set("sAMAccountName", "test");
 
         let mapped = map_ad_user(&entry).unwrap();
@@ -914,6 +916,7 @@ mod tests {
     fn test_map_ad_user_cn_fallback_display_name() {
         let mut entry = AttributeSet::new();
         entry.set("objectGUID", AttributeValue::Binary(vec![0x01; 16]));
+        entry.set("distinguishedName", "CN=John Doe,OU=Users,DC=example,DC=com");
         entry.set("cn", "John Doe");
         // No displayName set
 
@@ -925,6 +928,7 @@ mod tests {
     fn test_map_ad_user_minimal_entry() {
         let mut entry = AttributeSet::new();
         entry.set("objectGUID", AttributeValue::Binary(vec![0xFF; 16]));
+        entry.set("distinguishedName", "CN=Minimal,OU=Users,DC=example,DC=com");
 
         let mapped = map_ad_user(&entry).unwrap();
         assert!(!mapped.external_id.is_empty());
@@ -1399,6 +1403,7 @@ mod tests {
             {
                 let mut e = AttributeSet::new();
                 e.set("objectGUID", AttributeValue::Binary(vec![0x01; 16]));
+                e.set("distinguishedName", "CN=User1,OU=Users,DC=example,DC=com");
                 e.set("sAMAccountName", "user1");
                 e
             },
@@ -1412,6 +1417,7 @@ mod tests {
             {
                 let mut e = AttributeSet::new();
                 e.set("objectGUID", AttributeValue::Binary(vec![0x03; 16]));
+                e.set("distinguishedName", "CN=User3,OU=Users,DC=example,DC=com");
                 e.set("sAMAccountName", "user3");
                 e
             },
@@ -1439,6 +1445,7 @@ mod tests {
             {
                 let mut e = AttributeSet::new();
                 e.set("objectGUID", AttributeValue::Binary(vec![0xAA; 16]));
+                e.set("distinguishedName", "CN=GoodUser,OU=Users,DC=example,DC=com");
                 e.set("sAMAccountName", "good_user");
                 e
             },

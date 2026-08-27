@@ -859,6 +859,7 @@ mod tests {
     fn test_map_ad_group_single_member() {
         let mut entry = AttributeSet::new();
         entry.set("objectGUID", AttributeValue::Binary(vec![0x02; 16]));
+        entry.set("distinguishedName", "CN=SoloGroup,OU=Groups,DC=ex,DC=com");
         entry.set("groupType", AttributeValue::Integer(-2147483646));
         // Single member as string (not array)
         entry.set("member", "CN=Solo,OU=Users,DC=ex,DC=com");
