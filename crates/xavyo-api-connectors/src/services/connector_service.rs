@@ -575,29 +575,22 @@ impl ConnectorService {
             sync_account_disabled: json_bool_field(config, "sync_account_disabled", true)?,
             enable_exchange: json_bool_field(config, "enable_exchange", false)?,
             search_bases: Vec::new(),
-            user_filter: config
-                .get("user_filter")
-                .and_then(|v| v.as_str())
-                .unwrap_or("(&(objectClass=user)(objectCategory=person))")
+            user_filter: json_str_or_default(
+                config,
+                "user_filter",
+                "(&(objectClass=user)(objectCategory=person))",
+            )?
+            .to_string(),
+            group_filter: json_str_or_default(config, "group_filter", "(objectClass=group)")?
                 .to_string(),
-            group_filter: config
-                .get("group_filter")
-                .and_then(|v| v.as_str())
-                .unwrap_or("(objectClass=group)")
-                .to_string(),
-            max_nesting_depth: config
-                .get("max_nesting_depth")
-                .and_then(serde_json::Value::as_u64)
-                .unwrap_or(10) as u32,
-            max_referral_hops: config
-                .get("max_referral_hops")
-                .and_then(serde_json::Value::as_u64)
-                .unwrap_or(3) as u32,
-            incremental_attribute: config
-                .get("incremental_attribute")
-                .and_then(|v| v.as_str())
-                .unwrap_or("uSNChanged")
-                .to_string(),
+            max_nesting_depth: json_u32_field(config, "max_nesting_depth", 10)?,
+            max_referral_hops: json_u32_field(config, "max_referral_hops", 3)?,
+            incremental_attribute: json_str_or_default(
+                config,
+                "incremental_attribute",
+                "uSNChanged",
+            )?
+            .to_string(),
             outbound_target_ou: config
                 .get("outbound_target_ou")
                 .and_then(|v| v.as_str())
@@ -805,6 +798,35 @@ fn json_bool_field(config: &serde_json::Value, field: &str, default: bool) -> Re
         Some(v) => v.as_bool().ok_or_else(|| {
             ConnectorApiError::InvalidConfiguration(format!("{field} must be a boolean"))
         }),
+    }
+}
+
+/// JSON string. Non-string values must not become the default.
+fn json_str_or_default<'a>(
+    config: &'a serde_json::Value,
+    field: &str,
+    default: &'a str,
+) -> Result<&'a str> {
+    match config.get(field) {
+        None | Some(serde_json::Value::Null) => Ok(default),
+        Some(v) => v.as_str().filter(|s| !s.is_empty()).ok_or_else(|| {
+            ConnectorApiError::InvalidConfiguration(format!("{field} must be a non-empty string"))
+        }),
+    }
+}
+
+/// JSON unsigned integer. Non-numbers must not become the default.
+fn json_u32_field(config: &serde_json::Value, field: &str, default: u32) -> Result<u32> {
+    match config.get(field) {
+        None | Some(serde_json::Value::Null) => Ok(default),
+        Some(v) => {
+            let n = v.as_u64().ok_or_else(|| {
+                ConnectorApiError::InvalidConfiguration(format!("{field} must be a number"))
+            })?;
+            u32::try_from(n).map_err(|_| {
+                ConnectorApiError::InvalidConfiguration(format!("{field} is out of range"))
+            })
+        }
     }
 }
 
@@ -1064,6 +1086,59 @@ mod tests {
                 && !production.contains("unwrap_or(\"source_wins\")")
                 && !production.contains("unwrap_or(\"subtree\")"),
             "AD conflict_strategy and search scope must not invent values for unknown/non-string JSON"
+        );
+    }
+
+    #[test]
+    fn ad_filters_and_limits_do_not_invent_defaults_for_wrong_json_types() {
+        assert_eq!(
+            json_str_or_default(&serde_json::json!({}), "user_filter", "(objectClass=user)")
+                .unwrap(),
+            "(objectClass=user)"
+        );
+        assert!(json_str_or_default(
+            &serde_json::json!({"user_filter": true}),
+            "user_filter",
+            "(objectClass=user)"
+        )
+        .is_err());
+        assert!(json_str_or_default(
+            &serde_json::json!({"group_filter": ""}),
+            "group_filter",
+            "(objectClass=group)"
+        )
+        .is_err());
+        assert!(json_str_or_default(
+            &serde_json::json!({"incremental_attribute": 1}),
+            "incremental_attribute",
+            "uSNChanged"
+        )
+        .is_err());
+        assert_eq!(
+            json_u32_field(&serde_json::json!({}), "max_nesting_depth", 10).unwrap(),
+            10
+        );
+        assert!(json_u32_field(
+            &serde_json::json!({"max_nesting_depth": "ten"}),
+            "max_nesting_depth",
+            10
+        )
+        .is_err());
+        assert!(json_u32_field(
+            &serde_json::json!({"max_referral_hops": true}),
+            "max_referral_hops",
+            3
+        )
+        .is_err());
+        let src = include_str!("connector_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("json_str_or_default(")
+                && production.contains("json_u32_field(")
+                && !production.contains("unwrap_or(\"uSNChanged\")")
+                && !production.contains("unwrap_or(10)")
+                && !production.contains("unwrap_or(3)"),
+            "AD user/group filters, incremental_attribute, and depth/hops must not invent defaults for non-string/non-number JSON"
         );
     }
 }

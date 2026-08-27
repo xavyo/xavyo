@@ -117,15 +117,31 @@ impl AuthorizationPolicy {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
+        Self::list_filtered(pool, tenant_id, None, None, limit, offset).await
+    }
+
+    /// List policies for a tenant, applying advertised status/effect filters.
+    pub async fn list_filtered(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        status: Option<&str>,
+        effect: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
             SELECT * FROM authorization_policies
             WHERE tenant_id = $1
+              AND ($2::text IS NULL OR status = $2)
+              AND ($3::text IS NULL OR effect = $3)
             ORDER BY priority ASC, created_at DESC
-            LIMIT $2 OFFSET $3
+            LIMIT $4 OFFSET $5
             ",
         )
         .bind(tenant_id)
+        .bind(status)
+        .bind(effect)
         .bind(limit)
         .bind(offset)
         .fetch_all(pool)
@@ -134,13 +150,27 @@ impl AuthorizationPolicy {
 
     /// Count policies for a tenant.
     pub async fn count_by_tenant(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<i64, sqlx::Error> {
+        Self::count_filtered(pool, tenant_id, None, None).await
+    }
+
+    /// Count policies for a tenant matching advertised status/effect filters.
+    pub async fn count_filtered(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        status: Option<&str>,
+        effect: Option<&str>,
+    ) -> Result<i64, sqlx::Error> {
         let result: (i64,) = sqlx::query_as(
             r"
             SELECT COUNT(*) FROM authorization_policies
             WHERE tenant_id = $1
+              AND ($2::text IS NULL OR status = $2)
+              AND ($3::text IS NULL OR effect = $3)
             ",
         )
         .bind(tenant_id)
+        .bind(status)
+        .bind(effect)
         .fetch_one(pool)
         .await?;
 
