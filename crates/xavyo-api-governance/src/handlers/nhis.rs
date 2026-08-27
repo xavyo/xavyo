@@ -956,6 +956,43 @@ pub async fn list_nhi_certification_items(
     Extension(claims): Extension<JwtClaims>,
     Query(query): Query<ListNhiCertificationItemsQuery>,
 ) -> ApiResult<Json<NhiCertificationItemListResponse>> {
+    list_nhi_certification_items_with(state, claims, query.campaign_id, query).await
+}
+
+/// List certification items for a campaign.
+///
+/// The path `campaign_id` is the campaign filter. A query `campaign_id` must
+/// not list another campaign's items (or every item) instead.
+#[utoipa::path(
+    get,
+    path = "/governance/nhis/certification/campaigns/{campaign_id}/items",
+    tag = "Governance - NHI Certification",
+    params(
+        ("campaign_id" = Uuid, Path, description = "Campaign ID"),
+        ListNhiCertificationItemsQuery
+    ),
+    responses(
+        (status = 200, description = "List of certification items", body = NhiCertificationItemListResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn list_nhi_certification_campaign_items(
+    State(state): State<GovernanceState>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(campaign_id): Path<Uuid>,
+    Query(query): Query<ListNhiCertificationItemsQuery>,
+) -> ApiResult<Json<NhiCertificationItemListResponse>> {
+    list_nhi_certification_items_with(state, claims, Some(campaign_id), query).await
+}
+
+async fn list_nhi_certification_items_with(
+    state: GovernanceState,
+    claims: JwtClaims,
+    campaign_id: Option<Uuid>,
+    query: ListNhiCertificationItemsQuery,
+) -> ApiResult<Json<NhiCertificationItemListResponse>> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -974,7 +1011,7 @@ pub async fn list_nhi_certification_items(
         .nhi_certification_service
         .list_items(
             tenant_id,
-            query.campaign_id,
+            campaign_id,
             query.status,
             reviewer_id,
             query.owner_id,
@@ -1485,4 +1522,44 @@ pub async fn get_nhi_request_summary(
 pub struct NhiRequestApprovalResponse {
     /// The updated request.
     pub request: NhiRequestResponse,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn nested_campaign_items_list_uses_path_campaign_id() {
+        let src = include_str!("nhis.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let nested = production
+            .split("pub async fn list_nhi_certification_campaign_items")
+            .nth(1)
+            .expect("list_nhi_certification_campaign_items")
+            .split("async fn list_nhi_certification_items_with")
+            .next()
+            .expect("nested handler body");
+        assert!(
+            nested.contains("Path(campaign_id): Path<Uuid>")
+                && nested.contains("Some(campaign_id)")
+                && !nested.contains("query.campaign_id,"),
+            "GET /governance/nhis/certification/campaigns/{{id}}/items must filter by path campaign_id"
+        );
+    }
+
+    #[test]
+    fn nested_campaign_items_helper_does_not_prefer_query_over_path() {
+        let src = include_str!("nhis.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let helper = production
+            .split("async fn list_nhi_certification_items_with")
+            .nth(1)
+            .expect("list_nhi_certification_items_with");
+        assert!(
+            helper.contains("campaign_id,") && helper.contains("query.status,"),
+            "nested campaign item list must pass the path campaign_id into list_items"
+        );
+        assert!(
+            !helper.contains("query.campaign_id,"),
+            "path campaign_id must not be replaced by an optional query campaign_id"
+        );
+    }
 }
