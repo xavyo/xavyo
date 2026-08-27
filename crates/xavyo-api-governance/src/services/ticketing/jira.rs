@@ -455,11 +455,7 @@ impl TicketingProvider for JiraProvider {
                 status: ticket_status,
                 resolution_notes,
                 resolved_by: None, // Would need to query transitions/changelog
-                last_updated: issue.fields.updated.and_then(|s| {
-                    chrono::DateTime::parse_from_rfc3339(&s)
-                        .ok()
-                        .map(|dt| dt.with_timezone(&chrono::Utc))
-                }),
+                last_updated: super::parse_optional_rfc3339(issue.fields.updated.as_deref())?,
                 raw_response: Some(serde_json::json!({
                     "status": issue.fields.status.name,
                     "status_category": issue.fields.status.status_category.key
@@ -552,6 +548,25 @@ mod tests {
         assert_eq!(provider.map_priority(2), "High");
         assert_eq!(provider.map_priority(3), "Medium");
         assert_eq!(provider.map_priority(4), "Low");
+    }
+
+    #[test]
+    fn jira_status_does_not_drop_unparseable_last_updated() {
+        let src = include_str!("jira.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let get_status = production
+            .split("async fn get_ticket_status")
+            .nth(1)
+            .and_then(|s| s.split("async fn add_comment").next())
+            .expect("get_ticket_status");
+        assert!(
+            !get_status.contains("parse_from_rfc3339(&s)\n                        .ok()"),
+            "unparseable Jira updated timestamp must not be dropped"
+        );
+        assert!(
+            get_status.contains("parse_optional_rfc3339"),
+            "Jira status must fail closed on invalid last_updated"
+        );
     }
 
     #[test]

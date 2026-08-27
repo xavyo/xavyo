@@ -103,8 +103,7 @@ impl ServiceNowProvider {
         }
     }
 
-    /// Map `ServiceNow` state to our ticket status.
-    fn map_state_to_status(&self, state: i32) -> TicketStatus {
+    fn map_state_numeric(state: i32) -> TicketStatus {
         // ServiceNow incident states:
         // 1 = New, 2 = In Progress, 3 = On Hold
         // 4 = Pending, 6 = Resolved, 7 = Closed, 8 = Cancelled
@@ -117,6 +116,39 @@ impl ServiceNowProvider {
             8 => TicketStatus::Cancelled,
             _ => TicketStatus::Unknown(format!("state={state}")),
         }
+    }
+
+    /// Parse a ServiceNow `state` field. Display values must not silently
+    /// become New/Open.
+    fn parse_state_field(state: &str) -> TicketStatus {
+        let trimmed = state.trim();
+        match trimmed.to_lowercase().as_str() {
+            "1" | "new" => TicketStatus::Open,
+            "2" | "in progress" => TicketStatus::InProgress,
+            "3" | "on hold" => TicketStatus::Pending,
+            "4" | "pending" => TicketStatus::Pending,
+            "6" | "resolved" => TicketStatus::Resolved,
+            "7" | "closed" => TicketStatus::Closed,
+            "8" | "cancelled" | "canceled" => TicketStatus::Cancelled,
+            other => other
+                .parse::<i32>()
+                .map(Self::map_state_numeric)
+                .unwrap_or_else(|_| TicketStatus::Unknown(trimmed.to_string())),
+        }
+    }
+
+    /// Parse ServiceNow `sys_updated_on`. A present-but-unparseable value is
+    /// an error, not a dropped timestamp.
+    fn parse_sys_updated_on(
+        raw: Option<&str>,
+    ) -> TicketingResult<Option<chrono::DateTime<chrono::Utc>>> {
+        let Some(s) = raw else {
+            return Ok(None);
+        };
+        if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S") {
+            return Ok(Some(dt.and_utc()));
+        }
+        super::parse_optional_rfc3339(Some(s))
     }
 }
 
@@ -356,21 +388,19 @@ impl TicketingProvider for ServiceNowProvider {
                     TicketingError::TicketNotFound(external_reference.to_string())
                 })?;
 
-            let state: i32 = incident.state.parse().unwrap_or(1);
-            let ticket_status = self.map_state_to_status(state);
+            let ticket_status = Self::parse_state_field(&incident.state);
+            let last_updated = Self::parse_sys_updated_on(incident.sys_updated_on.as_deref())?;
 
             Ok(TicketStatusResponse {
                 status: ticket_status,
                 resolution_notes: incident.close_notes,
                 resolved_by: incident.closed_by.and_then(|u| u.display_value),
-                last_updated: incident.sys_updated_on.and_then(|s| {
-                    // ServiceNow returns dates like "2024-01-15 10:30:00"
-                    chrono::NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S")
-                        .ok()
-                        .map(|dt| dt.and_utc())
-                }),
+                last_updated,
                 raw_response: Some(serde_json::json!({
+                    "sys_id": incident.sys_id,
+                    "number": incident.number,
                     "state": incident.state,
+                    "sys_updated_on": incident.sys_updated_on,
                 })),
             })
         } else if status == StatusCode::NOT_FOUND {
@@ -488,18 +518,60 @@ mod tests {
 
     #[test]
     fn test_state_mapping() {
-        let config = test_config();
-        let credentials = serde_json::json!({
-            "username": "test",
-            "password": "test"
-        });
+        assert_eq!(
+            ServiceNowProvider::parse_state_field("1"),
+            TicketStatus::Open
+        );
+        assert_eq!(
+            ServiceNowProvider::parse_state_field("2"),
+            TicketStatus::InProgress
+        );
+        assert_eq!(
+            ServiceNowProvider::parse_state_field("6"),
+            TicketStatus::Resolved
+        );
+        assert_eq!(
+            ServiceNowProvider::parse_state_field("7"),
+            TicketStatus::Closed
+        );
+        assert_eq!(
+            ServiceNowProvider::parse_state_field("8"),
+            TicketStatus::Cancelled
+        );
+    }
 
-        let provider = ServiceNowProvider::new(&config, &credentials).unwrap();
-
-        assert_eq!(provider.map_state_to_status(1), TicketStatus::Open);
-        assert_eq!(provider.map_state_to_status(2), TicketStatus::InProgress);
-        assert_eq!(provider.map_state_to_status(6), TicketStatus::Resolved);
-        assert_eq!(provider.map_state_to_status(7), TicketStatus::Closed);
-        assert_eq!(provider.map_state_to_status(8), TicketStatus::Cancelled);
+    #[test]
+    fn servicenow_state_display_values_are_not_open() {
+        assert_eq!(
+            ServiceNowProvider::parse_state_field("New"),
+            TicketStatus::Open
+        );
+        assert_eq!(
+            ServiceNowProvider::parse_state_field("In Progress"),
+            TicketStatus::InProgress
+        );
+        assert_eq!(
+            ServiceNowProvider::parse_state_field("6"),
+            TicketStatus::Resolved
+        );
+        assert!(matches!(
+            ServiceNowProvider::parse_state_field("bogus"),
+            TicketStatus::Unknown(_)
+        ));
+        let src = include_str!("servicenow.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("incident.state.parse().unwrap_or(1)"),
+            "unknown ServiceNow state must not silently become New/Open"
+        );
+        assert!(
+            production.contains("sys_id") && production.contains("sys_updated_on"),
+            "status checks must persist more than just state in raw_response"
+        );
+        assert!(ServiceNowProvider::parse_sys_updated_on(Some("not-a-date")).is_err());
+        assert!(ServiceNowProvider::parse_sys_updated_on(Some("2024-01-15 10:30:00")).is_ok());
+        assert!(ServiceNowProvider::parse_sys_updated_on(None)
+            .unwrap()
+            .is_none());
     }
 }

@@ -337,20 +337,15 @@ impl ReportDataService {
         parameters: Option<&serde_json::Value>,
     ) -> Result<ReportData> {
         // Extract date range from parameters
-        let from_date = parameters
-            .and_then(|p| p.get("from_date"))
-            .and_then(|v| v.as_str())
-            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-            .map_or_else(
-                || chrono::Utc::now() - chrono::Duration::days(30),
-                |dt| dt.with_timezone(&chrono::Utc),
-            );
+        let from_date = match parse_rfc3339_param(parameters, "from_date")? {
+            Some(dt) => dt,
+            None => chrono::Utc::now() - chrono::Duration::days(30),
+        };
 
-        let to_date = parameters
-            .and_then(|p| p.get("to_date"))
-            .and_then(|v| v.as_str())
-            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-            .map_or_else(chrono::Utc::now, |dt| dt.with_timezone(&chrono::Utc));
+        let to_date = match parse_rfc3339_param(parameters, "to_date")? {
+            Some(dt) => dt,
+            None => chrono::Utc::now(),
+        };
 
         // Query admin audit logs for governance events
         let rows: Vec<(
@@ -418,6 +413,28 @@ fn extract_column_names(definition: &TemplateDefinition) -> Vec<String> {
     definition.columns.iter().map(|c| c.field.clone()).collect()
 }
 
+/// Present-but-invalid report date parameters must not silently fall back.
+fn parse_rfc3339_param(
+    parameters: Option<&serde_json::Value>,
+    key: &str,
+) -> Result<Option<chrono::DateTime<chrono::Utc>>> {
+    let Some(params) = parameters else {
+        return Ok(None);
+    };
+    let Some(value) = params.get(key) else {
+        return Ok(None);
+    };
+    if value.is_null() {
+        return Ok(None);
+    }
+    let raw = value.as_str().ok_or_else(|| {
+        GovernanceError::Validation(format!("{key} must be an RFC3339 timestamp"))
+    })?;
+    chrono::DateTime::parse_from_rfc3339(raw)
+        .map(|dt| Some(dt.with_timezone(&chrono::Utc)))
+        .map_err(|e| GovernanceError::Validation(format!("Invalid {key}: {e}")))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -446,5 +463,30 @@ mod tests {
 
         let columns = extract_column_names(&definition);
         assert_eq!(columns, vec!["user_email", "entitlement_name"]);
+    }
+
+    #[test]
+    fn report_date_params_do_not_silently_default() {
+        assert!(parse_rfc3339_param(None, "from_date").unwrap().is_none());
+        assert!(parse_rfc3339_param(Some(&json!({})), "from_date")
+            .unwrap()
+            .is_none());
+        assert!(
+            parse_rfc3339_param(Some(&json!({"from_date": "not-a-date"})), "from_date").is_err()
+        );
+        assert!(parse_rfc3339_param(Some(&json!({"from_date": 12})), "from_date").is_err());
+        let parsed = parse_rfc3339_param(
+            Some(&json!({"from_date": "2024-01-15T10:30:00Z"})),
+            "from_date",
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(parsed.to_rfc3339(), "2024-01-15T10:30:00+00:00");
+        let src = include_str!("report_data_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("parse_from_rfc3339(s).ok()"),
+            "invalid report from_date/to_date must not silently become last-30-days/now"
+        );
     }
 }

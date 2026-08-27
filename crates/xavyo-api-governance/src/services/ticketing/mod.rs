@@ -58,6 +58,21 @@ pub enum TicketingError {
     NotSupported(String),
 }
 
+/// Parse an optional RFC3339 timestamp. A present-but-unparseable value is an
+/// error, not a silent `None`.
+pub(crate) fn parse_optional_rfc3339(
+    raw: Option<&str>,
+) -> TicketingResult<Option<chrono::DateTime<chrono::Utc>>> {
+    match raw {
+        None => Ok(None),
+        Some(s) => chrono::DateTime::parse_from_rfc3339(s)
+            .map(|dt| Some(dt.with_timezone(&chrono::Utc)))
+            .map_err(|e| {
+                TicketingError::InvalidConfiguration(format!("Invalid last_updated timestamp: {e}"))
+            }),
+    }
+}
+
 /// Request to create a ticket in an external system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateTicketRequest {
@@ -404,6 +419,15 @@ mod tests {
         assert!(!TicketStatus::Open.is_terminal());
         assert!(!TicketStatus::InProgress.is_terminal());
         assert!(!TicketStatus::Pending.is_terminal());
+    }
+
+    #[test]
+    fn optional_rfc3339_does_not_drop_invalid_values() {
+        assert!(parse_optional_rfc3339(None).unwrap().is_none());
+        assert!(parse_optional_rfc3339(Some("2024-01-15T10:30:00Z"))
+            .unwrap()
+            .is_some());
+        assert!(parse_optional_rfc3339(Some("yesterday")).is_err());
     }
 
     #[test]
