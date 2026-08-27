@@ -135,11 +135,14 @@ impl ApprovalContext {
     }
 
     /// Check if there's an IP mismatch between origin and approver.
+    ///
+    /// Missing origin or approver IP cannot be verified as the same host —
+    /// treat that as a mismatch so the approval page still warns.
     #[must_use]
     pub fn has_ip_mismatch(&self) -> bool {
         match (&self.origin_ip, &self.approver_ip) {
             (Some(origin), Some(approver)) => origin != approver,
-            _ => false, // Can't determine mismatch if either is missing
+            _ => true,
         }
     }
 
@@ -2108,6 +2111,38 @@ mod tests {
         assert!(
             mismatch_context.has_ip_mismatch(),
             "Different IPs should be mismatch"
+        );
+
+        let missing_approver = ApprovalContext {
+            user_code: "ABCD-1234".to_string(),
+            client_id: "test-client".to_string(),
+            client_name: Some("Test App".to_string()),
+            scopes: vec!["openid".to_string()],
+            origin_ip: Some("10.0.0.1".to_string()),
+            origin_country: None,
+            created_at: Utc::now(),
+            approver_ip: None,
+            csrf_token: "csrf".to_string(),
+        };
+        assert!(
+            missing_approver.has_ip_mismatch(),
+            "Missing approver IP must warn, not skip the mismatch"
+        );
+
+        let missing_origin = ApprovalContext {
+            user_code: "ABCD-1234".to_string(),
+            client_id: "test-client".to_string(),
+            client_name: Some("Test App".to_string()),
+            scopes: vec!["openid".to_string()],
+            origin_ip: None,
+            origin_country: None,
+            created_at: Utc::now(),
+            approver_ip: Some("192.168.1.1".to_string()),
+            csrf_token: "csrf".to_string(),
+        };
+        assert!(
+            missing_origin.has_ip_mismatch(),
+            "Missing origin IP must warn, not skip the mismatch"
         );
     }
 

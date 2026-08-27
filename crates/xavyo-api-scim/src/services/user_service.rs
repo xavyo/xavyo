@@ -272,17 +272,10 @@ impl UserService {
         }
 
         // Apply sorting (column names are from a hardcoded allowlist — quote for defense-in-depth)
-        let sort_column = match pagination.sort_by.as_deref() {
-            Some("userName") => "email",
-            Some("displayName") => "display_name",
-            Some("name.givenName") => "first_name",
-            Some("name.familyName") => "last_name",
-            _ => "created_at",
-        };
-        let sort_order = match pagination.sort_order.as_deref() {
-            Some("descending") => "DESC",
-            _ => "ASC",
-        };
+        let (sort_column, sort_order) = resolve_user_sort(
+            pagination.sort_by.as_deref(),
+            pagination.sort_order.as_deref(),
+        )?;
         base_query.push_str(&format!(" ORDER BY \"{sort_column}\" {sort_order}"));
 
         // Apply pagination.
@@ -707,6 +700,38 @@ fn patch_string(value: &serde_json::Value, field: &str) -> ScimResult<String> {
         .ok_or_else(|| ScimError::Validation(format!("{field} must be a string")))
 }
 
+/// RFC 7644 §3.4.2.3: omitted `sortBy`/`sortOrder` use defaults; invalid
+/// values must not silently become `created_at` / ascending.
+fn resolve_user_sort(
+    sort_by: Option<&str>,
+    sort_order: Option<&str>,
+) -> ScimResult<(&'static str, &'static str)> {
+    let column = match sort_by {
+        None => "created_at",
+        Some("userName") => "email",
+        Some("displayName") => "display_name",
+        Some("name.givenName") => "first_name",
+        Some("name.familyName") => "last_name",
+        Some("id") => "id",
+        Some("meta.created") => "created_at",
+        Some(other) => {
+            return Err(ScimError::Validation(format!(
+                "Invalid sortBy '{other}'. Supported: userName, displayName, name.givenName, name.familyName, id, meta.created"
+            )));
+        }
+    };
+    let order = match sort_order {
+        None | Some("ascending") => "ASC",
+        Some("descending") => "DESC",
+        Some(other) => {
+            return Err(ScimError::Validation(format!(
+                "Invalid sortOrder '{other}'. Must be ascending or descending"
+            )));
+        }
+    };
+    Ok((column, order))
+}
+
 fn patch_optional_string(value: &serde_json::Value, field: &str) -> ScimResult<Option<String>> {
     match value {
         serde_json::Value::Null => Ok(None),
@@ -899,6 +924,47 @@ mod tests {
         assert!(
             !production.contains("tracing::warn!(\"Cannot remove path"),
             "must not no-op unknown user remove paths"
+        );
+    }
+
+    #[test]
+    fn invalid_user_sort_is_rejected() {
+        assert_eq!(
+            resolve_user_sort(None, None).unwrap(),
+            ("created_at", "ASC")
+        );
+        assert_eq!(
+            resolve_user_sort(Some("userName"), Some("descending")).unwrap(),
+            ("email", "DESC")
+        );
+        assert_eq!(
+            resolve_user_sort(Some("displayName"), Some("ascending")).unwrap(),
+            ("display_name", "ASC")
+        );
+        let err = resolve_user_sort(Some("password"), None).unwrap_err();
+        assert!(
+            matches!(err, ScimError::Validation(ref msg) if msg.contains("sortBy")),
+            "got {err:?}"
+        );
+        let err = resolve_user_sort(None, Some("desc")).unwrap_err();
+        assert!(
+            matches!(err, ScimError::Validation(ref msg) if msg.contains("sortOrder")),
+            "got {err:?}"
+        );
+        let src = include_str!("user_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_users")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn").next())
+            .expect("list_users");
+        assert!(
+            list.contains("resolve_user_sort("),
+            "SCIM user list must not silently default invalid sortBy/sortOrder"
+        );
+        assert!(
+            !list.contains("_ => \"created_at\"") && !list.contains("_ => \"ASC\""),
+            "invalid SCIM user sort must not fall through to created_at/ASC"
         );
     }
 

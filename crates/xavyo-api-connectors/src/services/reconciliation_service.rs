@@ -382,7 +382,7 @@ impl ReconciliationService {
             if let Some(d) =
                 ReconciliationDiscrepancy::find_by_id(&self.pool, tenant_id, id).await?
             {
-                let suggested_action = self.get_default_action(&d.discrepancy_type);
+                let suggested_action = self.get_default_action(&d.discrepancy_type)?;
                 *by_action.entry(suggested_action.clone()).or_insert(0) += 1;
 
                 items.push(PreviewItem {
@@ -729,15 +729,20 @@ impl ReconciliationService {
     // ========================================================================
 
     /// Get default action for a discrepancy type.
-    fn get_default_action(&self, discrepancy_type: &str) -> String {
+    ///
+    /// Unknown types must not become `"update"` — that would preview (and
+    /// could remediate) the wrong action.
+    fn get_default_action(&self, discrepancy_type: &str) -> ReconciliationServiceResult<String> {
         match discrepancy_type {
-            "missing" => "create".to_string(),
-            "orphan" => "link".to_string(),
-            "mismatch" => "update".to_string(),
-            "collision" => "link".to_string(),
-            "unlinked" => "link".to_string(),
-            "deleted" => "create".to_string(),
-            _ => "update".to_string(),
+            "missing" => Ok("create".to_string()),
+            "orphan" => Ok("link".to_string()),
+            "mismatch" => Ok("update".to_string()),
+            "collision" => Ok("link".to_string()),
+            "unlinked" => Ok("link".to_string()),
+            "deleted" => Ok("create".to_string()),
+            other => Err(ReconciliationServiceError::InvalidParameter(format!(
+                "Unknown discrepancy type '{other}'"
+            ))),
         }
     }
 }
@@ -819,25 +824,35 @@ mod tests {
 
     #[test]
     fn test_get_default_action() {
-        // Test the default action logic directly without creating a pool
-        fn get_default_action(discrepancy_type: &str) -> String {
+        fn get_default_action(discrepancy_type: &str) -> Result<String, String> {
             match discrepancy_type {
-                "missing" => "create".to_string(),
-                "orphan" => "link".to_string(),
-                "mismatch" => "update".to_string(),
-                "collision" => "link".to_string(),
-                "unlinked" => "link".to_string(),
-                "deleted" => "create".to_string(),
-                _ => "update".to_string(),
+                "missing" => Ok("create".to_string()),
+                "orphan" => Ok("link".to_string()),
+                "mismatch" => Ok("update".to_string()),
+                "collision" => Ok("link".to_string()),
+                "unlinked" => Ok("link".to_string()),
+                "deleted" => Ok("create".to_string()),
+                other => Err(format!("Unknown discrepancy type '{other}'")),
             }
         }
 
-        assert_eq!(get_default_action("missing"), "create");
-        assert_eq!(get_default_action("orphan"), "link");
-        assert_eq!(get_default_action("mismatch"), "update");
-        assert_eq!(get_default_action("collision"), "link");
-        assert_eq!(get_default_action("unlinked"), "link");
-        assert_eq!(get_default_action("deleted"), "create");
-        assert_eq!(get_default_action("unknown"), "update");
+        assert_eq!(get_default_action("missing").unwrap(), "create");
+        assert_eq!(get_default_action("orphan").unwrap(), "link");
+        assert_eq!(get_default_action("mismatch").unwrap(), "update");
+        assert_eq!(get_default_action("collision").unwrap(), "link");
+        assert_eq!(get_default_action("unlinked").unwrap(), "link");
+        assert_eq!(get_default_action("deleted").unwrap(), "create");
+        assert!(get_default_action("unknown").is_err());
+
+        let src = include_str!("reconciliation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let helper = production
+            .split("fn get_default_action")
+            .nth(1)
+            .expect("get_default_action");
+        assert!(
+            !helper.contains("_ => \"update\"") && !helper.contains("_ => Ok(\"update\""),
+            "unknown discrepancy types must not default to update"
+        );
     }
 }

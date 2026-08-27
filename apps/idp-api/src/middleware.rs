@@ -14,6 +14,8 @@ use axum::{
 };
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 
+use crate::config::AppEnvironment;
+
 /// Create a tower layer stack for request ID handling.
 ///
 /// This creates middleware that:
@@ -283,6 +285,20 @@ fn request_content_type(headers: &HeaderMap) -> Result<Option<&str>, ()> {
 
 // ── Error Sanitization (F082-US9) ─────────────────────────────────────────
 
+/// Whether 5xx bodies must be sanitized.
+///
+/// Boot parses `APP_ENV` case-insensitively (`PRODUCTION` is production). The
+/// sanitizer must do the same; otherwise internals leak. Unrecognized values
+/// sanitize rather than leak (boot already rejects them).
+fn app_env_is_production(app_env: Option<&str>) -> bool {
+    match app_env {
+        None => false,
+        Some(v) => AppEnvironment::from_env_str(v)
+            .map(|env| env.is_production())
+            .unwrap_or(true),
+    }
+}
+
 /// Axum middleware that sanitizes 5xx error responses in production mode.
 ///
 /// Replaces detailed error messages with a generic JSON error to prevent
@@ -292,9 +308,7 @@ pub async fn error_sanitization_middleware(
     request: axum::http::Request<Body>,
     next: Next,
 ) -> Response {
-    let is_production = std::env::var("APP_ENV")
-        .map(|v| v == "production" || v == "prod")
-        .unwrap_or(false);
+    let is_production = app_env_is_production(std::env::var("APP_ENV").ok().as_deref());
 
     let response = next.run(request).await;
 
@@ -1487,6 +1501,36 @@ mod tests {
         assert!(
             window.contains("request_content_type(") && !window.contains("unwrap_or(\"\")"),
             "invalid Content-Type encoding must not skip media-type validation"
+        );
+    }
+
+    #[test]
+    fn error_sanitization_matches_boot_app_env() {
+        assert!(!app_env_is_production(None));
+        assert!(!app_env_is_production(Some("development")));
+        assert!(!app_env_is_production(Some("dev")));
+        assert!(!app_env_is_production(Some("DEVELOPMENT")));
+        assert!(app_env_is_production(Some("production")));
+        assert!(app_env_is_production(Some("prod")));
+        assert!(app_env_is_production(Some("PRODUCTION")));
+        assert!(app_env_is_production(Some("Prod")));
+        // Unrecognized: sanitize rather than leak.
+        assert!(app_env_is_production(Some("staging")));
+
+        let src = include_str!("middleware.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let window = production
+            .split("pub async fn error_sanitization_middleware")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("error_sanitization_middleware");
+        assert!(
+            window.contains("app_env_is_production("),
+            "5xx sanitization must use the same APP_ENV parser as boot"
+        );
+        assert!(
+            !window.contains("v == \"production\"") && !window.contains("v == \"prod\""),
+            "APP_ENV must not be compared case-sensitively"
         );
     }
 

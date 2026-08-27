@@ -642,35 +642,46 @@ impl LdapConnector {
             .with_object_class_type(oc_type)
             .with_parent_classes(parent_classes);
 
-        // Add MUST attributes with metadata
+        // Add MUST attributes with metadata. Unknown SYNTAX on a required
+        // attribute must not invent String — drop the object class instead.
         for attr_name in must_attrs {
-            let attr = self.create_attribute_with_metadata(&attr_name, true, attribute_metadata);
+            let attr = self.create_attribute_with_metadata(&attr_name, true, attribute_metadata)?;
             oc.add_attribute(attr);
         }
 
-        // Add MAY attributes with metadata
+        // Add MAY attributes with metadata. Unknown SYNTAX skips the attribute.
         for attr_name in may_attrs {
-            let attr = self.create_attribute_with_metadata(&attr_name, false, attribute_metadata);
-            oc.add_attribute(attr);
+            if let Some(attr) =
+                self.create_attribute_with_metadata(&attr_name, false, attribute_metadata)
+            {
+                oc.add_attribute(attr);
+            } else {
+                warn!(
+                    attr = %attr_name,
+                    "skipping MAY attribute with unknown LDAP syntax OID"
+                );
+            }
         }
 
         Some(oc)
     }
 
     /// Create a `SchemaAttribute` with metadata from attributeTypes.
+    ///
+    /// Omitted SYNTAX defaults to Directory String (RFC 4512). A present but
+    /// unknown syntax OID must not be typed as String.
     fn create_attribute_with_metadata(
         &self,
         attr_name: &str,
         required: bool,
         attribute_metadata: &std::collections::HashMap<String, AttributeMetadata>,
-    ) -> SchemaAttribute {
+    ) -> Option<SchemaAttribute> {
         let meta = attribute_metadata.get(&attr_name.to_lowercase());
 
-        let data_type = meta
-            .and_then(|m| m.syntax.as_ref())
-            .map_or(AttributeDataType::String, |s| {
-                self.ldap_syntax_to_data_type(s)
-            });
+        let data_type = match meta.and_then(|m| m.syntax.as_ref()) {
+            None => AttributeDataType::String,
+            Some(s) => self.ldap_syntax_to_data_type(s)?,
+        };
 
         let mut attr = SchemaAttribute::new(attr_name, attr_name, data_type).case_insensitive(); // LDAP attributes are case-insensitive
 
@@ -707,13 +718,15 @@ impl LdapConnector {
             }
         }
 
-        attr
+        Some(attr)
     }
 
     /// Convert LDAP syntax OID to `AttributeDataType`.
-    fn ldap_syntax_to_data_type(&self, syntax_oid: &str) -> AttributeDataType {
+    ///
+    /// Unknown OIDs return `None` — they must not be typed as String.
+    fn ldap_syntax_to_data_type(&self, syntax_oid: &str) -> Option<AttributeDataType> {
         // Common LDAP syntax OIDs (RFC 4517)
-        match syntax_oid.split('{').next().unwrap_or(syntax_oid) {
+        Some(match syntax_oid.split('{').next().unwrap_or(syntax_oid) {
             // Directory String (UTF-8)
             "1.3.6.1.4.1.1466.115.121.1.15" => AttributeDataType::String,
             // IA5 String (ASCII)
@@ -742,9 +755,8 @@ impl LdapConnector {
             "1.3.6.1.4.1.1466.115.121.1.38" => AttributeDataType::String,
             // Numeric String
             "1.3.6.1.4.1.1466.115.121.1.36" => AttributeDataType::String,
-            // Default to String for unknown syntaxes
-            _ => AttributeDataType::String,
-        }
+            _ => return None,
+        })
     }
 
     /// Extract a keyword value (e.g., USAGE userApplications).
@@ -1978,19 +1990,19 @@ mod tests {
         // Directory String (UTF-8)
         assert_eq!(
             connector.ldap_syntax_to_data_type("1.3.6.1.4.1.1466.115.121.1.15"),
-            xavyo_connector::schema::AttributeDataType::String
+            Some(xavyo_connector::schema::AttributeDataType::String)
         );
 
         // IA5 String (ASCII)
         assert_eq!(
             connector.ldap_syntax_to_data_type("1.3.6.1.4.1.1466.115.121.1.26"),
-            xavyo_connector::schema::AttributeDataType::String
+            Some(xavyo_connector::schema::AttributeDataType::String)
         );
 
         // Printable String
         assert_eq!(
             connector.ldap_syntax_to_data_type("1.3.6.1.4.1.1466.115.121.1.44"),
-            xavyo_connector::schema::AttributeDataType::String
+            Some(xavyo_connector::schema::AttributeDataType::String)
         );
     }
 
@@ -2000,7 +2012,7 @@ mod tests {
 
         assert_eq!(
             connector.ldap_syntax_to_data_type("1.3.6.1.4.1.1466.115.121.1.27"),
-            xavyo_connector::schema::AttributeDataType::Integer
+            Some(xavyo_connector::schema::AttributeDataType::Integer)
         );
     }
 
@@ -2010,7 +2022,7 @@ mod tests {
 
         assert_eq!(
             connector.ldap_syntax_to_data_type("1.3.6.1.4.1.1466.115.121.1.7"),
-            xavyo_connector::schema::AttributeDataType::Boolean
+            Some(xavyo_connector::schema::AttributeDataType::Boolean)
         );
     }
 
@@ -2021,13 +2033,13 @@ mod tests {
         // Octet String
         assert_eq!(
             connector.ldap_syntax_to_data_type("1.3.6.1.4.1.1466.115.121.1.40"),
-            xavyo_connector::schema::AttributeDataType::Binary
+            Some(xavyo_connector::schema::AttributeDataType::Binary)
         );
 
         // JPEG
         assert_eq!(
             connector.ldap_syntax_to_data_type("1.3.6.1.4.1.1466.115.121.1.28"),
-            xavyo_connector::schema::AttributeDataType::Binary
+            Some(xavyo_connector::schema::AttributeDataType::Binary)
         );
     }
 
@@ -2037,7 +2049,7 @@ mod tests {
 
         assert_eq!(
             connector.ldap_syntax_to_data_type("1.3.6.1.4.1.1466.115.121.1.12"),
-            xavyo_connector::schema::AttributeDataType::Dn
+            Some(xavyo_connector::schema::AttributeDataType::Dn)
         );
     }
 
@@ -2048,7 +2060,7 @@ mod tests {
         // Generalized Time
         assert_eq!(
             connector.ldap_syntax_to_data_type("1.3.6.1.4.1.1466.115.121.1.24"),
-            xavyo_connector::schema::AttributeDataType::DateTime
+            Some(xavyo_connector::schema::AttributeDataType::DateTime)
         );
     }
 
@@ -2058,7 +2070,7 @@ mod tests {
 
         assert_eq!(
             connector.ldap_syntax_to_data_type("1.3.6.1.1.16.1"),
-            xavyo_connector::schema::AttributeDataType::Uuid
+            Some(xavyo_connector::schema::AttributeDataType::Uuid)
         );
     }
 
@@ -2069,17 +2081,49 @@ mod tests {
         // Syntax with length constraint should strip the constraint
         assert_eq!(
             connector.ldap_syntax_to_data_type("1.3.6.1.4.1.1466.115.121.1.15{256}"),
-            xavyo_connector::schema::AttributeDataType::String
+            Some(xavyo_connector::schema::AttributeDataType::String)
         );
     }
 
     #[test]
-    fn test_ldap_syntax_unknown_defaults_to_string() {
+    fn test_ldap_syntax_unknown_is_rejected() {
         let connector = test_connector();
 
         assert_eq!(
             connector.ldap_syntax_to_data_type("9.9.9.9.9.9.9.9.9"),
-            xavyo_connector::schema::AttributeDataType::String
+            None
+        );
+
+        let src = include_str!("connector.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let syntax_fn = production
+            .split("fn ldap_syntax_to_data_type")
+            .nth(1)
+            .expect("ldap_syntax_to_data_type");
+        assert!(
+            !syntax_fn.contains("_ => AttributeDataType::String"),
+            "unknown LDAP syntax OIDs must not be typed as String"
+        );
+
+        let mut metadata_map = std::collections::HashMap::new();
+        metadata_map.insert(
+            "mystery".to_lowercase(),
+            AttributeMetadata {
+                single_valued: true,
+                no_user_modification: false,
+                usage: "userApplications".to_string(),
+                syntax: Some("9.9.9.9.9.9.9.9.9".to_string()),
+                equality: None,
+                substr: None,
+                ordering: None,
+                description: None,
+            },
+        );
+        assert!(
+            connector
+                .create_attribute_with_metadata("mystery", false, &metadata_map)
+                .is_none(),
+            "unknown SYNTAX must not produce a String-typed attribute"
         );
     }
 
@@ -2104,7 +2148,9 @@ mod tests {
             },
         );
 
-        let attr = connector.create_attribute_with_metadata("mail", false, &metadata_map);
+        let attr = connector
+            .create_attribute_with_metadata("mail", false, &metadata_map)
+            .expect("known IA5 syntax");
 
         assert_eq!(attr.name, "mail");
         assert!(!attr.required);
@@ -2139,8 +2185,9 @@ mod tests {
             },
         );
 
-        let attr =
-            connector.create_attribute_with_metadata("modifyTimestamp", false, &metadata_map);
+        let attr = connector
+            .create_attribute_with_metadata("modifyTimestamp", false, &metadata_map)
+            .expect("known Generalized Time syntax");
 
         assert_eq!(attr.name, "modifyTimestamp");
         assert!(!attr.multi_valued); // SINGLE-VALUE
