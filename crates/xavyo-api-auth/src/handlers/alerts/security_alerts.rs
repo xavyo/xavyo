@@ -33,12 +33,14 @@ pub async fn get_security_alerts(
     // Clamp limit to valid range
     let limit = query.limit.clamp(1, 100);
 
+    let alert_type = parse_optional_alert_type(query.alert_type.as_deref())?;
+    let severity = parse_optional_severity(query.severity.as_deref())?;
     let (alerts, total, unacknowledged_count) = alert_service
         .get_user_alerts(
             *tenant_id.as_uuid(),
             user_id,
-            query.alert_type.as_deref(),
-            query.severity.as_deref(),
+            alert_type,
+            severity,
             query.acknowledged,
             query.cursor,
             limit,
@@ -102,4 +104,64 @@ pub async fn acknowledge_alert(
         .ok_or(ApiAuthError::AlertAlreadyAcknowledged)?;
 
     Ok(Json(updated_alert.into()))
+}
+
+/// Invalid alert-type filters must not silently list every alert.
+fn parse_optional_alert_type(value: Option<&str>) -> Result<Option<&str>, ApiAuthError> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s)
+            if matches!(
+                s,
+                "new_device" | "new_location" | "failed_attempts" | "password_change" | "mfa_disabled"
+            ) =>
+        {
+            Ok(Some(s))
+        }
+        Some(s) => Err(ApiAuthError::Validation(format!(
+            "Invalid alert type '{s}'. Must be one of: new_device, new_location, failed_attempts, password_change, mfa_disabled"
+        ))),
+    }
+}
+
+/// Invalid severity filters must not silently list every alert.
+fn parse_optional_severity(value: Option<&str>) -> Result<Option<&str>, ApiAuthError> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "info" | "warning" | "critical") => Ok(Some(s)),
+        Some(s) => Err(ApiAuthError::Validation(format!(
+            "Invalid alert severity '{s}'. Must be one of: info, warning, critical"
+        ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_alert_filters_do_not_list_all_alerts() {
+        assert_eq!(parse_optional_alert_type(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_alert_type(Some("new_device")).unwrap(),
+            Some("new_device")
+        );
+        assert!(parse_optional_alert_type(Some("bogus")).is_err());
+        assert_eq!(parse_optional_severity(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_severity(Some("warning")).unwrap(),
+            Some("warning")
+        );
+        assert!(parse_optional_severity(Some("bogus")).is_err());
+        let src = include_str!("security_alerts.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_alert_type(")
+                && production.contains("parse_optional_severity(")
+                && !production.contains("query.alert_type.as_deref(),"),
+            "invalid security-alert filters must be 400/422, not an unfiltered list"
+        );
+    }
 }
