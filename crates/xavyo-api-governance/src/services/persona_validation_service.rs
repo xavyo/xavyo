@@ -391,25 +391,31 @@ impl PersonaValidationService {
         if let Some(ref entitlements) = archetype.default_entitlements {
             if let Some(arr) = entitlements.as_array() {
                 for ent in arr {
-                    if let Some(requires_approval) = ent.get("requires_approval") {
-                        if requires_approval.as_bool().unwrap_or(false) {
-                            let ent_name = ent
-                                .get("name")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("unknown");
-                            return Err(GovernanceError::PersonaOperationRequiresApproval(
-                                format!(
-                                    "Default entitlement '{}' in archetype '{}' requires approval",
-                                    ent_name, archetype.name
-                                ),
-                            ));
-                        }
+                    if json_flag_bool(ent, "requires_approval")? {
+                        let ent_name = ent
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("unknown");
+                        return Err(GovernanceError::PersonaOperationRequiresApproval(format!(
+                            "Default entitlement '{}' in archetype '{}' requires approval",
+                            ent_name, archetype.name
+                        )));
                     }
                 }
             }
         }
 
         Ok(())
+    }
+}
+
+/// JSON boolean flags. A non-bool must not look like `false` (skip approval).
+fn json_flag_bool(value: &serde_json::Value, field: &str) -> Result<bool> {
+    match value.get(field) {
+        None => Ok(false),
+        Some(v) => v
+            .as_bool()
+            .ok_or_else(|| GovernanceError::Validation(format!("{field} must be a boolean"))),
     }
 }
 
@@ -476,6 +482,27 @@ mod tests {
                 && !production
                     .contains("from_value(a1.attribute_mappings.clone()).unwrap_or_default()"),
             "persona conflict checks must fail closed on mapping JSON parse"
+        );
+    }
+
+    #[test]
+    fn json_flag_bool_does_not_treat_non_bool_as_false() {
+        assert!(!json_flag_bool(&serde_json::json!({}), "requires_approval").unwrap());
+        assert!(json_flag_bool(
+            &serde_json::json!({"requires_approval": true}),
+            "requires_approval"
+        )
+        .unwrap());
+        assert!(json_flag_bool(
+            &serde_json::json!({"requires_approval": "true"}),
+            "requires_approval"
+        )
+        .is_err());
+        let src = include_str!("persona_validation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("as_bool().unwrap_or(false)"),
+            "persona validation must not skip approval when requires_approval is not a bool"
         );
     }
 }

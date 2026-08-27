@@ -249,15 +249,13 @@ impl PersonaAuthorizationService {
         if let Some(ref entitlements) = archetype.default_entitlements {
             if let Some(arr) = entitlements.as_array() {
                 for ent in arr {
-                    if let Some(requires_approval) = ent.get("requires_approval") {
-                        if requires_approval.as_bool().unwrap_or(false) {
-                            warn!(
-                                tenant_id = %tenant_id,
-                                archetype_id = %archetype_id,
-                                "Archetype has entitlements requiring approval - persona operations may behave unpredictably"
-                            );
-                            return Ok(true);
-                        }
+                    if json_flag_bool(ent, "requires_approval")? {
+                        warn!(
+                            tenant_id = %tenant_id,
+                            archetype_id = %archetype_id,
+                            "Archetype has entitlements requiring approval - persona operations may behave unpredictably"
+                        );
+                        return Ok(true);
                     }
                 }
             }
@@ -326,6 +324,16 @@ impl PersonaAuthorizationService {
     }
 }
 
+/// JSON boolean flags. A non-bool must not look like `false` (skip approval).
+fn json_flag_bool(value: &serde_json::Value, field: &str) -> Result<bool> {
+    match value.get(field) {
+        None => Ok(false),
+        Some(v) => v
+            .as_bool()
+            .ok_or_else(|| GovernanceError::Validation(format!("{field} must be a boolean"))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -351,5 +359,26 @@ mod tests {
         let result = AuthorizationResult::requires_approval("Needs approval");
         assert!(!result.authorized);
         assert!(result.requires_approval);
+    }
+
+    #[test]
+    fn json_flag_bool_does_not_treat_non_bool_as_false() {
+        assert!(!json_flag_bool(&serde_json::json!({}), "requires_approval").unwrap());
+        assert!(json_flag_bool(
+            &serde_json::json!({"requires_approval": true}),
+            "requires_approval"
+        )
+        .unwrap());
+        assert!(json_flag_bool(
+            &serde_json::json!({"requires_approval": "yes"}),
+            "requires_approval"
+        )
+        .is_err());
+        let src = include_str!("persona_authorization_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("as_bool().unwrap_or(false)"),
+            "persona authorization must not skip approval when requires_approval is not a bool"
+        );
     }
 }
