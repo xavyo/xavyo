@@ -84,15 +84,15 @@ Criteria:
 | xavyo-api-auth | 🟢 stable | 254 | 89 | MFA, passwordless complete |
 | xavyo-api-oauth | 🟢 stable | 201 | 63 | OAuth2/OIDC complete |
 | xavyo-api-users | 🟢 stable | 95+ | 34 | Full integration test coverage |
-| xavyo-api-scim | 🟡 beta | 45 | 27 | No integration tests |
-| xavyo-api-saml | 🟡 beta | 13 | 18 | 3 TODOs, limited coverage |
+| xavyo-api-scim | 🟢 stable | 370+ | 27 | SCIM 2.0 compliance + IdP interop integration tests |
+| xavyo-api-saml | 🟢 stable | 160+ | 18 | SP/IdP flows, security + vendor interop tests |
 | xavyo-api-social | 🟡 beta | 27 | 19 | Needs validation tests |
 | xavyo-api-governance | 🟢 stable | 1058 | 180+ | 135K LOC, massive coverage |
 | xavyo-api-connectors | 🟡 beta | 69 | 42 | 6 TODOs |
 | xavyo-api-tenants | 🟢 stable | 121 | 38 | Multi-tenant bootstrap complete |
 | xavyo-api-authorization | 🟡 beta | 36+ | 37 | Integration tests complete |
 | xavyo-api-import | 🟢 stable | 92+ | 45+ | Full integration test coverage |
-| xavyo-api-oidc-federation | 🟡 beta | 13 | 16 | Insufficient coverage |
+| xavyo-api-oidc-federation | 🟢 stable | 79+ | 16 | IdP interop tests (Auth0, Azure AD, Okta, Google) |
 | xavyo-api-nhi | 🟢 stable | 77 | 33 | Complete with risk scoring, F-047 & F-048 |
 | xavyo-api-ssf | 🔴 alpha | 20 | 50 | SSF push + poll (RFC 8936) delivery + SSRF guard, no integration tests |
 
@@ -102,8 +102,8 @@ Criteria:
 
 | Status | Count | Crates |
 |--------|-------|--------|
-| 🟢 Stable | 20 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-connector-entra, xavyo-connector-rest, xavyo-governance, xavyo-scim-client, xavyo-scim-types, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-tenants, xavyo-api-import, xavyo-api-users |
-| 🟡 Beta | 13 | xavyo-authorization, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-ext-authz, xavyo-connector-database, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi, xavyo-api-authorization |
+| 🟢 Stable | 23 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-connector-entra, xavyo-connector-rest, xavyo-governance, xavyo-scim-client, xavyo-scim-types, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-tenants, xavyo-api-import, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-oidc-federation |
+| 🟡 Beta | 10 | xavyo-authorization, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-ext-authz, xavyo-connector-database, xavyo-api-social, xavyo-api-connectors, xavyo-api-nhi, xavyo-api-authorization |
 | 🔴 Alpha | 2 | xavyo-ssf, xavyo-api-ssf |
 
 ---
