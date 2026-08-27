@@ -68,5 +68,18 @@ mod tests {
             "password".into(),
             CredentialChangeType::Update,
         );
+        e.token_claims_change(
+            Uuid::nil(),
+            Uuid::nil(),
+            serde_json::json!({"roles": ["admin"]}),
+        );
+    }
+
+    #[test]
+    fn noop_emitter_is_send_sync_object_safe() {
+        fn assert_object_safe(_: &dyn CaepEmitter) {}
+        assert_object_safe(&NoopEmitter);
+        let boxed: Box<dyn CaepEmitter> = Box::new(NoopEmitter);
+        boxed.session_revoked(Uuid::nil(), Uuid::nil(), Some("logout".into()));
     }
 }

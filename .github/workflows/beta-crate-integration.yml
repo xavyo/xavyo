@@ -78,3 +78,37 @@ jobs:
 
       - name: Run connector-database integration tests
         run: cargo test -p xavyo-connector-database --features integration -- --test-threads=1
+
+  api-ssf:
+    name: api-ssf integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: xavyo
+          POSTGRES_PASSWORD: xavyo_test_password
+          POSTGRES_DB: xavyo_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U xavyo -d xavyo_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev protobuf-compiler postgresql-client
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Initialize database
+        run: PGPASSWORD=xavyo_test_password psql -h localhost -U xavyo -d xavyo_test -f docker/postgres/init.sql
+
+      - name: Run migrations
+        run: cargo run -p xavyo-db --bin migrate
+
+      - name: Run api-ssf integration tests
+        run: cargo test -p xavyo-api-ssf --features integration

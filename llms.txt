@@ -51,7 +51,7 @@ The `docs-site/` contains a full Docusaurus documentation site:
 - [xavyo-authorization](crates/xavyo-authorization/CRATE.md): 🟢 Policy engine + Cedar (feature: `cedar`)
 - [xavyo-webhooks](crates/xavyo-webhooks/CRATE.md): 🟢 Event delivery
 - [xavyo-siem](crates/xavyo-siem/CRATE.md): 🟢 Audit export
-- [xavyo-ssf](crates/xavyo-ssf/CRATE.md): 🔴 CAEP/Shared Signals (SETs, emitter)
+- [xavyo-ssf](crates/xavyo-ssf/CRATE.md): 🟡 CAEP/Shared Signals (SETs, emitter)
 - [xavyo-secrets](crates/xavyo-secrets/CRATE.md): 🟢 Secret providers
 - [xavyo-scim-client](crates/xavyo-scim-client/CRATE.md): 🟢 Outbound SCIM
 - [xavyo-scim-types](crates/xavyo-scim-types/CRATE.md): 🟢 Shared SCIM 2.0 DTOs (RFC 7643/7644)
@@ -77,7 +77,7 @@ The `docs-site/` contains a full Docusaurus documentation site:
 - [xavyo-api-import](crates/xavyo-api-import/CRATE.md): 🟢 Bulk import
 - [xavyo-api-oidc-federation](crates/xavyo-api-oidc-federation/CRATE.md): 🟢 OIDC federation
 - [xavyo-api-nhi](crates/xavyo-api-nhi/CRATE.md): 🟢 Non-human identity API
-- [xavyo-api-ssf](crates/xavyo-api-ssf/CRATE.md): 🔴 SSF transmitter (streams, push CAEP)
+- [xavyo-api-ssf](crates/xavyo-api-ssf/CRATE.md): 🟡 SSF transmitter (streams, push CAEP)
 
 ## CRM Digital Twin Features (New)
 
