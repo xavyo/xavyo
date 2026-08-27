@@ -289,14 +289,7 @@ impl SearchQuery {
                 serde_json::Value::String(s) => s.clone(),
                 serde_json::Value::Number(n) => n.to_string(),
                 serde_json::Value::Bool(b) => b.to_string(),
-                serde_json::Value::Array(arr) => {
-                    // For IN operator, format as PostgreSQL array
-                    let values: Vec<String> = arr
-                        .iter()
-                        .filter_map(|v| v.as_str().map(String::from))
-                        .collect();
-                    format!("{{{}}}", values.join(","))
-                }
+                serde_json::Value::Array(arr) => in_filter_sql_value(&filter.field, arr)?,
                 _ => return Err(SearchError::InvalidValue(filter.field.clone())),
             };
 
@@ -305,7 +298,31 @@ impl SearchQuery {
 
         Ok((conditions.join(" AND "), params))
     }
+}
 
+/// Format an IN-filter array as a PostgreSQL array literal.
+///
+/// Non-scalar items (objects, nested arrays, null) must not be dropped —
+/// that would silently shrink `IN (a, 1, {x})` to `{a}` and lie about the
+/// requested match set. Numbers and bools stringify like `eq` does.
+fn in_filter_sql_value(field: &str, arr: &[serde_json::Value]) -> Result<String, SearchError> {
+    if arr.is_empty() {
+        return Err(SearchError::InvalidValue(field.to_string()));
+    }
+    let mut values = Vec::with_capacity(arr.len());
+    for v in arr {
+        let s = match v {
+            serde_json::Value::String(s) => s.clone(),
+            serde_json::Value::Number(n) => n.to_string(),
+            serde_json::Value::Bool(b) => b.to_string(),
+            _ => return Err(SearchError::InvalidValue(field.to_string())),
+        };
+        values.push(s);
+    }
+    Ok(format!("{{{}}}", values.join(",")))
+}
+
+impl SearchQuery {
     /// Build the ORDER BY clause.
     ///
     /// # Arguments
@@ -752,6 +769,47 @@ mod tests {
         // Even with no filters, tenant_id is present
         assert!(clause.contains("tenant_id = $1"));
         assert_eq!(params[0], tenant_id.to_string());
+    }
+
+    #[test]
+    fn in_filter_keeps_numbers_and_rejects_objects() {
+        let tenant_id = Uuid::new_v4();
+        let allowed = &["priority"];
+        let query = SearchQuery::new().with_filter(SearchFilter {
+            field: "priority".to_string(),
+            op: FilterOp::In,
+            value: serde_json::json!([1, 2, "3"]),
+        });
+        let (clause, params) = query.build_where_clause(tenant_id, allowed).unwrap();
+        assert!(clause.contains("priority = ANY($2)"));
+        assert_eq!(params[1], "{1,2,3}");
+
+        let bad = SearchQuery::new().with_filter(SearchFilter {
+            field: "priority".to_string(),
+            op: FilterOp::In,
+            value: serde_json::json!([1, {"x": 1}]),
+        });
+        assert!(matches!(
+            bad.build_where_clause(tenant_id, allowed),
+            Err(SearchError::InvalidValue(_))
+        ));
+
+        let empty = SearchQuery::new().with_filter(SearchFilter {
+            field: "priority".to_string(),
+            op: FilterOp::In,
+            value: serde_json::json!([]),
+        });
+        assert!(matches!(
+            empty.build_where_clause(tenant_id, allowed),
+            Err(SearchError::InvalidValue(_))
+        ));
+
+        let src = include_str!("search.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("filter_map(|v| v.as_str().map(String::from))"),
+            "IN filters must not drop non-string array items"
+        );
     }
 
     #[test]

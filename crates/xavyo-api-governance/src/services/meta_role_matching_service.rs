@@ -46,6 +46,16 @@ pub struct MatchingMetaRole {
     pub inheritance_id: Option<Uuid>,
 }
 
+/// `in` against a non-array value matches nothing (fail closed).
+fn array_contains(expected: &serde_json::Value, actual: &serde_json::Value) -> bool {
+    expected.as_array().is_some_and(|arr| arr.contains(actual))
+}
+
+/// `not_in` against a non-array value must not match every role.
+fn array_excludes(expected: &serde_json::Value, actual: &serde_json::Value) -> bool {
+    expected.as_array().is_some_and(|arr| !arr.contains(actual))
+}
+
 /// Service for meta-role matching and inheritance operations.
 pub struct MetaRoleMatchingService {
     pool: PgPool,
@@ -194,20 +204,8 @@ impl MetaRoleMatchingService {
         match criterion.operator {
             CriteriaOperator::Eq => Ok(actual_value == criterion.value),
             CriteriaOperator::Neq => Ok(actual_value != criterion.value),
-            CriteriaOperator::In => {
-                if let Some(arr) = criterion.value.as_array() {
-                    Ok(arr.contains(&actual_value))
-                } else {
-                    Ok(false)
-                }
-            }
-            CriteriaOperator::NotIn => {
-                if let Some(arr) = criterion.value.as_array() {
-                    Ok(!arr.contains(&actual_value))
-                } else {
-                    Ok(true)
-                }
-            }
+            CriteriaOperator::In => Ok(array_contains(&criterion.value, &actual_value)),
+            CriteriaOperator::NotIn => Ok(array_excludes(&criterion.value, &actual_value)),
             CriteriaOperator::Gt => {
                 self.compare_numeric(&actual_value, &criterion.value, |a, b| a > b)
             }
@@ -295,14 +293,10 @@ impl MetaRoleMatchingService {
             let matches = match criterion.operator {
                 xavyo_db::CriteriaOperator::Eq => actual_value == criterion.value,
                 xavyo_db::CriteriaOperator::Neq => actual_value != criterion.value,
-                xavyo_db::CriteriaOperator::In => criterion
-                    .value
-                    .as_array()
-                    .is_some_and(|arr| arr.contains(&actual_value)),
-                xavyo_db::CriteriaOperator::NotIn => criterion
-                    .value
-                    .as_array()
-                    .is_none_or(|arr| !arr.contains(&actual_value)),
+                xavyo_db::CriteriaOperator::In => array_contains(&criterion.value, &actual_value),
+                xavyo_db::CriteriaOperator::NotIn => {
+                    array_excludes(&criterion.value, &actual_value)
+                }
                 xavyo_db::CriteriaOperator::Gt => self
                     .compare_numeric(&actual_value, &criterion.value, |a, b| a > b)
                     .unwrap_or(false),
@@ -644,6 +638,36 @@ mod tests {
     fn test_criteria_logic() {
         // Test that AND requires all to match
         assert_eq!(CriteriaLogic::default(), CriteriaLogic::And);
+    }
+
+    #[test]
+    fn not_in_non_array_does_not_match_all_roles() {
+        let actual = serde_json::json!("admin");
+        assert!(array_excludes(
+            &serde_json::json!(["guest", "contractor"]),
+            &actual
+        ));
+        assert!(!array_excludes(
+            &serde_json::json!(["admin", "owner"]),
+            &actual
+        ));
+        assert!(
+            !array_excludes(&serde_json::json!("admin"), &actual),
+            "not_in with a non-array value must not match every role"
+        );
+        assert!(!array_contains(&serde_json::json!("admin"), &actual));
+        assert!(array_contains(&serde_json::json!(["admin"]), &actual));
+
+        let src = include_str!("meta_role_matching_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("is_none_or(|arr| !arr.contains"),
+            "NotIn must not fail-open when the criterion is not an array"
+        );
+        assert!(
+            !production.contains("Ok(true)"),
+            "NotIn must not return true when the criterion is not an array"
+        );
     }
 
     #[test]
