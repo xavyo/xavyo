@@ -239,7 +239,11 @@ pub async fn get_nhi(
             let ext = NhiServiceAccount::find_by_nhi_id(&state.pool, tenant_uuid, id).await?;
             (None, None, ext.map(to_service_account_extension))
         }
-        _ => (None, None, None),
+        other => {
+            return Err(NhiApiError::Internal(format!(
+                "Unsupported NHI type '{other}'"
+            )))
+        }
     };
 
     Ok(Json(NhiIdentityDetail {
@@ -296,4 +300,25 @@ pub fn unified_routes(state: NhiState) -> Router {
         .route("/", get(list_nhis))
         .route("/:id", get(get_nhi))
         .with_state(state)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn unknown_nhi_type_does_not_return_empty_extensions() {
+        let src = include_str!("unified.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let get_nhi = production
+            .split("async fn get_nhi")
+            .nth(1)
+            .expect("get_nhi");
+        assert!(
+            !get_nhi.contains("_ => (None, None, None)"),
+            "unknown NHI type must not succeed with empty type extensions"
+        );
+        assert!(
+            get_nhi.contains("Unsupported NHI type"),
+            "unknown NHI type must fail closed"
+        );
+    }
 }

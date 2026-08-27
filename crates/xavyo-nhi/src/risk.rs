@@ -327,7 +327,7 @@ fn calculate_scope_score(count: Option<u32>) -> u32 {
 /// - "medium" → 40 (center of 26-50)
 /// - "high" → 70 (center of 51-75)
 /// - "critical" → 90 (center of 76-100)
-/// - unknown → 0 (defaults to lowest risk)
+/// - unknown → `None` (must not be treated as lowest risk)
 ///
 /// # Example
 ///
@@ -335,27 +335,27 @@ fn calculate_scope_score(count: Option<u32>) -> u32 {
 /// use xavyo_nhi::risk::risk_level_to_score;
 ///
 /// // Case insensitive
-/// assert_eq!(risk_level_to_score("low"), 20);
-/// assert_eq!(risk_level_to_score("LOW"), 20);
-/// assert_eq!(risk_level_to_score("Low"), 20);
+/// assert_eq!(risk_level_to_score("low"), Some(20));
+/// assert_eq!(risk_level_to_score("LOW"), Some(20));
+/// assert_eq!(risk_level_to_score("Low"), Some(20));
 ///
 /// // All levels
-/// assert_eq!(risk_level_to_score("medium"), 40);
-/// assert_eq!(risk_level_to_score("high"), 70);
-/// assert_eq!(risk_level_to_score("critical"), 90);
+/// assert_eq!(risk_level_to_score("medium"), Some(40));
+/// assert_eq!(risk_level_to_score("high"), Some(70));
+/// assert_eq!(risk_level_to_score("critical"), Some(90));
 ///
-/// // Unknown defaults to 0 (safest assumption)
-/// assert_eq!(risk_level_to_score("unknown"), 0);
-/// assert_eq!(risk_level_to_score(""), 0);
+/// // Unknown must not default to 0 (lowest risk)
+/// assert_eq!(risk_level_to_score("unknown"), None);
+/// assert_eq!(risk_level_to_score(""), None);
 /// ```
 #[must_use]
-pub fn risk_level_to_score(risk_level: &str) -> u32 {
+pub fn risk_level_to_score(risk_level: &str) -> Option<u32> {
     match risk_level.to_lowercase().as_str() {
-        "low" => 20,
-        "medium" => 40,
-        "high" => 70,
-        "critical" => 90,
-        _ => 0,
+        "low" => Some(20),
+        "medium" => Some(40),
+        "high" => Some(70),
+        "critical" => Some(90),
+        _ => None,
     }
 }
 
@@ -493,13 +493,14 @@ mod tests {
 
     #[test]
     fn test_risk_level_to_score() {
-        assert_eq!(risk_level_to_score("low"), 20);
-        assert_eq!(risk_level_to_score("medium"), 40);
-        assert_eq!(risk_level_to_score("high"), 70);
-        assert_eq!(risk_level_to_score("critical"), 90);
-        assert_eq!(risk_level_to_score("unknown"), 0);
-        assert_eq!(risk_level_to_score("LOW"), 20);
-        assert_eq!(risk_level_to_score("HIGH"), 70);
+        assert_eq!(risk_level_to_score("low"), Some(20));
+        assert_eq!(risk_level_to_score("medium"), Some(40));
+        assert_eq!(risk_level_to_score("high"), Some(70));
+        assert_eq!(risk_level_to_score("critical"), Some(90));
+        assert_eq!(risk_level_to_score("unknown"), None);
+        assert_eq!(risk_level_to_score(""), None);
+        assert_eq!(risk_level_to_score("LOW"), Some(20));
+        assert_eq!(risk_level_to_score("HIGH"), Some(70));
     }
 
     #[test]

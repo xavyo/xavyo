@@ -89,17 +89,20 @@ impl ServiceNowProvider {
     }
 
     /// Map priority to `ServiceNow` urgency/impact.
-    fn map_priority(&self, priority: i32) -> (i32, i32) {
+    fn map_priority(&self, priority: i32) -> TicketingResult<(i32, i32)> {
         // ServiceNow uses urgency (1-3) and impact (1-3)
         // Priority 1 (Critical) -> urgency=1, impact=1
         // Priority 2 (High) -> urgency=2, impact=2
         // Priority 3 (Medium) -> urgency=2, impact=3
         // Priority 4 (Low) -> urgency=3, impact=3
         match priority {
-            1 => (1, 1),
-            2 => (2, 2),
-            3 => (2, 3),
-            _ => (3, 3),
+            1 => Ok((1, 1)),
+            2 => Ok((2, 2)),
+            3 => Ok((2, 3)),
+            4 => Ok((3, 3)),
+            other => Err(TicketingError::InvalidConfiguration(format!(
+                "invalid ticket priority {other}: expected 1-4"
+            ))),
         }
     }
 
@@ -267,7 +270,7 @@ impl TicketingProvider for ServiceNowProvider {
     ) -> TicketingResult<CreateTicketResponse> {
         let url = self.api_url(&format!("table/{}", self.table_name));
 
-        let (urgency, impact) = self.map_priority(request.priority);
+        let (urgency, impact) = self.map_priority(request.priority)?;
 
         // Build description with all relevant details
         let description = format!(
@@ -510,10 +513,19 @@ mod tests {
 
         let provider = ServiceNowProvider::new(&config, &credentials).unwrap();
 
-        assert_eq!(provider.map_priority(1), (1, 1));
-        assert_eq!(provider.map_priority(2), (2, 2));
-        assert_eq!(provider.map_priority(3), (2, 3));
-        assert_eq!(provider.map_priority(4), (3, 3));
+        assert_eq!(provider.map_priority(1).unwrap(), (1, 1));
+        assert_eq!(provider.map_priority(2).unwrap(), (2, 2));
+        assert_eq!(provider.map_priority(3).unwrap(), (2, 3));
+        assert_eq!(provider.map_priority(4).unwrap(), (3, 3));
+        assert!(provider.map_priority(0).is_err());
+        assert!(provider.map_priority(5).is_err());
+
+        let src = include_str!("servicenow.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("_ => (3, 3)"),
+            "unknown ServiceNow priority must not silently become Low"
+        );
     }
 
     #[test]

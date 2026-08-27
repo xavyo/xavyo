@@ -106,10 +106,13 @@ impl ScheduleConfig {
         }
     }
 
-    /// Set day of week for weekly schedule.
+    /// Set day of week for weekly schedule (0=Sunday … 6=Saturday).
+    ///
+    /// Values outside 0–6 are stored as-is so [`Self::validate`] can reject them
+    /// instead of silently becoming Saturday.
     #[must_use]
     pub fn with_day_of_week(mut self, day: u8) -> Self {
-        self.day_of_week = Some(day.min(6));
+        self.day_of_week = Some(day);
         self
     }
 
@@ -130,11 +133,18 @@ impl ScheduleConfig {
     /// Validate the schedule configuration.
     pub fn validate(&self) -> Result<(), String> {
         match &self.frequency {
-            ScheduleFrequency::Weekly if self.day_of_week.is_none() => {
-                Err("day_of_week is required for weekly schedule".to_string())
-            }
+            ScheduleFrequency::Weekly => match self.day_of_week {
+                None => Err("day_of_week is required for weekly schedule".to_string()),
+                Some(d) if d > 6 => Err(format!(
+                    "invalid day_of_week {d}: must be 0 (Sunday) through 6 (Saturday)"
+                )),
+                Some(_) => Ok(()),
+            },
             ScheduleFrequency::Monthly if self.day_of_month.is_none() => {
                 Err("day_of_month is required for monthly schedule".to_string())
+            }
+            ScheduleFrequency::Cron(_) => {
+                Err("cron reconciliation schedules are not implemented".to_string())
             }
             _ => Ok(()),
         }
@@ -165,18 +175,15 @@ impl ReconciliationScheduler {
             }
             ScheduleFrequency::Daily => Self::next_daily(from, target_time),
             ScheduleFrequency::Weekly => {
-                let day = config.day_of_week.unwrap_or(0);
+                let day = config.day_of_week?;
                 Self::next_weekly(from, target_time, day)
             }
             ScheduleFrequency::Monthly => {
-                let day = config.day_of_month.unwrap_or(1);
+                let day = config.day_of_month?;
                 Self::next_monthly(from, target_time, day)
             }
-            ScheduleFrequency::Cron(_) => {
-                // For cron, we'd need a cron parser
-                // For now, fall back to daily
-                Self::next_daily(from, target_time)
-            }
+            // Cron is advertised but not implemented. Do not silently run daily.
+            ScheduleFrequency::Cron(_) => None,
         }
     }
 
@@ -205,7 +212,8 @@ impl ReconciliationScheduler {
             3 => Weekday::Wed,
             4 => Weekday::Thu,
             5 => Weekday::Fri,
-            _ => Weekday::Sat,
+            6 => Weekday::Sat,
+            _ => return None,
         };
 
         let current_weekday = from.weekday();
@@ -509,5 +517,59 @@ mod tests {
         // Disabled
         config.enabled = false;
         assert!(!ReconciliationScheduler::is_due(&config, now, tolerance));
+    }
+
+    #[test]
+    fn unknown_weekday_does_not_become_saturday() {
+        let now = Utc.with_ymd_and_hms(2026, 1, 25, 10, 0, 0).unwrap();
+        let config = ScheduleConfig::new(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            ReconciliationMode::Full,
+            ScheduleFrequency::Weekly,
+        )
+        .with_day_of_week(99)
+        .with_hour(3);
+        assert!(config.validate().is_err());
+        assert!(ReconciliationScheduler::calculate_next_run(&config, now).is_none());
+        assert!(ReconciliationScheduler::next_weekly(
+            now,
+            NaiveTime::from_hms_opt(3, 0, 0).unwrap(),
+            99
+        )
+        .is_none());
+
+        let src = include_str!("scheduler.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("_ => Weekday::Sat"),
+            "unknown day_of_week must not silently become Saturday"
+        );
+        assert!(
+            !production.contains("unwrap_or(0)"),
+            "missing weekly day_of_week must not default to Sunday"
+        );
+    }
+
+    #[test]
+    fn cron_schedule_does_not_silently_run_daily() {
+        let now = Utc.with_ymd_and_hms(2026, 1, 25, 1, 0, 0).unwrap();
+        let config = ScheduleConfig::new(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            ReconciliationMode::Full,
+            ScheduleFrequency::Cron("0 2 * * *".to_string()),
+        )
+        .with_hour(2);
+        assert!(config.validate().is_err());
+        assert!(ReconciliationScheduler::calculate_next_run(&config, now).is_none());
+
+        let src = include_str!("scheduler.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("ScheduleFrequency::Cron(_) => None")
+                && !production.contains("fall back to daily"),
+            "cron must not silently schedule as daily"
+        );
     }
 }

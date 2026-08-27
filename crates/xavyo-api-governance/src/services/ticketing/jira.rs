@@ -94,14 +94,17 @@ impl JiraProvider {
     }
 
     /// Map priority to Jira priority name.
-    fn map_priority(&self, priority: i32) -> &'static str {
+    fn map_priority(&self, priority: i32) -> TicketingResult<&'static str> {
         // Jira default priorities: Highest, High, Medium, Low, Lowest
         match priority {
-            1 => "Highest",
-            2 => "High",
-            3 => "Medium",
-            4 => "Low",
-            _ => "Medium",
+            1 => Ok("Highest"),
+            2 => Ok("High"),
+            3 => Ok("Medium"),
+            4 => Ok("Low"),
+            5 => Ok("Lowest"),
+            other => Err(TicketingError::InvalidConfiguration(format!(
+                "invalid ticket priority {other}: expected 1-5"
+            ))),
         }
     }
 
@@ -355,7 +358,7 @@ impl TicketingProvider for JiraProvider {
                     name: self.issue_type.clone(),
                 },
                 priority: Some(JiraPriority {
-                    name: self.map_priority(request.priority).to_string(),
+                    name: self.map_priority(request.priority)?.to_string(),
                 }),
                 labels,
                 assignee: None, // Would need account ID lookup
@@ -559,10 +562,20 @@ mod tests {
 
         let provider = JiraProvider::new(&config, &credentials).unwrap();
 
-        assert_eq!(provider.map_priority(1), "Highest");
-        assert_eq!(provider.map_priority(2), "High");
-        assert_eq!(provider.map_priority(3), "Medium");
-        assert_eq!(provider.map_priority(4), "Low");
+        assert_eq!(provider.map_priority(1).unwrap(), "Highest");
+        assert_eq!(provider.map_priority(2).unwrap(), "High");
+        assert_eq!(provider.map_priority(3).unwrap(), "Medium");
+        assert_eq!(provider.map_priority(4).unwrap(), "Low");
+        assert_eq!(provider.map_priority(5).unwrap(), "Lowest");
+        assert!(provider.map_priority(0).is_err());
+        assert!(provider.map_priority(99).is_err());
+
+        let src = include_str!("jira.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("_ => \"Medium\""),
+            "unknown Jira priority must not silently become Medium"
+        );
     }
 
     #[test]

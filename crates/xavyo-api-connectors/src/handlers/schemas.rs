@@ -784,7 +784,6 @@ pub async fn get_object_class_details(
     Extension(claims): Extension<JwtClaims>,
     Path((id, name)): Path<(Uuid, String)>,
 ) -> Result<Json<ObjectClassResponse>> {
-    // TODO: Extend in User Story 3 (T044) to include hierarchy info
     let tenant_id = extract_tenant_id(&claims)?;
 
     let oc = state

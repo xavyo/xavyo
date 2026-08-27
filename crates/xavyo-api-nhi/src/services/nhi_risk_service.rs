@@ -118,7 +118,11 @@ impl NhiRiskService {
             NhiType::ServiceAccount => {
                 type_factors.push(Self::access_scope_factor(pool, tenant_id, nhi_id).await?);
             }
-            _ => {}
+            other => {
+                return Err(NhiApiError::Internal(format!(
+                    "Unsupported NHI type '{other}' for risk scoring"
+                )))
+            }
         }
 
         // Weighted average
@@ -434,6 +438,25 @@ mod tests {
                 && !summary.contains("COALESCE(risk_score, 0)")
                 && !summary.contains("unwrap_or(0.0)"),
             "NULL NHI risk scores must not classify as low or average 0"
+        );
+    }
+
+    #[test]
+    fn unknown_nhi_type_does_not_skip_type_risk_factors() {
+        let src = include_str!("nhi_risk_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let compute = production
+            .split("pub async fn compute(")
+            .nth(1)
+            .and_then(|s| s.split("fn staleness_factor").next())
+            .expect("compute");
+        assert!(
+            !compute.contains("_ => {}"),
+            "unknown NHI type must not skip type-specific risk factors"
+        );
+        assert!(
+            compute.contains("Unsupported NHI type"),
+            "unknown NHI type risk scoring must fail closed"
         );
     }
 }

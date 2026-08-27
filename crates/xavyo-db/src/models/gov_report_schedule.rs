@@ -314,7 +314,7 @@ impl GovReportSchedule {
             input.schedule_day_of_week,
             input.schedule_day_of_month,
             None,
-        );
+        )?;
 
         sqlx::query_as(
             r"
@@ -447,7 +447,7 @@ impl GovReportSchedule {
                     .schedule_day_of_month
                     .or(current.schedule_day_of_month),
                 None,
-            );
+            )?;
             q = q.bind(new_next_run);
         }
 
@@ -513,7 +513,7 @@ impl GovReportSchedule {
             current.schedule_day_of_week,
             current.schedule_day_of_month,
             None,
-        );
+        )?;
 
         sqlx::query_as(
             r"
@@ -548,7 +548,7 @@ impl GovReportSchedule {
             current.schedule_day_of_week,
             current.schedule_day_of_month,
             Some(Utc::now()),
-        );
+        )?;
 
         sqlx::query_as(
             r"
@@ -592,7 +592,7 @@ impl GovReportSchedule {
             current.schedule_day_of_week,
             current.schedule_day_of_month,
             Some(Utc::now()),
-        );
+        )?;
 
         sqlx::query_as(
             r"
@@ -632,6 +632,34 @@ pub(crate) fn schedule_json<T: serde::Serialize>(
     serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
 }
 
+fn schedule_error(detail: impl Into<String>) -> sqlx::Error {
+    sqlx::Error::Protocol(detail.into())
+}
+
+fn at_hour(date: chrono::NaiveDate, hour: u32) -> Result<DateTime<Utc>, sqlx::Error> {
+    date.and_hms_opt(hour, 0, 0)
+        .map(|naive| Utc.from_utc_datetime(&naive))
+        .ok_or_else(|| schedule_error(format!("invalid schedule hour: {hour}")))
+}
+
+fn weekday_from_stored(day: Option<i32>) -> Result<Weekday, sqlx::Error> {
+    match day {
+        Some(0) => Ok(Weekday::Sun),
+        Some(1) => Ok(Weekday::Mon),
+        Some(2) => Ok(Weekday::Tue),
+        Some(3) => Ok(Weekday::Wed),
+        Some(4) => Ok(Weekday::Thu),
+        Some(5) => Ok(Weekday::Fri),
+        Some(6) => Ok(Weekday::Sat),
+        Some(other) => Err(schedule_error(format!(
+            "invalid schedule_day_of_week: {other}"
+        ))),
+        None => Err(schedule_error(
+            "weekly schedule is missing schedule_day_of_week",
+        )),
+    }
+}
+
 /// Calculate the next run time for a schedule.
 fn calculate_next_run(
     frequency: ScheduleFrequency,
@@ -639,30 +667,26 @@ fn calculate_next_run(
     schedule_day_of_week: Option<i32>,
     schedule_day_of_month: Option<i32>,
     after: Option<DateTime<Utc>>,
-) -> DateTime<Utc> {
+) -> Result<DateTime<Utc>, sqlx::Error> {
     let now = after.unwrap_or_else(Utc::now);
     let today = now.date_naive();
-    let schedule_hour = schedule_hour.clamp(0, 23) as u32;
+    if !(0..=23).contains(&schedule_hour) {
+        return Err(schedule_error(format!(
+            "invalid schedule_hour: {schedule_hour}"
+        )));
+    }
+    let schedule_hour = schedule_hour as u32;
 
     match frequency {
         ScheduleFrequency::Daily => {
-            let mut next = Utc.from_utc_datetime(&today.and_hms_opt(schedule_hour, 0, 0).unwrap());
+            let mut next = at_hour(today, schedule_hour)?;
             if next <= now {
                 next += Duration::days(1);
             }
-            next
+            Ok(next)
         }
         ScheduleFrequency::Weekly => {
-            let target_day = schedule_day_of_week.unwrap_or(0).clamp(0, 6);
-            let target_weekday = match target_day {
-                0 => Weekday::Sun,
-                1 => Weekday::Mon,
-                2 => Weekday::Tue,
-                3 => Weekday::Wed,
-                4 => Weekday::Thu,
-                5 => Weekday::Fri,
-                _ => Weekday::Sat,
-            };
+            let target_weekday = weekday_from_stored(schedule_day_of_week)?;
 
             let current_weekday = today.weekday();
             let days_until = (i64::from(target_weekday.num_days_from_sunday())
@@ -671,25 +695,36 @@ fn calculate_next_run(
                 % 7;
 
             let target_date = today + Duration::days(days_until);
-            let mut next =
-                Utc.from_utc_datetime(&target_date.and_hms_opt(schedule_hour, 0, 0).unwrap());
+            let mut next = at_hour(target_date, schedule_hour)?;
 
             if next <= now {
                 next += Duration::weeks(1);
             }
-            next
+            Ok(next)
         }
         ScheduleFrequency::Monthly => {
-            let target_day = schedule_day_of_month.unwrap_or(1).clamp(1, 28) as u32;
+            let target_day = match schedule_day_of_month {
+                Some(d) if (1..=28).contains(&d) => d as u32,
+                Some(other) => {
+                    return Err(schedule_error(format!(
+                        "invalid schedule_day_of_month: {other}"
+                    )))
+                }
+                None => {
+                    return Err(schedule_error(
+                        "monthly schedule is missing schedule_day_of_month",
+                    ))
+                }
+            };
 
             let mut year = today.year();
             let mut month = today.month();
 
             // Try current month first
             if let Some(date) = chrono::NaiveDate::from_ymd_opt(year, month, target_day) {
-                let next = Utc.from_utc_datetime(&date.and_hms_opt(schedule_hour, 0, 0).unwrap());
+                let next = at_hour(date, schedule_hour)?;
                 if next > now {
-                    return next;
+                    return Ok(next);
                 }
             }
 
@@ -701,19 +736,11 @@ fn calculate_next_run(
             }
 
             let date =
-                chrono::NaiveDate::from_ymd_opt(year, month, target_day).unwrap_or_else(|| {
-                    // If day doesn't exist in month, use last day
-                    chrono::NaiveDate::from_ymd_opt(year, month + 1, 1)
-                        .map(|d| d.pred_opt().unwrap())
-                        .unwrap_or_else(|| {
-                            chrono::NaiveDate::from_ymd_opt(year + 1, 1, 1)
-                                .unwrap()
-                                .pred_opt()
-                                .unwrap()
-                        })
-                });
+                chrono::NaiveDate::from_ymd_opt(year, month, target_day).ok_or_else(|| {
+                    schedule_error(format!("invalid schedule date {year}-{month}-{target_day}"))
+                })?;
 
-            Utc.from_utc_datetime(&date.and_hms_opt(schedule_hour, 0, 0).unwrap())
+            at_hour(date, schedule_hour)
         }
     }
 }
@@ -757,12 +784,12 @@ mod tests {
         let now = Utc.with_ymd_and_hms(2026, 1, 24, 10, 0, 0).unwrap();
 
         // Schedule for 14:00, should be today
-        let next = calculate_next_run(ScheduleFrequency::Daily, 14, None, None, Some(now));
+        let next = calculate_next_run(ScheduleFrequency::Daily, 14, None, None, Some(now)).unwrap();
         assert_eq!(next.hour(), 14);
         assert_eq!(next.day(), 24);
 
         // Schedule for 8:00, should be tomorrow
-        let next = calculate_next_run(ScheduleFrequency::Daily, 8, None, None, Some(now));
+        let next = calculate_next_run(ScheduleFrequency::Daily, 8, None, None, Some(now)).unwrap();
         assert_eq!(next.hour(), 8);
         assert_eq!(next.day(), 25);
     }
@@ -773,7 +800,8 @@ mod tests {
         let now = Utc.with_ymd_and_hms(2026, 1, 24, 10, 0, 0).unwrap();
 
         // Schedule for Monday (day 1) at 8:00
-        let next = calculate_next_run(ScheduleFrequency::Weekly, 8, Some(1), None, Some(now));
+        let next =
+            calculate_next_run(ScheduleFrequency::Weekly, 8, Some(1), None, Some(now)).unwrap();
         assert_eq!(next.weekday(), Weekday::Mon);
         assert_eq!(next.hour(), 8);
     }
@@ -783,14 +811,39 @@ mod tests {
         let now = Utc.with_ymd_and_hms(2026, 1, 24, 10, 0, 0).unwrap();
 
         // Schedule for day 15, should be next month
-        let next = calculate_next_run(ScheduleFrequency::Monthly, 8, None, Some(15), Some(now));
+        let next =
+            calculate_next_run(ScheduleFrequency::Monthly, 8, None, Some(15), Some(now)).unwrap();
         assert_eq!(next.day(), 15);
         assert_eq!(next.month(), 2);
 
         // Schedule for day 28, should be current month
-        let next = calculate_next_run(ScheduleFrequency::Monthly, 8, None, Some(28), Some(now));
+        let next =
+            calculate_next_run(ScheduleFrequency::Monthly, 8, None, Some(28), Some(now)).unwrap();
         assert_eq!(next.day(), 28);
         assert_eq!(next.month(), 1);
+    }
+
+    #[test]
+    fn unknown_weekday_does_not_become_saturday() {
+        let now = Utc.with_ymd_and_hms(2026, 1, 24, 10, 0, 0).unwrap();
+        assert!(
+            calculate_next_run(ScheduleFrequency::Weekly, 8, Some(99), None, Some(now)).is_err()
+        );
+        assert!(calculate_next_run(ScheduleFrequency::Weekly, 8, None, None, Some(now)).is_err());
+        assert!(weekday_from_stored(Some(6)).is_ok());
+        assert!(weekday_from_stored(Some(7)).is_err());
+        assert!(weekday_from_stored(None).is_err());
+
+        let src = include_str!("gov_report_schedule.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("_ => Weekday::Sat"),
+            "unknown schedule_day_of_week must not silently become Saturday"
+        );
+        assert!(
+            !production.contains("unwrap_or(0).clamp(0, 6)"),
+            "invalid weekday must not clamp to Saturday"
+        );
     }
 
     #[test]
