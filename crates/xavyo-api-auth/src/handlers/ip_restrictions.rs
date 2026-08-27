@@ -79,7 +79,7 @@ pub async fn update_ip_settings(
         ));
     }
     let tenant_uuid = *tenant_id.as_uuid();
-    let user_id = Uuid::parse_str(&claims.sub).ok();
+    let user_id = Some(Uuid::parse_str(&claims.sub).map_err(|_| ApiAuthError::Unauthorized)?);
 
     let settings = ip_service
         .update_settings(tenant_uuid, request, user_id)
@@ -147,7 +147,7 @@ pub async fn create_ip_rule(
         .map_err(|e| ApiAuthError::Validation(e.to_string()))?;
 
     let tenant_uuid = *tenant_id.as_uuid();
-    let user_id = Uuid::parse_str(&claims.sub).ok();
+    let user_id = Some(Uuid::parse_str(&claims.sub).map_err(|_| ApiAuthError::Unauthorized)?);
 
     let rule = ip_service
         .create_rule(tenant_uuid, request, user_id)
@@ -293,4 +293,17 @@ pub async fn validate_ip(
         .await?;
 
     Ok(Json(result))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn ip_restriction_mutations_do_not_drop_malformed_actor() {
+        let src = include_str!("ip_restrictions.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("Uuid::parse_str(&claims.sub).ok()"),
+            "IP restriction update/create must refuse a malformed JWT sub"
+        );
+    }
 }

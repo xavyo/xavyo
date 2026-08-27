@@ -81,7 +81,7 @@ impl ScriptExecutionService {
         ))?;
 
         // Build a HookContext from the sample data
-        let context = build_hook_context_from_json(&context_data, tenant_id);
+        let context = build_hook_context_from_json(&context_data, tenant_id)?;
 
         // Execute dry-run
         let timeout = Duration::from_secs(timeout_seconds as u64);
@@ -138,17 +138,16 @@ impl ScriptExecutionService {
     }
 
     /// Dry-run a raw script body (not yet saved) with sample context.
-    #[must_use]
     pub fn dry_run_raw(
         &self,
         script_body: &str,
         context_data: serde_json::Value,
         tenant_id: Uuid,
         timeout_seconds: i32,
-    ) -> DryRunResult {
-        let context = build_hook_context_from_json(&context_data, tenant_id);
+    ) -> Result<DryRunResult> {
+        let context = build_hook_context_from_json(&context_data, tenant_id)?;
         let timeout = Duration::from_secs(timeout_seconds as u64);
-        self.executor.dry_run(script_body, &context, timeout)
+        Ok(self.executor.dry_run(script_body, &context, timeout))
     }
 
     /// Log a script execution result (called by the provisioning engine after hook execution).
@@ -191,30 +190,28 @@ impl ScriptExecutionService {
 }
 
 /// Build a `HookContext` from a JSON sample context.
-fn build_hook_context_from_json(data: &serde_json::Value, tenant_id: Uuid) -> HookContext {
+/// Invalid UUIDs, unknown operations, and corrupt variables must fail closed.
+fn build_hook_context_from_json(data: &serde_json::Value, tenant_id: Uuid) -> Result<HookContext> {
     use xavyo_connector::types::OperationType;
 
-    let connector_id = data
-        .get("connector_id")
-        .and_then(|v| v.as_str())
-        .and_then(|s| s.parse::<Uuid>().ok())
-        .unwrap_or_else(Uuid::new_v4);
+    let connector_id = parse_required_uuid(data, "connector_id")?;
+    let user_id = parse_required_uuid(data, "user_id")?;
 
-    let user_id = data
-        .get("user_id")
-        .and_then(|v| v.as_str())
-        .and_then(|s| s.parse::<Uuid>().ok())
-        .unwrap_or_else(Uuid::new_v4);
-
-    let operation_type =
-        data.get("operation_type")
-            .and_then(|v| v.as_str())
-            .map_or(OperationType::Create, |s| match s {
-                "create" => OperationType::Create,
-                "update" => OperationType::Update,
-                "delete" => OperationType::Delete,
-                _ => OperationType::Create,
-            });
+    let operation_type = match data.get("operation_type").and_then(|v| v.as_str()) {
+        Some("create") => OperationType::Create,
+        Some("update") => OperationType::Update,
+        Some("delete") => OperationType::Delete,
+        Some(other) => {
+            return Err(GovernanceError::Validation(format!(
+                "Invalid operation_type: {other}"
+            )));
+        }
+        None => {
+            return Err(GovernanceError::Validation(
+                "operation_type is required".to_string(),
+            ));
+        }
+    };
 
     let object_class = data
         .get("object_class")
@@ -232,12 +229,12 @@ fn build_hook_context_from_json(data: &serde_json::Value, tenant_id: Uuid) -> Ho
         .cloned()
         .unwrap_or_else(|| serde_json::json!({}));
 
-    let variables = data
-        .get("variables")
-        .and_then(|v| serde_json::from_value::<HashMap<String, serde_json::Value>>(v.clone()).ok())
-        .unwrap_or_default();
+    let variables = match data.get("variables") {
+        None | Some(serde_json::Value::Null) => HashMap::new(),
+        Some(v) => serde_json::from_value(v.clone()).map_err(GovernanceError::from)?,
+    };
 
-    HookContext {
+    Ok(HookContext {
         tenant_id,
         connector_id,
         user_id,
@@ -247,5 +244,74 @@ fn build_hook_context_from_json(data: &serde_json::Value, tenant_id: Uuid) -> Ho
         attributes,
         variables,
         error: None,
+    })
+}
+
+fn parse_required_uuid(data: &serde_json::Value, field: &str) -> Result<Uuid> {
+    let raw = data
+        .get(field)
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| GovernanceError::Validation(format!("{field} is required")))?;
+    Uuid::parse_str(raw).map_err(|_| GovernanceError::Validation(format!("Invalid {field} UUID")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hook_context_does_not_invent_ids_or_default_to_create() {
+        let tenant = Uuid::new_v4();
+        assert!(build_hook_context_from_json(&serde_json::json!({}), tenant).is_err());
+        assert!(build_hook_context_from_json(
+            &serde_json::json!({
+                "connector_id": "not-a-uuid",
+                "user_id": Uuid::new_v4().to_string(),
+                "operation_type": "create"
+            }),
+            tenant
+        )
+        .is_err());
+        assert!(build_hook_context_from_json(
+            &serde_json::json!({
+                "connector_id": Uuid::new_v4().to_string(),
+                "user_id": Uuid::new_v4().to_string(),
+                "operation_type": "upsert"
+            }),
+            tenant
+        )
+        .is_err());
+        assert!(build_hook_context_from_json(
+            &serde_json::json!({
+                "connector_id": Uuid::new_v4().to_string(),
+                "user_id": Uuid::new_v4().to_string(),
+                "operation_type": "create",
+                "variables": "nope"
+            }),
+            tenant
+        )
+        .is_err());
+
+        let ctx = build_hook_context_from_json(
+            &serde_json::json!({
+                "connector_id": Uuid::new_v4().to_string(),
+                "user_id": Uuid::new_v4().to_string(),
+                "operation_type": "delete"
+            }),
+            tenant,
+        )
+        .unwrap();
+        assert_eq!(
+            ctx.operation_type,
+            xavyo_connector::types::OperationType::Delete
+        );
+
+        let src = include_str!("script_execution_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or_else(Uuid::new_v4)")
+                && !production.contains("_ => OperationType::Create"),
+            "script dry-run must not invent actors or treat unknown ops as Create"
+        );
     }
 }

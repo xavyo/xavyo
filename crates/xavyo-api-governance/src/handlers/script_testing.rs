@@ -159,10 +159,12 @@ pub async fn dry_run_raw(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    let result =
-        state
-            .script_execution_service
-            .dry_run_raw(&body.script_body, body.context, tenant_id, 30);
+    let result = state.script_execution_service.dry_run_raw(
+        &body.script_body,
+        body.context,
+        tenant_id,
+        30,
+    )?;
 
     Ok(Json(DryRunResponse {
         success: result.success,
@@ -170,4 +172,21 @@ pub async fn dry_run_raw(
         error: result.error,
         duration_ms: result.duration_ms,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn dry_run_raw_propagates_context_parse_errors() {
+        let src = include_str!("script_testing.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let raw = production
+            .split("pub async fn dry_run_raw")
+            .nth(1)
+            .expect("dry_run_raw");
+        assert!(
+            raw.contains(")?;"),
+            "raw script dry-run must not swallow invalid hook context"
+        );
+    }
 }

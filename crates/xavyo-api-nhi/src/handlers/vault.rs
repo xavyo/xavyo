@@ -121,7 +121,10 @@ pub async fn store_secret_handler(
                 rotation_interval_days: body.rotation_interval_days,
                 max_lease_duration_secs: body.max_lease_duration_secs,
                 max_concurrent_leases: body.max_concurrent_leases,
-                created_by: Uuid::parse_str(&claims.sub).ok(),
+                created_by: Some(
+                    Uuid::parse_str(&claims.sub)
+                        .map_err(|_| NhiApiError::BadRequest("Invalid user ID".into()))?,
+                ),
             },
         )
         .await?;
@@ -223,7 +226,10 @@ pub async fn create_lease_handler(
             body.lessee_nhi_id,
             body.lessee_type.unwrap_or_else(|| "agent".to_string()),
             body.duration_secs.unwrap_or(3600),
-            Uuid::parse_str(&claims.sub).ok(),
+            Some(
+                Uuid::parse_str(&claims.sub)
+                    .map_err(|_| NhiApiError::BadRequest("Invalid user ID".into()))?,
+            ),
         )
         .await?;
 
@@ -295,4 +301,21 @@ pub async fn revoke_lease_handler(
         )
         .await?;
     Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn vault_mutations_do_not_drop_malformed_actor() {
+        let src = include_str!("vault.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("Uuid::parse_str(&claims.sub).ok()"),
+            "vault store/lease must refuse a malformed JWT sub"
+        );
+        assert!(
+            production.contains("Invalid user ID"),
+            "vault actor parse errors must be BadRequest"
+        );
+    }
 }

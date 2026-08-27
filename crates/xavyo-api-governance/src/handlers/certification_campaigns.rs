@@ -58,8 +58,13 @@ pub async fn list_campaigns(
         .list(tenant_id, query.status, limit, offset)
         .await?;
 
+    let items: Vec<CampaignResponse> = campaigns
+        .into_iter()
+        .map(TryInto::try_into)
+        .collect::<Result<Vec<_>, _>>()?;
+
     Ok(Json(CampaignListResponse {
-        items: campaigns.into_iter().map(Into::into).collect(),
+        items,
         total,
         page,
         page_size: limit,
@@ -114,7 +119,7 @@ pub async fn create_campaign(
         )
         .await?;
 
-    Ok((StatusCode::CREATED, Json(campaign.into())))
+    Ok((StatusCode::CREATED, Json(campaign.try_into()?)))
 }
 
 /// Get a certification campaign by ID.
@@ -154,7 +159,7 @@ pub async fn get_campaign(
         .await?;
 
     Ok(Json(CampaignWithProgressResponse {
-        campaign: campaign.into(),
+        campaign: campaign.try_into()?,
         progress: progress.into(),
     }))
 }
@@ -206,7 +211,7 @@ pub async fn update_campaign(
         )
         .await?;
 
-    Ok(Json(campaign.into()))
+    Ok(Json(campaign.try_into()?))
 }
 
 /// Delete a certification campaign (only allowed in draft status).
@@ -286,7 +291,7 @@ pub async fn launch_campaign(
         .await?;
 
     Ok(Json(CampaignWithProgressResponse {
-        campaign: campaign.into(),
+        campaign: campaign.try_into()?,
         progress: progress.into(),
     }))
 }
@@ -324,7 +329,7 @@ pub async fn cancel_campaign(
         .cancel(tenant_id, id)
         .await?;
 
-    Ok(Json(campaign.into()))
+    Ok(Json(campaign.try_into()?))
 }
 
 /// Get campaign progress.
