@@ -331,9 +331,10 @@ impl MiningService {
 
     /// Build peer groups for privilege detection.
     ///
-    /// If `peer_group_attribute` is specified, groups users by that attribute (e.g., "department", "team").
+    /// If `peer_group_attribute` is specified, groups users by that attribute.
     /// Supported attributes: "department", "group", "role".
-    /// Falls back to a single "`all_users`" group if attribute is not specified or has no data.
+    /// Falls back to a single "`all_users`" group if the attribute is omitted or has no data.
+    /// Unknown attribute names are an error.
     async fn build_peer_groups(
         &self,
         tenant_id: Uuid,
@@ -347,6 +348,7 @@ impl MiningService {
         }
 
         match peer_group_attribute {
+            None => Ok(self.create_default_peer_group(&user_ids)),
             Some("department") => {
                 // Group users by department from user metadata
                 let groups = self.group_users_by_department(tenant_id, &user_ids).await?;
@@ -365,10 +367,9 @@ impl MiningService {
                     Ok(groups)
                 }
             }
-            _ => {
-                // Default: all users in one group
-                Ok(self.create_default_peer_group(&user_ids))
-            }
+            Some(other) => Err(GovernanceError::InvalidMiningParameters(format!(
+                "Unknown peer_group_attribute '{other}'. Supported: department, group, role"
+            ))),
         }
     }
 
@@ -1385,6 +1386,22 @@ mod tests {
             production.contains("parse_privilege_review_action(")
                 && !production.contains("_ => PrivilegeFlagStatus::Reviewed"),
             "unknown privilege review action must not silently mark Reviewed"
+        );
+    }
+
+    #[test]
+    fn unknown_peer_group_attribute_does_not_become_all_users() {
+        let src = include_str!("mining_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let build = production
+            .split("async fn build_peer_groups")
+            .nth(1)
+            .expect("build_peer_groups");
+        assert!(
+            !build.contains("_ => {")
+                && build.contains("Unknown peer_group_attribute")
+                && build.contains("None => Ok(self.create_default_peer_group"),
+            "unknown peer_group_attribute must not silently group everyone as all_users"
         );
     }
 }

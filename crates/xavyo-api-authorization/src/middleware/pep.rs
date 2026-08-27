@@ -64,15 +64,22 @@ pub async fn pep_enforcement_middleware(request: Request<Body>, next: Next) -> R
         Err(_) => return unauthorized_response("Invalid user ID"),
     };
 
-    // 5. Map HTTP method to action
-    let action = method_to_action(request.method());
+    // 5. CORS preflight is not a resource action.
+    if request.method() == Method::OPTIONS {
+        return next.run(request).await;
+    }
 
-    // 6. Extract resource_id from path if available
+    // 6. Map HTTP method to action
+    let Ok(action) = method_to_action(request.method()) else {
+        return forbidden_response("Unsupported method");
+    };
+
+    // 7. Extract resource_id from path if available
     // Try to extract the last path segment as resource_id for GET/PUT/DELETE on specific resources
     let path = request.uri().path().to_string();
     let resource_id = extract_resource_id(&path);
 
-    // 7. Extract PDP from extensions
+    // 8. Extract PDP from extensions
     let pdp = request
         .extensions()
         .get::<Arc<PolicyDecisionPoint>>()
@@ -119,14 +126,13 @@ pub async fn pep_enforcement_middleware(request: Request<Body>, next: Next) -> R
 }
 
 /// Map an HTTP method to an authorization action.
-fn method_to_action(method: &Method) -> &'static str {
+fn method_to_action(method: &Method) -> Result<&'static str, ()> {
     match *method {
-        Method::GET => "read",
-        Method::POST => "create",
-        Method::PUT => "update",
-        Method::PATCH => "update",
-        Method::DELETE => "delete",
-        _ => "unknown",
+        Method::GET | Method::HEAD => Ok("read"),
+        Method::POST => Ok("create"),
+        Method::PUT | Method::PATCH => Ok("update"),
+        Method::DELETE => Ok("delete"),
+        _ => Err(()),
     }
 }
 
@@ -173,12 +179,21 @@ mod tests {
 
     #[test]
     fn test_method_to_action() {
-        assert_eq!(method_to_action(&Method::GET), "read");
-        assert_eq!(method_to_action(&Method::POST), "create");
-        assert_eq!(method_to_action(&Method::PUT), "update");
-        assert_eq!(method_to_action(&Method::PATCH), "update");
-        assert_eq!(method_to_action(&Method::DELETE), "delete");
-        assert_eq!(method_to_action(&Method::OPTIONS), "unknown");
+        assert_eq!(method_to_action(&Method::GET), Ok("read"));
+        assert_eq!(method_to_action(&Method::HEAD), Ok("read"));
+        assert_eq!(method_to_action(&Method::POST), Ok("create"));
+        assert_eq!(method_to_action(&Method::PUT), Ok("update"));
+        assert_eq!(method_to_action(&Method::PATCH), Ok("update"));
+        assert_eq!(method_to_action(&Method::DELETE), Ok("delete"));
+        assert!(method_to_action(&Method::TRACE).is_err());
+        let src = include_str!("pep.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("Method::GET | Method::HEAD")
+                && production.contains("Method::OPTIONS")
+                && !production.contains("_ => \"unknown\""),
+            "HEAD must authorize as read; OPTIONS must not be an unknown action"
+        );
     }
 
     #[test]

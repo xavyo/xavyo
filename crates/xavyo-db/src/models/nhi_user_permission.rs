@@ -253,7 +253,11 @@ impl NhiUserPermission {
             "use" => vec!["use", "manage", "admin"],
             "manage" => vec!["manage", "admin"],
             "admin" => vec!["admin"],
-            _ => return Ok(false),
+            other => {
+                return Err(sqlx::Error::Protocol(format!(
+                    "invalid NHI permission type '{other}', expected use, manage, or admin"
+                )));
+            }
         };
 
         let result = sqlx::query_scalar::<_, bool>(
@@ -361,5 +365,20 @@ mod tests {
 
         assert_eq!(input.permission_type, "admin");
         assert!(input.granted_by.is_some());
+    }
+
+    #[test]
+    fn unknown_permission_type_does_not_deny_as_false() {
+        let src = include_str!("nhi_user_permission.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let check = production
+            .split("pub async fn check_permission")
+            .nth(1)
+            .expect("check_permission");
+        assert!(
+            check.contains("invalid NHI permission type")
+                && !check.contains("_ => return Ok(false)"),
+            "unknown permission types must error, not look like a denied grant"
+        );
     }
 }
