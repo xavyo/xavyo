@@ -910,6 +910,7 @@ impl Modify for SecurityAddon {
         xavyo_api_governance::handlers::nhis::cancel_nhi_certification_campaign,
         xavyo_api_governance::handlers::nhis::get_nhi_certification_campaign_summary,
         xavyo_api_governance::handlers::nhis::list_nhi_certification_items,
+        xavyo_api_governance::handlers::nhis::list_nhi_certification_campaign_items,
         xavyo_api_governance::handlers::nhis::get_nhi_certification_item,
         xavyo_api_governance::handlers::nhis::decide_nhi_certification,
         xavyo_api_governance::handlers::nhis::bulk_decide_nhi_certification,

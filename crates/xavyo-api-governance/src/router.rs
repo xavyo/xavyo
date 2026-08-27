@@ -2248,9 +2248,13 @@ pub fn governance_router(
         )
         .route(
             "/nhis/certification/campaigns/:campaign_id/items",
-            get(nhis::list_nhi_certification_items),
+            get(nhis::list_nhi_certification_campaign_items),
         )
         // NHI Certification Items (F061)
+        .route(
+            "/nhis/certification/items",
+            get(nhis::list_nhi_certification_items),
+        )
         .route(
             "/nhis/certification/items/:item_id",
             get(nhis::get_nhi_certification_item),
