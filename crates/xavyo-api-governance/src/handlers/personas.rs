@@ -272,6 +272,16 @@ pub async fn update_archetype(
             ApiGovernanceError::Validation(format!("Invalid default entitlements: {e}"))
         })?;
 
+    let changes = archetype_update_changes(
+        request.name.as_deref(),
+        request.description.as_deref(),
+        request.naming_pattern.as_deref(),
+        attribute_mappings.as_ref(),
+        default_entitlements.as_ref(),
+        lifecycle_policy.as_ref(),
+        request.is_active,
+    );
+
     let input = UpdatePersonaArchetype {
         name: request.name,
         description: request.description,
@@ -287,16 +297,9 @@ pub async fn update_archetype(
         .update(tenant_id, id, input)
         .await?;
 
-    // Log audit event
     state
         .persona_audit_service
-        .log_archetype_updated(
-            tenant_id,
-            actor_id,
-            archetype.id,
-            &archetype.name,
-            serde_json::json!({}),
-        )
+        .log_archetype_updated(tenant_id, actor_id, archetype.id, &archetype.name, changes)
         .await?;
 
     Ok(Json(ArchetypeResponse::from(archetype)))
@@ -795,12 +798,11 @@ pub async fn propagate_attributes(
         .as_uuid();
     let actor_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
-    let persona = state
+    let (persona, changed_attributes) = state
         .persona_service
         .propagate_attributes(tenant_id, id)
         .await?;
 
-    // Log audit event (with empty changed_attributes for now)
     state
         .persona_audit_service
         .log_attributes_propagated(
@@ -808,7 +810,7 @@ pub async fn propagate_attributes(
             actor_id,
             id,
             persona.physical_user_id,
-            serde_json::Map::new(),
+            changed_attributes,
             "manual_propagation",
         )
         .await?;
@@ -1305,6 +1307,42 @@ pub async fn get_expiring_personas(
     }))
 }
 
+/// Fields actually submitted on an archetype update. Empty `{}` must not be
+/// stored as if nothing changed.
+fn archetype_update_changes(
+    name: Option<&str>,
+    description: Option<&str>,
+    naming_pattern: Option<&str>,
+    attribute_mappings: Option<&serde_json::Value>,
+    default_entitlements: Option<&serde_json::Value>,
+    lifecycle_policy: Option<&serde_json::Value>,
+    is_active: Option<bool>,
+) -> serde_json::Value {
+    let mut changes = serde_json::Map::new();
+    if let Some(v) = name {
+        changes.insert("name".into(), serde_json::json!(v));
+    }
+    if let Some(v) = description {
+        changes.insert("description".into(), serde_json::json!(v));
+    }
+    if let Some(v) = naming_pattern {
+        changes.insert("naming_pattern".into(), serde_json::json!(v));
+    }
+    if let Some(v) = attribute_mappings {
+        changes.insert("attribute_mappings".into(), v.clone());
+    }
+    if let Some(v) = default_entitlements {
+        changes.insert("default_entitlements".into(), v.clone());
+    }
+    if let Some(v) = lifecycle_policy {
+        changes.insert("lifecycle_policy".into(), v.clone());
+    }
+    if let Some(v) = is_active {
+        changes.insert("is_active".into(), serde_json::json!(v));
+    }
+    serde_json::Value::Object(changes)
+}
+
 /// Persona handler persist. Serialization errors must not store empty attributes.
 pub(crate) fn persona_handler_json<T: serde::Serialize>(value: &T) -> ApiResult<serde_json::Value> {
     serde_json::to_value(value).map_err(|e| ApiGovernanceError::Validation(e.to_string()))
@@ -1313,6 +1351,36 @@ pub(crate) fn persona_handler_json<T: serde::Serialize>(value: &T) -> ApiResult<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn archetype_update_and_propagate_audit_real_changes() {
+        let src = include_str!("personas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let update = production
+            .split("pub async fn update_archetype")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("update_archetype");
+        assert!(
+            update.contains("archetype_update_changes(")
+                && !update.contains("serde_json::json!({})"),
+            "archetype update audit must record the submitted changes"
+        );
+        let propagate = production
+            .split("pub async fn propagate_attributes")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("propagate_attributes");
+        assert!(
+            propagate.contains("changed_attributes")
+                && !propagate.contains("serde_json::Map::new()"),
+            "attribute propagation audit must record the propagated attributes"
+        );
+        let changes = archetype_update_changes(Some("n"), None, None, None, None, None, Some(true));
+        assert_eq!(changes["name"], "n");
+        assert_eq!(changes["is_active"], true);
+        assert!(changes.get("description").is_none());
+    }
 
     #[test]
     fn persona_handler_json_does_not_store_empty_on_serialize() {

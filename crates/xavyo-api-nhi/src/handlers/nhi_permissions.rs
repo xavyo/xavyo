@@ -54,6 +54,7 @@ pub struct PaginationQuery {
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PaginatedNhiPermissionResponse {
     pub data: Vec<NhiNhiPermission>,
+    pub total: i64,
     pub limit: i64,
     pub offset: i64,
 }
@@ -187,9 +188,11 @@ pub async fn list_callers(
     let data =
         NhiNhiPermissionService::list_callers(&state.pool, tenant_uuid, nhi_id, limit, offset)
             .await?;
+    let total = NhiNhiPermissionService::count_callers(&state.pool, tenant_uuid, nhi_id).await?;
 
     Ok(Json(PaginatedNhiPermissionResponse {
         data,
+        total,
         limit,
         offset,
     }))
@@ -226,9 +229,11 @@ pub async fn list_callees(
     let data =
         NhiNhiPermissionService::list_callees(&state.pool, tenant_uuid, nhi_id, limit, offset)
             .await?;
+    let total = NhiNhiPermissionService::count_callees(&state.pool, tenant_uuid, nhi_id).await?;
 
     Ok(Json(PaginatedNhiPermissionResponse {
         data,
+        total,
         limit,
         offset,
     }))
@@ -250,4 +255,27 @@ pub fn nhi_nhi_permission_routes(state: NhiState) -> Router {
         .route("/:id/callers", get(list_callers))
         .route("/:id/callees", get(list_callees))
         .with_state(state)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn caller_and_callee_lists_report_real_totals() {
+        let src = include_str!("nhi_permissions.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for (fn_name, count_fn) in [
+            ("list_callers", "count_callers"),
+            ("list_callees", "count_callees"),
+        ] {
+            let body = production
+                .split(&format!("pub async fn {fn_name}"))
+                .nth(1)
+                .and_then(|s| s.split("pub async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                body.contains(&format!("{count_fn}(")) && body.contains("total,"),
+                "{fn_name} must report a COUNT total"
+            );
+        }
+    }
 }

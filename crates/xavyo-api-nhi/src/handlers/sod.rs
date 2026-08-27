@@ -106,6 +106,7 @@ pub struct PaginationQuery {
 ))]
 pub struct PaginatedResponse<T: Serialize> {
     pub data: Vec<T>,
+    pub total: i64,
     pub limit: i64,
     pub offset: i64,
 }
@@ -227,8 +228,15 @@ pub async fn list_sod_rules(
         .map(SodRule::try_from)
         .collect::<Result<Vec<_>, _>>()?;
 
+    let total: i64 = sqlx::query_scalar(r"SELECT COUNT(*) FROM nhi_sod_rules WHERE tenant_id = $1")
+        .bind(tenant_uuid)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(NhiApiError::Database)?;
+
     Ok(Json(PaginatedResponse {
         data,
+        total,
         limit,
         offset,
     }))
@@ -446,6 +454,21 @@ mod tests {
         assert!(
             !production.contains("_ => SodEnforcement::Warn"),
             "unknown SoD enforcement must not weaken Prevent to Warn"
+        );
+    }
+
+    #[test]
+    fn list_sod_rules_reports_real_total() {
+        let src = include_str!("sod.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_sod_rules")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_sod_rules");
+        assert!(
+            list.contains("SELECT COUNT(*) FROM nhi_sod_rules") && list.contains("total,"),
+            "GET /nhi/sod/rules must report the matching row count"
         );
     }
 }

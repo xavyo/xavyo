@@ -50,6 +50,7 @@ pub struct PaginationQuery {
 ))]
 pub struct PaginatedResponse<T: Serialize> {
     pub data: Vec<T>,
+    pub total: i64,
     pub limit: i64,
     pub offset: i64,
 }
@@ -215,9 +216,11 @@ pub async fn list_agent_tools(
     let data =
         NhiPermissionService::list_agent_tools(&state.pool, tenant_uuid, agent_id, limit, offset)
             .await?;
+    let total = NhiPermissionService::count_agent_tools(&state.pool, tenant_uuid, agent_id).await?;
 
     Ok(Json(PaginatedResponse {
         data,
+        total,
         limit,
         offset,
     }))
@@ -256,9 +259,11 @@ pub async fn list_tool_agents(
     let data =
         NhiPermissionService::list_tool_agents(&state.pool, tenant_uuid, tool_id, limit, offset)
             .await?;
+    let total = NhiPermissionService::count_tool_agents(&state.pool, tenant_uuid, tool_id).await?;
 
     Ok(Json(PaginatedResponse {
         data,
+        total,
         limit,
         offset,
     }))
@@ -550,6 +555,26 @@ mod tests {
             assert!(
                 !production.contains(&needle),
                 "must not fail-open unregistered tools ({needle})"
+            );
+        }
+    }
+
+    #[test]
+    fn agent_and_tool_permission_lists_report_real_totals() {
+        let src = include_str!("permissions.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for (fn_name, count_fn) in [
+            ("list_agent_tools", "count_agent_tools"),
+            ("list_tool_agents", "count_tool_agents"),
+        ] {
+            let body = production
+                .split(&format!("pub async fn {fn_name}"))
+                .nth(1)
+                .and_then(|s| s.split("pub async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                body.contains(&format!("{count_fn}(")) && body.contains("total,"),
+                "{fn_name} must report a COUNT total"
             );
         }
     }

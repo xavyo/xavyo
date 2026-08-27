@@ -54,6 +54,25 @@ pub async fn list_policies(
         .list_policies(tenant_id, query.is_active, limit, offset)
         .await?;
 
+    let policy_ids: Vec<Uuid> = policies.iter().map(|p| p.id).collect();
+    let level_counts: Vec<(Uuid, i64)> = sqlx::query_as(
+        r"
+        SELECT policy_id, COUNT(*)::bigint
+        FROM gov_escalation_levels
+        WHERE tenant_id = $1 AND policy_id = ANY($2)
+        GROUP BY policy_id
+        ",
+    )
+    .bind(tenant_id)
+    .bind(&policy_ids)
+    .fetch_all(state.pool())
+    .await
+    .map_err(ApiGovernanceError::Database)?;
+    let level_count_by_id: std::collections::HashMap<Uuid, i32> = level_counts
+        .into_iter()
+        .map(|(id, count)| (id, i32::try_from(count).unwrap_or(i32::MAX)))
+        .collect();
+
     let items: Vec<EscalationPolicySummary> = policies
         .into_iter()
         .map(|p| {
@@ -65,7 +84,7 @@ pub async fn list_policies(
                 default_timeout_secs,
                 final_fallback: p.final_fallback,
                 is_active: p.is_active,
-                level_count: 0, // Will be populated in a future enhancement
+                level_count: level_count_by_id.get(&p.id).copied().unwrap_or(0),
                 created_at: p.created_at,
                 updated_at: p.updated_at,
             }
@@ -664,6 +683,23 @@ mod tests {
         assert!(
             !production.contains("find_by_id(state.escalation_policy_service.pool(), step_id)"),
             "must not look up approval steps by id alone"
+        );
+    }
+
+    #[test]
+    fn list_policies_reports_real_level_count() {
+        let src = include_str!("escalation_policies.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_policies")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_policies");
+        assert!(
+            list.contains("FROM gov_escalation_levels")
+                && list.contains("level_count_by_id")
+                && !list.contains("level_count: 0"),
+            "GET escalation policies must report real level_count"
         );
     }
 }

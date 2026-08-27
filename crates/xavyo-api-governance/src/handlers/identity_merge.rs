@@ -481,20 +481,30 @@ pub async fn list_merge_audits(
     let ops_by_id: std::collections::HashMap<Uuid, GovMergeOperation> =
         operations.into_iter().map(|op| (op.id, op)).collect();
 
-    let items: Vec<MergeAuditSummaryResponse> = audits
-        .into_iter()
-        .filter_map(|a| {
-            let op = ops_by_id.get(&a.operation_id)?;
-            merge_audit_summary(
-                a.id,
-                a.operation_id,
-                op.source_identity_id,
-                op.target_identity_id,
-                op.operator_id,
-                a.created_at,
-            )
-        })
-        .collect();
+    let mut items = Vec::with_capacity(audits.len());
+    for a in audits {
+        let op = ops_by_id.get(&a.operation_id).ok_or_else(|| {
+            ApiGovernanceError::Internal(format!(
+                "Merge audit {} is missing operation {}",
+                a.id, a.operation_id
+            ))
+        })?;
+        let summary = merge_audit_summary(
+            a.id,
+            a.operation_id,
+            op.source_identity_id,
+            op.target_identity_id,
+            op.operator_id,
+            a.created_at,
+        )
+        .ok_or_else(|| {
+            ApiGovernanceError::Internal(format!(
+                "Merge audit {} has a nil identity or operator id",
+                a.id
+            ))
+        })?;
+        items.push(summary);
+    }
 
     Ok(Json(MergePaginatedResponse {
         items,
@@ -770,6 +780,10 @@ mod tests {
         assert!(
             production.contains("merge_audit_summary"),
             "audit list must map operator from the merge operation"
+        );
+        assert!(
+            !production.contains("filter_map"),
+            "audit list must not drop rows and still report the unfiltered total"
         );
     }
 

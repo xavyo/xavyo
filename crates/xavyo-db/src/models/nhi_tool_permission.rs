@@ -181,6 +181,44 @@ impl NhiToolPermission {
         .await
     }
 
+    /// Count non-expired permissions for an agent.
+    pub async fn count_by_agent(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        agent_nhi_id: Uuid,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar(
+            r"
+            SELECT COUNT(*) FROM nhi_tool_permissions
+            WHERE tenant_id = $1 AND agent_nhi_id = $2
+              AND (expires_at IS NULL OR expires_at > NOW())
+            ",
+        )
+        .bind(tenant_id)
+        .bind(agent_nhi_id)
+        .fetch_one(pool)
+        .await
+    }
+
+    /// Count non-expired permissions for a tool.
+    pub async fn count_by_tool(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        tool_nhi_id: Uuid,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar(
+            r"
+            SELECT COUNT(*) FROM nhi_tool_permissions
+            WHERE tenant_id = $1 AND tool_nhi_id = $2
+              AND (expires_at IS NULL OR expires_at > NOW())
+            ",
+        )
+        .bind(tenant_id)
+        .bind(tool_nhi_id)
+        .fetch_one(pool)
+        .await
+    }
+
     /// Revoke a specific permission by ID.
     pub async fn revoke(pool: &PgPool, tenant_id: Uuid, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
