@@ -210,6 +210,11 @@ impl IntoResponse for ScimError {
 /// Result type alias for SCIM operations
 pub type ScimResult<T> = Result<T, ScimError>;
 
+/// Unknown SCIM PATCH paths must fail, not no-op as HTTP success.
+pub(crate) fn unsupported_patch_path(path: &str) -> ScimError {
+    ScimError::InvalidPatchOp(format!("Unsupported patch path: {path}"))
+}
+
 /// Check if a SQLx error is a PostgreSQL unique constraint violation (error code 23505).
 ///
 /// Used to catch TOCTOU race conditions where a pre-check passes but the
@@ -230,6 +235,14 @@ mod tests {
         assert_eq!(ScimErrorType::InvalidFilter.to_string(), "invalidFilter");
         assert_eq!(ScimErrorType::TooMany.to_string(), "tooMany");
         assert_eq!(ScimErrorType::Uniqueness.to_string(), "uniqueness");
+    }
+
+    #[test]
+    fn unsupported_patch_path_is_invalid_path_not_success() {
+        let err = unsupported_patch_path("title");
+        assert_eq!(err.status_code(), StatusCode::BAD_REQUEST);
+        assert_eq!(err.scim_type(), Some(ScimErrorType::InvalidPath));
+        assert!(err.to_string().contains("title"));
     }
 
     #[test]

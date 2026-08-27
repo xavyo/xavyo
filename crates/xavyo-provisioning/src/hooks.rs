@@ -334,21 +334,20 @@ impl HookExecutor for WebhookExecutor {
         })?;
 
         let status = response.status();
-        let body: serde_json::Value = response
-            .json::<serde_json::Value>()
-            .await
-            .unwrap_or_else(|_| serde_json::json!({}));
+        let response_text =
+            response
+                .text()
+                .await
+                .map_err(|e: reqwest::Error| HookError::ExecutionFailed {
+                    message: e.to_string(),
+                })?;
+        let body = parse_webhook_hook_body(&response_text)?;
 
         if status.is_success() {
             Ok(HookExecutionResult {
                 success: true,
                 modified_attributes: body.get("attributes").cloned(),
-                output_variables: body
-                    .get("variables")
-                    .and_then(|v: &serde_json::Value| {
-                        serde_json::from_value::<HashMap<String, serde_json::Value>>(v.clone()).ok()
-                    })
-                    .unwrap_or_default(),
+                output_variables: parse_webhook_hook_variables(&body)?,
                 error: None,
                 duration_ms: start.elapsed().as_millis() as u64,
             })
@@ -365,6 +364,28 @@ impl HookExecutor for WebhookExecutor {
 
     fn executor_type(&self) -> &'static str {
         "webhook"
+    }
+}
+
+/// Parse a webhook hook body. Garbage JSON is an error, not a fake `{}` success.
+fn parse_webhook_hook_body(text: &str) -> HookResult<serde_json::Value> {
+    if text.trim().is_empty() {
+        return Ok(serde_json::json!({}));
+    }
+    serde_json::from_str(text).map_err(|e| HookError::ExecutionFailed {
+        message: format!("Webhook hook returned non-JSON body: {e}"),
+    })
+}
+
+/// Parse hook `variables`. Invalid JSON is an error, not an empty map.
+fn parse_webhook_hook_variables(
+    body: &serde_json::Value,
+) -> HookResult<HashMap<String, serde_json::Value>> {
+    match body.get("variables") {
+        None | Some(serde_json::Value::Null) => Ok(HashMap::new()),
+        Some(v) => serde_json::from_value(v.clone()).map_err(|e| HookError::ExecutionFailed {
+            message: format!("Webhook hook returned invalid variables JSON: {e}"),
+        }),
     }
 }
 
@@ -775,5 +796,24 @@ mod tests {
 
         assert!(manager.remove_hook("test-hook"));
         assert!(!manager.remove_hook("non-existent"));
+    }
+
+    #[test]
+    fn webhook_hook_body_does_not_default_on_invalid_json() {
+        let parsed = parse_webhook_hook_body(r#"{"attributes":{"a":1}}"#).unwrap();
+        assert_eq!(parsed["attributes"]["a"], 1);
+        assert!(parse_webhook_hook_body("not-json").is_err());
+        assert_eq!(parse_webhook_hook_body("").unwrap(), serde_json::json!({}));
+        let vars =
+            parse_webhook_hook_variables(&serde_json::json!({"variables": {"k": 1}})).unwrap();
+        assert_eq!(vars["k"], 1);
+        assert!(parse_webhook_hook_variables(&serde_json::json!({"variables": "nope"})).is_err());
+        let src = include_str!("hooks.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_webhook_hook_body(")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!({}))"),
+            "webhook hook GET/execute must fail closed on JSON parse"
+        );
     }
 }

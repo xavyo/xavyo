@@ -174,7 +174,7 @@ struct WebhookCreateResponse {
 }
 
 /// Expected response from webhook status check.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct WebhookStatusResponse {
     /// Current status of the ticket.
     status: String,
@@ -271,28 +271,8 @@ impl TicketingProvider for WebhookProvider {
         let status = response.status();
 
         if status.is_success() {
-            // Try to parse the response
             let response_text = response.text().await?;
-
-            if let Ok(webhook_response) =
-                serde_json::from_str::<WebhookCreateResponse>(&response_text)
-            {
-                Ok(CreateTicketResponse {
-                    external_reference: webhook_response.ticket_id,
-                    external_url: webhook_response.ticket_url,
-                    raw_response: serde_json::from_str(&response_text).ok(),
-                })
-            } else {
-                // If response doesn't match expected format, use task_id as reference
-                tracing::warn!(
-                    "Webhook response didn't match expected format, using task_id as reference"
-                );
-                Ok(CreateTicketResponse {
-                    external_reference: request.task_id.to_string(),
-                    external_url: None,
-                    raw_response: serde_json::from_str(&response_text).ok(),
-                })
-            }
+            parse_webhook_create_body(status.as_u16(), &response_text)
         } else if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
             Err(TicketingError::AuthenticationFailed(
                 "Webhook authentication failed".to_string(),
@@ -344,6 +324,7 @@ impl TicketingProvider for WebhookProvider {
 
         if status.is_success() {
             let webhook_response: WebhookStatusResponse = response.json().await?;
+            let raw_response = webhook_status_raw_response(&webhook_response)?;
 
             let ticket_status = match webhook_response.status.to_lowercase().as_str() {
                 "open" | "new" | "pending" => TicketStatus::Open,
@@ -363,7 +344,7 @@ impl TicketingProvider for WebhookProvider {
                         .ok()
                         .map(|dt| dt.with_timezone(&chrono::Utc))
                 }),
-                raw_response: None,
+                raw_response: Some(raw_response),
             })
         } else if status == StatusCode::NOT_FOUND {
             Err(TicketingError::TicketNotFound(
@@ -379,11 +360,41 @@ impl TicketingProvider for WebhookProvider {
     }
 
     async fn add_comment(&self, _external_reference: &str, _comment: &str) -> TicketingResult<()> {
-        // Webhook provider doesn't support adding comments
-        // Could be extended with a comment_url configuration
-        tracing::warn!("Webhook provider does not support adding comments");
-        Ok(())
+        Err(reject_unsupported_webhook_comment())
     }
+}
+
+/// Parse a webhook create body. Missing `ticket_id` is an error, not a fake
+/// success that substitutes the local task id. Non-JSON bodies are errors,
+/// not `raw_response: None`.
+fn parse_webhook_create_body(status: u16, body: &str) -> TicketingResult<CreateTicketResponse> {
+    let parsed: WebhookCreateResponse =
+        serde_json::from_str(body).map_err(|e| TicketingError::ApiError {
+            status,
+            message: format!("Webhook response did not include ticket_id: {e}"),
+        })?;
+    if parsed.ticket_id.trim().is_empty() {
+        return Err(TicketingError::ApiError {
+            status,
+            message: "Webhook response did not include ticket_id".to_string(),
+        });
+    }
+    let raw_response = serde_json::from_str(body)?;
+    Ok(CreateTicketResponse {
+        external_reference: parsed.ticket_id,
+        external_url: parsed.ticket_url,
+        raw_response: Some(raw_response),
+    })
+}
+
+/// Webhook comments are not implemented; callers must not see success.
+fn reject_unsupported_webhook_comment() -> TicketingError {
+    TicketingError::NotSupported("Webhook provider does not support adding comments".to_string())
+}
+
+/// Persist the provider body as `raw_response` instead of dropping it.
+fn webhook_status_raw_response(body: &WebhookStatusResponse) -> TicketingResult<serde_json::Value> {
+    serde_json::to_value(body).map_err(TicketingError::from)
 }
 
 #[cfg(test)]
@@ -446,5 +457,77 @@ mod tests {
 
         let provider = WebhookProvider::new(&config, &credentials).unwrap();
         assert_eq!(provider.custom_headers.len(), 2);
+    }
+
+    #[test]
+    fn webhook_create_requires_ticket_id() {
+        let parsed = parse_webhook_create_body(
+            200,
+            r#"{"ticket_id":"INC-99","ticket_url":"https://example.com/INC-99"}"#,
+        )
+        .expect("valid body");
+        assert_eq!(parsed.external_reference, "INC-99");
+        assert_eq!(
+            parsed.external_url.as_deref(),
+            Some("https://example.com/INC-99")
+        );
+        assert!(parsed.raw_response.is_some());
+
+        let missing = parse_webhook_create_body(200, r#"{"ok":true}"#)
+            .expect_err("must not substitute the local task id");
+        assert!(
+            matches!(missing, TicketingError::ApiError { status: 200, ref message } if message.contains("ticket_id")),
+            "got {missing:?}"
+        );
+
+        let not_json = parse_webhook_create_body(200, "thanks")
+            .expect_err("non-JSON body must not be a fake success");
+        assert!(matches!(
+            not_json,
+            TicketingError::ApiError { status: 200, .. }
+        ));
+    }
+
+    #[test]
+    fn webhook_add_comment_is_not_success() {
+        let err = reject_unsupported_webhook_comment();
+        assert!(
+            matches!(err, TicketingError::NotSupported(ref msg) if msg.contains("comments")),
+            "got {err:?}"
+        );
+        let src = include_str!("webhook.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("reject_unsupported_webhook_comment()"),
+            "add_comment must fail closed when comments are unsupported"
+        );
+        assert!(
+            !production.contains("using task_id as reference"),
+            "create_ticket must not fake an external ticket id"
+        );
+    }
+
+    #[test]
+    fn webhook_status_keeps_raw_response() {
+        let body = WebhookStatusResponse {
+            status: "resolved".to_string(),
+            resolution_notes: Some("done".to_string()),
+            resolved_by: Some("alice".to_string()),
+            last_updated: Some("2024-01-15T10:30:00Z".to_string()),
+        };
+        let raw = webhook_status_raw_response(&body).expect("serialize");
+        assert_eq!(raw["status"], "resolved");
+        assert_eq!(raw["resolution_notes"], "done");
+        let src = include_str!("webhook.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let get_status = production
+            .split("async fn get_ticket_status")
+            .nth(1)
+            .and_then(|s| s.split("async fn add_comment").next())
+            .expect("get_ticket_status body");
+        assert!(
+            !get_status.contains("raw_response: None"),
+            "status checks must persist the provider body"
+        );
     }
 }

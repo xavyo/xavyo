@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use xavyo_db::models::{Group, GroupMembership};
 
-use crate::error::{is_unique_violation, ScimError, ScimResult};
+use crate::error::{is_unique_violation, unsupported_patch_path, ScimError, ScimResult};
 use crate::models::{
     CreateScimGroupRequest, ReplaceScimGroupRequest, ScimGroup, ScimGroupListResponse,
     ScimGroupMember, ScimMeta, ScimPagination, ScimPatchOp, ScimPatchRequest, XavyoGroupExtension,
@@ -666,17 +666,16 @@ impl GroupService {
                                     .await?;
                                 group.parent_id = Some(parent.id);
                             } else {
-                                tracing::warn!(
-                                    parent_external_id = %ext_id,
-                                    "Parent not found by external_id in patch"
-                                );
+                                return Err(ScimError::NotFound(format!(
+                                    "Parent group with externalId {ext_id} not found"
+                                )));
                             }
                         } else if value.is_null() {
                             group.parent_id = None;
                         }
                     }
                     _ => {
-                        tracing::warn!("Unknown patch path: {}", path);
+                        return Err(unsupported_patch_path(path));
                     }
                 }
             }
@@ -742,19 +741,16 @@ impl GroupService {
                         }
                     }
                 } else {
-                    // Handle other add operations
-                    tracing::warn!("Add operation on path {} not supported", path);
+                    return Err(unsupported_patch_path(path));
                 }
             }
             "remove" => {
                 if path.starts_with("members") {
-                    // Parse member filter from path: members[value eq "uuid"]
-                    if let Some(user_id) = self.parse_member_filter(path) {
-                        GroupMembership::remove_member(&self.pool, tenant_id, group_id, user_id)
-                            .await?;
-                    }
+                    let user_id = member_id_from_remove_path(path)?;
+                    GroupMembership::remove_member(&self.pool, tenant_id, group_id, user_id)
+                        .await?;
                 } else {
-                    tracing::warn!("Cannot remove path: {}", path);
+                    return Err(unsupported_patch_path(path));
                 }
             }
             _ => {
@@ -767,11 +763,12 @@ impl GroupService {
 
         Ok(())
     }
+}
 
-    /// Parse member ID from path like `members[value eq "uuid"]`.
-    fn parse_member_filter(&self, path: &str) -> Option<Uuid> {
-        parse_member_filter_path(path)
-    }
+/// Parse member ID from a remove-members PATCH path. Unparseable paths fail.
+fn member_id_from_remove_path(path: &str) -> ScimResult<Uuid> {
+    parse_member_filter_path(path)
+        .ok_or_else(|| ScimError::InvalidPatchOp(format!("Invalid member filter path: {path}")))
 }
 
 /// Parse member ID from path like `members[value eq "uuid"]`.
@@ -843,6 +840,55 @@ mod tests {
 
         let invalid = parse_member_filter_path("members");
         assert_eq!(invalid, None);
+    }
+
+    #[test]
+    fn invalid_member_remove_path_is_not_success() {
+        let err = member_id_from_remove_path("members").expect_err("must fail closed");
+        assert!(
+            matches!(err, ScimError::InvalidPatchOp(ref msg) if msg.contains("members")),
+            "got {err:?}"
+        );
+        let uuid = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+        assert_eq!(
+            member_id_from_remove_path(
+                r#"members[value eq "550e8400-e29b-41d4-a716-446655440000"]"#
+            )
+            .unwrap(),
+            uuid
+        );
+    }
+
+    #[test]
+    fn group_patch_unknown_path_is_not_success() {
+        let src = include_str!("group_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("unsupported_patch_path(path)"),
+            "unknown group PATCH paths must fail closed"
+        );
+        assert!(
+            !production.contains("tracing::warn!(\"Unknown patch path"),
+            "must not no-op unknown group PATCH paths"
+        );
+        assert!(
+            !production.contains("tracing::warn!(\"Add operation on path"),
+            "must not no-op unsupported add paths"
+        );
+        assert!(
+            !production.contains("tracing::warn!(\"Cannot remove path"),
+            "must not no-op unsupported remove paths"
+        );
+        assert!(
+            production.contains("Parent group with externalId")
+                && !production.contains("Parent not found by external_id in patch"),
+            "missing parent on PATCH must fail, not continue"
+        );
+        let err = unsupported_patch_path("displayName.invalid");
+        assert!(
+            matches!(err, ScimError::InvalidPatchOp(ref msg) if msg.contains("displayName.invalid")),
+            "got {err:?}"
+        );
     }
 
     #[test]
