@@ -493,7 +493,10 @@ pub async fn list_conflicts(
         .map_err(|e| ConnectorApiError::Conflict(e.to_string()))?;
 
     let response = ConflictListResponse {
-        conflicts: conflicts.iter().map(ConflictResponse::from).collect(),
+        conflicts: conflicts
+            .iter()
+            .map(ConflictResponse::try_from)
+            .collect::<Result<Vec<_>>>()?,
         pending_count,
         offset,
         limit,
@@ -540,7 +543,7 @@ pub async fn get_conflict(
             id: conflict_id.to_string(),
         })?;
 
-    Ok(Json(ConflictResponse::from(&conflict)))
+    Ok(Json(ConflictResponse::try_from(&conflict)?))
 }
 
 /// Resolve a conflict manually.
@@ -606,7 +609,7 @@ pub async fn resolve_conflict(
             other => ConnectorApiError::Conflict(other.to_string()),
         })?;
 
-    Ok(Json(ConflictResponse::from(&resolved)))
+    Ok(Json(ConflictResponse::try_from(&resolved)?))
 }
 
 /// Extract tenant ID from JWT claims.
@@ -652,6 +655,17 @@ mod tests {
         assert!(
             production.contains("extract_user_id(") && !production.contains("Uuid::new_v4()"),
             "operation/conflict resolve must not invent an actor UUID"
+        );
+    }
+
+    #[test]
+    fn conflict_list_uses_try_from() {
+        let src = include_str!("operations.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("ConflictResponse::try_from")
+                && !production.contains("ConflictResponse::from("),
+            "conflict list/get/resolve must fail closed on affected_attributes JSON"
         );
     }
 }

@@ -268,8 +268,9 @@ pub struct BindingResponse {
     /// Whether the binding is enabled.
     pub enabled: bool,
 
-    /// Who created the binding.
-    pub created_by: Uuid,
+    /// Who created the binding. Omitted when the store has no actor.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_by: Option<Uuid>,
 
     /// When the binding was created.
     pub created_at: DateTime<Utc>,

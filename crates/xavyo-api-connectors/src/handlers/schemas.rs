@@ -536,15 +536,23 @@ pub async fn get_cached_schema(
                 id: format!("{id}/v{version}"),
             })?;
 
-        // Convert versioned schema to response
+        // Convert versioned schema to response. Corrupt JSON must not look empty.
         let object_classes: Vec<crate::services::ObjectClassResponse> = serde_json::from_value(
             version_data
                 .schema_data
                 .get("object_classes")
                 .cloned()
-                .unwrap_or_default(),
+                .ok_or_else(|| {
+                    crate::error::ConnectorApiError::InvalidConfiguration(
+                        "Cached schema missing object_classes".to_string(),
+                    )
+                })?,
         )
-        .unwrap_or_default();
+        .map_err(|e| {
+            crate::error::ConnectorApiError::InvalidConfiguration(format!(
+                "Invalid cached schema object_classes: {e}"
+            ))
+        })?;
 
         return Ok(Json(crate::services::SchemaResponse {
             connector_id: id,
@@ -1056,6 +1064,21 @@ fn extract_user_id(claims: &JwtClaims) -> Result<Uuid> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn cached_schema_does_not_default_on_invalid_json() {
+        let src = include_str!("schemas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let cached = production
+            .split("pub async fn get_cached_schema")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_cached_schema");
+        assert!(
+            !cached.contains("unwrap_or_default()"),
+            "cached schema GET must not hide corrupt object_classes as empty"
+        );
+    }
+
     #[test]
     fn schema_discovery_requires_actor_uuid() {
         let src = include_str!("schemas.rs");
