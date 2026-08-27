@@ -175,3 +175,28 @@ pub async fn cleanup_expired_events(
 
     Ok(Json(response))
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn list_user_risk_events_honors_advertised_filters() {
+        let src = include_str!("risk_events.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("list_for_user("),
+            "list_user_risk_events must call the service"
+        );
+        let svc = include_str!("../services/risk_event_service.rs");
+        let list = svc
+            .split("pub async fn list_for_user")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_for_user");
+        assert!(
+            list.contains(".event_type")
+                && list.contains("query.factor_id")
+                && list.contains("list_with_filter("),
+            "GET /governance/users/{{user_id}}/risk-events must apply advertised event_type and factor_id filters"
+        );
+    }
+}

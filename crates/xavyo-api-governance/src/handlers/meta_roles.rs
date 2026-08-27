@@ -1035,13 +1035,19 @@ pub async fn trigger_cascade(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
-    Json(_request): Json<TriggerCascadeRequest>,
+    Json(request): Json<TriggerCascadeRequest>,
 ) -> ApiResult<Json<CascadeStatusResponse>> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
     let actor_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
+
+    if request.dry_run {
+        return Err(ApiGovernanceError::Validation(
+            "dry_run cascade is not supported; omit dry_run to execute the cascade".to_string(),
+        ));
+    }
 
     let status = state
         .meta_role_cascade_service
@@ -1050,7 +1056,7 @@ pub async fn trigger_cascade(
 
     let failures = status.error.map(|e| {
         vec![CascadeFailure {
-            role_id: Uuid::nil(),
+            role_id: id,
             error: e,
             failed_at: chrono::Utc::now(),
         }]
@@ -1108,12 +1114,19 @@ pub async fn list_events(
         ApiGovernanceError::Validation("meta_role_id is required for event listing".to_string())
     })?;
 
-    let events = state
+    let filter = xavyo_db::MetaRoleEventFilter {
+        meta_role_id: Some(meta_role_id),
+        event_type: query.event_type,
+        actor_id: query.actor_id,
+        from_date: query.from_date,
+        to_date: query.to_date,
+    };
+
+    let (events, total) = state
         .meta_role_service
-        .list_events(tenant_id, meta_role_id, limit, offset)
+        .list_events_filtered(tenant_id, &filter, limit, offset)
         .await?;
 
-    let total = events.len() as i64;
     let items: Vec<EventResponse> = events.into_iter().map(EventResponse::from).collect();
 
     Ok(Json(EventListResponse {
@@ -1148,4 +1161,45 @@ pub async fn get_event_stats(
     let stats = state.meta_role_service.get_event_stats(tenant_id).await?;
 
     Ok(Json(EventStatsResponse::from(stats)))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn list_events_honors_advertised_filters() {
+        let src = include_str!("meta_roles.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_events")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_events");
+        assert!(
+            list.contains("query.event_type")
+                && list.contains("query.actor_id")
+                && list.contains("query.from_date")
+                && list.contains("query.to_date")
+                && list.contains("list_events_filtered(")
+                && !list.contains("events.len() as i64"),
+            "GET /governance/meta-roles/events must apply advertised event_type, actor_id, and date filters"
+        );
+    }
+
+    #[test]
+    fn cascade_does_not_run_dry_run_or_use_nil_role_id() {
+        let src = include_str!("meta_roles.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let cascade = production
+            .split("pub async fn trigger_cascade")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("trigger_cascade");
+        assert!(
+            cascade.contains("request.dry_run")
+                && cascade.contains("Json(request)")
+                && !cascade.contains("Uuid::nil()")
+                && !cascade.contains("Json(_request)"),
+            "POST cascade must not execute when dry_run is set and must not report Uuid::nil as a failed role"
+        );
+    }
 }

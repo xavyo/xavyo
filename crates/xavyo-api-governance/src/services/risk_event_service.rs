@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use validator::Validate;
 
-use xavyo_db::{CreateGovRiskEvent, GovRiskEvent};
+use xavyo_db::{CreateGovRiskEvent, GovRiskEvent, RiskEventFilter};
 
 use crate::error::{ApiGovernanceError, ApiResult};
 use crate::models::{
@@ -74,19 +74,23 @@ impl RiskEventService {
         let limit = query.limit.unwrap_or(50).min(100);
         let offset = query.offset.unwrap_or(0).max(0);
 
-        let events = GovRiskEvent::list_for_user(
-            &self.pool,
-            tenant_id,
-            user_id,
-            query.include_expired,
-            limit,
-            offset,
-        )
-        .await?;
+        let event_type = query
+            .event_type
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string);
 
-        let total =
-            GovRiskEvent::count_for_user(&self.pool, tenant_id, user_id, query.include_expired)
-                .await?;
+        let filter = RiskEventFilter {
+            user_id: Some(user_id),
+            factor_id: query.factor_id,
+            event_type,
+            include_expired: query.include_expired,
+        };
+
+        let events =
+            GovRiskEvent::list_with_filter(&self.pool, tenant_id, &filter, limit, offset).await?;
+        let total = GovRiskEvent::count_with_filter(&self.pool, tenant_id, &filter).await?;
 
         Ok(RiskEventListResponse {
             items: events.into_iter().map(RiskEventResponse::from).collect(),
