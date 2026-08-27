@@ -3,7 +3,7 @@
 //! Orchestrates risk evaluation during login: generates risk events from login context,
 //! calculates risk score, determines enforcement action, and generates security alerts.
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -12,6 +12,11 @@ use xavyo_db::{
     GovRiskEnforcementPolicy, GovRiskEvent, GovRiskFactor, GovRiskScore, GovRiskThreshold,
     RiskLevel, ThresholdAction, UpsertGovRiskScore,
 };
+
+/// Login hour for unusual-time scoring. Never treat a clock as midnight on parse failure.
+pub fn login_hour_f64(login_time: DateTime<Utc>) -> f64 {
+    f64::from(login_time.hour())
+}
 
 /// Contextual signals collected at login time for risk evaluation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -350,12 +355,7 @@ impl RiskEnforcementService {
             return Ok(());
         }
 
-        let current_hour = context
-            .login_time
-            .format("%H")
-            .to_string()
-            .parse::<f64>()
-            .unwrap_or(0.0);
+        let current_hour = login_hour_f64(context.login_time);
 
         let mean: f64 = hours.iter().sum::<f64>() / hours.len() as f64;
         let variance: f64 =
@@ -800,6 +800,26 @@ mod tests {
         assert!(
             !generate.contains("Impossible travel check failed"),
             "must not swallow impossible travel errors"
+        );
+    }
+
+    #[test]
+    fn login_hour_does_not_default_to_midnight() {
+        use chrono::{Timelike, Utc};
+        let noon = Utc::now().with_hour(15).expect("hour 15");
+        assert!((login_hour_f64(noon) - 15.0).abs() < f64::EPSILON);
+        let midnight = Utc::now().with_hour(0).expect("hour 0");
+        assert!((login_hour_f64(midnight) - 0.0).abs() < f64::EPSILON);
+
+        let src = include_str!("risk_enforcement_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let unusual = production
+            .split("async fn generate_unusual_time_event")
+            .nth(1)
+            .expect("generate_unusual_time_event");
+        assert!(
+            unusual.contains("login_hour_f64(") && !unusual.contains("unwrap_or(0.0)"),
+            "unusual login hour must not treat parse failure as midnight"
         );
     }
 

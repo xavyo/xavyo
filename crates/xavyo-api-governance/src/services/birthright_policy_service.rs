@@ -320,8 +320,8 @@ impl BirthrightPolicyService {
         let mut all_match = true;
 
         for condition in &conditions {
-            let operator =
-                ConditionOperator::parse(&condition.operator).unwrap_or(ConditionOperator::Equals);
+            let operator = ConditionOperator::parse_required(&condition.operator)
+                .map_err(GovernanceError::Validation)?;
 
             // Resolve attribute value (F081: support custom_attributes.* and metadata.* prefixes)
             let actual = if let Some(key) = condition.attribute.strip_prefix("custom_attributes.") {
@@ -820,5 +820,23 @@ mod tests {
 
         let result = validate_condition_test(&condition);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn simulate_does_not_treat_unknown_operator_as_equals() {
+        assert_eq!(
+            ConditionOperator::parse_required("equals").unwrap(),
+            ConditionOperator::Equals
+        );
+        assert!(ConditionOperator::parse_required("gte").is_err());
+        assert!(ConditionOperator::parse_required("").is_err());
+
+        let src = include_str!("birthright_policy_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_required(")
+                && !production.contains("unwrap_or(ConditionOperator::Equals)"),
+            "unknown birthright operators must fail simulation, not match as Equals"
+        );
     }
 }

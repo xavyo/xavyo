@@ -55,15 +55,17 @@ pub struct PolicyConditionResponse {
     pub value: serde_json::Value,
 }
 
-impl From<PolicyCondition> for PolicyConditionResponse {
-    fn from(condition: PolicyCondition) -> Self {
-        let operator =
-            ConditionOperator::parse(&condition.operator).unwrap_or(ConditionOperator::Equals);
-        Self {
+impl TryFrom<PolicyCondition> for PolicyConditionResponse {
+    type Error = crate::error::ApiGovernanceError;
+
+    fn try_from(condition: PolicyCondition) -> Result<Self, Self::Error> {
+        let operator = ConditionOperator::parse_required(&condition.operator)
+            .map_err(crate::error::ApiGovernanceError::Validation)?;
+        Ok(Self {
             attribute: condition.attribute,
             operator,
             value: condition.value,
-        }
+        })
     }
 }
 
@@ -249,8 +251,8 @@ impl TryFrom<GovBirthrightPolicy> for BirthrightPolicyResponse {
                 ))
             })?
             .into_iter()
-            .map(PolicyConditionResponse::from)
-            .collect();
+            .map(PolicyConditionResponse::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(Self {
             id: policy.id,
@@ -523,5 +525,21 @@ mod tests {
                 && !production.contains("impl From<GovBirthrightPolicy>"),
             "birthright policy GET must fail closed on JSON parse"
         );
+        assert!(
+            production.contains("parse_required(")
+                && !production.contains("unwrap_or(ConditionOperator::Equals)"),
+            "unknown birthright operators must not serialize as Equals"
+        );
+    }
+
+    #[test]
+    fn unknown_operator_does_not_become_equals() {
+        let condition = xavyo_db::PolicyCondition {
+            attribute: "department".into(),
+            operator: "gte".into(),
+            value: serde_json::json!("Engineering"),
+        };
+        let err = super::PolicyConditionResponse::try_from(condition).expect_err("fail closed");
+        assert!(err.to_string().contains("gte"));
     }
 }

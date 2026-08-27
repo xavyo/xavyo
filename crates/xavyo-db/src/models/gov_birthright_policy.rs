@@ -108,6 +108,11 @@ impl ConditionOperator {
         }
     }
 
+    /// Fail closed: unknown operators must not become `Equals`.
+    pub fn parse_required(s: &str) -> Result<Self, String> {
+        Self::parse(s).ok_or_else(|| format!("Invalid operator: {s}"))
+    }
+
     /// Convert operator to string representation.
     #[must_use]
     pub fn as_str(&self) -> &'static str {
@@ -779,6 +784,16 @@ mod tests {
         assert!(op.evaluate(Some("Engineering Lead"), &serde_json::json!("Engineer")));
         assert!(!op.evaluate(Some("Sales Manager"), &serde_json::json!("Engineer")));
         assert!(!op.evaluate(None, &serde_json::json!("Engineer")));
+    }
+
+    #[test]
+    fn unknown_operator_does_not_parse_as_equals() {
+        assert_eq!(
+            ConditionOperator::parse_required("equals").unwrap(),
+            ConditionOperator::Equals
+        );
+        assert!(ConditionOperator::parse_required("gte").is_err());
+        assert!(ConditionOperator::parse("gte").is_none());
     }
 
     #[test]

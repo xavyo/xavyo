@@ -575,8 +575,8 @@ impl OrphanDetectionService {
         .await
         .map_err(GovernanceError::Database)?;
 
-        // Get average age
-        let average_age_days = self.calculate_average_age(tenant_id).await.unwrap_or(0.0);
+        // Get average age — query errors must fail the summary, not report 0.0.
+        let average_age_days = self.calculate_average_age(tenant_id).await?;
 
         // Get median age
         let median_age_days: Option<f64> = sqlx::query_scalar(
@@ -1088,6 +1088,14 @@ mod tests {
         assert!(
             !production.contains("calculate_average_age(tenant_id).await.ok()"),
             "orphan summary must not hide average-age query errors as missing"
+        );
+        assert!(
+            !production.contains("calculate_average_age(tenant_id).await.unwrap_or(0.0)"),
+            "orphan age analysis must not report 0.0 when the average-age query fails"
+        );
+        assert!(
+            production.contains("self.calculate_average_age(tenant_id).await?"),
+            "average-age query errors must fail the age analysis"
         );
     }
 }

@@ -37,9 +37,41 @@ pub struct PeerGroupStats {
     pub member_count: i32,
     pub mean_entitlements: f64,
     pub std_dev_entitlements: f64,
-    pub mean_roles: f64,
-    pub std_dev_roles: f64,
+    /// Independent role-count mean when the store has one.
+    ///
+    /// `None` means role z-scores must not be computed from entitlement stats.
+    pub mean_roles: Option<f64>,
+    pub std_dev_roles: Option<f64>,
     pub role_frequencies: std::collections::HashMap<Uuid, f64>,
+}
+
+/// Missing entitlement mean/stddev must not become 0.0 (z-score 0 = everyone normal).
+pub fn peer_entitlement_stats(avg: Option<f64>, stddev: Option<f64>) -> Option<(f64, f64)> {
+    match (avg, stddev) {
+        (Some(mean), Some(std_dev)) => Some((mean, std_dev)),
+        _ => None,
+    }
+}
+
+/// `GovPeerGroup` has no independent role statistics; do not copy entitlement stats.
+pub fn independent_peer_role_stats() -> Option<(f64, f64)> {
+    None
+}
+
+/// Role z-score only when independent role stats exist.
+pub fn role_count_z_score(
+    role_count: i32,
+    mean_roles: Option<f64>,
+    std_dev_roles: Option<f64>,
+) -> Option<f64> {
+    match (mean_roles, std_dev_roles) {
+        (Some(mean), Some(std_dev)) => Some(OutlierScoringService::calculate_z_score(
+            f64::from(role_count),
+            mean,
+            std_dev,
+        )),
+        _ => None,
+    }
 }
 
 /// User access profile for scoring.
@@ -178,20 +210,12 @@ impl OutlierScoringService {
             stats.std_dev_entitlements,
         );
 
-        // Calculate Z-score for role count
-        let role_z = Self::calculate_z_score(
-            f64::from(user.role_count),
-            stats.mean_roles,
-            stats.std_dev_roles,
-        );
-
-        // Use the higher Z-score (more deviant)
-        let max_z = entitlement_z.abs().max(role_z.abs());
-        let z_score = if entitlement_z.abs() > role_z.abs() {
-            entitlement_z
-        } else {
-            role_z
-        };
+        let z_score =
+            match role_count_z_score(user.role_count, stats.mean_roles, stats.std_dev_roles) {
+                Some(role_z) if role_z.abs() > entitlement_z.abs() => role_z,
+                _ => entitlement_z,
+            };
+        let max_z = z_score.abs();
 
         let deviation_factor = Self::z_score_to_deviation_factor(max_z);
         let is_outlier = max_z.abs() >= confidence_threshold;
@@ -329,18 +353,31 @@ impl OutlierScoringService {
 
         let mut max_deviation = 0.0;
         let mut best_comparison = (0.0, 0.0);
+        let mut compared = false;
 
         for stats in peer_stats {
-            let z_score = Self::calculate_z_score(
-                f64::from(user.role_count),
-                stats.mean_roles,
-                stats.std_dev_roles,
-            );
-
+            let Some(z_score) =
+                role_count_z_score(user.role_count, stats.mean_roles, stats.std_dev_roles)
+            else {
+                continue;
+            };
+            let Some(mean) = stats.mean_roles else {
+                continue;
+            };
+            compared = true;
             if z_score.abs() > max_deviation {
                 max_deviation = z_score.abs();
-                best_comparison = (stats.mean_roles, z_score);
+                best_comparison = (mean, z_score);
             }
+        }
+
+        if !compared {
+            return FactorScore {
+                raw_value: 0.0,
+                weight,
+                contribution: 0.0,
+                details: "No independent peer role statistics".to_string(),
+            };
         }
 
         let raw_value = Self::z_score_to_deviation_factor(max_deviation);
@@ -521,22 +558,20 @@ impl OutlierScoringService {
 
         let stats: Vec<PeerGroupStats> = groups
             .into_iter()
-            .map(|g| {
-                // Parse role frequencies from JSON if available
-                let role_frequencies = std::collections::HashMap::new();
-                // TODO: Extend GovPeerGroup to include role_frequency_map
-
-                PeerGroupStats {
+            .filter_map(|g| {
+                let (mean_entitlements, std_dev_entitlements) =
+                    peer_entitlement_stats(g.avg_entitlements, g.stddev_entitlements)?;
+                let role_stats = independent_peer_role_stats();
+                Some(PeerGroupStats {
                     peer_group_id: g.id,
                     peer_group_name: g.name,
                     member_count: g.user_count,
-                    mean_entitlements: g.avg_entitlements.unwrap_or(0.0),
-                    std_dev_entitlements: g.stddev_entitlements.unwrap_or(0.0),
-                    // GovPeerGroup doesn't track role stats currently, default to entitlement-based
-                    mean_roles: g.avg_entitlements.unwrap_or(0.0),
-                    std_dev_roles: g.stddev_entitlements.unwrap_or(0.0),
-                    role_frequencies,
-                }
+                    mean_entitlements,
+                    std_dev_entitlements,
+                    mean_roles: role_stats.map(|(mean, _)| mean),
+                    std_dev_roles: role_stats.map(|(_, std_dev)| std_dev),
+                    role_frequencies: std::collections::HashMap::new(),
+                })
             })
             .collect();
 
@@ -1507,8 +1542,8 @@ mod tests {
             peer_group_name: "Test".to_string(),
             mean_entitlements: 5.0,
             std_dev_entitlements: 2.0,
-            mean_roles: 3.0,
-            std_dev_roles: 1.0,
+            mean_roles: Some(3.0),
+            std_dev_roles: Some(1.0),
             member_count: 10,
             role_frequencies: std::collections::HashMap::new(),
         }];
@@ -1723,6 +1758,41 @@ mod tests {
         assert!(
             !execute.contains("let _ = GovOutlierAnalysis::update_progress"),
             "must not swallow outlier analysis progress persist"
+        );
+    }
+
+    #[test]
+    fn missing_peer_entitlement_stats_are_not_zero() {
+        assert!(peer_entitlement_stats(None, Some(1.0)).is_none());
+        assert!(peer_entitlement_stats(Some(4.0), None).is_none());
+        assert_eq!(
+            peer_entitlement_stats(Some(4.0), Some(1.5)),
+            Some((4.0, 1.5))
+        );
+        assert!(independent_peer_role_stats().is_none());
+        assert!(role_count_z_score(10, None, None).is_none());
+        assert!(
+            role_count_z_score(10, Some(5.0), Some(2.0)).is_some_and(|z| (z - 2.5).abs() < 0.001)
+        );
+
+        let src = include_str!("outlier_scoring_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let load = production
+            .split("pub async fn load_peer_group_stats")
+            .nth(1)
+            .expect("load_peer_group_stats");
+        assert!(
+            load.contains("peer_entitlement_stats(")
+                && load.contains("independent_peer_role_stats("),
+            "peer stats must fail closed on missing averages"
+        );
+        assert!(
+            !load.contains("unwrap_or(0.0)"),
+            "missing peer averages must not become 0.0: {load}"
+        );
+        assert!(
+            !load.contains("mean_roles: g.avg_entitlements"),
+            "role stats must not copy entitlement averages"
         );
     }
 }
