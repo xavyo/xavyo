@@ -541,12 +541,22 @@ pub struct ListExpiringPersonasQuery {
     /// Personas expiring within this many days.
     #[param(default = 7, minimum = 1, maximum = 90)]
     pub within_days: Option<i32>,
+    /// Alias for `within_days` used by the web BFF.
+    #[param(minimum = 1, maximum = 90)]
+    pub days_ahead: Option<i32>,
     /// Maximum number of items to return.
     #[param(default = 50, maximum = 100)]
     pub limit: Option<i64>,
     /// Number of items to skip.
     #[param(default = 0)]
     pub offset: Option<i64>,
+}
+
+/// Response after propagating physical-user attributes onto a persona.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct PropagateAttributesResponse {
+    pub persona_id: Uuid,
+    pub attributes_updated: i32,
 }
 
 // ============================================================================

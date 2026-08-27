@@ -411,10 +411,14 @@ impl PersonaExpirationService {
         &self,
         tenant_id: Uuid,
         persona_id: Uuid,
-        extension_days: i32,
+        new_valid_until: DateTime<Utc>,
         actor_id: Uuid,
         _reason: Option<&str>,
     ) -> Result<ExtensionResult> {
+        if new_valid_until <= Utc::now() {
+            return Err(GovernanceError::InvalidPersonaExtensionDate);
+        }
+
         let persona = GovPersona::find_by_id(&self.pool, tenant_id, persona_id)
             .await
             .map_err(GovernanceError::Database)?
@@ -445,29 +449,27 @@ impl PersonaExpirationService {
         let is_owner = actor_id == persona.physical_user_id;
         reject_unapproved_persona_extension(requires_approval, is_owner)?;
 
-        // Calculate new valid_until
         let current_valid_until = persona.valid_until.unwrap_or_else(Utc::now);
-        let new_valid_until = if current_valid_until < Utc::now() {
-            // If already expired, extend from now
-            Utc::now() + Duration::days(i64::from(extension_days))
+        let baseline = if current_valid_until < Utc::now() {
+            Utc::now()
         } else {
-            // Extend from current valid_until
-            current_valid_until + Duration::days(i64::from(extension_days))
+            current_valid_until
         };
+        let extension_days =
+            i32::try_from((new_valid_until - baseline).num_days().max(1)).unwrap_or(i32::MAX);
 
         enforce_max_validity_days(&policy, persona_id, persona.created_at, new_valid_until)?;
 
-        // Update the persona
-        let _ = GovPersona::extend_validity(&self.pool, tenant_id, persona_id, new_valid_until)
+        GovPersona::extend_validity(&self.pool, tenant_id, persona_id, new_valid_until)
             .await
-            .map_err(GovernanceError::Database)?;
+            .map_err(GovernanceError::Database)?
+            .ok_or(GovernanceError::PersonaNotFound(persona_id))?;
 
-        // If persona was expired or expiring, reactivate it
         if persona.status == PersonaStatus::Expired || persona.status == PersonaStatus::Expiring {
-            let _ =
-                GovPersona::update_status(&self.pool, tenant_id, persona_id, PersonaStatus::Active)
-                    .await
-                    .map_err(GovernanceError::Database)?;
+            GovPersona::update_status(&self.pool, tenant_id, persona_id, PersonaStatus::Active)
+                .await
+                .map_err(GovernanceError::Database)?
+                .ok_or(GovernanceError::PersonaNotFound(persona_id))?;
         }
 
         // Log audit event
@@ -729,6 +731,26 @@ mod tests {
                 && production.contains("log_persona_extended")
                 && production.contains(".await?;"),
             "persona expiration mutations must fail when audit rows cannot be written"
+        );
+    }
+
+    #[test]
+    fn extend_validity_does_not_report_success_when_update_misses() {
+        let src = include_str!("persona_expiration_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let extend = production
+            .split("pub async fn extend_validity")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("extend_validity");
+        assert!(
+            extend.contains("new_valid_until: DateTime<Utc>")
+                && extend.contains("InvalidPersonaExtensionDate")
+                && extend.contains("ok_or(GovernanceError::PersonaNotFound")
+                && !extend.contains("let _ = GovPersona::extend_validity")
+                && !extend.contains("let _ =")
+                && !extend.contains("extension_days: i32"),
+            "extend must take new_valid_until and fail when the persona row is not updated"
         );
     }
 }

@@ -20,11 +20,13 @@ use crate::error::{ApiGovernanceError, ApiResult};
 use crate::models::{
     ArchetypeListResponse, ArchetypeResponse, ArchivePersonaRequest, ContextSessionListResponse,
     ContextSessionSummary, CreateArchetypeRequest, CreatePersonaRequest, CurrentContextResponse,
-    DeactivatePersonaRequest, ListArchetypesQuery, ListPersonasQuery, PersonaAttributesResponse,
+    DeactivatePersonaRequest, ExpiringPersonaSummary, ExpiringPersonasResponse,
+    ExtendPersonaRequest, ExtendPersonaResponse, ExtensionStatus, ListArchetypesQuery,
+    ListExpiringPersonasQuery, ListPersonasQuery, PersonaAttributesResponse,
     PersonaAuditEventResponse, PersonaAuditListResponse, PersonaDetailResponse,
-    PersonaListResponse, PersonaResponse, SearchAuditQuery, SwitchBackRequest,
-    SwitchContextRequest, SwitchContextResponse, UpdateArchetypeRequest, UpdatePersonaRequest,
-    UserPersonasResponse,
+    PersonaListResponse, PersonaResponse, PropagateAttributesResponse, SearchAuditQuery,
+    SwitchBackRequest, SwitchContextRequest, SwitchContextResponse, UpdateArchetypeRequest,
+    UpdatePersonaRequest, UserPersonasResponse,
 };
 use crate::router::GovernanceState;
 
@@ -780,7 +782,7 @@ pub async fn archive_persona(
         ("id" = Uuid, Path, description = "Persona ID")
     ),
     responses(
-        (status = 200, description = "Attributes propagated", body = PersonaResponse),
+        (status = 200, description = "Attributes propagated", body = PropagateAttributesResponse),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Persona not found"),
         (status = 500, description = "Internal server error")
@@ -791,7 +793,7 @@ pub async fn propagate_attributes(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
-) -> ApiResult<Json<PersonaResponse>> {
+) -> ApiResult<Json<PropagateAttributesResponse>> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -802,6 +804,8 @@ pub async fn propagate_attributes(
         .persona_service
         .propagate_attributes(tenant_id, id)
         .await?;
+
+    let attributes_updated = i32::try_from(changed_attributes.len()).unwrap_or(i32::MAX);
 
     state
         .persona_audit_service
@@ -815,7 +819,10 @@ pub async fn propagate_attributes(
         )
         .await?;
 
-    Ok(Json(PersonaResponse::from(persona)))
+    Ok(Json(PropagateAttributesResponse {
+        persona_id: persona.id,
+        attributes_updated,
+    }))
 }
 
 /// Get personas for a specific user.
@@ -1156,52 +1163,27 @@ pub async fn list_context_sessions(
 // Expiration Handlers (US5)
 // ============================================================================
 
-/// Request body for extending persona validity.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
-pub struct ExtendPersonaRequest {
-    /// Number of days to extend validity.
-    pub extension_days: i32,
-    /// Reason for extension.
-    pub reason: Option<String>,
+fn expiring_query_days(query: &ListExpiringPersonasQuery) -> i32 {
+    query
+        .days_ahead
+        .or(query.within_days)
+        .unwrap_or(7)
+        .clamp(1, 90)
 }
 
-/// Response for expiring personas report.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
-pub struct ExpiringPersonasResponse {
-    /// Count of personas in expiring status.
-    pub expiring_count: i64,
-    /// Count of personas that expire today.
-    pub expires_today_count: i64,
-    /// Count of personas that expired recently.
-    pub recently_expired_count: i64,
-    /// List of expiring personas.
-    pub personas: Vec<ExpiringPersonaItem>,
-    /// Report generation timestamp.
-    pub generated_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Expiring persona item in report.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
-pub struct ExpiringPersonaItem {
-    /// Persona ID.
-    pub persona_id: Uuid,
-    /// Persona name.
-    pub persona_name: String,
-    /// Physical user ID.
-    pub physical_user_id: Uuid,
-    /// Valid until date.
-    pub valid_until: Option<chrono::DateTime<chrono::Utc>>,
-    /// Days until expiration.
-    pub days_remaining: i64,
-    /// Current status.
-    pub status: String,
-}
-
-/// Query parameters for expiring report.
-#[derive(Debug, Clone, serde::Deserialize, utoipa::IntoParams)]
-pub struct ExpiringReportQuery {
-    /// Number of days ahead to check (default 7).
-    pub days_ahead: Option<i64>,
+fn map_expiring_persona(
+    p: crate::services::ExpiringPersonaSummary,
+) -> Option<ExpiringPersonaSummary> {
+    Some(ExpiringPersonaSummary {
+        id: p.persona_id,
+        persona_name: p.persona_name,
+        physical_user_id: p.physical_user_id,
+        physical_user_name: None,
+        archetype_name: p.archetype_name,
+        valid_until: p.valid_until?,
+        days_remaining: i32::try_from(p.days_remaining).unwrap_or(i32::MAX),
+        notification_sent: false,
+    })
 }
 
 /// Extend persona validity (T073).
@@ -1214,7 +1196,7 @@ pub struct ExpiringReportQuery {
     ),
     request_body = ExtendPersonaRequest,
     responses(
-        (status = 200, description = "Persona validity extended", body = PersonaResponse),
+        (status = 200, description = "Persona validity extended", body = ExtendPersonaResponse),
         (status = 400, description = "Invalid extension request"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Persona not found"),
@@ -1227,34 +1209,36 @@ pub async fn extend_persona(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
     Json(request): Json<ExtendPersonaRequest>,
-) -> ApiResult<Json<PersonaResponse>> {
+) -> ApiResult<Json<ExtendPersonaResponse>> {
+    request.validate()?;
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
     let actor_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
-    if request.extension_days <= 0 {
-        return Err(ApiGovernanceError::Validation(
-            "Extension days must be positive".to_string(),
-        ));
-    }
-
-    let _result = state
+    let result = state
         .persona_expiration_service
         .extend_validity(
             tenant_id,
             id,
-            request.extension_days,
+            request.new_valid_until,
             actor_id,
             request.reason.as_deref(),
         )
         .await?;
 
-    // Get the updated persona
     let persona = state.persona_service.get(tenant_id, id).await?;
 
-    Ok(Json(persona.into()))
+    Ok(Json(ExtendPersonaResponse {
+        status: if result.required_approval {
+            ExtensionStatus::PendingApproval
+        } else {
+            ExtensionStatus::Approved
+        },
+        persona: Some(persona.into()),
+        approval_request_id: None,
+    }))
 }
 
 /// Get expiring personas report (T075).
@@ -1262,7 +1246,7 @@ pub async fn extend_persona(
     get,
     path = "/governance/personas/expiring",
     tag = "Governance - Persona Management",
-    params(ExpiringReportQuery),
+    params(ListExpiringPersonasQuery),
     responses(
         (status = 200, description = "Expiring personas report", body = ExpiringPersonasResponse),
         (status = 401, description = "Unauthorized"),
@@ -1273,37 +1257,40 @@ pub async fn extend_persona(
 pub async fn get_expiring_personas(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
-    Query(query): Query<ExpiringReportQuery>,
+    Query(query): Query<ListExpiringPersonasQuery>,
 ) -> ApiResult<Json<ExpiringPersonasResponse>> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    let days_ahead = query.days_ahead.unwrap_or(7);
+    let days_ahead = i64::from(expiring_query_days(&query));
+    let limit = query.limit.unwrap_or(50).clamp(1, 100);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let report = state
         .persona_expiration_service
         .get_expiring_report(tenant_id, days_ahead)
         .await?;
 
+    let all: Vec<ExpiringPersonaSummary> = report
+        .personas
+        .into_iter()
+        .filter_map(map_expiring_persona)
+        .collect();
+    let total = i64::try_from(all.len()).unwrap_or(i64::MAX);
+    let items = all
+        .into_iter()
+        .skip(usize::try_from(offset).unwrap_or(0))
+        .take(usize::try_from(limit).unwrap_or(50))
+        .collect();
+
     Ok(Json(ExpiringPersonasResponse {
-        expiring_count: report.expiring_count,
-        expires_today_count: report.expires_today_count,
-        recently_expired_count: report.recently_expired_count,
-        personas: report
-            .personas
-            .into_iter()
-            .map(|p| ExpiringPersonaItem {
-                persona_id: p.persona_id,
-                persona_name: p.persona_name,
-                physical_user_id: p.physical_user_id,
-                valid_until: p.valid_until,
-                days_remaining: p.days_remaining,
-                status: format!("{:?}", p.status).to_lowercase(),
-            })
-            .collect(),
-        generated_at: report.generated_at,
+        items,
+        total,
+        within_days: expiring_query_days(&query),
+        limit,
+        offset,
     }))
 }
 
@@ -1442,6 +1429,100 @@ mod tests {
                 && sessions.contains("let (sessions, total)")
                 && !sessions.contains("sessions.len() as i64"),
             "GET /governance/context/sessions must report the filtered total, not the page length"
+        );
+    }
+
+    #[test]
+    fn extend_persona_uses_advertised_new_valid_until_and_extend_response() {
+        let src = include_str!("personas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let extend = production
+            .split("pub async fn extend_persona")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("extend_persona");
+        assert!(
+            extend.contains("request.new_valid_until")
+                && extend.contains("ExtendPersonaResponse")
+                && extend.contains("ExtensionStatus::Approved")
+                && !extend.contains("extension_days")
+                && !extend.contains("Json(persona.into())"),
+            "POST /governance/personas/{{id}}/extend must accept new_valid_until and return ExtendPersonaResponse"
+        );
+    }
+
+    #[test]
+    fn get_expiring_personas_uses_advertised_page_shape() {
+        let src = include_str!("personas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let expiring = production
+            .split("pub async fn get_expiring_personas")
+            .nth(1)
+            .expect("get_expiring_personas");
+        assert!(
+            expiring.contains("ListExpiringPersonasQuery")
+                && expiring.contains("items")
+                && expiring.contains("total")
+                && expiring.contains("limit")
+                && expiring.contains("offset")
+                && expiring.contains("days_ahead")
+                && expiring.contains("within_days")
+                && !expiring.contains("expiring_count")
+                && !expiring.contains("personas:"),
+            "GET /governance/personas/expiring must return items/total/limit/offset and honor pagination"
+        );
+    }
+
+    #[test]
+    fn propagate_attributes_returns_count_not_persona_body() {
+        let src = include_str!("personas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let propagate = production
+            .split("pub async fn propagate_attributes")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("propagate_attributes");
+        assert!(
+            propagate.contains("PropagateAttributesResponse")
+                && propagate.contains("attributes_updated")
+                && propagate.contains("persona_id: persona.id")
+                && !propagate.contains("Json(PersonaResponse::from(persona))"),
+            "POST /governance/personas/{{id}}/propagate-attributes must return persona_id and attributes_updated"
+        );
+    }
+
+    #[test]
+    fn map_expiring_persona_uses_advertised_id_and_drops_missing_dates() {
+        use chrono::{Duration, Utc};
+        use xavyo_db::models::PersonaStatus;
+
+        let until = Utc::now() + Duration::days(3);
+        let mapped = map_expiring_persona(crate::services::ExpiringPersonaSummary {
+            persona_id: Uuid::new_v4(),
+            persona_name: "ops".into(),
+            physical_user_id: Uuid::new_v4(),
+            valid_until: Some(until),
+            days_remaining: 3,
+            status: PersonaStatus::Expiring,
+            archetype_name: Some("Operator".into()),
+        })
+        .expect("valid_until present");
+        assert_eq!(mapped.persona_name, "ops");
+        assert_eq!(mapped.days_remaining, 3);
+        assert_eq!(mapped.archetype_name.as_deref(), Some("Operator"));
+        assert!(!mapped.notification_sent);
+
+        assert!(
+            map_expiring_persona(crate::services::ExpiringPersonaSummary {
+                persona_id: Uuid::new_v4(),
+                persona_name: "gone".into(),
+                physical_user_id: Uuid::new_v4(),
+                valid_until: None,
+                days_remaining: 0,
+                status: PersonaStatus::Expired,
+                archetype_name: None,
+            })
+            .is_none()
         );
     }
 }
