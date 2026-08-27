@@ -358,6 +358,7 @@ pub async fn list_delegated_work_items(
 
     let limit = query.limit.unwrap_or(50).min(100);
     let offset = query.offset.unwrap_or(0).max(0);
+    let work_item_type = parse_optional_work_item_type(query.work_item_type.as_deref())?;
 
     let (items, total) = state
         .delegation_service
@@ -365,7 +366,7 @@ pub async fn list_delegated_work_items(
             tenant_id,
             user_id,
             query.delegator_id,
-            query.work_item_type.as_deref(),
+            work_item_type,
             query.application_id,
             limit,
             offset,
@@ -476,4 +477,40 @@ pub async fn list_delegation_audit(
         limit,
         offset,
     }))
+}
+
+/// Invalid work-item-type filters must not silently list every delegated item.
+fn parse_optional_work_item_type(value: Option<&str>) -> ApiResult<Option<&str>> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "access_request" | "certification" | "state_transition") => {
+            Ok(Some(s))
+        }
+        Some(s) => Err(ApiGovernanceError::Validation(format!(
+            "Invalid work item type '{s}'. Must be one of: access_request, certification, state_transition"
+        ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_work_item_type_does_not_list_all_delegated_items() {
+        assert_eq!(parse_optional_work_item_type(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_work_item_type(Some("access_request")).unwrap(),
+            Some("access_request")
+        );
+        assert!(parse_optional_work_item_type(Some("bogus")).is_err());
+        let src = include_str!("delegations.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_work_item_type(")
+                && !production.contains("query.work_item_type.as_deref(),"),
+            "invalid delegated work_item_type must be 400, not an unfiltered list"
+        );
+    }
 }

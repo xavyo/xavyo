@@ -487,13 +487,14 @@ pub async fn list_changes(
     Query(query): Query<ListChangesQuery>,
 ) -> Result<Json<ListChangesResponse>, ApiError> {
     let tenant_id = extract_tenant_id(&claims)?;
+    let status = parse_optional_change_status(query.status.as_deref())?;
 
     let (changes, total) = state
         .sync_service
         .list_changes(
             tenant_id,
             connector_id,
-            query.status.as_deref(),
+            status,
             query.limit.unwrap_or(50).min(100),
             query.offset.unwrap_or(0).max(0),
         )
@@ -654,13 +655,14 @@ pub async fn list_sync_conflicts(
     Query(query): Query<ListConflictsQuery>,
 ) -> Result<Json<ListConflictsResponse>, ApiError> {
     let tenant_id = extract_tenant_id(&claims)?;
+    let status = parse_optional_conflict_status(query.status.as_deref())?;
 
     let (conflicts, total) = state
         .sync_service
         .list_conflicts(
             tenant_id,
             connector_id,
-            query.status.as_deref(),
+            status,
             query.limit.unwrap_or(50).min(100),
         )
         .await
@@ -777,6 +779,44 @@ fn extract_tenant_id(claims: &JwtClaims) -> ApiResult<Uuid> {
         ))
 }
 
+/// Invalid inbound-change status filters must not silently list every change.
+fn parse_optional_change_status(value: Option<&str>) -> Result<Option<&str>, ApiError> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s)
+            if matches!(
+                s,
+                "pending" | "processing" | "completed" | "failed" | "conflict"
+            ) =>
+        {
+            Ok(Some(s))
+        }
+        Some(s) => Err(ApiError::bad_request(format!(
+            "Invalid change status '{s}'. Must be one of: pending, processing, completed, failed, conflict"
+        ))),
+    }
+}
+
+/// Invalid conflict-status filters must not silently list every pending conflict.
+fn parse_optional_conflict_status(value: Option<&str>) -> Result<Option<&str>, ApiError> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s)
+            if matches!(
+                s,
+                "pending" | "inbound_wins" | "outbound_wins" | "merge" | "manual"
+            ) =>
+        {
+            Ok(Some(s))
+        }
+        Some(s) => Err(ApiError::bad_request(format!(
+            "Invalid conflict status '{s}'. Must be one of: pending, inbound_wins, outbound_wins, merge, manual"
+        ))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -790,6 +830,39 @@ mod tests {
         assert!(
             production.contains("outbound_value: c.outbound_value"),
             "conflict list must preserve optional outbound_value"
+        );
+    }
+
+    #[test]
+    fn invalid_change_status_does_not_list_all_changes() {
+        assert_eq!(super::parse_optional_change_status(None).unwrap(), None);
+        assert_eq!(
+            super::parse_optional_change_status(Some("failed")).unwrap(),
+            Some("failed")
+        );
+        assert!(super::parse_optional_change_status(Some("bogus")).is_err());
+        let src = include_str!("sync.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_change_status("),
+            "invalid inbound-change status must be 400, not an unfiltered list"
+        );
+    }
+
+    #[test]
+    fn invalid_conflict_status_does_not_list_all_conflicts() {
+        assert_eq!(super::parse_optional_conflict_status(None).unwrap(), None);
+        assert_eq!(
+            super::parse_optional_conflict_status(Some("pending")).unwrap(),
+            Some("pending")
+        );
+        assert!(super::parse_optional_conflict_status(Some("bogus")).is_err());
+        let src = include_str!("sync.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_conflict_status(")
+                && !production.contains("query.status.as_deref(),"),
+            "invalid sync conflict status must be 400, not an unfiltered pending list"
         );
     }
 }

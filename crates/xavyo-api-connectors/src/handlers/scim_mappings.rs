@@ -99,13 +99,10 @@ pub async fn list_mappings(
             id: target_id.to_string(),
         })?;
 
-    let mappings = ScimTargetAttributeMapping::list_by_target(
-        pool,
-        tenant_id,
-        target_id,
-        query.resource_type.as_deref(),
-    )
-    .await?;
+    let resource_type = parse_optional_mapping_resource_type(query.resource_type.as_deref())?;
+    let mappings =
+        ScimTargetAttributeMapping::list_by_target(pool, tenant_id, target_id, resource_type)
+            .await?;
 
     let total_count = mappings.len();
 
@@ -255,4 +252,38 @@ pub async fn reset_mapping_defaults(
             total_count,
         }),
     ))
+}
+
+/// Invalid mapping `resource_type` filters must not silently list every mapping.
+fn parse_optional_mapping_resource_type(value: Option<&str>) -> Result<Option<&str>> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "user" | "group") => Ok(Some(s)),
+        Some(s) => Err(ConnectorApiError::Validation(format!(
+            "Invalid mapping resource type '{s}'. Must be one of: user, group"
+        ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_mapping_resource_type_does_not_list_all_mappings() {
+        assert_eq!(parse_optional_mapping_resource_type(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_mapping_resource_type(Some("user")).unwrap(),
+            Some("user")
+        );
+        assert!(parse_optional_mapping_resource_type(Some("bogus")).is_err());
+        let src = include_str!("scim_mappings.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_mapping_resource_type(")
+                && !production.contains("query.resource_type.as_deref(),"),
+            "invalid SCIM mapping resource_type must be 400, not an unfiltered list"
+        );
+    }
 }

@@ -79,9 +79,8 @@ pub async fn list_attribute_definitions(
         .ok_or(ApiUsersError::Unauthorized)?
         .as_uuid();
 
-    let response = service
-        .list(tenant_id, query.is_active, query.data_type.as_deref())
-        .await?;
+    let data_type = parse_optional_data_type(query.data_type.as_deref())?;
+    let response = service.list(tenant_id, query.is_active, data_type).await?;
     Ok(Json(response))
 }
 
@@ -252,8 +251,45 @@ pub async fn seed_wellknown(
     Ok(Json(response))
 }
 
+/// Invalid data-type filters must not silently list every attribute definition.
+fn parse_optional_data_type(value: Option<&str>) -> Result<Option<&str>, ApiUsersError> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s)
+            if matches!(
+                s,
+                "string" | "number" | "boolean" | "date" | "json" | "enum"
+            ) =>
+        {
+            Ok(Some(s))
+        }
+        Some(s) => Err(ApiUsersError::Validation(format!(
+            "Invalid data type '{s}'. Must be one of: string, number, boolean, date, json, enum"
+        ))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_data_type_does_not_list_all_definitions() {
+        assert_eq!(parse_optional_data_type(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_data_type(Some("string")).unwrap(),
+            Some("string")
+        );
+        assert!(parse_optional_data_type(Some("bogus")).is_err());
+        let src = include_str!("attribute_definitions.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("let data_type = parse_optional_data_type("),
+            "invalid attribute data_type must be 400, not an unfiltered list"
+        );
+    }
+
     #[test]
     fn attribute_definition_mutations_require_actor_uuid() {
         let src = include_str!("attribute_definitions.rs");

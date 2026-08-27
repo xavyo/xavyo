@@ -99,12 +99,13 @@ pub async fn list_provisioning_state(
     let limit = query.limit.clamp(1, 100);
     let offset = query.offset.max(0);
     let status = parse_optional_provisioning_status(query.status.as_deref())?;
+    let resource_type = parse_optional_provisioning_resource_type(query.resource_type.as_deref())?;
 
     let (items, total_count) = ScimProvisioningState::list_by_target(
         pool,
         tenant_id,
         target_id,
-        query.resource_type.as_deref(),
+        resource_type,
         status,
         limit,
         offset,
@@ -218,6 +219,18 @@ fn parse_optional_provisioning_status(status: Option<&str>) -> Result<Option<&st
     }
 }
 
+/// Invalid provisioning `resource_type` filters must not silently list every state.
+fn parse_optional_provisioning_resource_type(value: Option<&str>) -> Result<Option<&str>> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "User" | "Group") => Ok(Some(s)),
+        Some(s) => Err(ConnectorApiError::Validation(format!(
+            "Invalid provisioning resource type '{s}'. Must be one of: User, Group"
+        ))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236,6 +249,26 @@ mod tests {
             production.contains("parse_optional_provisioning_status(")
                 && !production.contains("query.status.as_deref(),"),
             "invalid SCIM provisioning status must be 400, not an unfiltered list"
+        );
+    }
+
+    #[test]
+    fn invalid_provisioning_resource_type_does_not_list_all_states() {
+        assert_eq!(
+            parse_optional_provisioning_resource_type(None).unwrap(),
+            None
+        );
+        assert_eq!(
+            parse_optional_provisioning_resource_type(Some("Group")).unwrap(),
+            Some("Group")
+        );
+        assert!(parse_optional_provisioning_resource_type(Some("bogus")).is_err());
+        let src = include_str!("scim_provisioning.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_provisioning_resource_type(")
+                && !production.contains("query.resource_type.as_deref(),"),
+            "invalid SCIM provisioning resource_type must be 400, not an unfiltered list"
         );
     }
 }
