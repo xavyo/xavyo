@@ -83,8 +83,12 @@ impl AttributeMapper {
                     .collect()
             };
 
-        // Start with a base user.
-        let user_name = email.unwrap_or("unknown").to_string();
+        // Start with a base user. Missing email must not invent a shared "unknown"
+        // userName that would collide across identities.
+        let user_name = email
+            .filter(|e| !e.is_empty())
+            .map(std::string::ToString::to_string)
+            .unwrap_or_else(|| user_id.to_string());
         let mut user = ScimUser::new(&user_name);
         user.external_id = Some(user_id.to_string());
         // Defaults that may be overridden by mappings.
@@ -94,20 +98,20 @@ impl AttributeMapper {
         for (source_field, scim_path, mapping_type, constant_value, transform) in &user_mappings {
             let raw_value = match *mapping_type {
                 "constant" => constant_value.map(std::string::ToString::to_string),
-                _ => {
-                    // "direct" or "expression" — look up source field value.
-                    source_values
-                        .iter()
-                        .find(|(k, _)| k == source_field)
-                        .and_then(|(_, v)| v.clone())
-                }
+                "direct" | "expression" => source_values
+                    .iter()
+                    .find(|(k, _)| k == source_field)
+                    .and_then(|(_, v)| v.clone()),
+                _ => continue,
             };
 
-            // Apply optional transform.
+            // Apply optional transform. Unknown transforms must not apply untransformed.
             let value = match (raw_value, transform) {
                 (Some(v), Some("lowercase")) => Some(v.to_lowercase()),
                 (Some(v), Some("uppercase")) => Some(v.to_uppercase()),
-                (v, _) => v,
+                (Some(v), None) => Some(v),
+                (Some(_), Some(_)) => None,
+                (None, _) => None,
             };
 
             if let Some(val) = value {
@@ -316,10 +320,73 @@ mod tests {
         let user_id = Uuid::new_v4();
         let user = AttributeMapper::map_user_to_scim(user_id, None, None, None, None, false, &[]);
 
-        assert_eq!(user.user_name, "unknown");
+        assert_eq!(user.user_name, user_id.to_string());
+        assert_ne!(user.user_name, "unknown");
         assert!(!user.active);
         assert!(user.name.is_none());
         assert!(user.emails.is_empty());
+    }
+
+    #[test]
+    fn map_user_to_scim_does_not_invent_unknown_or_apply_unknown_mapping() {
+        let user_id = Uuid::new_v4();
+        let mapping = ScimTargetAttributeMapping {
+            id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            target_id: Uuid::new_v4(),
+            resource_type: "user".to_string(),
+            source_field: "email".to_string(),
+            target_scim_path: "displayName".to_string(),
+            mapping_type: "invented".to_string(),
+            constant_value: None,
+            transform: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+        let user = AttributeMapper::map_user_to_scim(
+            user_id,
+            Some("john@example.com"),
+            Some("John Doe"),
+            None,
+            None,
+            true,
+            &[mapping],
+        );
+        assert_eq!(user.user_name, "john@example.com");
+        assert!(user.display_name.is_none());
+
+        let transform_mapping = ScimTargetAttributeMapping {
+            id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            target_id: Uuid::new_v4(),
+            resource_type: "user".to_string(),
+            source_field: "email".to_string(),
+            target_scim_path: "displayName".to_string(),
+            mapping_type: "direct".to_string(),
+            constant_value: None,
+            transform: Some("rot13".to_string()),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+        let user = AttributeMapper::map_user_to_scim(
+            user_id,
+            Some("john@example.com"),
+            None,
+            None,
+            None,
+            true,
+            &[transform_mapping],
+        );
+        assert!(user.display_name.is_none());
+
+        let src = include_str!("mapper.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(\"unknown\")")
+                && production.contains("\"direct\" | \"expression\"")
+                && production.contains("(Some(_), Some(_)) => None"),
+            "SCIM mapper must not invent userName unknown or apply unknown mapping/transform"
+        );
     }
 
     #[test]

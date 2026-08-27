@@ -602,11 +602,13 @@ impl ConnectorService {
                 .get("outbound_target_ou")
                 .and_then(|v| v.as_str())
                 .map(std::string::ToString::to_string),
-            conflict_strategy: config
-                .get("conflict_strategy")
-                .and_then(|v| v.as_str())
-                .unwrap_or("source_wins")
-                .to_string(),
+            conflict_strategy: json_allowed_str(
+                config,
+                "conflict_strategy",
+                &["source_wins", "target_wins", "manual"],
+                Some("source_wins"),
+            )?
+            .to_string(),
         };
 
         // Parse search_bases array
@@ -615,11 +617,13 @@ impl ConnectorService {
                 if let Some(dn) = base.get("dn").and_then(|v| v.as_str()) {
                     ad_config.search_bases.push(SearchBase {
                         dn: dn.to_string(),
-                        scope: base
-                            .get("scope")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("subtree")
-                            .to_string(),
+                        scope: json_allowed_str(
+                            base,
+                            "scope",
+                            &["subtree", "onelevel", "base"],
+                            Some("subtree"),
+                        )?
+                        .to_string(),
                         filter: base
                             .get("filter")
                             .and_then(|v| v.as_str())
@@ -804,6 +808,31 @@ fn json_bool_field(config: &serde_json::Value, field: &str, default: bool) -> Re
     }
 }
 
+/// JSON string enum. Unknown or non-string values must not become a default.
+fn json_allowed_str<'a>(
+    config: &'a serde_json::Value,
+    field: &str,
+    allowed: &[&str],
+    default: Option<&'a str>,
+) -> Result<&'a str> {
+    match config.get(field) {
+        None | Some(serde_json::Value::Null) => default
+            .ok_or_else(|| ConnectorApiError::InvalidConfiguration(format!("Missing '{field}'"))),
+        Some(v) => {
+            let s = v.as_str().ok_or_else(|| {
+                ConnectorApiError::InvalidConfiguration(format!("{field} must be a string"))
+            })?;
+            if allowed.contains(&s) {
+                Ok(s)
+            } else {
+                Err(ConnectorApiError::InvalidConfiguration(format!(
+                    "Invalid {field} '{s}'. Must be one of: {allowed:?}"
+                )))
+            }
+        }
+    }
+}
+
 fn required_str<'a>(obj: &'a serde_json::Value, field: &str) -> Result<&'a str> {
     obj.get(field)
         .and_then(|v| v.as_str())
@@ -975,6 +1004,66 @@ mod tests {
         assert!(
             production.contains("Missing 'bind_password' in LDAP credentials"),
             "LDAP must require bind_password instead of anonymous bind"
+        );
+    }
+
+    #[test]
+    fn ad_conflict_strategy_and_scope_do_not_invent_defaults_for_unknown() {
+        assert_eq!(
+            json_allowed_str(
+                &serde_json::json!({}),
+                "conflict_strategy",
+                &["source_wins", "target_wins", "manual"],
+                Some("source_wins"),
+            )
+            .unwrap(),
+            "source_wins"
+        );
+        assert!(json_allowed_str(
+            &serde_json::json!({"conflict_strategy": "delete_all"}),
+            "conflict_strategy",
+            &["source_wins", "target_wins", "manual"],
+            Some("source_wins"),
+        )
+        .is_err());
+        assert!(json_allowed_str(
+            &serde_json::json!({"conflict_strategy": true}),
+            "conflict_strategy",
+            &["source_wins", "target_wins", "manual"],
+            Some("source_wins"),
+        )
+        .is_err());
+        assert_eq!(
+            json_allowed_str(
+                &serde_json::json!({}),
+                "scope",
+                &["subtree", "onelevel", "base"],
+                Some("subtree"),
+            )
+            .unwrap(),
+            "subtree"
+        );
+        assert!(json_allowed_str(
+            &serde_json::json!({"scope": "everything"}),
+            "scope",
+            &["subtree", "onelevel", "base"],
+            Some("subtree"),
+        )
+        .is_err());
+        assert!(json_allowed_str(
+            &serde_json::json!({"scope": 1}),
+            "scope",
+            &["subtree", "onelevel", "base"],
+            Some("subtree"),
+        )
+        .is_err());
+        let src = include_str!("connector_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("json_allowed_str(")
+                && !production.contains("unwrap_or(\"source_wins\")")
+                && !production.contains("unwrap_or(\"subtree\")"),
+            "AD conflict_strategy and search scope must not invent values for unknown/non-string JSON"
         );
     }
 }

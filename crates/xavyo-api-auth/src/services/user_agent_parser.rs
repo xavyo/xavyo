@@ -61,8 +61,8 @@ fn detect_device_type(ua: &str) -> String {
         return "mobile".to_string();
     }
 
-    // Default to desktop
-    "desktop".to_string()
+    // Unrecognized UA is not a desktop — device-type policies must not skip.
+    "unknown".to_string()
 }
 
 /// Detect browser and version from user-agent.
@@ -331,7 +331,7 @@ mod tests {
 
         assert_eq!(info.browser, None);
         assert_eq!(info.os, None);
-        assert_eq!(info.device_type, "desktop");
+        assert_eq!(info.device_type, "unknown");
         assert_eq!(info.device_name, "Unknown device");
     }
 
@@ -341,6 +341,17 @@ mod tests {
         let info = parse_user_agent(ua);
 
         assert_eq!(info.device_name, "Unknown device");
-        assert_eq!(info.device_type, "desktop");
+        assert_eq!(info.device_type, "unknown");
+    }
+
+    #[test]
+    fn unrecognized_user_agent_is_unknown_not_desktop() {
+        let src = include_str!("user_agent_parser.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("\"unknown\".to_string()")
+                && !production.contains("Default to desktop"),
+            "unrecognized UA must not be classified as desktop"
+        );
     }
 }

@@ -270,15 +270,9 @@ impl RiskScoreService {
                         .map_err(GovernanceError::Database)?;
                 Ok(count as f64)
             }
-            "excessive_privilege" => {
-                // Placeholder - would compare against peer group average
-                Ok(0.0)
-            }
-            "orphan_account" => {
-                // Placeholder - would check if account has no manager/owner
-                Ok(0.0)
-            }
-            _ => Ok(0.0), // Unknown factor type
+            other => Err(GovernanceError::Validation(format!(
+                "Unknown or unimplemented static risk factor type '{other}'"
+            ))),
         }
     }
 
@@ -813,6 +807,20 @@ mod tests {
         assert_eq!(
             normalize_factor_value_for_test("new_location_login", 1.0),
             50.0
+        );
+    }
+
+    #[test]
+    fn unknown_static_factor_does_not_score_zero() {
+        let src = include_str!("risk_score_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("Unknown or unimplemented static risk factor type")
+                && !production.contains("_ => Ok(0.0)")
+                && !production.contains("Placeholder - would compare against peer group average")
+                && !production
+                    .contains("Placeholder - would check if account has no manager/owner"),
+            "unknown/unimplemented static factors must error, not score 0.0"
         );
     }
 }
