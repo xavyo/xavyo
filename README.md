@@ -300,7 +300,7 @@ xavyo exposes a comprehensive REST API with full OpenAPI/Swagger documentation.
 |----------|-------------|
 | **[llms.txt](llms.txt)** | LLM-friendly navigation index for all 32 crates |
 | **[llms-full.txt](llms-full.txt)** | Complete documentation (~15,500 words) |
-| **[Architecture](docs/ARCHITECTURE.md)** | System architecture overview |
+| **[First deployment](docs/operations/first-deployment.md)** | Production secrets, health, upgrades |
 | **[Crate Index](docs/crates/index.md)** | All crates organized by layer |
 | **[Dependency Graph](docs/crates/dependency-graph.md)** | Visual dependency relationships |
 | **[API Reference](http://localhost:8080/docs/)** | Swagger UI (when running) |

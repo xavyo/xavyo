@@ -10,7 +10,7 @@ mod jira;
 mod servicenow;
 mod webhook;
 
-pub use encryption::{decrypt_credentials, encrypt_credentials};
+pub use encryption::{decrypt_credentials, encrypt_credentials, init_ticketing_encryption_key};
 pub use jira::JiraProvider;
 pub use servicenow::ServiceNowProvider;
 pub use webhook::WebhookProvider;

@@ -117,6 +117,7 @@ impl std::str::FromStr for DynamicProviderType {
 }
 
 /// Generated credentials must include a lease id so they can be revoked.
+#[cfg(feature = "vault-provider")]
 pub(crate) fn require_lease_id(
     provider: &str,
     name: &str,
@@ -133,6 +134,7 @@ pub(crate) fn require_lease_id(
 
 /// Lease revoke HTTP status. 404 means already gone; other errors must not
 /// look like a successful revocation.
+#[cfg(feature = "vault-provider")]
 pub(crate) fn lease_revocation_http_status(
     provider: &str,
     lease_id: &str,
@@ -195,6 +197,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "vault-provider")]
     fn require_lease_id_does_not_succeed_when_missing() {
         assert_eq!(
             require_lease_id("openbao", "role", Some("lease-1".into())).unwrap(),
@@ -206,6 +209,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "vault-provider")]
     fn lease_revocation_http_status_does_not_succeed_on_error() {
         assert!(lease_revocation_http_status("infisical", "l1", 200, "").is_ok());
         assert!(lease_revocation_http_status("openbao", "l1", 204, "").is_ok());

@@ -1,0 +1,5 @@
+# Local development: use committed sqlx query cache so `cargo build` works
+# without a migrated database when DATABASE_URL is set in .env.
+# CI `cargo sqlx prepare` workflows are unaffected (they run prepare explicitly).
+[env]
+SQLX_OFFLINE = "true"

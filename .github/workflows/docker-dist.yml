@@ -1,0 +1,37 @@
+name: Docker Dist Validation
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: '0 3 * * *'
+
+jobs:
+  validate-compose:
+    name: Validate docker-compose.dist.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate compose file syntax
+        env:
+          POSTGRES_PASSWORD: ci-test-password
+          ISSUER_URL: https://auth.example.com
+          CORS_ORIGINS: https://app.example.com
+          EMAIL_SMTP_HOST: smtp.example.com
+          EMAIL_SMTP_USERNAME: ci-user
+          EMAIL_SMTP_PASSWORD: ci-password
+          EMAIL_FROM_ADDRESS: noreply@example.com
+          FRONTEND_BASE_URL: https://app.example.com
+          ADMIN_PASSWORD: 'CiTestPassword1!'
+          XAVYO_TICKETING_ENCRYPTION_KEY: dGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXktdGVzdCE=
+          XAVYO_SIEM_ENCRYPTION_KEY: dGVzdC1rZXktdGVzdC1rZXktdGVzdC1rZXktdGVzdCE=
+        run: docker compose -f docker/docker-compose.dist.yml config --quiet
+
+      - name: Check required env vars documented
+        run: |
+          grep -q 'XAVYO_SIEM_ENCRYPTION_KEY' docker/.env.dist.example
+          grep -q 'XAVYO_TICKETING_ENCRYPTION_KEY' docker/.env.dist.example
+          grep -q 'ADMIN_PASSWORD' docker/.env.dist.example

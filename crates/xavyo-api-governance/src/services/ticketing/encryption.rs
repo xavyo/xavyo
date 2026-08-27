@@ -5,6 +5,8 @@
 // TODO: Update to generic-array 1.x when aes-gcm is updated
 #![allow(deprecated)]
 
+use std::sync::OnceLock;
+
 use aes_gcm::{
     aead::{Aead, KeyInit, OsRng},
     Aes256Gcm, Nonce,
@@ -19,37 +21,21 @@ const KEY_LENGTH: usize = 32;
 /// Length of the GCM nonce in bytes.
 const NONCE_LENGTH: usize = 12;
 
-/// Get the encryption key from environment.
-///
-/// SECURITY: This function requires the `XAVYO_TICKETING_ENCRYPTION_KEY` environment
-/// variable to be set. There is no fallback to a hardcoded key to prevent
-/// accidental use of weak encryption in production.
-///
-/// To generate a key: `openssl rand -base64 32`
+static TICKETING_ENCRYPTION_KEY: OnceLock<[u8; KEY_LENGTH]> = OnceLock::new();
+
+/// Initialize the ticketing encryption key from application config (called once at startup).
+pub fn init_ticketing_encryption_key(key: [u8; KEY_LENGTH]) {
+    let _ = TICKETING_ENCRYPTION_KEY.set(key);
+}
+
+/// Get the encryption key from application config.
 fn get_encryption_key() -> Result<[u8; KEY_LENGTH], TicketingError> {
-    let key_b64 = std::env::var("XAVYO_TICKETING_ENCRYPTION_KEY").map_err(|_| {
+    TICKETING_ENCRYPTION_KEY.get().copied().ok_or_else(|| {
         TicketingError::EncryptionError(
-            "XAVYO_TICKETING_ENCRYPTION_KEY environment variable not set. \
-             Generate a key with: openssl rand -base64 32"
+            "Ticketing encryption key not initialized — set XAVYO_TICKETING_ENCRYPTION_KEY at startup"
                 .to_string(),
         )
-    })?;
-
-    let key_bytes = BASE64
-        .decode(&key_b64)
-        .map_err(|e| TicketingError::EncryptionError(format!("Invalid base64 key: {e}")))?;
-
-    if key_bytes.len() != KEY_LENGTH {
-        return Err(TicketingError::EncryptionError(format!(
-            "Key must be {} bytes, got {}",
-            KEY_LENGTH,
-            key_bytes.len()
-        )));
-    }
-
-    let mut key = [0u8; KEY_LENGTH];
-    key.copy_from_slice(&key_bytes);
-    Ok(key)
+    })
 }
 
 /// Encrypt credentials using AES-256-GCM.
@@ -130,9 +116,10 @@ mod tests {
 
     /// Set up the test encryption key. Uses a fixed key for deterministic tests.
     fn setup_test_key() {
-        // Test key: 32 bytes encoded as base64
-        // "test-encrypt-key-32-bytes-long!!" = 32 bytes
-        std::env::set_var("XAVYO_TICKETING_ENCRYPTION_KEY", TEST_KEY);
+        let key_bytes = BASE64.decode(TEST_KEY).expect("valid test key");
+        let mut key = [0u8; KEY_LENGTH];
+        key.copy_from_slice(&key_bytes);
+        let _ = TICKETING_ENCRYPTION_KEY.set(key);
     }
 
     #[test]
@@ -192,27 +179,5 @@ mod tests {
 
         let result = decrypt_credentials(&BASE64.encode([0u8; 5]));
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_missing_key_returns_error() {
-        let _lock = ENV_MUTEX.lock().unwrap();
-
-        // Save original value
-        let key_backup = std::env::var("XAVYO_TICKETING_ENCRYPTION_KEY").ok();
-
-        // Remove the key to test error handling
-        std::env::remove_var("XAVYO_TICKETING_ENCRYPTION_KEY");
-
-        let result = get_encryption_key();
-        assert!(result.is_err());
-        let err_msg = format!("{:?}", result.unwrap_err());
-        assert!(err_msg.contains("not set"));
-
-        // Restore key
-        match key_backup {
-            Some(key) => std::env::set_var("XAVYO_TICKETING_ENCRYPTION_KEY", key),
-            None => std::env::set_var("XAVYO_TICKETING_ENCRYPTION_KEY", TEST_KEY),
-        }
     }
 }

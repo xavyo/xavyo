@@ -12,26 +12,39 @@ Thanks for your interest in contributing to xavyo!
 
 ### Development Setup
 
+**Recommended:** one-command setup with Docker:
+
+```bash
+git clone https://github.com/xavyo/xavyo.git
+cd xavyo
+make dev          # generates .env, starts postgres+mailpit, builds idp-api
+make dev-run      # start API on :8080
+make smoke        # verify readyz + admin login
+```
+
+`SQLX_OFFLINE=true` is set in `.cargo/config.toml` so `cargo build` works without a migrated database when `DATABASE_URL` is in `.env` (#99). Use `bash scripts/cargo-dev.sh build -p idp-api` to override.
+
+CI runs the golden path smoke test (`tests/smoke/golden-path.sh`) and critical auth checks (`tests/functional/run-critical.sh`) on every PR.
+
+**Manual setup:**
+
 ```bash
 # Clone
 git clone https://github.com/xavyo/xavyo.git
 cd xavyo
 
-# Generate JWT keys
-mkdir -p keys
-openssl genpkey -algorithm RSA -out keys/test-private.pem -pkeyopt rsa_keygen_bits:2048
-openssl rsa -pubout -in keys/test-private.pem -out keys/test-public.pem
+# Generate JWT keys + .env
+bash scripts/setup-dev-env.sh
 
-# Start PostgreSQL
-docker compose -f docker/docker-compose.yml up -d postgres
-
-# Setup environment
-cp .env.example .env
+# Start PostgreSQL + Mailpit
+bash scripts/dev-env.sh start
 
 # Build and test
-cargo build --workspace
-cargo test --workspace
+bash scripts/cargo-dev.sh build -p idp-api
+bash scripts/cargo-dev.sh test --workspace
 ```
+
+Production deployment: [docs/operations/first-deployment.md](docs/operations/first-deployment.md)
 
 ## How to Contribute
 

@@ -1,0 +1,86 @@
+name: Smoke Test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+  SQLX_OFFLINE: true
+
+jobs:
+  golden-path:
+    name: Golden path smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: xavyo
+          POSTGRES_PASSWORD: xavyo_test_password
+          POSTGRES_DB: xavyo_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U xavyo -d xavyo_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      mailpit:
+        image: axllent/mailpit:latest
+        ports:
+          - 1025:1025
+          - 8025:8025
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev protobuf-compiler postgresql-client
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Generate JWT keys
+        run: bash docker/generate-keys.sh
+
+      - name: Initialize database
+        run: PGPASSWORD=xavyo_test_password psql -h localhost -U xavyo -d xavyo_test -f docker/postgres/init.sql
+
+      - name: Build idp-api
+        run: cargo build -p idp-api
+
+      - name: Start idp-api
+        run: |
+          export DATABASE_URL="postgres://xavyo:xavyo_test_password@localhost:5432/xavyo_test"
+          export JWT_PRIVATE_KEY="$(cat docker/keys/jwt_private.pem)"
+          export JWT_PUBLIC_KEY="$(cat docker/keys/jwt_public.pem)"
+          export ISSUER_URL="http://localhost:8080"
+          export FRONTEND_URL="http://localhost:3000"
+          export CORS_ORIGINS="http://localhost:3000"
+          export EMAIL_SMTP_HOST="localhost"
+          export EMAIL_SMTP_PORT="1025"
+          export EMAIL_SMTP_TLS="false"
+          export EMAIL_FROM_ADDRESS="noreply@xavyo.local"
+          export ADMIN_EMAIL="admin@xavyo.local"
+          export ADMIN_PASSWORD="Admin@1234"
+          export GOV_KEY="$(openssl rand -base64 32)"
+          export XAVYO_SIEM_ENCRYPTION_KEY="$GOV_KEY"
+          export XAVYO_TICKETING_ENCRYPTION_KEY="$GOV_KEY"
+          ./target/debug/idp-api &
+          echo $! > /tmp/idp-api.pid
+
+      - name: Run golden path smoke test
+        env:
+          DATABASE_URL: postgres://xavyo:xavyo_test_password@localhost:5432/xavyo_test
+        run: bash tests/smoke/golden-path.sh
+
+      - name: Run critical auth tests
+        env:
+          DATABASE_URL: postgres://xavyo:xavyo_test_password@localhost:5432/xavyo_test
+        run: bash tests/functional/run-critical.sh
+
+      - name: Stop idp-api
+        if: always()
+        run: kill "$(cat /tmp/idp-api.pid)" 2>/dev/null || true
