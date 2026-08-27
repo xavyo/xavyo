@@ -17,6 +17,8 @@ use xavyo_db::models::{
     CircuitState as DbCircuitState, UpsertCircuitBreakerState, WebhookCircuitBreakerState,
 };
 
+use crate::error::WebhookError;
+
 // Note: We define our own CircuitState here for the webhook domain to provide
 // better ergonomics and doc comments specific to webhook circuit breaking.
 // The database model uses the shared CircuitState from connector_health.
@@ -179,26 +181,21 @@ impl CircuitBreaker {
     }
 
     /// Create a circuit breaker from persisted state.
-    #[must_use]
     pub fn from_persisted(
         state: &WebhookCircuitBreakerState,
         config: CircuitBreakerConfig,
-    ) -> Self {
-        let circuit_state = CircuitState::parse(&state.state).unwrap_or_default();
-        let recent_failures: Vec<FailureRecord> =
-            serde_json::from_value(state.recent_failures.clone()).unwrap_or_default();
-
-        Self {
+    ) -> Result<Self, WebhookError> {
+        Ok(Self {
             subscription_id: state.subscription_id,
             tenant_id: state.tenant_id,
             config,
-            state: circuit_state,
+            state: persisted_circuit_state(&state.state)?,
             failure_count: state.failure_count as u32,
-            recent_failures,
+            recent_failures: persisted_recent_failures(state.recent_failures.clone())?,
             last_failure_at: state.last_failure_at,
             last_success_at: state.last_success_at,
             opened_at: state.opened_at,
-        }
+        })
     }
 
     /// Get the subscription ID this circuit breaker is for.
@@ -387,13 +384,29 @@ impl CircuitBreaker {
         tenant_id: Uuid,
         subscription_id: Uuid,
         config: CircuitBreakerConfig,
-    ) -> Result<Option<Self>, sqlx::Error> {
+    ) -> Result<Option<Self>, WebhookError> {
         let state =
             WebhookCircuitBreakerState::find_by_subscription(pool, tenant_id, subscription_id)
                 .await?;
 
-        Ok(state.map(|s| Self::from_persisted(&s, config)))
+        state.map(|s| Self::from_persisted(&s, config)).transpose()
     }
+}
+
+/// Persisted circuit state. Unknown values must not default to Closed
+/// (fail-open: deliveries would proceed).
+pub(crate) fn persisted_circuit_state(state: &str) -> Result<CircuitState, WebhookError> {
+    CircuitState::parse(state)
+        .ok_or_else(|| WebhookError::Internal(format!("invalid circuit breaker state: {state}")))
+}
+
+/// Persisted failure history. Parse errors must not look like a healthy circuit.
+pub(crate) fn persisted_recent_failures(
+    value: serde_json::Value,
+) -> Result<Vec<FailureRecord>, WebhookError> {
+    serde_json::from_value(value).map_err(|e| {
+        WebhookError::Internal(format!("invalid circuit breaker failure history: {e}"))
+    })
 }
 
 /// Status information for a circuit breaker.
@@ -448,7 +461,7 @@ impl CircuitBreakerRegistry {
         &self,
         tenant_id: Uuid,
         subscription_id: Uuid,
-    ) -> Result<CircuitBreakerStatus, sqlx::Error> {
+    ) -> Result<CircuitBreakerStatus, WebhookError> {
         // Check in-memory cache first
         {
             let breakers = self.breakers.read().await;
@@ -485,7 +498,7 @@ impl CircuitBreakerRegistry {
         &self,
         tenant_id: Uuid,
         subscription_id: Uuid,
-    ) -> Result<bool, sqlx::Error> {
+    ) -> Result<bool, WebhookError> {
         // Ensure circuit breaker exists
         self.get_or_create(tenant_id, subscription_id).await?;
 
@@ -493,8 +506,7 @@ impl CircuitBreakerRegistry {
         if let Some(cb) = breakers.get_mut(&subscription_id) {
             Ok(cb.can_execute())
         } else {
-            // Should not happen after get_or_create
-            Ok(true)
+            Err(WebhookError::CircuitBreakerNotFound { subscription_id })
         }
     }
 
@@ -503,7 +515,7 @@ impl CircuitBreakerRegistry {
         &self,
         tenant_id: Uuid,
         subscription_id: Uuid,
-    ) -> Result<(), sqlx::Error> {
+    ) -> Result<(), WebhookError> {
         self.get_or_create(tenant_id, subscription_id).await?;
 
         let mut breakers = self.breakers.write().await;
@@ -521,7 +533,7 @@ impl CircuitBreakerRegistry {
         tenant_id: Uuid,
         subscription_id: Uuid,
         failure: FailureRecord,
-    ) -> Result<(), sqlx::Error> {
+    ) -> Result<(), WebhookError> {
         self.get_or_create(tenant_id, subscription_id).await?;
 
         let mut breakers = self.breakers.write().await;
@@ -538,7 +550,7 @@ impl CircuitBreakerRegistry {
         &self,
         tenant_id: Uuid,
         subscription_id: Uuid,
-    ) -> Result<Option<CircuitBreakerStatus>, sqlx::Error> {
+    ) -> Result<Option<CircuitBreakerStatus>, WebhookError> {
         // Check in-memory first
         {
             let breakers = self.breakers.read().await;
@@ -560,18 +572,16 @@ impl CircuitBreakerRegistry {
     pub async fn get_all_status(
         &self,
         tenant_id: Uuid,
-    ) -> Result<Vec<CircuitBreakerStatus>, sqlx::Error> {
+    ) -> Result<Vec<CircuitBreakerStatus>, WebhookError> {
         let db_states = WebhookCircuitBreakerState::list_by_tenant(&self.pool, tenant_id).await?;
 
-        let statuses: Vec<CircuitBreakerStatus> = db_states
+        db_states
             .iter()
             .map(|s| {
-                let cb = CircuitBreaker::from_persisted(s, self.config.clone());
-                CircuitBreakerStatus::from(&cb)
+                let cb = CircuitBreaker::from_persisted(s, self.config.clone())?;
+                Ok(CircuitBreakerStatus::from(&cb))
             })
-            .collect();
-
-        Ok(statuses)
+            .collect()
     }
 
     /// Remove a circuit breaker from the registry (e.g., when subscription is deleted).
@@ -783,5 +793,25 @@ mod tests {
         assert_eq!(status.state, cb.state());
         assert_eq!(status.failure_count, cb.failure_count());
         assert_eq!(status.recent_failures.len(), 1);
+    }
+
+    #[test]
+    fn persisted_circuit_does_not_fail_open() {
+        assert_eq!(persisted_circuit_state("open").unwrap(), CircuitState::Open);
+        assert!(persisted_circuit_state("bogus").is_err());
+        assert!(persisted_recent_failures(serde_json::json!([])).is_ok());
+        assert!(persisted_recent_failures(serde_json::json!("nope")).is_err());
+
+        let src = include_str!("circuit_breaker.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("persisted_circuit_state(")
+                && production.contains("persisted_recent_failures("),
+            "persisted circuit load must fail closed"
+        );
+        assert!(
+            !production.contains("unwrap_or_default()") && !production.contains("Ok(true)"),
+            "must not treat unknown state as Closed or cache-miss as allow"
+        );
     }
 }

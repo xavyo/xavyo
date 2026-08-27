@@ -12,6 +12,7 @@ use xavyo_db::{
     ConstructionAttributeMapping, ConstructionAttributeMappings, ConstructionCondition,
     ConstructionConditionOperator, DeprovisioningPolicy, RoleConstruction,
 };
+use xavyo_governance::error::{GovernanceError, Result};
 
 /// Query parameters for listing role constructions.
 #[derive(Debug, Clone, Deserialize, IntoParams, Default)]
@@ -457,16 +458,19 @@ pub struct ConstructionResponse {
 
 impl ConstructionResponse {
     /// Create response from database model.
-    pub fn from_model(construction: RoleConstruction, connector_name: Option<String>) -> Self {
+    pub fn from_model(
+        construction: RoleConstruction,
+        connector_name: Option<String>,
+    ) -> Result<Self> {
         let attribute_mappings: AttributeMappingsDto =
-            serde_json::from_value(construction.attribute_mappings.clone()).unwrap_or_default();
+            construction_attribute_mappings(construction.attribute_mappings.clone())?;
 
         let condition: Option<ConditionDto> = construction
             .condition
-            .as_ref()
-            .and_then(|c| serde_json::from_value(c.clone()).ok());
+            .map(construction_condition)
+            .transpose()?;
 
-        Self {
+        Ok(Self {
             id: construction.id,
             tenant_id: construction.tenant_id,
             role_id: construction.role_id,
@@ -484,14 +488,28 @@ impl ConstructionResponse {
             created_by: construction.created_by,
             created_at: construction.created_at,
             updated_at: construction.updated_at,
-        }
+        })
     }
 }
 
-impl From<RoleConstruction> for ConstructionResponse {
-    fn from(construction: RoleConstruction) -> Self {
+impl TryFrom<RoleConstruction> for ConstructionResponse {
+    type Error = GovernanceError;
+
+    fn try_from(construction: RoleConstruction) -> Result<Self> {
         Self::from_model(construction, None)
     }
+}
+
+/// Stored construction mappings. Parse errors must not look like an empty mapping set.
+pub(crate) fn construction_attribute_mappings(
+    value: serde_json::Value,
+) -> Result<AttributeMappingsDto> {
+    serde_json::from_value(value).map_err(GovernanceError::from)
+}
+
+/// Stored construction condition. Parse errors must not drop the gate.
+pub(crate) fn construction_condition(value: serde_json::Value) -> Result<ConditionDto> {
+    serde_json::from_value(value).map_err(GovernanceError::from)
 }
 
 /// List constructions response.
@@ -555,4 +573,29 @@ pub struct UserEffectiveConstructionsResponse {
 
     /// List of effective constructions.
     pub constructions: Vec<UserEffectiveConstructionResponse>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn construction_parse_does_not_default_empty_mappings() {
+        assert!(construction_attribute_mappings(serde_json::json!({})).is_ok());
+        assert!(construction_attribute_mappings(serde_json::json!("nope")).is_err());
+        assert!(construction_condition(serde_json::json!("nope")).is_err());
+
+        let src = include_str!("role_construction.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("construction_attribute_mappings(")
+                && production.contains("construction_condition("),
+            "GET construction must fail closed on JSON parse"
+        );
+        assert!(
+            !production.contains("unwrap_or_default()")
+                && !production.contains("from_value(c.clone()).ok()"),
+            "must not hide mapping/condition parse errors as empty"
+        );
+    }
 }

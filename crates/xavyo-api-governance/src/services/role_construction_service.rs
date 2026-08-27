@@ -60,8 +60,8 @@ impl RoleConstructionService {
 
         let items = constructions
             .into_iter()
-            .map(ConstructionResponse::from)
-            .collect();
+            .map(ConstructionResponse::try_from)
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(ConstructionListResponse { items, total })
     }
@@ -78,7 +78,7 @@ impl RoleConstructionService {
                 .await?
                 .ok_or(GovernanceError::RoleConstructionNotFound(construction_id))?;
 
-        Ok(ConstructionResponse::from(construction))
+        ConstructionResponse::try_from(construction)
     }
 
     /// Create a new construction for a role.
@@ -132,7 +132,7 @@ impl RoleConstructionService {
         let construction =
             RoleConstruction::create(&self.pool, tenant_id, role_id, &input, created_by).await?;
 
-        Ok(ConstructionResponse::from(construction))
+        ConstructionResponse::try_from(construction)
     }
 
     /// Update a construction.
@@ -173,7 +173,7 @@ impl RoleConstructionService {
             RoleConstruction::update(&self.pool, tenant_id, construction_id, &input).await?;
 
         match updated {
-            Some(construction) => Ok(ConstructionResponse::from(construction)),
+            Some(construction) => ConstructionResponse::try_from(construction),
             None => Err(GovernanceError::RoleConstructionVersionConflict),
         }
     }
@@ -214,7 +214,7 @@ impl RoleConstructionService {
             .await?
             .ok_or(GovernanceError::RoleConstructionNotFound(construction_id))?;
 
-        Ok(ConstructionResponse::from(updated))
+        ConstructionResponse::try_from(updated)
     }
 
     /// Disable a construction.
@@ -233,7 +233,7 @@ impl RoleConstructionService {
             .await?
             .ok_or(GovernanceError::RoleConstructionNotFound(construction_id))?;
 
-        Ok(ConstructionResponse::from(updated))
+        ConstructionResponse::try_from(updated)
     }
 
     /// Get all enabled constructions for a set of role IDs.
@@ -246,10 +246,10 @@ impl RoleConstructionService {
         let constructions =
             RoleConstruction::list_enabled_by_roles(&self.pool, tenant_id, role_ids).await?;
 
-        Ok(constructions
+        constructions
             .into_iter()
-            .map(ConstructionResponse::from)
-            .collect())
+            .map(ConstructionResponse::try_from)
+            .collect()
     }
 
     /// Get effective constructions for a role (own + induced roles).

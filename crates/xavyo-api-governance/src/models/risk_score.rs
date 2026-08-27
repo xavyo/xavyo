@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 use xavyo_db::{GovRiskScore, GovRiskScoreHistory, RiskLevel, RiskScoreTrend, TrendDirection};
+use xavyo_governance::error::{GovernanceError, Result};
 
 /// Score breakdown per factor.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -90,17 +91,19 @@ pub struct RiskScoreResponse {
     pub updated_at: DateTime<Utc>,
 }
 
-impl From<GovRiskScore> for RiskScoreResponse {
-    fn from(score: GovRiskScore) -> Self {
+impl TryFrom<GovRiskScore> for RiskScoreResponse {
+    type Error = GovernanceError;
+
+    fn try_from(score: GovRiskScore) -> Result<Self> {
         let factor_breakdown: Vec<FactorBreakdown> =
-            serde_json::from_value(score.factor_breakdown.clone()).unwrap_or_default();
+            risk_factor_breakdown(score.factor_breakdown.clone())?;
 
         let peer_comparison: Option<PeerComparisonData> = score
             .peer_comparison
-            .as_ref()
-            .and_then(|v| serde_json::from_value(v.clone()).ok());
+            .map(risk_peer_comparison)
+            .transpose()?;
 
-        Self {
+        Ok(Self {
             id: score.id,
             user_id: score.user_id,
             total_score: score.total_score,
@@ -112,8 +115,18 @@ impl From<GovRiskScore> for RiskScoreResponse {
             calculated_at: score.calculated_at,
             created_at: score.created_at,
             updated_at: score.updated_at,
-        }
+        })
     }
+}
+
+/// Stored factor breakdown. Parse errors must not look like a score with no factors.
+pub(crate) fn risk_factor_breakdown(value: serde_json::Value) -> Result<Vec<FactorBreakdown>> {
+    serde_json::from_value(value).map_err(GovernanceError::from)
+}
+
+/// Stored peer comparison. Parse errors must not drop the comparison.
+pub(crate) fn risk_peer_comparison(value: serde_json::Value) -> Result<PeerComparisonData> {
+    serde_json::from_value(value).map_err(GovernanceError::from)
 }
 
 /// Query parameters for listing risk scores.
@@ -435,4 +448,29 @@ pub struct UpsertEnforcementPolicyRequest {
 
     /// Whether impossible travel detection is enabled.
     pub impossible_travel_enabled: Option<bool>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn risk_score_parse_does_not_empty_breakdown() {
+        assert!(risk_factor_breakdown(serde_json::json!([])).is_ok());
+        assert!(risk_factor_breakdown(serde_json::json!("nope")).is_err());
+        assert!(risk_peer_comparison(serde_json::json!("nope")).is_err());
+
+        let src = include_str!("risk_score.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("risk_factor_breakdown(")
+                && production.contains("risk_peer_comparison("),
+            "GET risk score must fail closed on JSON parse"
+        );
+        assert!(
+            !production.contains("unwrap_or_default()")
+                && !production.contains("from_value(v.clone()).ok()"),
+            "must not hide factor/peer parse errors as empty"
+        );
+    }
 }

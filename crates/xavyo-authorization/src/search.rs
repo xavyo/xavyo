@@ -130,7 +130,7 @@ impl SearchFilter {
         Self {
             field: field.into(),
             op: FilterOp::Eq,
-            value: serde_json::to_value(value).unwrap_or(serde_json::Value::Null),
+            value: filter_json(&value).expect("SearchFilter values must serialize to JSON"),
         }
     }
 
@@ -157,9 +157,15 @@ impl SearchFilter {
         Self {
             field: field.into(),
             op: FilterOp::In,
-            value: serde_json::to_value(values).unwrap_or(serde_json::Value::Null),
+            value: filter_json(&values).expect("SearchFilter values must serialize to JSON"),
         }
     }
+}
+
+/// Filter JSON. Serialization errors must not become `Null` (a match-anything
+/// equality against SQL NULL / JSON null).
+pub(crate) fn filter_json<T: Serialize>(value: &T) -> Result<serde_json::Value, serde_json::Error> {
+    serde_json::to_value(value)
 }
 
 // ---------------------------------------------------------------------------
@@ -746,5 +752,22 @@ mod tests {
         // Even with no filters, tenant_id is present
         assert!(clause.contains("tenant_id = $1"));
         assert_eq!(params[0], tenant_id.to_string());
+    }
+
+    #[test]
+    fn search_filter_does_not_become_null_on_serialize_fail() {
+        assert!(filter_json(&"allow").is_ok());
+        assert!(filter_json(&vec!["allow".to_string(), "deny".to_string()]).is_ok());
+
+        let src = include_str!("search.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("filter_json("),
+            "eq/in_list must serialize through filter_json"
+        );
+        assert!(
+            !production.contains("unwrap_or(serde_json::Value::Null)"),
+            "serialize fail must not become a Null filter value"
+        );
     }
 }
