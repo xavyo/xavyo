@@ -113,7 +113,10 @@ pub use queue::{
 pub use rhai_executor::{
     DryRunResult, RhaiExecutorConfig, RhaiScriptExecutor, ScriptValidationError,
 };
-pub use shadow::{Shadow, ShadowError, ShadowRepository, ShadowResult, ShadowState, SyncSituation};
+pub use shadow::{
+    InMemoryShadowStore, Shadow, ShadowError, ShadowRepository, ShadowResult, ShadowState,
+    ShadowStore, SyncSituation,
+};
 pub use transform::{
     AttributeMapping, MappingConfig, MappingDirection, TransformConfig, TransformEngine,
     TransformError, TransformErrorCode, TransformResult, ValidationError,

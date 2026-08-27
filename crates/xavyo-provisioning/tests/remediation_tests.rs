@@ -25,7 +25,11 @@ use xavyo_provisioning::reconciliation::remediation::{
 };
 use xavyo_provisioning::reconciliation::transaction::TransactionStatus;
 use xavyo_provisioning::reconciliation::types::{ActionType, RemediationDirection};
-use xavyo_provisioning::shadow::{Shadow, ShadowRepository, SyncSituation};
+use xavyo_provisioning::shadow::{InMemoryShadowStore, Shadow, SyncSituation};
+
+fn test_shadow_repo() -> Arc<InMemoryShadowStore> {
+    Arc::new(InMemoryShadowStore::new())
+}
 
 // =============================================================================
 // Manual Mock Connector Implementations
@@ -500,8 +504,7 @@ mod us1_create_tests {
 
         let identity_service = MockIdentityService::new().with_attributes(test_attributes());
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -534,8 +537,7 @@ mod us1_create_tests {
 
         let identity_service = MockIdentityService::new().with_attributes(test_attributes());
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -568,8 +570,7 @@ mod us1_create_tests {
 
         let identity_service = MockIdentityService::new().with_attributes(test_attributes());
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -601,8 +602,7 @@ mod us1_create_tests {
         let attrs = test_attributes();
         let identity_service = MockIdentityService::new().with_attributes(attrs);
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -633,8 +633,7 @@ mod us1_create_tests {
         let identity_service =
             MockIdentityService::new().with_get_error("Identity not found".to_string());
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -670,8 +669,7 @@ mod us2_update_tests {
         let connector_provider = MockConnectorProvider::new();
         let identity_service = MockIdentityService::new().with_attributes(test_attributes());
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -757,8 +755,7 @@ mod us3_delete_tests {
 
         let identity_service = MockIdentityService::new();
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -788,8 +785,7 @@ mod us3_delete_tests {
 
         let identity_service = MockIdentityService::new();
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -820,8 +816,7 @@ mod us3_delete_tests {
 
         let identity_service = MockIdentityService::new();
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -862,8 +857,7 @@ mod us3_delete_tests {
 
         let identity_service = MockIdentityService::new();
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -923,8 +917,7 @@ mod us4_link_tests {
         let connector_provider = MockConnectorProvider::new();
         let identity_service = MockIdentityService::new();
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -1012,8 +1005,7 @@ mod us4_link_tests {
         let connector_provider = MockConnectorProvider::new();
         let identity_service = MockIdentityService::new();
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -1164,8 +1156,7 @@ mod us6_inactivate_tests {
         let connector_provider = MockConnectorProvider::new();
         let identity_service = MockIdentityService::new().with_active(true);
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -1192,8 +1183,7 @@ mod us6_inactivate_tests {
         let connector_provider = MockConnectorProvider::new();
         let identity_service = MockIdentityService::new().with_active(true);
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -1225,8 +1215,7 @@ mod us6_inactivate_tests {
         let connector_provider = MockConnectorProvider::new();
         let identity_service = MockIdentityService::new().with_active(false);
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -1256,8 +1245,7 @@ mod us6_inactivate_tests {
             .with_active(true)
             .with_inactivate_error("Database error".to_string());
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -1284,8 +1272,7 @@ mod us6_inactivate_tests {
         let connector_provider = MockConnectorProvider::new();
         let identity_service = Arc::new(MockIdentityService::new().with_active(true));
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -1319,8 +1306,7 @@ mod us7_identity_service_tests {
         let connector_provider = MockConnectorProvider::new();
         let identity_service = Arc::new(MockIdentityService::new());
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -1353,8 +1339,7 @@ mod us7_identity_service_tests {
         let connector_provider = MockConnectorProvider::new();
         let identity_service = Arc::new(MockIdentityService::new());
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -1387,8 +1372,7 @@ mod us7_identity_service_tests {
         let identity_service = MockIdentityService::new()
             .with_create_error("Database constraint violation".to_string());
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -1420,8 +1404,7 @@ mod us7_identity_service_tests {
         let connector_provider = MockConnectorProvider::new();
         let identity_service = Arc::new(MockIdentityService::new().with_exists(true));
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -1450,8 +1433,7 @@ mod us7_identity_service_tests {
         let connector_provider = MockConnectorProvider::new();
         let identity_service = Arc::new(MockIdentityService::new().with_exists(true));
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -1480,8 +1462,7 @@ mod us7_identity_service_tests {
         let connector_provider = MockConnectorProvider::new();
         let identity_service = Arc::new(MockIdentityService::new().with_exists(false));
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -1512,8 +1493,7 @@ mod us7_identity_service_tests {
             .with_exists(true)
             .with_delete_error("Foreign key constraint".to_string());
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,
@@ -1633,8 +1613,7 @@ mod edge_case_tests {
 
         let identity_service = MockIdentityService::new().with_attributes(test_attributes());
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+        let shadow_repo = test_shadow_repo();
 
         let executor = RemediationExecutor::new(
             tenant_id,

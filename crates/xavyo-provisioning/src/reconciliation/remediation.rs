@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use super::transaction::{CompletedStep, RemediationTransaction};
 use super::types::{ActionResult, ActionType, RemediationDirection};
-use crate::shadow::{Shadow, ShadowRepository};
+use crate::shadow::{Shadow, ShadowStore};
 use xavyo_connector::error::{ConnectorError, ConnectorResult};
 use xavyo_connector::operation::{AttributeDelta, AttributeSet, Uid};
 use xavyo_connector::traits::{CreateOp, DeleteOp, SearchOp, UpdateOp};
@@ -317,31 +317,33 @@ pub trait IdentityService: Send + Sync {
 }
 
 /// Executor for remediation actions.
-pub struct RemediationExecutor<C, I>
+pub struct RemediationExecutor<C, I, S>
 where
     C: ConnectorProvider,
     I: IdentityService,
+    S: ShadowStore,
 {
     /// Tenant ID.
     tenant_id: Uuid,
     /// Connector provider for runtime connector lookup.
     connector_provider: Arc<C>,
     /// Shadow repository for link management.
-    shadow_repository: Arc<ShadowRepository>,
+    shadow_repository: Arc<S>,
     /// Identity service for identity operations.
     identity_service: Arc<I>,
 }
 
-impl<C, I> RemediationExecutor<C, I>
+impl<C, I, S> RemediationExecutor<C, I, S>
 where
     C: ConnectorProvider,
     I: IdentityService,
+    S: ShadowStore,
 {
     /// Create a new executor with dependencies.
     pub fn new(
         tenant_id: Uuid,
         connector_provider: Arc<C>,
-        shadow_repository: Arc<ShadowRepository>,
+        shadow_repository: Arc<S>,
         identity_service: Arc<I>,
     ) -> Self {
         Self {
