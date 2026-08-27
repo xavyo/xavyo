@@ -52,6 +52,23 @@ pub fn reject_unimplemented_connector_remediation() -> ReconciliationServiceResu
 /// Result type for reconciliation service operations.
 pub type ReconciliationServiceResult<T> = Result<T, ReconciliationServiceError>;
 
+/// Invalid mode must be 400, not a silent full recon.
+pub fn parse_reconciliation_mode(
+    mode: &str,
+) -> ReconciliationServiceResult<ConnectorReconciliationMode> {
+    mode.parse()
+        .map_err(ReconciliationServiceError::InvalidParameter)
+}
+
+/// Invalid frequency must be 400, not a silent daily schedule.
+pub fn parse_reconciliation_frequency(
+    frequency: &str,
+) -> ReconciliationServiceResult<ReconciliationScheduleFrequency> {
+    frequency
+        .parse()
+        .map_err(ReconciliationServiceError::InvalidParameter)
+}
+
 /// Service for managing reconciliation operations.
 ///
 /// This service is stateless with respect to tenant - all methods accept `tenant_id`
@@ -91,9 +108,7 @@ impl ReconciliationService {
             ));
         }
 
-        // Parse mode
-        let recon_mode: ConnectorReconciliationMode =
-            mode.parse().unwrap_or(ConnectorReconciliationMode::Full);
+        let recon_mode = parse_reconciliation_mode(mode)?;
 
         // Create the run
         let input = CreateConnectorReconciliationRun {
@@ -422,12 +437,8 @@ impl ReconciliationService {
         hour_of_day: i32,
         enabled: Option<bool>,
     ) -> ReconciliationServiceResult<ReconciliationSchedule> {
-        let recon_mode: ConnectorReconciliationMode =
-            mode.parse().unwrap_or(ConnectorReconciliationMode::Full);
-
-        let freq: ReconciliationScheduleFrequency = frequency
-            .parse()
-            .unwrap_or(ReconciliationScheduleFrequency::Daily);
+        let recon_mode = parse_reconciliation_mode(mode)?;
+        let freq = parse_reconciliation_frequency(frequency)?;
 
         let input = UpsertReconciliationSchedule {
             mode: recon_mode,
@@ -735,6 +746,37 @@ impl ReconciliationService {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_reconciliation_mode_does_not_default_to_full() {
+        assert_eq!(
+            parse_reconciliation_mode("full").unwrap(),
+            ConnectorReconciliationMode::Full
+        );
+        assert_eq!(
+            parse_reconciliation_mode("delta").unwrap(),
+            ConnectorReconciliationMode::Delta
+        );
+        assert!(parse_reconciliation_mode("nope").is_err());
+        assert_eq!(
+            parse_reconciliation_frequency("hourly").unwrap(),
+            ReconciliationScheduleFrequency::Hourly
+        );
+        assert_eq!(
+            parse_reconciliation_frequency("daily").unwrap(),
+            ReconciliationScheduleFrequency::Daily
+        );
+        assert!(parse_reconciliation_frequency("never").is_err());
+        let src = include_str!("reconciliation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_reconciliation_mode(")
+                && production.contains("parse_reconciliation_frequency(")
+                && !production.contains("unwrap_or(ConnectorReconciliationMode::Full)")
+                && !production.contains("unwrap_or(ReconciliationScheduleFrequency::Daily)"),
+            "invalid recon mode/frequency must not silently default to full/daily"
+        );
+    }
 
     #[test]
     fn ignore_discrepancy_rejects_missing_actor() {

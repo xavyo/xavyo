@@ -25,6 +25,10 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, WebhookError> {
         .ok_or(WebhookError::Unauthorized)
 }
 
+fn extract_user_id(claims: &JwtClaims) -> Result<Uuid, WebhookError> {
+    Uuid::parse_str(&claims.sub).map_err(|_| WebhookError::Unauthorized)
+}
+
 // ---------------------------------------------------------------------------
 // Subscription CRUD handlers
 // ---------------------------------------------------------------------------
@@ -52,7 +56,7 @@ pub async fn create_subscription_handler(
         return Err(WebhookError::Forbidden);
     }
     let tenant_id = extract_tenant_id(&claims)?;
-    let actor_id = Uuid::parse_str(&claims.sub).ok();
+    let actor_id = Some(extract_user_id(&claims)?);
 
     request
         .validate()
@@ -221,4 +225,18 @@ pub async fn list_event_types_handler() -> Json<EventTypeListResponse> {
         .collect();
 
     Json(EventTypeListResponse { event_types })
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn create_subscription_requires_actor_uuid() {
+        let src = include_str!("subscriptions.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("extract_user_id(")
+                && !production.contains("Uuid::parse_str(&claims.sub).ok()"),
+            "webhook subscription create must not drop a malformed JWT sub"
+        );
+    }
 }

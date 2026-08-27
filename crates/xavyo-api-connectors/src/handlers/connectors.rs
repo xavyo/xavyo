@@ -302,7 +302,7 @@ pub async fn activate_connector(
         return Err(ConnectorApiError::Forbidden);
     }
     let tenant_id = extract_tenant_id(&claims)?;
-    let actor_id = Uuid::parse_str(&claims.sub).ok();
+    let actor_id = Some(extract_user_id(&claims)?);
 
     state
         .connector_service
@@ -355,7 +355,7 @@ pub async fn deactivate_connector(
         return Err(ConnectorApiError::Forbidden);
     }
     let tenant_id = extract_tenant_id(&claims)?;
-    let actor_id = Uuid::parse_str(&claims.sub).ok();
+    let actor_id = Some(extract_user_id(&claims)?);
 
     state
         .connector_service
@@ -455,4 +455,25 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid> {
         .ok_or(ConnectorApiError::Validation(
             "Missing tenant_id in claims".to_string(),
         ))
+}
+
+/// JWT `sub` must be a real actor UUID for webhook/audit attribution.
+fn extract_user_id(claims: &JwtClaims) -> Result<Uuid> {
+    Uuid::parse_str(&claims.sub).map_err(|_| ConnectorApiError::Unauthorized {
+        message: "Invalid user ID in claims".to_string(),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn activate_deactivate_require_actor_uuid() {
+        let src = include_str!("connectors.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("extract_user_id(")
+                && !production.contains("Uuid::parse_str(&claims.sub).ok()"),
+            "connector activate/deactivate must not drop a malformed JWT sub"
+        );
+    }
 }
