@@ -7,9 +7,10 @@ use quick_xml::events::BytesText;
 use quick_xml::XmlVersion;
 
 /// Decode a normalized attribute value for SAML 1.0-compatible documents.
-pub fn attribute_value<'a>(attr: &'a Attribute<'_>) -> Cow<'a, str> {
+/// Invalid encoding must not become an empty string.
+pub fn attribute_value<'a>(attr: &'a Attribute<'_>) -> Result<Cow<'a, str>, String> {
     attr.normalized_value(XmlVersion::Implicit1_0)
-        .unwrap_or_default()
+        .map_err(|err| format!("invalid XML attribute encoding: {err}"))
 }
 
 /// Decode XML text. Invalid encoding must not become an empty string.
@@ -48,6 +49,20 @@ mod tests {
         assert!(
             !decode.contains("unwrap_or_default()"),
             "XML text decode must not become empty on error"
+        );
+    }
+
+    #[test]
+    fn attribute_value_does_not_default_to_empty() {
+        let src = include_str!("xml.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let attr_fn = production
+            .split("fn attribute_value")
+            .nth(1)
+            .expect("attribute_value");
+        assert!(
+            !attr_fn.contains("unwrap_or_default()"),
+            "XML attribute decode must not become empty on error"
         );
     }
 }

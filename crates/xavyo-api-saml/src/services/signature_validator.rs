@@ -324,7 +324,9 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
                     for attr in e.attributes().flatten() {
                         let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                         if let Some(prefix) = key.strip_prefix("xmlns:") {
-                            let value = crate::xml::attribute_value(&attr).to_string();
+                            let value = crate::xml::attribute_value(&attr)
+                                .map_err(SamlError::SignatureValidationFailed)?
+                                .into_owned();
                             // Keep only the latest declaration per prefix
                             ancestor_namespaces.retain(|(p, _)| p != prefix);
                             ancestor_namespaces.push((prefix.to_string(), value));
@@ -340,7 +342,9 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
                     for attr in e.attributes().flatten() {
                         let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                         if key == "URI" {
-                            reference_uri = crate::xml::attribute_value(&attr).to_string();
+                            reference_uri = crate::xml::attribute_value(&attr)
+                                .map_err(SamlError::SignatureValidationFailed)?
+                                .into_owned();
                         }
                     }
                 }
@@ -358,15 +362,22 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
                     for attr in e.attributes().flatten() {
                         let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                         if key == "Algorithm" {
-                            signature_algorithm =
-                                Some(crate::xml::attribute_value(&attr).to_string());
+                            signature_algorithm = Some(
+                                crate::xml::attribute_value(&attr)
+                                    .map_err(SamlError::SignatureValidationFailed)?
+                                    .into_owned(),
+                            );
                         }
                     }
                 } else if local == "DigestMethod" {
                     for attr in e.attributes().flatten() {
                         let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                         if key == "Algorithm" {
-                            digest_algorithm = Some(crate::xml::attribute_value(&attr).to_string());
+                            digest_algorithm = Some(
+                                crate::xml::attribute_value(&attr)
+                                    .map_err(SamlError::SignatureValidationFailed)?
+                                    .into_owned(),
+                            );
                         }
                     }
                 }
@@ -524,7 +535,8 @@ fn extract_element_by_id(xml: &str, element_id: &str) -> SamlResult<String> {
                         // Case-insensitive matching would find non-SAML elements with lowercase
                         // "id" attributes, enabling an XSW variant attack.
                         if key == "ID" {
-                            let val = crate::xml::attribute_value(&attr);
+                            let val = crate::xml::attribute_value(&attr)
+                                .map_err(SamlError::SignatureValidationFailed)?;
                             if val.as_ref() == element_id {
                                 capturing = true;
                                 depth = 1;
@@ -560,7 +572,8 @@ fn extract_element_by_id(xml: &str, element_id: &str) -> SamlResult<String> {
                 for attr in e.attributes().flatten() {
                     let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                     if key == "ID" {
-                        let val = crate::xml::attribute_value(&attr);
+                        let val = crate::xml::attribute_value(&attr)
+                            .map_err(SamlError::SignatureValidationFailed)?;
                         if val.as_ref() == element_id {
                             let end_offset = reader.buffer_position() as usize;
                             return Ok(xml
@@ -789,6 +802,18 @@ t6Rp
             production.contains("decode_xml_text(")
                 && !production.contains("e.decode().unwrap_or_default()"),
             "SAML signature/digest text must not become empty on decode failure"
+        );
+    }
+
+    #[test]
+    fn signature_attributes_do_not_default_to_empty_on_decode_error() {
+        let src = include_str!("signature_validator.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("attribute_value(&attr)")
+                && production.contains("map_err(SamlError::SignatureValidationFailed)")
+                && !production.contains("attribute_value(&attr).to_string()"),
+            "SAML signature attributes must not become empty on decode failure"
         );
     }
 }

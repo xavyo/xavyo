@@ -253,25 +253,40 @@ pub struct ListAuditQuery {
     pub offset: i64,
 }
 
-impl From<ListAuditQuery> for PolicyAuditFilter {
-    fn from(query: ListAuditQuery) -> Self {
-        Self {
+impl TryFrom<ListAuditQuery> for PolicyAuditFilter {
+    type Error = String;
+
+    fn try_from(query: ListAuditQuery) -> Result<Self, Self::Error> {
+        Ok(Self {
             policy_id: query.policy_id,
             actor_id: query.actor_id,
-            action: query.action.and_then(|s| match s.as_str() {
-                "created" => Some(PolicyAuditAction::Created),
-                "updated" => Some(PolicyAuditAction::Updated),
-                "deleted" => Some(PolicyAuditAction::Deleted),
-                "condition_added" => Some(PolicyAuditAction::ConditionAdded),
-                "condition_removed" => Some(PolicyAuditAction::ConditionRemoved),
-                "status_changed" => Some(PolicyAuditAction::StatusChanged),
-                _ => None,
-            }),
+            action: parse_optional_policy_audit_action(query.action.as_deref())?,
             from_date: query.from_date,
             to_date: query.to_date,
             limit: Some(query.limit.clamp(1, 1000) as usize),
             offset: Some(query.offset.max(0) as usize),
-        }
+        })
+    }
+}
+
+/// Invalid action filters must not silently list every policy audit event.
+fn parse_optional_policy_audit_action(
+    action: Option<&str>,
+) -> Result<Option<PolicyAuditAction>, String> {
+    match action {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) => match s {
+            "created" => Ok(Some(PolicyAuditAction::Created)),
+            "updated" => Ok(Some(PolicyAuditAction::Updated)),
+            "deleted" => Ok(Some(PolicyAuditAction::Deleted)),
+            "condition_added" => Ok(Some(PolicyAuditAction::ConditionAdded)),
+            "condition_removed" => Ok(Some(PolicyAuditAction::ConditionRemoved)),
+            "status_changed" => Ok(Some(PolicyAuditAction::StatusChanged)),
+            other => Err(format!(
+                "Invalid policy audit action '{other}'. Must be one of: created, updated, deleted, condition_added, condition_removed, status_changed"
+            )),
+        },
     }
 }
 
@@ -316,7 +331,7 @@ mod tests {
             offset: 10,
         };
 
-        let filter: PolicyAuditFilter = query.into();
+        let filter: PolicyAuditFilter = query.try_into().expect("valid action");
         assert_eq!(filter.action, Some(PolicyAuditAction::Updated));
         assert_eq!(filter.limit, Some(50));
         assert_eq!(filter.offset, Some(10));
@@ -334,7 +349,27 @@ mod tests {
             offset: 0,
         };
 
-        let filter: PolicyAuditFilter = query.into();
+        let filter: PolicyAuditFilter = query.try_into().expect("valid query");
         assert_eq!(filter.limit, Some(1000)); // Capped at 1000
+    }
+
+    #[test]
+    fn invalid_policy_audit_action_does_not_list_all_events() {
+        let query = ListAuditQuery {
+            policy_id: None,
+            actor_id: None,
+            action: Some("bogus".to_string()),
+            from_date: None,
+            to_date: None,
+            limit: 50,
+            offset: 0,
+        };
+        assert!(PolicyAuditFilter::try_from(query).is_err());
+        assert!(parse_optional_policy_audit_action(Some("bogus")).is_err());
+        assert_eq!(parse_optional_policy_audit_action(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_policy_audit_action(Some("created")).unwrap(),
+            Some(PolicyAuditAction::Created)
+        );
     }
 }
