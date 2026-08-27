@@ -2,7 +2,7 @@
 //!
 //! Provides functions to encode and decode JWT tokens using RSA and EC keys.
 
-use crate::claims::JwtClaims;
+use crate::claims::{jwt_subject_is_usable, JwtClaims};
 use crate::error::AuthError;
 use jsonwebtoken::{
     decode, encode, Algorithm, DecodingKey, EncodingKey, Header, TokenData, Validation,
@@ -92,6 +92,9 @@ impl ValidationConfig {
 /// let token = encode_token(&claims, private_key_pem)?;
 /// ```
 pub fn encode_token(claims: &JwtClaims, private_key_pem: &[u8]) -> Result<String, AuthError> {
+    if !jwt_subject_is_usable(&claims.sub) {
+        return Err(AuthError::MissingClaim("sub".into()));
+    }
     let key = EncodingKey::from_rsa_pem(private_key_pem)
         .map_err(|e| AuthError::InvalidKey(format!("Invalid private key: {e}")))?;
 
@@ -119,6 +122,9 @@ pub fn encode_token_with_kid(
     private_key_pem: &[u8],
     kid: &str,
 ) -> Result<String, AuthError> {
+    if !jwt_subject_is_usable(&claims.sub) {
+        return Err(AuthError::MissingClaim("sub".into()));
+    }
     let key = EncodingKey::from_rsa_pem(private_key_pem)
         .map_err(|e| AuthError::InvalidKey(format!("Invalid private key: {e}")))?;
 
@@ -574,5 +580,15 @@ pwIDAQAB
         assert_eq!(decoded.tid, original.tid);
         assert_eq!(decoded.roles, original.roles);
         assert_eq!(decoded.jti, original.jti);
+    }
+
+    #[test]
+    fn encode_token_rejects_empty_subject() {
+        let claims = JwtClaims::builder().build();
+        assert!(claims.sub.is_empty());
+        let err = encode_token(&claims, TEST_PRIVATE_KEY).unwrap_err();
+        assert!(matches!(err, AuthError::MissingClaim(ref c) if c == "sub"));
+        let err = encode_token_with_kid(&claims, TEST_PRIVATE_KEY, "k1").unwrap_err();
+        assert!(matches!(err, AuthError::MissingClaim(ref c) if c == "sub"));
     }
 }

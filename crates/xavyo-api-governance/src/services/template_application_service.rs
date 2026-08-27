@@ -414,7 +414,7 @@ impl TemplateApplicationService {
     ) -> Result<()> {
         for (_template_id, rule) in rules {
             // Check condition if present
-            if !self.evaluate_condition(&rule.condition, data)? {
+            if !self.evaluate_condition(rule.id, &rule.condition, data)? {
                 continue;
             }
 
@@ -439,7 +439,7 @@ impl TemplateApplicationService {
 
             if should_apply {
                 // Evaluate the expression
-                let value = self.evaluate_expression(&rule.expression, data)?;
+                let value = self.evaluate_expression(rule.id, &rule.expression, data)?;
 
                 // Set the value
                 if let Some(obj) = data.as_object_mut() {
@@ -487,13 +487,13 @@ impl TemplateApplicationService {
                 }
 
                 // Check condition if present
-                if !self.evaluate_condition(&rule.condition, data)? {
+                if !self.evaluate_condition(rule.id, &rule.condition, data)? {
                     computed.insert(rule.id);
                     continue;
                 }
 
                 // Try to evaluate the expression
-                match self.evaluate_expression(&rule.expression, data) {
+                match self.evaluate_expression(rule.id, &rule.expression, data) {
                     Ok(value) => {
                         let target = &rule.target_attribute;
 
@@ -555,7 +555,7 @@ impl TemplateApplicationService {
     ) -> Result<()> {
         for (_template_id, rule) in rules {
             // Check condition if present
-            if !self.evaluate_condition(&rule.condition, data)? {
+            if !self.evaluate_condition(rule.id, &rule.condition, data)? {
                 continue;
             }
 
@@ -567,7 +567,7 @@ impl TemplateApplicationService {
             }
 
             // Evaluate the normalization expression
-            match self.evaluate_expression(&rule.expression, data) {
+            match self.evaluate_expression(rule.id, &rule.expression, data) {
                 Ok(value) => {
                     if let Some(obj) = data.as_object_mut() {
                         obj.insert(target.clone(), value);
@@ -596,12 +596,12 @@ impl TemplateApplicationService {
 
         for (template_id, rule) in rules {
             // Check condition if present
-            if !self.evaluate_condition(&rule.condition, data)? {
+            if !self.evaluate_condition(rule.id, &rule.condition, data)? {
                 continue;
             }
 
             // Evaluate the validation expression
-            match self.evaluate_expression(&rule.expression, data) {
+            match self.evaluate_expression(rule.id, &rule.expression, data) {
                 Ok(result) => {
                     // Validation passes if result is truthy
                     let passes = match result {
@@ -646,13 +646,18 @@ impl TemplateApplicationService {
     // =========================================================================
 
     /// Evaluate a condition expression.
-    fn evaluate_condition(&self, condition: &Option<String>, data: &JsonValue) -> Result<bool> {
+    fn evaluate_condition(
+        &self,
+        rule_id: Uuid,
+        condition: &Option<String>,
+        data: &JsonValue,
+    ) -> Result<bool> {
         match condition {
             None => Ok(true), // No condition means always apply
             Some(expr) => {
                 let parsed = self.expression_service.parse(expr).map_err(|e| {
                     GovernanceError::TemplateRuleExpressionError {
-                        rule_id: Uuid::nil(),
+                        rule_id,
                         message: format!("Invalid condition: {e}"),
                     }
                 })?;
@@ -662,7 +667,7 @@ impl TemplateApplicationService {
                     .expression_service
                     .evaluate(&parsed, &context)
                     .map_err(|e| GovernanceError::TemplateRuleExpressionError {
-                        rule_id: Uuid::nil(),
+                        rule_id,
                         message: format!("Condition evaluation error: {e}"),
                     })?;
 
@@ -670,7 +675,7 @@ impl TemplateApplicationService {
                     JsonValue::Bool(b) => Ok(b),
                     JsonValue::Null => Ok(false),
                     _ => Err(GovernanceError::TemplateRuleExpressionError {
-                        rule_id: Uuid::nil(),
+                        rule_id,
                         message: "Condition must evaluate to boolean".to_string(),
                     }),
                 }
@@ -679,10 +684,15 @@ impl TemplateApplicationService {
     }
 
     /// Evaluate an expression and return the result.
-    fn evaluate_expression(&self, expression: &str, data: &JsonValue) -> Result<JsonValue> {
+    fn evaluate_expression(
+        &self,
+        rule_id: Uuid,
+        expression: &str,
+        data: &JsonValue,
+    ) -> Result<JsonValue> {
         let parsed = self.expression_service.parse(expression).map_err(|e| {
             GovernanceError::TemplateRuleExpressionError {
-                rule_id: Uuid::nil(),
+                rule_id,
                 message: format!("Invalid expression: {e}"),
             }
         })?;
@@ -691,7 +701,7 @@ impl TemplateApplicationService {
         self.expression_service
             .evaluate(&parsed, &context)
             .map_err(|e| GovernanceError::TemplateRuleExpressionError {
-                rule_id: Uuid::nil(),
+                rule_id,
                 message: e.to_string(),
             })
     }
@@ -825,6 +835,21 @@ mod tests {
             production.contains("template_app_json(")
                 && !production.contains("to_value(&result.validation_errors).unwrap_or_default()"),
             "template application persist must fail closed on JSON serialize"
+        );
+    }
+
+    #[test]
+    fn template_application_errors_include_rule_id() {
+        let src = include_str!("template_application_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("evaluate_condition(rule.id,")
+                && production.contains("evaluate_expression(rule.id,"),
+            "evaluate_condition/expression must pass the rule id"
+        );
+        assert!(
+            !production.contains("Uuid::nil()"),
+            "template application errors must not use Uuid::nil as rule_id"
         );
     }
 }

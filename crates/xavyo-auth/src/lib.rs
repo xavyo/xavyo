@@ -53,7 +53,9 @@ pub mod rar;
 pub mod step_up;
 
 // Re-export public API
-pub use claims::{ActorClaim, JwtClaims, JwtClaimsBuilder};
+pub use claims::{
+    jwt_subject_is_usable, required_jwt_subject, ActorClaim, JwtClaims, JwtClaimsBuilder,
+};
 pub use client_assertion::{
     validate_client_assertion, ClientAssertionError, ValidatedClientAssertion,
     CLIENT_ASSERTION_TYPE_JWT_BEARER,

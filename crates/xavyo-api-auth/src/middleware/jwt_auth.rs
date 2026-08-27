@@ -420,6 +420,10 @@ pub async fn jwt_auth_middleware(
     // Extract user ID from sub claim
     // For client_credentials tokens, sub is the client_id (not a UUID)
     // In that case, we mark it as a service account token
+    if !jwt_sub_usable(&claims.sub) {
+        tracing::warn!("Rejected token with empty subject");
+        return Err((StatusCode::UNAUTHORIZED, "Invalid token claims").into_response());
+    }
     let (user_uuid, is_service_account) = match service_account_user_id(&claims.sub) {
         (id, true) => {
             tracing::debug!(
@@ -498,6 +502,12 @@ pub async fn jwt_auth_middleware(
     request.extensions_mut().insert(user_agent); // User agent for audit
 
     Ok(next.run(request).await)
+}
+
+/// Empty JWT subjects must not be hashed into a service-account identity.
+#[must_use]
+pub(crate) fn jwt_sub_usable(sub: &str) -> bool {
+    !sub.is_empty()
 }
 
 /// Map JWT `sub` to a user UUID.
@@ -700,6 +710,18 @@ mod tests {
         assert!(
             !production.contains("unwrap_or(false)"),
             "must not treat sentinel query errors as not-revoked"
+        );
+    }
+
+    #[test]
+    fn empty_jwt_sub_is_not_usable() {
+        assert!(!jwt_sub_usable(""));
+        assert!(jwt_sub_usable("user-123"));
+        let src = include_str!("jwt_auth.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("jwt_sub_usable("),
+            "empty JWT sub must not be hashed into a service-account identity"
         );
     }
 

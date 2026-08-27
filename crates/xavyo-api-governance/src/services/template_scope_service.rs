@@ -277,10 +277,7 @@ impl TemplateScopeService {
         let result = self
             .expression_service
             .evaluate(&expr, &attributes)
-            .map_err(|e| GovernanceError::TemplateRuleExpressionError {
-                rule_id: Uuid::nil(),
-                message: e.to_string(),
-            })?;
+            .map_err(|e| GovernanceError::TemplateScopeConditionError(e.to_string()))?;
 
         // Convert result to boolean
         match result {
@@ -574,10 +571,7 @@ mod tests {
             let result = self
                 .expression_service
                 .evaluate(&expr, &attributes)
-                .map_err(|e| GovernanceError::TemplateRuleExpressionError {
-                    rule_id: Uuid::nil(),
-                    message: e.to_string(),
-                })?;
+                .map_err(|e| GovernanceError::TemplateScopeConditionError(e.to_string()))?;
 
             match result {
                 JsonValue::Bool(b) => Ok(b),
@@ -774,6 +768,14 @@ mod tests {
             production.contains("template_scope_json(")
                 && !production.contains("to_value(&scope).unwrap_or_default()"),
             "template scope persist must fail closed on JSON serialize"
+        );
+        assert!(
+            !production.contains("Uuid::nil()"),
+            "template scope errors must not use Uuid::nil as a rule id"
+        );
+        assert!(
+            production.contains("TemplateScopeConditionError("),
+            "scope evaluation errors must use TemplateScopeConditionError"
         );
     }
 }
