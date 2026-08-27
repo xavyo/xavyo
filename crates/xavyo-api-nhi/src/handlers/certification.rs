@@ -171,15 +171,11 @@ pub async fn list_campaigns(
     let limit = query.limit.unwrap_or(20).clamp(1, 100);
     let offset = query.offset.unwrap_or(0).max(0);
 
-    let campaigns = NhiCertificationCampaign::list_by_tenant(
-        &state.pool,
-        tenant_uuid,
-        query.status.as_deref(),
-        limit,
-        offset,
-    )
-    .await
-    .map_err(NhiApiError::Database)?;
+    let status = parse_optional_campaign_status(query.status.as_deref())?;
+    let campaigns =
+        NhiCertificationCampaign::list_by_tenant(&state.pool, tenant_uuid, status, limit, offset)
+            .await
+            .map_err(NhiApiError::Database)?;
 
     Ok(Json(campaigns))
 }
@@ -371,6 +367,18 @@ fn campaign_allows_nhi(
     }
 }
 
+/// Invalid campaign status filters must not silently list every campaign.
+fn parse_optional_campaign_status(status: Option<&str>) -> Result<Option<&str>, NhiApiError> {
+    match status {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "active" | "completed" | "cancelled") => Ok(Some(s)),
+        Some(s) => Err(NhiApiError::ValidationError(format!(
+            "Invalid campaign status '{s}'. Must be one of: active, completed, cancelled"
+        ))),
+    }
+}
+
 /// Creates the certification routes sub-router.
 ///
 /// Routes:
@@ -403,6 +411,23 @@ mod tests {
             production.contains("fn campaign_allows_nhi")
                 && !production.contains("_ => {} // \"all\" or any other scope"),
             "unknown NHI campaign scopes must not skip membership checks"
+        );
+    }
+
+    #[test]
+    fn invalid_campaign_status_does_not_list_all_campaigns() {
+        assert_eq!(super::parse_optional_campaign_status(None).unwrap(), None);
+        assert_eq!(
+            super::parse_optional_campaign_status(Some("active")).unwrap(),
+            Some("active")
+        );
+        assert!(super::parse_optional_campaign_status(Some("bogus")).is_err());
+        let src = include_str!("certification.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_campaign_status(")
+                && !production.contains("query.status.as_deref(),"),
+            "invalid NHI campaign status must be 400, not an unfiltered list"
         );
     }
 }

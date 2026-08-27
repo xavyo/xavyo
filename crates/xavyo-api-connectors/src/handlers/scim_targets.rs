@@ -100,9 +100,10 @@ pub async fn list_scim_targets(
     let tenant_id = extract_tenant_id(&claims)?;
     let limit = query.limit.clamp(1, 100);
     let offset = query.offset.max(0);
+    let status = parse_optional_scim_target_status(query.status.as_deref())?;
     let response = state
         .scim_target_service
-        .list_targets(tenant_id, query.status.as_deref(), limit, offset)
+        .list_targets(tenant_id, status, limit, offset)
         .await?;
     Ok(Json(response))
 }
@@ -224,4 +225,38 @@ pub async fn health_check_scim_target(
         .health_check(tenant_id, target_id)
         .await?;
     Ok(Json(result))
+}
+
+/// Invalid SCIM target status filters must not silently list every target.
+fn parse_optional_scim_target_status(status: Option<&str>) -> Result<Option<&str>> {
+    match status {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "active" | "disabled" | "unreachable") => Ok(Some(s)),
+        Some(s) => Err(ConnectorApiError::Validation(format!(
+            "Invalid SCIM target status '{s}'. Must be one of: active, disabled, unreachable"
+        ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_scim_target_status_does_not_list_all_targets() {
+        assert_eq!(parse_optional_scim_target_status(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_scim_target_status(Some("active")).unwrap(),
+            Some("active")
+        );
+        assert!(parse_optional_scim_target_status(Some("bogus")).is_err());
+        let src = include_str!("scim_targets.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_scim_target_status(")
+                && !production.contains("query.status.as_deref(), limit, offset"),
+            "invalid SCIM target status must be 400, not an unfiltered list"
+        );
+    }
 }

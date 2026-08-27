@@ -115,6 +115,10 @@ pub enum ImportError {
     #[error("Unauthorized")]
     Unauthorized,
 
+    /// Query validation error.
+    #[error("Validation error: {0}")]
+    Validation(String),
+
     /// Internal server error.
     #[error("Internal server error: {0}")]
     Internal(String),
@@ -216,6 +220,13 @@ impl ImportError {
                     .with_detail("Authentication required.")
             }
 
+            ImportError::Validation(msg) => ProblemDetails::new(
+                "validation-error",
+                "Validation Error",
+                StatusCode::BAD_REQUEST,
+            )
+            .with_detail(msg.clone()),
+
             ImportError::Internal(msg) => {
                 tracing::error!(error = %msg, "Internal import error");
                 ProblemDetails::new(
@@ -256,6 +267,7 @@ impl ImportError {
             ImportError::TokenAlreadyUsed => StatusCode::GONE,
             ImportError::PasswordPolicyViolation(_) => StatusCode::BAD_REQUEST,
             ImportError::Unauthorized => StatusCode::UNAUTHORIZED,
+            ImportError::Validation(_) => StatusCode::BAD_REQUEST,
             ImportError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ImportError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }

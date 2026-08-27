@@ -23,6 +23,20 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, WebhookError> {
         .ok_or(WebhookError::Unauthorized)
 }
 
+/// Invalid delivery status filters must not silently list every attempt.
+fn parse_optional_delivery_status(status: Option<&str>) -> Result<Option<&str>, WebhookError> {
+    match status {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "pending" | "success" | "failed" | "timeout" | "abandoned") => {
+            Ok(Some(s))
+        }
+        Some(s) => Err(WebhookError::Validation(format!(
+            "Invalid delivery status '{s}'. Must be one of: pending, success, failed, timeout, abandoned"
+        ))),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Delivery history handlers
 // ---------------------------------------------------------------------------
@@ -59,7 +73,7 @@ pub async fn list_deliveries_handler(
 
     let limit = query.limit.clamp(1, 100);
     let offset = query.offset.max(0);
-    let status = query.status.as_deref();
+    let status = parse_optional_delivery_status(query.status.as_deref())?;
 
     let deliveries = WebhookDelivery::list_by_subscription(
         state.pool(),
@@ -165,5 +179,27 @@ fn delivery_to_detail_response(d: WebhookDelivery) -> WebhookDeliveryDetailRespo
         latency_ms: d.latency_ms,
         created_at: d.created_at,
         completed_at: d.completed_at,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_delivery_status_does_not_list_all_attempts() {
+        assert_eq!(parse_optional_delivery_status(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_delivery_status(Some("pending")).unwrap(),
+            Some("pending")
+        );
+        assert!(parse_optional_delivery_status(Some("bogus")).is_err());
+        let src = include_str!("deliveries.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_delivery_status(")
+                && !production.contains("let status = query.status.as_deref();"),
+            "invalid webhook delivery status must be 400, not an unfiltered list"
+        );
     }
 }
