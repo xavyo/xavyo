@@ -22,6 +22,34 @@ use xavyo_connector::types::ConnectorType;
 use crate::config::{HttpMethod, PaginationStyle, RestConfig};
 use crate::rate_limit::{parse_retry_after, RateLimiter};
 
+/// Extract list results from a REST JSON body.
+///
+/// When `results_path` is configured, a missing or non-array value must not
+/// become an empty success list.
+fn extract_json_results(body: &Value, results_path: Option<&str>) -> ConnectorResult<Vec<Value>> {
+    match results_path {
+        Some(path) => {
+            let pointer = format!("/{}", path.replace('.', "/"));
+            match body.pointer(&pointer) {
+                None | Some(Value::Null) => Err(ConnectorError::operation_failed(format!(
+                    "response missing results array at '{path}'"
+                ))),
+                Some(Value::Array(arr)) => Ok(arr.clone()),
+                Some(_) => Err(ConnectorError::operation_failed(format!(
+                    "response field '{path}' must be a JSON array"
+                ))),
+            }
+        }
+        None => match body {
+            Value::Array(arr) => Ok(arr.clone()),
+            Value::Null => Err(ConnectorError::operation_failed(
+                "search response body is null",
+            )),
+            other => Ok(vec![other.clone()]),
+        },
+    }
+}
+
 /// REST Connector for provisioning to REST APIs.
 pub struct RestConnector {
     /// Configuration.
@@ -418,20 +446,11 @@ impl RestConnector {
     }
 
     /// Parse JSON response and extract results.
-    fn extract_results(&self, body: &Value) -> Vec<Value> {
-        if let Some(ref path) = self.config.response.results_path {
-            // Extract from nested path
-            body.pointer(&format!("/{}", path.replace('.', "/")))
-                .and_then(|v| v.as_array())
-                .cloned()
-                .unwrap_or_default()
-        } else if let Some(arr) = body.as_array() {
-            // Response is already an array
-            arr.clone()
-        } else {
-            // Single object response
-            vec![body.clone()]
-        }
+    ///
+    /// A configured `results_path` that is missing or not an array must not
+    /// look like a successful empty listing.
+    fn extract_results(&self, body: &Value) -> ConnectorResult<Vec<Value>> {
+        extract_json_results(body, self.config.response.results_path.as_deref())
     }
 
     /// Extract total count from response.
@@ -1356,7 +1375,7 @@ impl SearchOp for RestConnector {
         })?;
 
         // Extract results
-        let results = self.extract_results(&response_body);
+        let results = self.extract_results(&response_body)?;
         let total_count = self.extract_total_count(&response_body);
         let next_cursor = self.extract_next_cursor(&response_body);
 
@@ -1570,7 +1589,7 @@ mod tests {
             "total": 2
         });
 
-        let results = connector.extract_results(&body);
+        let results = connector.extract_results(&body).unwrap();
         assert_eq!(results.len(), 2);
     }
 
@@ -1584,8 +1603,24 @@ mod tests {
             {"id": "2", "name": "User 2"}
         ]);
 
-        let results = connector.extract_results(&body);
+        let results = connector.extract_results(&body).unwrap();
         assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn extract_results_does_not_fake_empty_list() {
+        let missing = extract_json_results(&serde_json::json!({"total": 2}), Some("data"));
+        assert!(missing.is_err());
+        let not_array =
+            extract_json_results(&serde_json::json!({"data": {"id": "1"}}), Some("data"));
+        assert!(not_array.is_err());
+        let src = include_str!("connector.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("extract_json_results(")
+                && !production.contains(".cloned()\n                .unwrap_or_default()"),
+            "REST search must not treat a missing results_path as an empty listing"
+        );
     }
 
     // =========================================================================
