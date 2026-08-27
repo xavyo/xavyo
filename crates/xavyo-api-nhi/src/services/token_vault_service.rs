@@ -162,10 +162,7 @@ impl TokenVaultService {
         .ok_or(NhiApiError::NotFound)?;
 
         let now = Utc::now();
-        let is_expired = token
-            .access_token_expires_at
-            .map(|exp| exp <= now)
-            .unwrap_or(false);
+        let is_expired = access_token_is_expired(token.access_token_expires_at, now);
 
         if is_expired {
             // Try auto-refresh
@@ -237,9 +234,9 @@ impl TokenVaultService {
                             nhi_id = %nhi_id,
                             user_id = %user_id,
                             error = %e,
-                            "auto-refresh failed, returning expired token"
+                            "auto-refresh failed"
                         );
-                        // Fall through to return the expired token
+                        return expired_token_not_returned(Err(e));
                     }
                 }
             } else {
@@ -248,10 +245,13 @@ impl TokenVaultService {
                     nhi_id = %nhi_id,
                     "token expired but no refresh token or endpoint available"
                 );
+                return Err(NhiApiError::BadGateway(
+                    "token expired and cannot be refreshed".into(),
+                ));
             }
         }
 
-        // Decrypt and return the (possibly expired) access token
+        // Decrypt and return a non-expired access token.
         let mut decrypted = self
             .crypto
             .decrypt(
@@ -340,6 +340,20 @@ fn crypto_err(e: VaultCryptoError) -> NhiApiError {
     NhiApiError::Internal(format!("vault crypto error: {e}"))
 }
 
+/// Missing expiry is treated as expired so an unknown lifetime cannot be
+/// handed out as a usable access token.
+pub(crate) fn access_token_is_expired(
+    expires_at: Option<chrono::DateTime<Utc>>,
+    now: chrono::DateTime<Utc>,
+) -> bool {
+    expires_at.map(|exp| exp <= now).unwrap_or(true)
+}
+
+/// Refresh or expiry failures must not fall through to the expired token.
+pub(crate) fn expired_token_not_returned<T, E>(result: Result<T, E>) -> Result<T, E> {
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -382,5 +396,39 @@ mod tests {
             rt.zeroize();
             assert!(rt.iter().all(|&b| b == 0));
         }
+    }
+
+    #[test]
+    fn missing_expiry_is_treated_as_expired() {
+        let now = Utc::now();
+        assert!(access_token_is_expired(None, now));
+        assert!(access_token_is_expired(
+            Some(now - chrono::Duration::seconds(1)),
+            now
+        ));
+        assert!(!access_token_is_expired(
+            Some(now + chrono::Duration::seconds(30)),
+            now
+        ));
+    }
+
+    #[test]
+    fn exchange_does_not_return_expired_token_on_refresh_failure() {
+        assert!(expired_token_not_returned(Ok::<(), &str>(())).is_ok());
+        assert!(expired_token_not_returned::<(), &str>(Err("refresh")).is_err());
+
+        let src = include_str!("token_vault_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("access_token_is_expired(")
+                && production.contains("expired_token_not_returned(")
+                && production.contains("token expired and cannot be refreshed"),
+            "exchange must fail closed when the token is expired"
+        );
+        assert!(
+            !production.contains("returning expired token")
+                && !production.contains("unwrap_or(false)"),
+            "must not hand out an expired or unexpiring token"
+        );
     }
 }

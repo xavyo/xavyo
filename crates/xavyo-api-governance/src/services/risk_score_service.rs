@@ -48,7 +48,7 @@ impl RiskScoreService {
             .map_err(GovernanceError::Database)?
             .ok_or(GovernanceError::RiskScoreNotFound(user_id))?;
 
-        Ok(RiskScoreResponse::from(score))
+        RiskScoreResponse::try_from(score)
     }
 
     /// Calculate and store the risk score for a user.
@@ -392,7 +392,7 @@ impl RiskScoreService {
 
         let score = GovRiskScore::upsert(&self.pool, tenant_id, input).await?;
 
-        Ok(RiskScoreResponse::from(score))
+        RiskScoreResponse::try_from(score)
     }
 
     /// List risk scores with filtering and pagination.
@@ -426,7 +426,10 @@ impl RiskScoreService {
                 .await?;
         let total = GovRiskScore::count_by_tenant(&self.pool, tenant_id, &filter).await?;
 
-        let items: Vec<RiskScoreResponse> = scores.into_iter().map(Into::into).collect();
+        let items: Vec<RiskScoreResponse> = scores
+            .into_iter()
+            .map(RiskScoreResponse::try_from)
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(RiskScoreListResponse {
             items,

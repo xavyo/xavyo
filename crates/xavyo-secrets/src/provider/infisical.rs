@@ -363,7 +363,7 @@ impl DynamicSecretProvider for InfisicalSecretProvider {
             .and_then(|v| v.as_str())
             .map(std::string::ToString::to_string);
 
-        let credentials = lease.get("data").cloned().unwrap_or(serde_json::json!({}));
+        let credentials = infisical_lease_data(lease, &secret_name)?;
 
         let ttl = lease
             .get("ttl")
@@ -458,6 +458,20 @@ impl DynamicSecretProvider for InfisicalSecretProvider {
     }
 }
 
+/// Lease credential payload. Missing `data` must not look like empty credentials.
+pub(crate) fn infisical_lease_data(
+    lease: &serde_json::Value,
+    secret_name: &str,
+) -> Result<serde_json::Value, SecretError> {
+    lease
+        .get("data")
+        .cloned()
+        .ok_or_else(|| SecretError::InvalidValue {
+            name: secret_name.to_string(),
+            detail: "Missing 'data' in Infisical lease".to_string(),
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -510,5 +524,24 @@ mod tests {
             token: "token".to_string(),
         };
         matches!(machine, InfisicalAuthMethod::MachineIdentity { .. });
+    }
+
+    #[test]
+    fn lease_without_data_is_not_empty_credentials() {
+        let lease = serde_json::json!({ "id": "lease-1", "ttl": 60 });
+        assert!(infisical_lease_data(&lease, "postgres").is_err());
+        let with_data = serde_json::json!({ "data": { "username": "u" } });
+        assert_eq!(
+            infisical_lease_data(&with_data, "postgres").unwrap()["username"],
+            "u"
+        );
+
+        let src = include_str!("infisical.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("infisical_lease_data(")
+                && !production.contains("unwrap_or(serde_json::json!({}))"),
+            "dynamic credentials must fail closed when lease data is missing"
+        );
     }
 }
