@@ -307,7 +307,8 @@ pub async fn revoke_assignment(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
-    let actor_id = Uuid::parse_str(&claims.sub).ok();
+    let actor_id =
+        Some(Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?);
 
     // F063: Get assignment details before revoking for persona audit
     let assignment = state
@@ -374,6 +375,10 @@ mod tests {
             production.contains("maybe_log_persona_entitlement_audit")
                 && production.contains(".await?;"),
             "persona audit must propagate lookup and write errors"
+        );
+        assert!(
+            !production.contains("Uuid::parse_str(&claims.sub).ok()"),
+            "assignment revoke must not drop a malformed JWT sub"
         );
     }
 }

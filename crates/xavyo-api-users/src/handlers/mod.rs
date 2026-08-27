@@ -1,5 +1,14 @@
 //! HTTP handlers for the User Management API.
 
+use crate::error::ApiUsersError;
+use uuid::Uuid;
+use xavyo_auth::JwtClaims;
+
+/// JWT `sub` must be a real actor UUID for audit/webhook attribution.
+pub(crate) fn extract_user_id(claims: &JwtClaims) -> Result<Uuid, ApiUsersError> {
+    Uuid::parse_str(&claims.sub).map_err(|_| ApiUsersError::Unauthorized)
+}
+
 pub mod attribute_audit;
 pub mod attribute_definitions;
 pub mod create;
