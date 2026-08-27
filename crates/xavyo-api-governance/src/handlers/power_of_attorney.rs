@@ -135,17 +135,7 @@ pub async fn list_poa(
     let limit = query.limit.unwrap_or(50).min(100);
     let offset = query.offset.unwrap_or(0).max(0);
 
-    // Parse status string to PoaStatus
-    let status = query
-        .status
-        .as_deref()
-        .and_then(|s| match s.to_lowercase().as_str() {
-            "pending" => Some(PoaStatus::Pending),
-            "active" => Some(PoaStatus::Active),
-            "expired" => Some(PoaStatus::Expired),
-            "revoked" => Some(PoaStatus::Revoked),
-            _ => None,
-        });
+    let status = parse_optional_poa_status(query.status.as_deref())?;
 
     let (poas, total) = state
         .poa_service
@@ -285,16 +275,7 @@ pub async fn admin_list_poa(
     let limit = query.limit.unwrap_or(50).min(100);
     let offset = query.offset.unwrap_or(0).max(0);
 
-    let status = query
-        .status
-        .as_deref()
-        .and_then(|s| match s.to_lowercase().as_str() {
-            "pending" => Some(PoaStatus::Pending),
-            "active" => Some(PoaStatus::Active),
-            "expired" => Some(PoaStatus::Expired),
-            "revoked" => Some(PoaStatus::Revoked),
-            _ => None,
-        });
+    let status = parse_optional_poa_status(query.status.as_deref())?;
 
     let (poas, total) = state
         .poa_service
@@ -533,8 +514,11 @@ pub async fn get_poa_audit_trail(
     let limit = query.limit.unwrap_or(50).min(100);
     let offset = query.offset.unwrap_or(0).max(0);
 
-    // Parse event type filter
-    let event_type = query.event_type.as_deref().and_then(parse_event_type);
+    let event_type = query
+        .event_type
+        .as_deref()
+        .map(parse_event_type)
+        .transpose()?;
 
     let filter = PoaAuditEventFilter {
         event_type,
@@ -568,16 +552,81 @@ pub async fn get_poa_audit_trail(
     }))
 }
 
-/// Helper to parse event type string to enum.
-fn parse_event_type(s: &str) -> Option<DbPoaEventType> {
+/// Invalid PoA status filters must not silently list every grant.
+fn parse_optional_poa_status(
+    status: Option<&str>,
+) -> Result<Option<PoaStatus>, ApiGovernanceError> {
+    match status {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) => parse_poa_status(s).map(Some),
+    }
+}
+
+fn parse_poa_status(s: &str) -> Result<PoaStatus, ApiGovernanceError> {
     match s.to_lowercase().as_str() {
-        "grant_created" => Some(DbPoaEventType::GrantCreated),
-        "grant_extended" => Some(DbPoaEventType::GrantExtended),
-        "grant_revoked" => Some(DbPoaEventType::GrantRevoked),
-        "grant_expired" => Some(DbPoaEventType::GrantExpired),
-        "identity_assumed" => Some(DbPoaEventType::IdentityAssumed),
-        "identity_dropped" => Some(DbPoaEventType::IdentityDropped),
-        "action_performed" => Some(DbPoaEventType::ActionPerformed),
-        _ => None,
+        "pending" => Ok(PoaStatus::Pending),
+        "active" => Ok(PoaStatus::Active),
+        "expired" => Ok(PoaStatus::Expired),
+        "revoked" => Ok(PoaStatus::Revoked),
+        _ => Err(ApiGovernanceError::Validation(format!(
+            "Invalid PoA status '{s}'. Must be one of: pending, active, expired, revoked"
+        ))),
+    }
+}
+
+/// Invalid event-type filters must not silently list every audit event.
+fn parse_event_type(s: &str) -> Result<DbPoaEventType, ApiGovernanceError> {
+    match s.to_lowercase().as_str() {
+        "grant_created" => Ok(DbPoaEventType::GrantCreated),
+        "grant_extended" => Ok(DbPoaEventType::GrantExtended),
+        "grant_revoked" => Ok(DbPoaEventType::GrantRevoked),
+        "grant_expired" => Ok(DbPoaEventType::GrantExpired),
+        "identity_assumed" => Ok(DbPoaEventType::IdentityAssumed),
+        "identity_dropped" => Ok(DbPoaEventType::IdentityDropped),
+        "action_performed" => Ok(DbPoaEventType::ActionPerformed),
+        _ => Err(ApiGovernanceError::Validation(format!(
+            "Invalid PoA event type '{s}'. Must be one of: grant_created, grant_extended, grant_revoked, grant_expired, identity_assumed, identity_dropped, action_performed"
+        ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_poa_status_does_not_list_all_grants() {
+        assert_eq!(parse_optional_poa_status(None).unwrap(), None);
+        assert_eq!(parse_optional_poa_status(Some("")).unwrap(), None);
+        assert_eq!(
+            parse_optional_poa_status(Some("active")).unwrap(),
+            Some(PoaStatus::Active)
+        );
+        assert!(parse_optional_poa_status(Some("bogus")).is_err());
+        let src = include_str!("power_of_attorney.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_poa_status(")
+                && !production.contains("and_then(|s| match s.to_lowercase().as_str()"),
+            "invalid PoA status must be 400, not an unfiltered list"
+        );
+    }
+
+    #[test]
+    fn invalid_poa_event_type_does_not_list_all_events() {
+        assert_eq!(
+            parse_event_type("grant_created").unwrap(),
+            DbPoaEventType::GrantCreated
+        );
+        assert!(parse_event_type("bogus").is_err());
+        let src = include_str!("power_of_attorney.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("map(parse_event_type)")
+                && production.contains(".transpose()?")
+                && !production.contains("and_then(parse_event_type)"),
+            "invalid PoA event type must be 400, not an unfiltered audit list"
+        );
     }
 }

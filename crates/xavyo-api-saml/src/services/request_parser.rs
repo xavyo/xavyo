@@ -211,7 +211,8 @@ impl RequestParser {
                         "AuthnRequest" => {
                             for attr in e.attributes().flatten() {
                                 let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                                let value = crate::xml::attribute_value(&attr);
+                                let value = crate::xml::attribute_value(&attr)
+                                    .map_err(SamlError::InvalidAuthnRequest)?;
 
                                 match key {
                                     "ID" => id = Some(value.to_string()),
@@ -234,8 +235,11 @@ impl RequestParser {
                             for attr in e.attributes().flatten() {
                                 let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                                 if key == "Format" {
-                                    name_id_format =
-                                        Some(crate::xml::attribute_value(&attr).to_string());
+                                    name_id_format = Some(
+                                        crate::xml::attribute_value(&attr)
+                                            .map_err(SamlError::InvalidAuthnRequest)?
+                                            .into_owned(),
+                                    );
                                 }
                             }
                         }
@@ -411,6 +415,18 @@ mod tests {
             production.contains("decode_xml_text(")
                 && !production.contains("e.decode().unwrap_or_default()"),
             "SAML AuthnRequest issuer text must not become empty on decode failure"
+        );
+    }
+
+    #[test]
+    fn authn_request_attributes_do_not_default_to_empty_on_decode_error() {
+        let src = include_str!("request_parser.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("attribute_value(&attr)")
+                && production.contains("map_err(SamlError::InvalidAuthnRequest)")
+                && !production.contains("attribute_value(&attr).to_string()"),
+            "SAML AuthnRequest attributes must not become empty on decode failure"
         );
     }
 }

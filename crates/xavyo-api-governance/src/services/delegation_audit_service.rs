@@ -99,8 +99,16 @@ impl DelegationAuditService {
             delegation_id: params.delegation_id,
             deputy_id: params.deputy_id,
             delegator_id: params.delegator_id,
-            action_type: params.action_type.and_then(|s| parse_action_type(&s)),
-            work_item_type: params.work_item_type.and_then(|s| parse_work_item_type(&s)),
+            action_type: params
+                .action_type
+                .as_deref()
+                .map(parse_action_type)
+                .transpose()?,
+            work_item_type: params
+                .work_item_type
+                .as_deref()
+                .map(parse_work_item_type)
+                .transpose()?,
             from_date: params.from_date,
             to_date: params.to_date,
         };
@@ -199,26 +207,30 @@ impl DelegationAuditService {
     }
 }
 
-/// Parse action type string to enum.
-fn parse_action_type(s: &str) -> Option<DelegationActionType> {
+/// Invalid action-type filters must not silently list every audit record.
+fn parse_action_type(s: &str) -> Result<DelegationActionType> {
     match s.to_lowercase().as_str() {
-        "approve_request" => Some(DelegationActionType::ApproveRequest),
-        "reject_request" => Some(DelegationActionType::RejectRequest),
-        "certify_access" => Some(DelegationActionType::CertifyAccess),
-        "revoke_access" => Some(DelegationActionType::RevokeAccess),
-        "approve_transition" => Some(DelegationActionType::ApproveTransition),
-        "reject_transition" => Some(DelegationActionType::RejectTransition),
-        _ => None,
+        "approve_request" => Ok(DelegationActionType::ApproveRequest),
+        "reject_request" => Ok(DelegationActionType::RejectRequest),
+        "certify_access" => Ok(DelegationActionType::CertifyAccess),
+        "revoke_access" => Ok(DelegationActionType::RevokeAccess),
+        "approve_transition" => Ok(DelegationActionType::ApproveTransition),
+        "reject_transition" => Ok(DelegationActionType::RejectTransition),
+        other => Err(xavyo_governance::error::GovernanceError::Validation(format!(
+            "Invalid action type '{other}'. Must be one of: approve_request, reject_request, certify_access, revoke_access, approve_transition, reject_transition"
+        ))),
     }
 }
 
-/// Parse work item type string to enum.
-fn parse_work_item_type(s: &str) -> Option<WorkItemType> {
+/// Invalid work-item-type filters must not silently list every audit record.
+fn parse_work_item_type(s: &str) -> Result<WorkItemType> {
     match s.to_lowercase().as_str() {
-        "access_request" => Some(WorkItemType::AccessRequest),
-        "certification" => Some(WorkItemType::Certification),
-        "state_transition" => Some(WorkItemType::StateTransition),
-        _ => None,
+        "access_request" => Ok(WorkItemType::AccessRequest),
+        "certification" => Ok(WorkItemType::Certification),
+        "state_transition" => Ok(WorkItemType::StateTransition),
+        other => Err(xavyo_governance::error::GovernanceError::Validation(format!(
+            "Invalid work item type '{other}'. Must be one of: access_request, certification, state_transition"
+        ))),
     }
 }
 
@@ -229,35 +241,48 @@ mod tests {
     #[test]
     fn test_parse_action_type() {
         assert_eq!(
-            parse_action_type("approve_request"),
-            Some(DelegationActionType::ApproveRequest)
+            parse_action_type("approve_request").unwrap(),
+            DelegationActionType::ApproveRequest
         );
         assert_eq!(
-            parse_action_type("REJECT_REQUEST"),
-            Some(DelegationActionType::RejectRequest)
+            parse_action_type("REJECT_REQUEST").unwrap(),
+            DelegationActionType::RejectRequest
         );
         assert_eq!(
-            parse_action_type("certify_access"),
-            Some(DelegationActionType::CertifyAccess)
+            parse_action_type("certify_access").unwrap(),
+            DelegationActionType::CertifyAccess
         );
-        assert_eq!(parse_action_type("invalid"), None);
+        assert!(parse_action_type("invalid").is_err());
     }
 
     #[test]
     fn test_parse_work_item_type() {
         assert_eq!(
-            parse_work_item_type("access_request"),
-            Some(WorkItemType::AccessRequest)
+            parse_work_item_type("access_request").unwrap(),
+            WorkItemType::AccessRequest
         );
         assert_eq!(
-            parse_work_item_type("CERTIFICATION"),
-            Some(WorkItemType::Certification)
+            parse_work_item_type("CERTIFICATION").unwrap(),
+            WorkItemType::Certification
         );
         assert_eq!(
-            parse_work_item_type("state_transition"),
-            Some(WorkItemType::StateTransition)
+            parse_work_item_type("state_transition").unwrap(),
+            WorkItemType::StateTransition
         );
-        assert_eq!(parse_work_item_type("invalid"), None);
+        assert!(parse_work_item_type("invalid").is_err());
+    }
+
+    #[test]
+    fn invalid_delegation_audit_filters_do_not_list_all_records() {
+        let src = include_str!("delegation_audit_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("map(parse_action_type)")
+                && production.contains("map(parse_work_item_type)")
+                && !production.contains("and_then(|s| parse_action_type")
+                && !production.contains("and_then(|s| parse_work_item_type"),
+            "invalid delegation audit filters must not silently list every record"
+        );
     }
 
     #[test]
