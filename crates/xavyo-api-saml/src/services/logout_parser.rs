@@ -49,23 +49,31 @@ pub fn parse_logout_request_xml(xml: &str) -> SamlResult<ParsedLogoutRequest> {
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref e)) | Ok(Event::Empty(ref e)) => {
-                let local = String::from_utf8_lossy(e.local_name().into_inner()).to_string();
+                let local = crate::xml::decode_xml_name(e.local_name().into_inner())
+                    .map_err(SamlError::InvalidLogoutRequest)?
+                    .to_string();
                 current_element = local.clone();
 
                 if local == "LogoutRequest" {
                     for attr in e.attributes().flatten() {
-                        let key =
-                            String::from_utf8_lossy(attr.key.local_name().into_inner()).to_string();
+                        let key = crate::xml::decode_xml_name(attr.key.local_name().into_inner())
+                            .map_err(SamlError::InvalidLogoutRequest)?;
                         if key == "ID" {
-                            id = Some(String::from_utf8_lossy(&attr.value).to_string());
+                            id = Some(
+                                crate::xml::attribute_value(&attr)
+                                    .map_err(SamlError::InvalidLogoutRequest)?
+                                    .into_owned(),
+                            );
                         }
                     }
                 } else if local == "NameID" {
                     for attr in e.attributes().flatten() {
-                        let key =
-                            String::from_utf8_lossy(attr.key.local_name().into_inner()).to_string();
+                        let key = crate::xml::decode_xml_name(attr.key.local_name().into_inner())
+                            .map_err(SamlError::InvalidLogoutRequest)?;
                         if key == "Format" {
-                            name_id_format = String::from_utf8_lossy(&attr.value).to_string();
+                            name_id_format = crate::xml::attribute_value(&attr)
+                                .map_err(SamlError::InvalidLogoutRequest)?
+                                .into_owned();
                         }
                     }
                 }
@@ -197,6 +205,16 @@ mod tests {
             production.contains("decode_xml_text(")
                 && !production.contains("e.decode().unwrap_or_default()"),
             "SAML LogoutRequest text must not become empty on decode failure"
+        );
+    }
+
+    #[test]
+    fn logout_names_do_not_default_to_empty_on_decode_error() {
+        let src = include_str!("logout_parser.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("decode_xml_name(") && !production.contains("from_utf8_lossy"),
+            "SAML LogoutRequest names must not become empty on decode failure"
         );
     }
 }
