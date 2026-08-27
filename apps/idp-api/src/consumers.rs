@@ -3,6 +3,7 @@
 //! This module is only compiled when the `kafka` feature is enabled.
 //! It sets up consumers for governance events that trigger micro-certifications.
 
+use std::str::FromStr;
 use std::sync::Arc;
 
 use sqlx::PgPool;
@@ -29,8 +30,15 @@ pub async fn start_micro_cert_consumers(pool: PgPool, config: KafkaConfig) {
     // Create the MicroCertificationService that will be shared across consumers
     let micro_cert_service = Arc::new(MicroCertificationService::new(pool.clone()));
 
-    // Convert our config to xavyo-events config
-    let events_config = convert_kafka_config(&config);
+    // Convert our config to xavyo-events config. Unknown security
+    // settings must not start consumers over plaintext.
+    let events_config = match convert_kafka_config(&config) {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            error!(error = %e, "Refusing to start micro-cert consumers with invalid Kafka security config");
+            return;
+        }
+    };
 
     // Start assignment created consumer
     let pool_clone = pool.clone();
@@ -78,13 +86,9 @@ pub async fn start_micro_cert_consumers(pool: PgPool, config: KafkaConfig) {
 }
 
 /// Convert our Kafka config to xavyo-events Kafka config.
-fn convert_kafka_config(config: &KafkaConfig) -> EventsKafkaConfig {
-    let security_protocol = match config.security_protocol.to_uppercase().as_str() {
-        "SSL" => SecurityProtocol::Ssl,
-        "SASL_PLAINTEXT" => SecurityProtocol::SaslPlaintext,
-        "SASL_SSL" => SecurityProtocol::SaslSsl,
-        _ => SecurityProtocol::Plaintext,
-    };
+fn convert_kafka_config(config: &KafkaConfig) -> Result<EventsKafkaConfig, String> {
+    let security_protocol =
+        SecurityProtocol::from_str(&config.security_protocol).map_err(|e| e.to_string())?;
 
     let sasl = match (
         &config.sasl_mechanism,
@@ -92,11 +96,7 @@ fn convert_kafka_config(config: &KafkaConfig) -> EventsKafkaConfig {
         &config.sasl_password,
     ) {
         (Some(mechanism), Some(username), Some(password)) => {
-            let mech = match mechanism.to_uppercase().as_str() {
-                "SCRAM-SHA-256" => SaslMechanism::ScramSha256,
-                "SCRAM-SHA-512" => SaslMechanism::ScramSha512,
-                _ => SaslMechanism::Plain,
-            };
+            let mech = SaslMechanism::from_str(mechanism).map_err(|e| e.to_string())?;
             Some(SaslCredentials {
                 mechanism: mech,
                 username: username.clone(),
@@ -106,12 +106,12 @@ fn convert_kafka_config(config: &KafkaConfig) -> EventsKafkaConfig {
         _ => None,
     };
 
-    EventsKafkaConfig {
+    Ok(EventsKafkaConfig {
         bootstrap_servers: config.bootstrap_servers.clone(),
         client_id: "xavyo-micro-cert".to_string(),
         security_protocol,
         sasl,
-    }
+    })
 }
 
 /// Start the assignment created consumer.
@@ -170,4 +170,29 @@ async fn start_manager_change_consumer(
     typed_consumer.run().await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unknown_kafka_security_does_not_fail_open_to_plaintext() {
+        assert!(SecurityProtocol::from_str("PLAINTEXT").is_ok());
+        assert!(SecurityProtocol::from_str("SSL").is_ok());
+        assert!(SecurityProtocol::from_str("TLS").is_err());
+        assert!(SecurityProtocol::from_str("").is_err());
+        assert!(SaslMechanism::from_str("PLAIN").is_ok());
+        assert!(SaslMechanism::from_str("GSSAPI").is_err());
+
+        let src = include_str!("consumers.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("SecurityProtocol::from_str(")
+                && production.contains("SaslMechanism::from_str(")
+                && !production.contains("_ => SecurityProtocol::Plaintext")
+                && !production.contains("_ => SaslMechanism::Plain"),
+            "unknown Kafka security protocol/mechanism must not default to plaintext/PLAIN"
+        );
+    }
 }

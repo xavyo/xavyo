@@ -43,16 +43,19 @@ impl FailureReason {
     }
 
     /// Parse from database string representation.
+    ///
+    /// Unknown values must not silently become `Other`.
     #[must_use]
-    pub fn parse(s: &str) -> Self {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
-            "invalid_password" => Self::InvalidPassword,
-            "account_locked" => Self::AccountLocked,
-            "account_inactive" => Self::AccountInactive,
-            "unknown_email" => Self::UnknownEmail,
-            "password_expired" => Self::PasswordExpired,
-            "mfa_failed" => Self::MfaFailed,
-            _ => Self::Other,
+            "invalid_password" => Some(Self::InvalidPassword),
+            "account_locked" => Some(Self::AccountLocked),
+            "account_inactive" => Some(Self::AccountInactive),
+            "unknown_email" => Some(Self::UnknownEmail),
+            "password_expired" => Some(Self::PasswordExpired),
+            "mfa_failed" => Some(Self::MfaFailed),
+            "other" => Some(Self::Other),
+            _ => None,
         }
     }
 }
@@ -121,7 +124,7 @@ impl FailedLoginAttempt {
 
     /// Get the failure reason as an enum.
     #[must_use]
-    pub fn reason(&self) -> FailureReason {
+    pub fn reason(&self) -> Option<FailureReason> {
         FailureReason::parse(&self.failure_reason)
     }
 
@@ -266,7 +269,7 @@ mod tests {
         for reason in reasons {
             let s = reason.as_str();
             let parsed = FailureReason::parse(s);
-            assert_eq!(reason, parsed);
+            assert_eq!(Some(reason), parsed);
         }
     }
 
@@ -280,8 +283,8 @@ mod tests {
     }
 
     #[test]
-    fn test_unknown_reason_parses_as_other() {
-        let parsed = FailureReason::parse("unknown_reason");
-        assert_eq!(parsed, FailureReason::Other);
+    fn test_unknown_reason_does_not_parse_as_other() {
+        assert!(FailureReason::parse("unknown_reason").is_none());
+        assert_eq!(FailureReason::parse("other"), Some(FailureReason::Other));
     }
 }
