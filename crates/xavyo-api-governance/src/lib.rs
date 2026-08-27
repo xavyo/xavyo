@@ -36,3 +36,4 @@ pub use jobs::{
     MicroCertExpirationJobError, MicroCertExpirationStats, ScheduledTransitionJob,
 };
 pub use router::{governance_router, governance_self_service_router};
+pub use services::ticketing::init_ticketing_encryption_key;

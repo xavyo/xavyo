@@ -86,6 +86,9 @@ pub const INSECURE_CSRF_SECRET: &str =
 pub const INSECURE_SOCIAL_STATE_SECRET: &str =
     "development-social-state-secret-change-in-production";
 
+/// Default `XAVYO_SIEM_ENCRYPTION_KEY` / `XAVYO_TICKETING_ENCRYPTION_KEY` (docker-compose dev).
+pub const INSECURE_GOVERNANCE_KEY_B64: &str = "zxDtnpmuQkkoKKupjsjDjgdx/OGnAaS4O65YpGHNY+M=";
+
 // ── AppEnvironment (F069) ─────────────────────────────────────────────────
 
 /// Application environment mode.
@@ -588,6 +591,12 @@ pub struct Config {
     /// Kafka configuration (optional - only if `KAFKA_BOOTSTRAP_SERVERS` is set)
     pub kafka: Option<KafkaConfig>,
 
+    /// SIEM destination credential encryption key (32 bytes, base64-encoded).
+    pub siem_encryption_key: [u8; 32],
+
+    /// Ticketing integration credential encryption key (32 bytes, base64-encoded).
+    pub ticketing_encryption_key: [u8; 32],
+
     /// OpenTelemetry configuration (F072)
     pub otel: OtelConfig,
 
@@ -783,6 +792,21 @@ impl Config {
             .map(|s| !matches!(s.to_lowercase().as_str(), "false" | "0" | "no"))
             .unwrap_or(true);
 
+        // Governance encryption keys (base64-encoded 32 bytes) — secrets.
+        let siem_encryption_key = parse_base64_encryption_key(
+            "XAVYO_SIEM_ENCRYPTION_KEY",
+            &take_sensitive_env_or_else("XAVYO_SIEM_ENCRYPTION_KEY", || {
+                INSECURE_GOVERNANCE_KEY_B64.to_string()
+            }),
+        )?;
+
+        let ticketing_encryption_key = parse_base64_encryption_key(
+            "XAVYO_TICKETING_ENCRYPTION_KEY",
+            &take_sensitive_env_or_else("XAVYO_TICKETING_ENCRYPTION_KEY", || {
+                INSECURE_GOVERNANCE_KEY_B64.to_string()
+            }),
+        )?;
+
         // Kafka configuration (optional - only enabled if KAFKA_BOOTSTRAP_SERVERS is set)
         let kafka = env::var("KAFKA_BOOTSTRAP_SERVERS")
             .ok()
@@ -848,6 +872,8 @@ impl Config {
             csrf_secret,
             dpop_nonce_required,
             kafka,
+            siem_encryption_key,
+            ticketing_encryption_key,
             otel,
             secret_provider: None,
         })
@@ -1093,6 +1119,28 @@ impl Config {
             issues.push("SOCIAL_STATE_SECRET is using the default insecure value".to_string());
         }
 
+        // Check governance encryption keys (shared docker-compose dev default)
+        if let Ok(insecure) =
+            parse_base64_encryption_key("XAVYO_SIEM_ENCRYPTION_KEY", INSECURE_GOVERNANCE_KEY_B64)
+        {
+            if self.siem_encryption_key == insecure {
+                issues.push(
+                    "XAVYO_SIEM_ENCRYPTION_KEY is using the default insecure value".to_string(),
+                );
+            }
+        }
+        if let Ok(insecure) = parse_base64_encryption_key(
+            "XAVYO_TICKETING_ENCRYPTION_KEY",
+            INSECURE_GOVERNANCE_KEY_B64,
+        ) {
+            if self.ticketing_encryption_key == insecure {
+                issues.push(
+                    "XAVYO_TICKETING_ENCRYPTION_KEY is using the default insecure value"
+                        .to_string(),
+                );
+            }
+        }
+
         // Check CORS_ORIGINS wildcard
         if self.cors_origins.iter().any(|o| o == "*") {
             issues.push(
@@ -1206,6 +1254,28 @@ fn looks_like_remote_environment(database_url: &str) -> bool {
         && host != "postgresql" // common docker-compose service name
 }
 
+/// Parse base64-encoded 32-byte encryption key (governance SIEM/ticketing).
+fn parse_base64_encryption_key(var_name: &str, b64_str: &str) -> Result<[u8; 32], ConfigError> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(b64_str.trim())
+        .map_err(|e| ConfigError::InvalidValue {
+            var: var_name.to_string(),
+            message: format!("Must be valid base64: {e}"),
+        })?;
+
+    if bytes.len() != 32 {
+        return Err(ConfigError::InvalidValue {
+            var: var_name.to_string(),
+            message: format!("Expected 32 bytes, got {}", bytes.len()),
+        });
+    }
+
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&bytes);
+    Ok(key)
+}
+
 /// Parse hex-encoded 32-byte encryption key
 fn parse_hex_encryption_key(var_name: &str, hex_str: &str) -> Result<[u8; 32], ConfigError> {
     let bytes = hex::decode(hex_str).map_err(|_| ConfigError::InvalidValue {
@@ -1272,6 +1342,16 @@ mod tests {
             csrf_secret: [0x55u8; 32],
             dpop_nonce_required: true,
             kafka: None,
+            siem_encryption_key: parse_base64_encryption_key(
+                "XAVYO_SIEM_ENCRYPTION_KEY",
+                INSECURE_GOVERNANCE_KEY_B64,
+            )
+            .unwrap(),
+            ticketing_encryption_key: parse_base64_encryption_key(
+                "XAVYO_TICKETING_ENCRYPTION_KEY",
+                INSECURE_GOVERNANCE_KEY_B64,
+            )
+            .unwrap(),
             otel: OtelConfig {
                 otlp_endpoint: None,
                 service_name: "xavyo-test".to_string(),
@@ -1325,6 +1405,8 @@ mod tests {
             csrf_secret: [0xFFu8; 32],
             dpop_nonce_required: true,
             kafka: None,
+            siem_encryption_key: [0x99u8; 32],
+            ticketing_encryption_key: [0x98u8; 32],
             otel: OtelConfig {
                 otlp_endpoint: None,
                 service_name: "xavyo-test".to_string(),

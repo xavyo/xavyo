@@ -445,40 +445,9 @@ impl GovernanceState {
         &self.siem_encryption_key
     }
 
-    /// Load the SIEM encryption key from the environment.
-    ///
-    /// SECURITY: This function requires the `XAVYO_SIEM_ENCRYPTION_KEY` environment
-    /// variable to be set. There is no fallback to a hardcoded key to prevent
-    /// accidental use of weak encryption in production.
-    ///
-    /// To generate a key: `openssl rand -base64 32`
-    fn load_siem_encryption_key() -> Result<[u8; 32], String> {
-        use base64::Engine;
-        let key_b64 = std::env::var("XAVYO_SIEM_ENCRYPTION_KEY").map_err(|_| {
-            "XAVYO_SIEM_ENCRYPTION_KEY environment variable not set. \
-             Generate a key with: openssl rand -base64 32"
-                .to_string()
-        })?;
-        let key_bytes = base64::engine::general_purpose::STANDARD
-            .decode(&key_b64)
-            .map_err(|e| format!("XAVYO_SIEM_ENCRYPTION_KEY must be valid base64: {e}"))?;
-        if key_bytes.len() != 32 {
-            return Err(format!(
-                "XAVYO_SIEM_ENCRYPTION_KEY must decode to 32 bytes, got {}",
-                key_bytes.len()
-            ));
-        }
-        let mut key = [0u8; 32];
-        key.copy_from_slice(&key_bytes);
-        Ok(key)
-    }
-
     /// Create a new governance state with all services.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the SIEM encryption key environment variable is not set or invalid.
-    pub fn new(pool: PgPool) -> Result<Self, String> {
+    #[must_use]
+    pub fn new(pool: PgPool, siem_encryption_key: [u8; 32]) -> Self {
         let sod_enforcement_service = Arc::new(SodEnforcementService::new(pool.clone()));
         let matching_service = Arc::new(MetaRoleMatchingService::new(pool.clone()));
         // NHI services need to be created first as NhiRequestService depends on them
@@ -487,7 +456,7 @@ impl GovernanceState {
         // Identity Merge service needs to be created first as BatchMergeService depends on it
         let identity_merge_service = Arc::new(IdentityMergeService::new(pool.clone()));
 
-        Ok(Self {
+        Self {
             pool: pool.clone(),
             application_service: Arc::new(ApplicationService::new(pool.clone())),
             entitlement_service: Arc::new(EntitlementService::new(pool.clone())),
@@ -669,7 +638,7 @@ impl GovernanceState {
             siem_destination_service: Arc::new(SiemDestinationService::new(pool.clone())),
             siem_batch_export_service: Arc::new(SiemBatchExportService::new(pool.clone())),
             siem_health_service: Arc::new(SiemHealthService::new(pool.clone())),
-            siem_encryption_key: Self::load_siem_encryption_key()?,
+            siem_encryption_key,
             // Business Role Hierarchy services (F088)
             role_hierarchy_service: Arc::new(RoleHierarchyService::new(pool.clone())),
             // Self-Service Request Catalog services (F-062)
@@ -683,7 +652,7 @@ impl GovernanceState {
             bulk_action_service: Arc::new(BulkActionService::new(pool.clone())),
             // GDPR Report services (F-067)
             gdpr_report_service: Arc::new(GdprReportService::new(pool)),
-        })
+        }
     }
 
     /// Attach a CAEP emitter so role assignment/revocation broadcasts
@@ -701,10 +670,9 @@ impl GovernanceState {
 fn governance_state(
     pool: PgPool,
     caep_emitter: Arc<dyn xavyo_ssf::CaepEmitter>,
+    siem_encryption_key: [u8; 32],
 ) -> GovernanceState {
-    GovernanceState::new(pool)
-        .expect("Failed to initialize GovernanceState (check XAVYO_SIEM_ENCRYPTION_KEY)")
-        .with_caep_emitter(caep_emitter)
+    GovernanceState::new(pool, siem_encryption_key).with_caep_emitter(caep_emitter)
 }
 
 /// Self-service IGA routes (JWT only — no admin role).
@@ -714,8 +682,9 @@ fn governance_state(
 pub fn governance_self_service_router(
     pool: PgPool,
     caep_emitter: Arc<dyn xavyo_ssf::CaepEmitter>,
+    siem_encryption_key: [u8; 32],
 ) -> Router {
-    let state = governance_state(pool, caep_emitter);
+    let state = governance_state(pool, caep_emitter, siem_encryption_key);
     Router::new()
         .route("/access-requests", get(access_requests::list_my_requests))
         .route("/access-requests", post(access_requests::create_request))
@@ -774,8 +743,12 @@ pub fn governance_self_service_router(
 ///
 /// Mount behind JWT + `admin_guard`. Self-service routes live on
 /// [`governance_self_service_router`].
-pub fn governance_router(pool: PgPool, caep_emitter: Arc<dyn xavyo_ssf::CaepEmitter>) -> Router {
-    let state = governance_state(pool, caep_emitter);
+pub fn governance_router(
+    pool: PgPool,
+    caep_emitter: Arc<dyn xavyo_ssf::CaepEmitter>,
+    siem_encryption_key: [u8; 32],
+) -> Router {
+    let state = governance_state(pool, caep_emitter, siem_encryption_key);
 
     Router::new()
         // Applications

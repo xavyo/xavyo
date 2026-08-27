@@ -54,7 +54,7 @@ use xavyo_api_governance::services::{
     AccessRequestService, CertificationCampaignService, EscalationPolicyService, EscalationService,
 };
 use xavyo_api_governance::EscalationJob;
-use xavyo_api_governance::{governance_router, governance_self_service_router};
+use xavyo_api_governance::{governance_router, governance_self_service_router, init_ticketing_encryption_key};
 use xavyo_api_import::{import_admin_router, import_public_router, ImportState};
 use xavyo_api_nhi::{a2a_router, discovery_router, mcp_router};
 use xavyo_api_nhi::{nhi_router, NhiState};
@@ -145,6 +145,8 @@ async fn main() {
             std::process::exit(1);
         }
     }
+
+    init_ticketing_encryption_key(config.ticketing_encryption_key);
 
     // Create admin database connection pool (superuser — for bootstrap, migrations, and PDP)
     let admin_pool = match PgPoolOptions::new()
@@ -469,8 +471,8 @@ async fn main() {
         auth_state.clone(),
         metrics_registry.clone(),
         health_config,
-        // TODO(F074): Wire Kafka health callback once xavyo-events exposes a health check method.
-        // Currently the rdkafka consumer does not provide a connection health API.
+        // Kafka is optional: only wired when KAFKA_BOOTSTRAP_SERVERS is set (F074 / #109).
+        // When unset, readyz checks Postgres only — no Kafka dependency.
         None,
     )
     // F080: Wire secret provider for health check integration
@@ -1070,13 +1072,21 @@ async fn main() {
     // Self-service (my-approvals, own access-requests) is JWT-only so non-admin
     // reviewers are not 403'd by admin_guard.
     let governance_self_service_routes = crate::governance_auth::apply_governance_auth_layers(
-        governance_self_service_router(pool.clone(), ssf_emitter.clone()),
+        governance_self_service_router(
+            pool.clone(),
+            ssf_emitter.clone(),
+            config.siem_encryption_key,
+        ),
         config.jwt_public_key.clone(),
         pool.clone(),
     );
     let governance_routes = crate::governance_auth::apply_governance_auth_layers(
-        governance_router(pool.clone(), ssf_emitter.clone())
-            .layer(axum::middleware::from_fn(admin_guard)),
+        governance_router(
+            pool.clone(),
+            ssf_emitter.clone(),
+            config.siem_encryption_key,
+        )
+        .layer(axum::middleware::from_fn(admin_guard)),
         config.jwt_public_key.clone(),
         pool.clone(),
     );

@@ -38,18 +38,18 @@ use xavyo_db::{
 };
 use xavyo_ssf::NoopEmitter;
 
+fn test_siem_key() -> [u8; 32] {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode("zxDtnpmuQkkoKKupjsjDjgdx/OGnAaS4O65YpGHNY+M=")
+        .expect("valid test siem key");
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&bytes);
+    key
+}
+
 fn ensure_siem_key() {
-    if std::env::var("XAVYO_SIEM_ENCRYPTION_KEY").is_ok() {
-        return;
-    }
-    // 32-byte key from docker-compose.yml default (tests only).
-    // SAFETY: process-wide test setup; value is a dummy key.
-    unsafe {
-        std::env::set_var(
-            "XAVYO_SIEM_ENCRYPTION_KEY",
-            "zxDtnpmuQkkoKKupjsjDjgdx/OGnAaS4O65YpGHNY+M=",
-        );
-    }
+    let _ = test_siem_key();
 }
 
 fn user_claims(user_id: Uuid, tenant_id: Uuid) -> JwtClaims {
@@ -103,8 +103,7 @@ async fn non_admin_jwt_drives_self_service_handlers() {
     .await
     .expect("create approval step");
 
-    let state = GovernanceState::new(pool.clone())
-        .expect("GovernanceState")
+    let state = GovernanceState::new(pool.clone(), test_siem_key())
         .with_caep_emitter(Arc::new(NoopEmitter));
 
     let requester = user_claims(requester_id, tenant_id);
@@ -129,7 +128,11 @@ async fn non_admin_jwt_drives_self_service_handlers() {
     assert!(catalog.0.total >= 0);
 
     // --- catalog via shipped self-service router (oneshot) ---
-    let router = governance_self_service_router(pool.clone(), Arc::new(NoopEmitter))
+    let router = governance_self_service_router(
+        pool.clone(),
+        Arc::new(NoopEmitter),
+        test_siem_key(),
+    )
         .layer(Extension(requester.clone()));
     let catalog_http = router
         .oneshot(
@@ -290,7 +293,11 @@ async fn non_admin_jwt_drives_self_service_handlers() {
 
     // router path: non-admin POST to an admin campaign launch is not on the
     // self-service router; GET my-approvals is.
-    let router = governance_self_service_router(pool.clone(), Arc::new(NoopEmitter))
+    let router = governance_self_service_router(
+        pool.clone(),
+        Arc::new(NoopEmitter),
+        test_siem_key(),
+    )
         .layer(Extension(approver));
     let my_approvals = router
         .oneshot(
