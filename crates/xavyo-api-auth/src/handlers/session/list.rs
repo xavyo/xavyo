@@ -30,11 +30,16 @@ pub async fn list_sessions(
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
 ) -> Result<(StatusCode, Json<SessionListResponse>), ApiAuthError> {
-    // Get current session ID from JWT jti if available
-    let current_session_id = Uuid::parse_str(&claims.jti).ok();
+    // Current session is identified by JWT jti. A malformed jti must not hide it.
+    let current_session_id =
+        Uuid::parse_str(&claims.jti).map_err(|_| ApiAuthError::Unauthorized)?;
 
     let sessions = session_service
-        .get_user_sessions(*user_id.as_uuid(), *tenant_id.as_uuid(), current_session_id)
+        .get_user_sessions(
+            *user_id.as_uuid(),
+            *tenant_id.as_uuid(),
+            Some(current_session_id),
+        )
         .await?;
 
     let session_responses: Vec<SessionInfoResponse> =
@@ -49,4 +54,17 @@ pub async fn list_sessions(
             total,
         }),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn list_sessions_does_not_hide_current_session_on_malformed_jti() {
+        let src = include_str!("list.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("Uuid::parse_str(&claims.jti).ok()"),
+            "session list must refuse a malformed JWT jti"
+        );
+    }
 }

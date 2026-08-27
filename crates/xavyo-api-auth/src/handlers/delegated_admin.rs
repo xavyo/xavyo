@@ -427,11 +427,15 @@ pub async fn get_assignment(
         .get_assignment(tenant_uuid, assignment_id)
         .await?;
 
-    // Get template details
-    let template = delegation_service
+    // Template may have been deleted; database errors must not look like that.
+    let template = match delegation_service
         .get_role_template(tenant_uuid, assignment.template_id)
         .await
-        .ok(); // Template might not exist or be inaccessible
+    {
+        Ok(template) => Some(template),
+        Err(ApiAuthError::TemplateNotFound) => None,
+        Err(e) => return Err(e),
+    };
 
     Ok(Json(AssignmentDetailResponse {
         assignment,
@@ -606,4 +610,23 @@ pub async fn check_permission(
         has_permission,
         is_super_admin: false, // Can't check without claims
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn get_assignment_does_not_hide_template_lookup_errors() {
+        let src = include_str!("delegated_admin.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let get = production
+            .split("pub async fn get_assignment")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_assignment");
+        assert!(
+            !get.contains(".await\n        .ok()")
+                && get.contains("ApiAuthError::TemplateNotFound"),
+            "assignment GET must not treat template lookup errors as a missing template"
+        );
+    }
 }

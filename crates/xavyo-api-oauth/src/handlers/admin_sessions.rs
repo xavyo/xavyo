@@ -60,7 +60,10 @@ pub async fn admin_revoke_user_handler(
     Json(request): Json<AdminRevokeUserRequest>,
 ) -> Result<Json<AdminRevokeUserResponse>, OAuthError> {
     let tenant_id = extract_tenant_id(&claims)?;
-    let admin_id = claims.sub.parse::<Uuid>().ok();
+    let admin_id = claims
+        .sub
+        .parse::<Uuid>()
+        .map_err(|_| OAuthError::InvalidRequest("Invalid user ID in claims".to_string()))?;
 
     // R9-F1: Acquire a dedicated connection so set_config and queries share RLS context.
     let mut conn = state.pool.acquire().await.map_err(|e| {
@@ -111,7 +114,7 @@ pub async fn admin_revoke_user_handler(
         reason: Some(reason.clone()),
         // Sentinel expires after access token max lifetime (15 min + 45 min buffer)
         expires_at: Utc::now() + chrono::Duration::hours(1),
-        revoked_by: admin_id,
+        revoked_by: Some(admin_id),
     };
 
     let access_tokens_blacklisted =
@@ -376,6 +379,22 @@ mod tests {
         assert!(
             !production.contains("if let Err(e) = RevokedToken::insert"),
             "must not swallow revoke-all sentinel insert errors"
+        );
+    }
+
+    #[test]
+    fn admin_revoke_user_does_not_drop_malformed_actor() {
+        let src = include_str!("admin_sessions.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let revoke = production
+            .split("pub async fn admin_revoke_user_handler")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("admin_revoke_user_handler");
+        assert!(
+            !revoke.contains("claims.sub.parse::<Uuid>().ok()")
+                && revoke.contains("Invalid user ID in claims"),
+            "admin revoke-user must refuse a malformed JWT sub"
         );
     }
 }
