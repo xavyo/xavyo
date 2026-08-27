@@ -7,7 +7,10 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::dynamic::{DynamicCredential, DynamicCredentialRequest, DynamicSecretProvider};
+use crate::dynamic::{
+    lease_revocation_http_status, require_lease_id, DynamicCredential, DynamicCredentialRequest,
+    DynamicSecretProvider,
+};
 use crate::SecretError;
 
 /// Authentication method for `OpenBao`.
@@ -386,10 +389,13 @@ impl DynamicSecretProvider for OpenBaoSecretProvider {
             .clone();
 
         // Extract lease information
-        let lease_id = json
-            .get("lease_id")
-            .and_then(|v| v.as_str())
-            .map(std::string::ToString::to_string);
+        let lease_id = require_lease_id(
+            "openbao",
+            &role_name,
+            json.get("lease_id")
+                .and_then(|v| v.as_str())
+                .map(std::string::ToString::to_string),
+        )?;
 
         let lease_duration = json
             .get("lease_duration")
@@ -407,7 +413,7 @@ impl DynamicSecretProvider for OpenBaoSecretProvider {
 
         Ok(DynamicCredential {
             credentials: data,
-            lease_id,
+            lease_id: Some(lease_id),
             ttl_seconds: lease_duration as i32,
         })
     }
@@ -440,19 +446,12 @@ impl DynamicSecretProvider for OpenBaoSecretProvider {
 
         if resp.status().is_success() {
             tracing::info!(lease_id = lease_id, "OpenBao: Successfully revoked lease");
+            Ok(())
         } else {
             let status = resp.status();
             let body_text = resp.text().await.unwrap_or_default();
-            tracing::warn!(
-                lease_id = lease_id,
-                status = %status,
-                body = %body_text,
-                "OpenBao: Lease revocation returned non-success status"
-            );
-            // Don't fail on revocation errors - the lease may have already expired
+            lease_revocation_http_status("openbao", lease_id, status.as_u16(), &body_text)
         }
-
-        Ok(())
     }
 
     async fn health_check(&self) -> Result<bool, SecretError> {
@@ -524,5 +523,20 @@ mod tests {
         assert_eq!(request.secret_type, "postgres-readonly");
         assert_eq!(request.ttl_seconds, 300);
         assert_eq!(request.role, Some("reader".to_string()));
+    }
+
+    #[test]
+    fn openbao_revoke_and_generate_do_not_fail_open() {
+        let src = include_str!("openbao.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("lease_revocation_http_status(")
+                && production.contains("require_lease_id("),
+            "OpenBao must fail closed on revoke errors and missing lease ids"
+        );
+        assert!(
+            !production.contains("Don't fail on revocation errors"),
+            "must not treat revoke HTTP errors as success"
+        );
     }
 }

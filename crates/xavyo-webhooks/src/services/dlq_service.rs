@@ -62,6 +62,14 @@ pub struct AttemptRecord {
     pub latency_ms: Option<i32>,
 }
 
+/// Parse persisted attempt history. Corrupt JSON must not look like zero attempts.
+pub(crate) fn parse_attempt_history(
+    value: serde_json::Value,
+) -> Result<Vec<AttemptRecord>, WebhookError> {
+    serde_json::from_value(value)
+        .map_err(|e| WebhookError::Internal(format!("invalid DLQ attempt history: {e}")))
+}
+
 /// Paginated list of DLQ entries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DlqEntryList {
@@ -165,8 +173,8 @@ impl DlqService {
         let summaries: Vec<DlqEntrySummary> = entries
             .into_iter()
             .map(|e| {
-                let attempt_count = extract_attempt_count(&e.attempt_history);
-                DlqEntrySummary {
+                let attempt_count = parse_attempt_history(e.attempt_history.clone())?.len() as i32;
+                Ok(DlqEntrySummary {
                     id: e.id,
                     subscription_id: e.subscription_id,
                     subscription_url: e.subscription_url,
@@ -177,9 +185,9 @@ impl DlqService {
                     attempt_count,
                     created_at: e.created_at,
                     replayed_at: e.replayed_at,
-                }
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, WebhookError>>()?;
 
         let has_more = (offset + limit) < total;
 
@@ -200,8 +208,7 @@ impl DlqService {
             .await?
             .ok_or(WebhookError::DlqEntryNotFound)?;
 
-        let attempt_history: Vec<AttemptRecord> =
-            serde_json::from_value(entry.attempt_history.clone()).unwrap_or_default();
+        let attempt_history = parse_attempt_history(entry.attempt_history.clone())?;
 
         Ok(DlqEntryDetail {
             id: entry.id,
@@ -417,35 +424,24 @@ impl DlqService {
     }
 }
 
-/// Extract attempt count from attempt history JSON.
-fn extract_attempt_count(history: &serde_json::Value) -> i32 {
-    history.as_array().map_or(0, |arr| arr.len() as i32)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_extract_attempt_count_array() {
-        let history = serde_json::json!([
-            {"attempt_number": 1},
-            {"attempt_number": 2},
-            {"attempt_number": 3}
-        ]);
-        assert_eq!(extract_attempt_count(&history), 3);
-    }
-
-    #[test]
-    fn test_extract_attempt_count_empty() {
-        let history = serde_json::json!([]);
-        assert_eq!(extract_attempt_count(&history), 0);
-    }
-
-    #[test]
-    fn test_extract_attempt_count_invalid() {
-        let history = serde_json::json!({});
-        assert_eq!(extract_attempt_count(&history), 0);
+    fn parse_attempt_history_does_not_look_empty_on_corrupt_json() {
+        assert!(parse_attempt_history(serde_json::json!({})).is_err());
+        assert!(parse_attempt_history(serde_json::json!("nope")).is_err());
+        assert!(parse_attempt_history(serde_json::json!([]))
+            .unwrap()
+            .is_empty());
+        let src = include_str!("dlq_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_attempt_history(")
+                && !production.contains("unwrap_or_default()"),
+            "DLQ attempt history must fail closed on corrupt JSON"
+        );
     }
 
     #[test]
