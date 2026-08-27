@@ -244,7 +244,7 @@ pub async fn export_simulation_comparison(
         .get(tenant_id, comparison_id)
         .await?;
 
-    let format = query.format.as_deref().unwrap_or("json");
+    let format = parse_optional_export_format(query.format.as_deref())?;
 
     if format == "csv" {
         // Generate CSV export
@@ -319,6 +319,18 @@ pub async fn export_simulation_comparison(
     }
 }
 
+/// Invalid export formats must not silently download JSON.
+fn parse_optional_export_format(value: Option<&str>) -> Result<&str, ApiGovernanceError> {
+    match value {
+        None => Ok("json"),
+        Some(s) if s.trim().is_empty() => Ok("json"),
+        Some(s) if matches!(s, "json" | "csv") => Ok(s),
+        Some(s) => Err(ApiGovernanceError::Validation(format!(
+            "Invalid export format '{s}'. Must be one of: json, csv"
+        ))),
+    }
+}
+
 /// Export data structure for simulation comparison.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SimulationComparisonExport {
@@ -341,6 +353,23 @@ mod tests {
         assert!(
             production.contains("csv_json_field(") && !production.contains("unwrap_or_default()"),
             "simulation comparison CSV fields must not drop on serialize error"
+        );
+    }
+
+    #[test]
+    fn invalid_export_format_does_not_silently_download_json() {
+        assert_eq!(super::parse_optional_export_format(None).unwrap(), "json");
+        assert_eq!(
+            super::parse_optional_export_format(Some("csv")).unwrap(),
+            "csv"
+        );
+        assert!(super::parse_optional_export_format(Some("xml")).is_err());
+        let src = include_str!("simulation_comparisons.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_export_format(")
+                && !production.contains("unwrap_or(\"json\")"),
+            "unknown simulation-comparison export format must be 400, not JSON"
         );
     }
 }
