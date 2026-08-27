@@ -123,11 +123,16 @@ impl PolicyService {
     ) -> ApiResult<PolicyListResponse> {
         let limit = query.limit.min(100);
         let offset = query.offset;
+        let status = parse_optional_policy_status(query.status.as_deref())?;
+        let effect = parse_optional_policy_effect(query.effect.as_deref())?;
 
-        let policies =
-            AuthorizationPolicy::list_by_tenant(&self.pool, tenant_id, limit, offset).await?;
+        let policies = AuthorizationPolicy::list_filtered(
+            &self.pool, tenant_id, status, effect, limit, offset,
+        )
+        .await?;
 
-        let total = AuthorizationPolicy::count_by_tenant(&self.pool, tenant_id).await?;
+        let total =
+            AuthorizationPolicy::count_filtered(&self.pool, tenant_id, status, effect).await?;
 
         // Load conditions for each policy
         let mut items = Vec::with_capacity(policies.len());
@@ -242,5 +247,60 @@ impl PolicyService {
             deactivated,
             conditions,
         ))
+    }
+}
+
+/// Advertised `status` query must 400 on unknown values, not list everything.
+pub(crate) fn parse_optional_policy_status(status: Option<&str>) -> ApiResult<Option<&str>> {
+    match status {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "active" | "inactive") => Ok(Some(s)),
+        Some(s) => Err(ApiAuthorizationError::Validation(format!(
+            "Invalid policy status '{s}'. Must be one of: active, inactive"
+        ))),
+    }
+}
+
+/// Advertised `effect` query must 400 on unknown values, not list everything.
+pub(crate) fn parse_optional_policy_effect(effect: Option<&str>) -> ApiResult<Option<&str>> {
+    match effect {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "allow" | "deny") => Ok(Some(s)),
+        Some(s) => Err(ApiAuthorizationError::Validation(format!(
+            "Invalid policy effect '{s}'. Must be one of: allow, deny"
+        ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn policy_list_filters_do_not_fail_open() {
+        assert_eq!(parse_optional_policy_status(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_policy_status(Some("active")).unwrap(),
+            Some("active")
+        );
+        assert!(parse_optional_policy_status(Some("bogus")).is_err());
+        assert_eq!(parse_optional_policy_effect(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_policy_effect(Some("deny")).unwrap(),
+            Some("deny")
+        );
+        assert!(parse_optional_policy_effect(Some("permit")).is_err());
+
+        let src = include_str!("policy_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_policy_status(")
+                && production.contains("parse_optional_policy_effect(")
+                && production.contains("list_filtered(")
+                && production.contains("count_filtered("),
+            "list_policies must honor and validate advertised status/effect filters"
+        );
     }
 }

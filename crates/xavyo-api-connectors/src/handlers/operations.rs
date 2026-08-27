@@ -94,6 +94,8 @@ pub async fn list_operations(
         user_id: query.user_id,
         status: query.status,
         operation_type: query.operation_type,
+        from_date: query.from_date,
+        to_date: query.to_date,
         limit: query.limit.min(100),
         offset: query.offset.max(0),
     };
@@ -666,6 +668,19 @@ mod tests {
             production.contains("ConflictResponse::try_from")
                 && !production.contains("ConflictResponse::from("),
             "conflict list/get/resolve must fail closed on affected_attributes JSON"
+        );
+    }
+
+    #[test]
+    fn list_operations_forwards_advertised_filters() {
+        let src = include_str!("operations.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("from_date: query.from_date")
+                && production.contains("to_date: query.to_date")
+                && production.contains("user_id: query.user_id")
+                && production.contains("operation_type: query.operation_type"),
+            "list_operations must forward advertised user_id, operation_type, and date filters"
         );
     }
 }

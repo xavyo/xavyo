@@ -263,6 +263,7 @@ impl From<crate::services::OperationServiceError> for ConnectorApiError {
             OperationServiceError::ConnectorNotFound(id) => {
                 ConnectorApiError::ConnectorNotFound(id)
             }
+            OperationServiceError::InvalidFilter(msg) => ConnectorApiError::Validation(msg),
         }
     }
 }

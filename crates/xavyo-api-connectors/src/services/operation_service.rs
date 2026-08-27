@@ -45,6 +45,10 @@ pub enum OperationServiceError {
     /// Connector not found.
     #[error("Connector not found: {0}")]
     ConnectorNotFound(Uuid),
+
+    /// Invalid list filter.
+    #[error("Invalid filter: {0}")]
+    InvalidFilter(String),
 }
 
 /// Result type for operation service.
@@ -202,6 +206,14 @@ pub struct OperationFilter {
     /// Filter by operation type.
     pub operation_type: Option<String>,
 
+    /// Filter operations created on or after this date.
+    #[serde(default)]
+    pub from_date: Option<chrono::DateTime<chrono::Utc>>,
+
+    /// Filter operations created on or before this date.
+    #[serde(default)]
+    pub to_date: Option<chrono::DateTime<chrono::Utc>>,
+
     /// Maximum results.
     #[serde(default = "default_limit")]
     pub limit: i64,
@@ -218,9 +230,39 @@ impl Default for OperationFilter {
             user_id: None,
             status: None,
             operation_type: None,
+            from_date: None,
+            to_date: None,
             limit: 50,
             offset: 0,
         }
+    }
+}
+
+fn parse_optional_operation_status(
+    status: Option<&str>,
+) -> OperationServiceResult<Option<xavyo_db::models::OperationStatus>> {
+    match status {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) => s.parse().map(Some).map_err(|_| {
+            OperationServiceError::InvalidFilter(format!(
+                "Invalid operation status '{s}'. Must be one of: pending, in_progress, completed, failed, dead_letter, awaiting_system, resolved, cancelled"
+            ))
+        }),
+    }
+}
+
+fn parse_optional_operation_type(
+    operation_type: Option<&str>,
+) -> OperationServiceResult<Option<xavyo_db::models::OperationType>> {
+    match operation_type {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) => s.parse().map(Some).map_err(|_| {
+            OperationServiceError::InvalidFilter(format!(
+                "Invalid operation type '{s}'. Must be one of: create, update, delete"
+            ))
+        }),
     }
 }
 
@@ -423,11 +465,19 @@ impl OperationService {
         tenant_id: Uuid,
         filter: OperationFilter,
     ) -> OperationServiceResult<OperationListResponse> {
-        let operations = ProvisioningOperation::list_by_tenant(
+        let db_filter = xavyo_db::models::provisioning_operation::OperationFilter {
+            connector_id: filter.connector_id,
+            user_id: filter.user_id,
+            status: parse_optional_operation_status(filter.status.as_deref())?,
+            operation_type: parse_optional_operation_type(filter.operation_type.as_deref())?,
+            from_date: filter.from_date,
+            to_date: filter.to_date,
+        };
+
+        let operations = ProvisioningOperation::list_with_filter(
             &self.pool,
             tenant_id,
-            filter.connector_id,
-            filter.status.as_deref(),
+            &db_filter,
             filter.limit,
             filter.offset,
         )
@@ -462,14 +512,8 @@ impl OperationService {
             })
             .collect();
 
-        // Get total count
-        let total = ProvisioningOperation::count_by_tenant(
-            &self.pool,
-            tenant_id,
-            filter.connector_id,
-            filter.status.as_deref(),
-        )
-        .await?;
+        let total =
+            ProvisioningOperation::count_with_filter(&self.pool, tenant_id, &db_filter).await?;
 
         Ok(OperationListResponse {
             operations: responses,
@@ -1038,6 +1082,8 @@ mod tests {
             user_id: None,
             status: None,
             operation_type: None,
+            from_date: None,
+            to_date: None,
             limit: 100,
             offset: 0,
         };
@@ -1052,6 +1098,8 @@ mod tests {
             user_id: None,
             status: Some("failed".to_string()),
             operation_type: None,
+            from_date: None,
+            to_date: None,
             limit: 50,
             offset: 0,
         };
@@ -1066,12 +1114,41 @@ mod tests {
             user_id: Some(user_id),
             status: None,
             operation_type: Some("create".to_string()),
+            from_date: None,
+            to_date: None,
             limit: 25,
             offset: 10,
         };
         assert_eq!(filter.user_id, Some(user_id));
         assert_eq!(filter.operation_type, Some("create".to_string()));
         assert_eq!(filter.offset, 10);
+    }
+
+    #[test]
+    fn list_operations_does_not_drop_filters_or_fail_open() {
+        assert!(parse_optional_operation_status(None).unwrap().is_none());
+        assert!(parse_optional_operation_status(Some("failed"))
+            .unwrap()
+            .is_some());
+        assert!(parse_optional_operation_status(Some("bogus")).is_err());
+        assert!(parse_optional_operation_type(None).unwrap().is_none());
+        assert!(parse_optional_operation_type(Some("create"))
+            .unwrap()
+            .is_some());
+        assert!(parse_optional_operation_type(Some("bogus")).is_err());
+
+        let src = include_str!("operation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("list_with_filter(")
+                && production.contains("count_with_filter(")
+                && production.contains("parse_optional_operation_status(")
+                && production.contains("parse_optional_operation_type(")
+                && production.contains("user_id: filter.user_id")
+                && production.contains("from_date: filter.from_date")
+                && !production.contains("list_by_tenant("),
+            "list_operations must honor user_id/operation_type/dates and 400 unknown status/type"
+        );
     }
 
     // T026: Unit tests for OperationResponse with attempts
