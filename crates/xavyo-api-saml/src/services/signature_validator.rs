@@ -366,8 +366,7 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
                     for attr in e.attributes().flatten() {
                         let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                         if key == "Algorithm" {
-                            digest_algorithm =
-                                Some(crate::xml::attribute_value(&attr).to_string());
+                            digest_algorithm = Some(crate::xml::attribute_value(&attr).to_string());
                         }
                     }
                 }

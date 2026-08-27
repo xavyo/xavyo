@@ -448,8 +448,8 @@ fn write_c14n_start_tag(
         let value = attr
             .normalized_value(quick_xml::XmlVersion::Implicit1_0)
             .map_err(|err| {
-            SamlError::AssertionGenerationFailed(format!("XML attribute decode error: {err}"))
-        })?;
+                SamlError::AssertionGenerationFailed(format!("XML attribute decode error: {err}"))
+            })?;
 
         if key == "xmlns" || key.starts_with("xmlns:") {
             ns_attrs.push((key.to_string(), value.to_string()));
