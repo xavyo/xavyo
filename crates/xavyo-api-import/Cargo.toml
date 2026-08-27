@@ -47,7 +47,7 @@ sha2 = "0.10"
 rand = "0.8"
 
 # HTML sanitization
-ammonia = "4"
+ammonia = "4.1.4"
 
 # Async trait
 async-trait = "0.1"

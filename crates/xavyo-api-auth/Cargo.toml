@@ -113,7 +113,7 @@ data-encoding = "2.6"
 # Custom branding dependencies
 axum-extra = { version = "0.9", features = ["multipart"] }
 handlebars = "5.1"
-ammonia = "3.3"
+ammonia = "3.3.3"
 
 # WebAuthn MFA dependencies
 webauthn-rs = { version = "0.5", features = ["danger-allow-state-serialisation", "danger-credential-internals"] }
