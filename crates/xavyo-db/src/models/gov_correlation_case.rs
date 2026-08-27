@@ -113,6 +113,33 @@ pub struct CreateGovCorrelationCase {
     pub rules_snapshot: serde_json::Value,
 }
 
+/// Resolve list sort for correlation cases.
+///
+/// Omitted values use defaults. Provided but unknown `sort_by`/`sort_order`
+/// must not silently become `created_at` / `ASC`.
+pub fn resolve_correlation_sort(
+    sort_by: Option<&str>,
+    sort_order: Option<&str>,
+) -> Result<(&'static str, &'static str), String> {
+    let column = match sort_by {
+        None | Some("created_at") => "created_at",
+        Some("highest_confidence") => "highest_confidence",
+        Some(other) => {
+            return Err(format!(
+                "Invalid sort_by '{other}'. Supported: created_at, highest_confidence"
+            ));
+        }
+    };
+    let direction = match sort_order {
+        None | Some("asc") | Some("ASC") | Some("ascending") => "ASC",
+        Some("desc") | Some("DESC") | Some("descending") => "DESC",
+        Some(other) => {
+            return Err(format!("Invalid sort_order '{other}'. Must be asc or desc"));
+        }
+    };
+    Ok((column, direction))
+}
+
 /// Filter options for listing correlation cases.
 #[derive(Debug, Clone, Default)]
 pub struct CorrelationCaseFilter {
@@ -186,15 +213,9 @@ impl GovCorrelationCase {
             query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
-        // Determine sort column (whitelist to prevent SQL injection)
-        let sort_col = match filter.sort_by.as_deref() {
-            Some("highest_confidence") => "highest_confidence",
-            _ => "created_at",
-        };
-        let sort_dir = match filter.sort_order.as_deref() {
-            Some("desc" | "DESC") => "DESC",
-            _ => "ASC",
-        };
+        let (sort_col, sort_dir) =
+            resolve_correlation_sort(filter.sort_by.as_deref(), filter.sort_order.as_deref())
+                .map_err(sqlx::Error::Protocol)?;
 
         query.push_str(&format!(
             " ORDER BY {} {} LIMIT ${} OFFSET ${}",
@@ -483,5 +504,30 @@ mod tests {
         assert!(filter.end_date.is_none());
         assert!(filter.sort_by.is_none());
         assert!(filter.sort_order.is_none());
+    }
+
+    #[test]
+    fn invalid_correlation_sort_is_rejected() {
+        assert_eq!(
+            resolve_correlation_sort(None, None).unwrap(),
+            ("created_at", "ASC")
+        );
+        assert_eq!(
+            resolve_correlation_sort(Some("highest_confidence"), Some("desc")).unwrap(),
+            ("highest_confidence", "DESC")
+        );
+        assert!(resolve_correlation_sort(Some("password"), None).is_err());
+        assert!(resolve_correlation_sort(None, Some("sideways")).is_err());
+
+        let src = include_str!("gov_correlation_case.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("resolve_correlation_sort("),
+            "correlation case list must not silently default invalid sort"
+        );
+        assert!(
+            !production.contains("_ => \"created_at\"") && !production.contains("_ => \"ASC\""),
+            "invalid sort_by/sort_order must not fall through to created_at/ASC"
+        );
     }
 }

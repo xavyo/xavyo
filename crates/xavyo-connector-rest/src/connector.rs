@@ -563,15 +563,19 @@ impl RestConnector {
     }
 
     /// Get endpoint and method for an object class operation.
+    ///
+    /// Unknown operations must not become GET on `/{object_class}` — that would
+    /// report success while performing the wrong verb. Custom object classes
+    /// still map known verbs to `/{object_class}`.
     fn get_endpoint(
         &self,
         object_class: &str,
         operation: &str,
         id: Option<&str>,
-    ) -> (String, HttpMethod) {
+    ) -> ConnectorResult<(String, HttpMethod)> {
         let endpoints = &self.config.endpoints;
 
-        match (object_class.to_lowercase().as_str(), operation, id) {
+        let pair = match (object_class.to_lowercase().as_str(), operation, id) {
             ("user" | "users", "list", _) => {
                 (self.config.url(&endpoints.list_users), HttpMethod::Get)
             }
@@ -597,7 +601,6 @@ impl RestConnector {
                 let path = endpoints.endpoint_for_id(&endpoints.get_group, uid);
                 (self.config.url(&path), HttpMethod::Get)
             }
-            // Default to treating object class as resource path
             (_, "list", _) => (
                 self.config.url(&format!("/{object_class}")),
                 HttpMethod::Get,
@@ -618,11 +621,15 @@ impl RestConnector {
                 self.config.url(&format!("/{object_class}/{uid}")),
                 HttpMethod::Delete,
             ),
-            _ => (
-                self.config.url(&format!("/{object_class}")),
-                HttpMethod::Get,
-            ),
-        }
+            _ => {
+                return Err(ConnectorError::InvalidData {
+                    message: format!(
+                        "Unsupported REST operation '{operation}' for object class '{object_class}'"
+                    ),
+                });
+            }
+        };
+        Ok(pair)
     }
 
     /// Build pagination query parameters.
@@ -686,7 +693,7 @@ impl Connector for RestConnector {
         self.check_disposed().await?;
 
         // Try to fetch the base URL or a health endpoint
-        let (url, method) = self.get_endpoint("user", "list", None);
+        let (url, method) = self.get_endpoint("user", "list", None)?;
 
         debug!(url = %url, "Testing REST connection");
 
@@ -1170,7 +1177,7 @@ impl RestConnector {
 impl CreateOp for RestConnector {
     #[instrument(skip(self, attrs))]
     async fn create(&self, object_class: &str, attrs: AttributeSet) -> ConnectorResult<Uid> {
-        let (url, method) = self.get_endpoint(object_class, "create", None);
+        let (url, method) = self.get_endpoint(object_class, "create", None)?;
 
         debug!(url = %url, object_class = %object_class, "Creating REST object");
 
@@ -1223,7 +1230,7 @@ impl UpdateOp for RestConnector {
         uid: &Uid,
         changes: AttributeDelta,
     ) -> ConnectorResult<Uid> {
-        let (url, method) = self.get_endpoint(object_class, "update", Some(uid.value()));
+        let (url, method) = self.get_endpoint(object_class, "update", Some(uid.value()))?;
 
         debug!(url = %url, object_class = %object_class, id = %uid.value(), "Updating REST object");
 
@@ -1258,7 +1265,7 @@ impl UpdateOp for RestConnector {
 impl DeleteOp for RestConnector {
     #[instrument(skip(self))]
     async fn delete(&self, object_class: &str, uid: &Uid) -> ConnectorResult<()> {
-        let (url, method) = self.get_endpoint(object_class, "delete", Some(uid.value()));
+        let (url, method) = self.get_endpoint(object_class, "delete", Some(uid.value()))?;
 
         debug!(url = %url, object_class = %object_class, id = %uid.value(), "Deleting REST object");
 
@@ -1293,7 +1300,7 @@ impl SearchOp for RestConnector {
         _attributes_to_get: Option<Vec<String>>,
         page: Option<PageRequest>,
     ) -> ConnectorResult<SearchResult> {
-        let (url, method) = self.get_endpoint(object_class, "list", None);
+        let (url, method) = self.get_endpoint(object_class, "list", None)?;
 
         debug!(url = %url, object_class = %object_class, "Searching REST objects");
 
@@ -1517,15 +1524,15 @@ mod tests {
         let config = RestConfig::new("https://api.example.com/v1");
         let connector = RestConnector::new(config).unwrap();
 
-        let (url, method) = connector.get_endpoint("user", "list", None);
+        let (url, method) = connector.get_endpoint("user", "list", None).unwrap();
         assert_eq!(url, "https://api.example.com/v1/users");
         assert_eq!(method, HttpMethod::Get);
 
-        let (url, method) = connector.get_endpoint("user", "get", Some("123"));
+        let (url, method) = connector.get_endpoint("user", "get", Some("123")).unwrap();
         assert_eq!(url, "https://api.example.com/v1/users/123");
         assert_eq!(method, HttpMethod::Get);
 
-        let (url, method) = connector.get_endpoint("user", "create", None);
+        let (url, method) = connector.get_endpoint("user", "create", None).unwrap();
         assert_eq!(url, "https://api.example.com/v1/users");
         assert_eq!(method, HttpMethod::Post);
     }
@@ -1535,7 +1542,7 @@ mod tests {
         let config = RestConfig::new("https://api.example.com/v1");
         let connector = RestConnector::new(config).unwrap();
 
-        let (url, method) = connector.get_endpoint("group", "list", None);
+        let (url, method) = connector.get_endpoint("group", "list", None).unwrap();
         assert_eq!(url, "https://api.example.com/v1/groups");
         assert_eq!(method, HttpMethod::Get);
     }
@@ -1545,9 +1552,38 @@ mod tests {
         let config = RestConfig::new("https://api.example.com/v1");
         let connector = RestConnector::new(config).unwrap();
 
-        let (url, method) = connector.get_endpoint("applications", "list", None);
+        let (url, method) = connector
+            .get_endpoint("applications", "list", None)
+            .unwrap();
         assert_eq!(url, "https://api.example.com/v1/applications");
         assert_eq!(method, HttpMethod::Get);
+    }
+
+    #[test]
+    fn unknown_rest_operation_is_rejected() {
+        let config = RestConfig::new("https://api.example.com/v1");
+        let connector = RestConnector::new(config).unwrap();
+        let err = connector.get_endpoint("user", "search", None).unwrap_err();
+        assert!(
+            matches!(err, ConnectorError::InvalidData { .. }),
+            "got {err:?}"
+        );
+
+        let src = include_str!("connector.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let endpoint_fn = production
+            .split("fn get_endpoint")
+            .nth(1)
+            .and_then(|s| s.split("fn ").next())
+            .expect("get_endpoint");
+        assert!(
+            endpoint_fn.contains("Unsupported REST operation"),
+            "unknown REST operations must error"
+        );
+        assert!(
+            !endpoint_fn.contains("_ => ("),
+            "unknown REST operations must not fall through to GET"
+        );
     }
 
     #[test]

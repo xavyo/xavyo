@@ -937,8 +937,8 @@ pub use gov_correlation_candidate::{
     CreateGovCorrelationCandidate, GovCorrelationCandidate, PerAttributeScore, PerAttributeScores,
 };
 pub use gov_correlation_case::{
-    CorrelationCaseFilter, CreateGovCorrelationCase, GovCorrelationCase, GovCorrelationCaseStatus,
-    GovCorrelationTrigger,
+    resolve_correlation_sort, CorrelationCaseFilter, CreateGovCorrelationCase, GovCorrelationCase,
+    GovCorrelationCaseStatus, GovCorrelationTrigger,
 };
 pub use gov_correlation_threshold::{GovCorrelationThreshold, UpsertGovCorrelationThreshold};
 

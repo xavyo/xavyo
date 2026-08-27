@@ -11,8 +11,9 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use xavyo_db::{
-    CorrelationCaseFilter, CreateGovCorrelationCandidate, CreateGovCorrelationCase,
-    GovCorrelationCandidate, GovCorrelationCase, GovCorrelationCaseStatus, GovCorrelationTrigger,
+    resolve_correlation_sort, CorrelationCaseFilter, CreateGovCorrelationCandidate,
+    CreateGovCorrelationCase, GovCorrelationCandidate, GovCorrelationCase,
+    GovCorrelationCaseStatus, GovCorrelationTrigger,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -346,6 +347,9 @@ fn build_case_filter(query: &ListCorrelationCasesQuery) -> Result<CorrelationCas
         None => None,
     };
 
+    resolve_correlation_sort(query.sort_by.as_deref(), query.sort_order.as_deref())
+        .map_err(GovernanceError::Validation)?;
+
     Ok(CorrelationCaseFilter {
         status,
         connector_id: query.connector_id,
@@ -461,6 +465,36 @@ mod tests {
     fn test_case_service_creation() {
         // Verifies the type compiles correctly.
         // Actual service tests would require a database connection.
+    }
+
+    #[test]
+    fn invalid_list_sort_is_rejected() {
+        let mut query = ListCorrelationCasesQuery {
+            status: None,
+            connector_id: None,
+            assigned_to: None,
+            trigger_type: None,
+            start_date: None,
+            end_date: None,
+            sort_by: None,
+            sort_order: None,
+            limit: None,
+            offset: None,
+        };
+        assert!(build_case_filter(&query).is_ok());
+        query.sort_by = Some("password".to_string());
+        let err = build_case_filter(&query).unwrap_err();
+        assert!(
+            matches!(err, GovernanceError::Validation(ref msg) if msg.contains("sort_by")),
+            "got {err:?}"
+        );
+        query.sort_by = None;
+        query.sort_order = Some("sideways".to_string());
+        let err = build_case_filter(&query).unwrap_err();
+        assert!(
+            matches!(err, GovernanceError::Validation(ref msg) if msg.contains("sort_order")),
+            "got {err:?}"
+        );
     }
 
     #[test]
