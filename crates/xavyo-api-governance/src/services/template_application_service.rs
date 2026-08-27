@@ -11,9 +11,9 @@ use uuid::Uuid;
 
 use chrono::{DateTime, Utc};
 use xavyo_db::models::{
-    CreateGovTemplateApplicationEvent, GovObjectTemplate, GovTemplateApplicationEvent,
-    GovTemplateRule, TemplateObjectType, TemplateOperation, TemplateRuleType, TemplateStrength,
-    TemplateTimeReference,
+    ApplicationEventFilter, CreateGovTemplateApplicationEvent, GovObjectTemplate,
+    GovTemplateApplicationEvent, GovTemplateRule, TemplateObjectType, TemplateOperation,
+    TemplateRuleType, TemplateStrength, TemplateTimeReference,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -769,9 +769,18 @@ impl TemplateApplicationService {
         tenant_id: Uuid,
         template_id: Uuid,
     ) -> Result<Vec<GovTemplateApplicationEvent>> {
-        GovTemplateApplicationEvent::list_by_template(&self.pool, tenant_id, template_id)
-            .await
-            .map_err(GovernanceError::Database)
+        let (events, _) = self
+            .list_application_events(
+                tenant_id,
+                ApplicationEventFilter {
+                    template_id: Some(template_id),
+                    ..ApplicationEventFilter::default()
+                },
+                10_000,
+                0,
+            )
+            .await?;
+        Ok(events)
     }
 
     /// List application events for an object.
@@ -781,9 +790,38 @@ impl TemplateApplicationService {
         object_type: TemplateObjectType,
         object_id: Uuid,
     ) -> Result<Vec<GovTemplateApplicationEvent>> {
-        GovTemplateApplicationEvent::list_by_object(&self.pool, tenant_id, object_type, object_id)
+        let (events, _) = self
+            .list_application_events(
+                tenant_id,
+                ApplicationEventFilter {
+                    object_type: Some(object_type),
+                    object_id: Some(object_id),
+                    ..ApplicationEventFilter::default()
+                },
+                10_000,
+                0,
+            )
+            .await?;
+        Ok(events)
+    }
+
+    /// List application events with advertised filters and a real total.
+    pub async fn list_application_events(
+        &self,
+        tenant_id: Uuid,
+        filter: ApplicationEventFilter,
+        limit: i64,
+        offset: i64,
+    ) -> Result<(Vec<GovTemplateApplicationEvent>, i64)> {
+        let events = GovTemplateApplicationEvent::list_with_filter(
+            &self.pool, tenant_id, &filter, limit, offset,
+        )
+        .await
+        .map_err(GovernanceError::Database)?;
+        let total = GovTemplateApplicationEvent::count_with_filter(&self.pool, tenant_id, &filter)
             .await
-            .map_err(GovernanceError::Database)
+            .map_err(GovernanceError::Database)?;
+        Ok((events, total))
     }
 }
 
@@ -850,6 +888,18 @@ mod tests {
         assert!(
             !production.contains("Uuid::nil()"),
             "template application errors must not use Uuid::nil as rule_id"
+        );
+    }
+
+    #[test]
+    fn list_application_events_uses_filter_and_count() {
+        let src = include_str!("template_application_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("list_with_filter(")
+                && production.contains("count_with_filter(")
+                && production.contains("list_application_events("),
+            "application event listing must paginate with a real COUNT"
         );
     }
 }
