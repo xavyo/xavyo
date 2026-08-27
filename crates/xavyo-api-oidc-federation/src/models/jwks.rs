@@ -126,7 +126,7 @@ impl Jwk {
 
         // Fallback: kty + crv
         match self.kty.as_str() {
-            "RSA" => Some(Algorithm::RS256), // Default RSA algorithm
+            "RSA" => None,
             "EC" => match self.crv.as_deref() {
                 Some("P-256") => Some(Algorithm::ES256),
                 Some("P-384") => Some(Algorithm::ES384),
@@ -509,7 +509,7 @@ mod tests {
         };
         assert_eq!(jwk_no_alg.algorithm(), Some(Algorithm::ES384));
 
-        // RSA default
+        // RSA without alg is ambiguous (RS256/RS384/RS512) — do not invent RS256.
         let rsa_jwk = Jwk {
             kty: "RSA".to_string(),
             use_: Some("sig".to_string()),
@@ -523,7 +523,19 @@ mod tests {
             x: None,
             y: None,
         };
-        assert_eq!(rsa_jwk.algorithm(), Some(Algorithm::RS256));
+        assert_eq!(rsa_jwk.algorithm(), None);
+
+        let src = include_str!("jwks.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let alg_fn = production
+            .split("pub fn algorithm")
+            .nth(1)
+            .and_then(|s| s.split("pub fn ").next())
+            .expect("algorithm");
+        assert!(
+            !alg_fn.contains("Some(Algorithm::RS256), // Default RSA"),
+            "RSA JWKs without alg must not default to RS256"
+        );
     }
 
     #[test]

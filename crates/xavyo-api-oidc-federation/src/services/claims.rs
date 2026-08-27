@@ -272,25 +272,33 @@ impl ClaimsService {
     }
 
     /// Extract the subject (`NameID`) from claims based on configuration.
-    #[must_use]
-    pub fn extract_subject(&self, mapping: &ClaimMappingConfig, claims: &IdTokenClaims) -> String {
-        // Check name_id configuration
+    ///
+    /// When `name_id.source` is configured, a missing claim must not fall
+    /// through to `sub` — that would provision the wrong subject.
+    pub fn extract_subject(
+        &self,
+        mapping: &ClaimMappingConfig,
+        claims: &IdTokenClaims,
+    ) -> FederationResult<String> {
         if let Some(name_id) = &mapping.name_id {
-            // Build claims map
             let mut source_claims: HashMap<&str, &str> = HashMap::new();
             source_claims.insert("sub", &claims.sub);
             if let Some(email) = &claims.email {
                 source_claims.insert("email", email);
             }
 
-            // Use configured source
-            if let Some(value) = source_claims.get(name_id.source.as_str()) {
-                return (*value).to_string();
-            }
+            return source_claims
+                .get(name_id.source.as_str())
+                .map(|value| (*value).to_string())
+                .ok_or_else(|| {
+                    FederationError::InvalidClaimMapping(format!(
+                        "Configured name_id source '{}' is not present in the ID token",
+                        name_id.source
+                    ))
+                });
         }
 
-        // Default to sub
-        claims.sub.clone()
+        Ok(claims.sub.clone())
     }
 }
 
@@ -438,7 +446,7 @@ mod tests {
         let claims = make_claims();
         let mapping = ClaimMappingConfig::default();
 
-        let subject = service.extract_subject(&mapping, &claims);
+        let subject = service.extract_subject(&mapping, &claims).unwrap();
         assert_eq!(subject, "user123");
     }
 
@@ -454,8 +462,43 @@ mod tests {
             }),
         };
 
-        let subject = service.extract_subject(&mapping, &claims);
+        let subject = service.extract_subject(&mapping, &claims).unwrap();
         assert_eq!(subject, "user@example.com");
+    }
+
+    #[test]
+    fn configured_nameid_source_missing_does_not_fall_through_to_sub() {
+        let service = ClaimsService::new();
+        let mut claims = make_claims();
+        claims.email = None;
+        let mapping = ClaimMappingConfig {
+            mappings: vec![],
+            name_id: Some(NameIdConfig {
+                source: "email".to_string(),
+                format: "emailAddress".to_string(),
+            }),
+        };
+        let err = service.extract_subject(&mapping, &claims).unwrap_err();
+        assert!(
+            matches!(err, FederationError::InvalidClaimMapping(ref msg) if msg.contains("email")),
+            "got {err:?}"
+        );
+
+        let src = include_str!("claims.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let extract = production
+            .split("pub fn extract_subject")
+            .nth(1)
+            .and_then(|s| s.split("fn ").next())
+            .expect("extract_subject");
+        assert!(
+            !extract.contains("claims.sub.clone()") || extract.contains("Ok(claims.sub.clone())"),
+            "configured name_id source must not silently become sub"
+        );
+        assert!(
+            extract.contains("InvalidClaimMapping"),
+            "missing configured name_id source must error"
+        );
     }
 
     #[test]

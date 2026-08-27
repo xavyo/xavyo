@@ -209,7 +209,9 @@ impl MetaRoleMatchingService {
         role: &GovEntitlement,
         criterion: &GovMetaRoleCriteria,
     ) -> Result<bool> {
-        let actual_value = self.get_role_field_value(role, &criterion.field);
+        let Some(actual_value) = self.get_role_field_value(role, &criterion.field) else {
+            return Ok(false);
+        };
 
         match criterion.operator {
             CriteriaOperator::Eq => Ok(actual_value == criterion.value),
@@ -263,8 +265,12 @@ impl MetaRoleMatchingService {
     }
 
     /// Get a field value from a role as a JSON value.
-    fn get_role_field_value(&self, role: &GovEntitlement, field: &str) -> serde_json::Value {
-        match field {
+    fn get_role_field_value(
+        &self,
+        role: &GovEntitlement,
+        field: &str,
+    ) -> Option<serde_json::Value> {
+        Some(match field {
             "risk_level" => serde_json::json!(format!("{:?}", role.risk_level)),
             "application_id" => serde_json::json!(role.application_id.to_string()),
             "owner_id" => role.owner_id.map_or(serde_json::Value::Null, |id| {
@@ -274,8 +280,8 @@ impl MetaRoleMatchingService {
             "name" => serde_json::json!(&role.name),
             "is_delegable" => serde_json::json!(role.is_delegable),
             "metadata" => role.metadata.clone().unwrap_or(serde_json::Value::Null),
-            _ => serde_json::Value::Null,
-        }
+            _ => return None,
+        })
     }
 
     // =========================================================================
@@ -298,7 +304,10 @@ impl MetaRoleMatchingService {
         let mut any_matched = false;
 
         for criterion in criteria {
-            let actual_value = self.get_role_field_value(role, &criterion.field);
+            let Some(actual_value) = self.get_role_field_value(role, &criterion.field) else {
+                all_matched = false;
+                continue;
+            };
 
             let matches = match criterion.operator {
                 xavyo_db::CriteriaOperator::Eq => actual_value == criterion.value,
@@ -643,6 +652,30 @@ mod tests {
     fn test_criteria_logic() {
         // Test that AND requires all to match
         assert_eq!(CriteriaLogic::default(), CriteriaLogic::And);
+    }
+
+    #[test]
+    fn unknown_role_field_does_not_become_null() {
+        let src = include_str!("meta_role_matching_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let getter = production
+            .split("fn get_role_field_value")
+            .nth(1)
+            .and_then(|s| s.split("pub fn ").next())
+            .expect("get_role_field_value");
+        assert!(
+            getter.contains("return None") && !getter.contains("_ => serde_json::Value::Null"),
+            "unknown meta-role fields must not be invented as JSON null"
+        );
+        let eval = production
+            .split("fn evaluate_single_criterion")
+            .nth(1)
+            .and_then(|s| s.split("fn ").next())
+            .expect("evaluate_single_criterion");
+        assert!(
+            eval.contains("return Ok(false)"),
+            "unknown fields must not satisfy Eq against JSON null"
+        );
     }
 
     #[test]
