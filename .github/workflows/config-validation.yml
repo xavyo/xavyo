@@ -15,9 +15,10 @@ jobs:
   production-config:
     name: Production config rejection
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.95.0
       - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev protobuf-compiler
       - uses: Swatinem/rust-cache@v2
       - run: bash scripts/validate-production-config.sh

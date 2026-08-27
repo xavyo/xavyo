@@ -54,7 +54,9 @@ use xavyo_api_governance::services::{
     AccessRequestService, CertificationCampaignService, EscalationPolicyService, EscalationService,
 };
 use xavyo_api_governance::EscalationJob;
-use xavyo_api_governance::{governance_router, governance_self_service_router, init_ticketing_encryption_key};
+use xavyo_api_governance::{
+    governance_router, governance_self_service_router, init_ticketing_encryption_key,
+};
 use xavyo_api_import::{import_admin_router, import_public_router, ImportState};
 use xavyo_api_nhi::{a2a_router, discovery_router, mcp_router};
 use xavyo_api_nhi::{nhi_router, NhiState};

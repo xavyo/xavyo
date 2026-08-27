@@ -53,5 +53,14 @@ if [[ -n "$token_a" ]]; then
   assert_status "GET /me/profile" "200" "$me_ok"
 fi
 
+echo "[critical] === Cross-tenant token reuse (must fail) ==="
+if [[ -n "$token_a" ]]; then
+  wrong_tenant="00000000-0000-0000-0000-000000000099"
+  cross_tenant="$(curl -s -o /dev/null -w "%{http_code}" "${API}/me/profile" \
+    -H "Authorization: Bearer ${token_a}" \
+    -H "X-Tenant-ID: ${wrong_tenant}")"
+  assert_status "GET /me/profile with wrong tenant" "401" "$cross_tenant"
+fi
+
 echo "[critical] === Summary: ${pass} passed, ${fail} failed ==="
 [[ "$fail" -eq 0 ]]

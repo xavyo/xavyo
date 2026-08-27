@@ -128,12 +128,9 @@ async fn non_admin_jwt_drives_self_service_handlers() {
     assert!(catalog.0.total >= 0);
 
     // --- catalog via shipped self-service router (oneshot) ---
-    let router = governance_self_service_router(
-        pool.clone(),
-        Arc::new(NoopEmitter),
-        test_siem_key(),
-    )
-        .layer(Extension(requester.clone()));
+    let router =
+        governance_self_service_router(pool.clone(), Arc::new(NoopEmitter), test_siem_key())
+            .layer(Extension(requester.clone()));
     let catalog_http = router
         .oneshot(
             Request::builder()
@@ -293,12 +290,9 @@ async fn non_admin_jwt_drives_self_service_handlers() {
 
     // router path: non-admin POST to an admin campaign launch is not on the
     // self-service router; GET my-approvals is.
-    let router = governance_self_service_router(
-        pool.clone(),
-        Arc::new(NoopEmitter),
-        test_siem_key(),
-    )
-        .layer(Extension(approver));
+    let router =
+        governance_self_service_router(pool.clone(), Arc::new(NoopEmitter), test_siem_key())
+            .layer(Extension(approver));
     let my_approvals = router
         .oneshot(
             Request::builder()

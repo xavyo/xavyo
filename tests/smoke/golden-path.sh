@@ -43,4 +43,18 @@ if ! echo "$body" | grep -q '"access_token"'; then
 fi
 
 echo "[smoke] admin login OK"
+
+if [[ -n "${DATABASE_URL:-}" ]] && command -v psql &>/dev/null; then
+  echo "[smoke] Verifying bootstrap admin in database (#110)..."
+  admin_role="$(psql "$DATABASE_URL" -tAc \
+    "SELECT ur.role_name FROM users u JOIN user_roles ur ON ur.user_id = u.id \
+     WHERE u.tenant_id = '${SYS_TENANT}' AND lower(u.email) = lower('${ADMIN_EMAIL}') LIMIT 1")"
+  admin_role="$(echo "$admin_role" | tr -d '[:space:]')"
+  if [[ "$admin_role" != "super_admin" ]]; then
+    echo "[smoke] FAIL: expected super_admin role, got '${admin_role}'"
+    exit 1
+  fi
+  echo "[smoke] bootstrap admin has super_admin role"
+fi
+
 echo "[smoke] PASS — golden path verified"
