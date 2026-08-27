@@ -228,8 +228,7 @@ impl GovAccessSnapshot {
         tenant_id: Uuid,
         input: CreateAccessSnapshot,
     ) -> Result<Self, sqlx::Error> {
-        let assignments_json = serde_json::to_value(&input.assignments)
-            .unwrap_or_else(|_| serde_json::json!({"assignments": [], "total_count": 0}));
+        let assignments_json = snapshot_assignments_json(&input.assignments)?;
 
         sqlx::query_as(
             r"
@@ -250,16 +249,21 @@ impl GovAccessSnapshot {
     }
 
     /// Parse the assignments JSON.
-    #[must_use]
-    pub fn parse_assignments(&self) -> SnapshotContent {
-        serde_json::from_value(self.assignments.clone()).unwrap_or_default()
+    pub fn parse_assignments(&self) -> Result<SnapshotContent, serde_json::Error> {
+        serde_json::from_value(self.assignments.clone())
     }
 
     /// Get the total count of assignments in the snapshot.
-    #[must_use]
-    pub fn assignment_count(&self) -> i32 {
-        self.parse_assignments().total_count
+    pub fn assignment_count(&self) -> Result<i32, serde_json::Error> {
+        Ok(self.parse_assignments()?.total_count)
     }
+}
+
+/// Access snapshot persist. Serialization errors must not store empty assignments.
+pub(crate) fn snapshot_assignments_json<T: serde::Serialize>(
+    value: &T,
+) -> Result<serde_json::Value, sqlx::Error> {
+    serde_json::to_value(value).map_err(|e| sqlx::Error::Protocol(e.to_string()))
 }
 
 #[cfg(test)]
@@ -306,5 +310,38 @@ mod tests {
         let json = serde_json::to_string(&assignment).unwrap();
         assert!(json.contains("GitHub Access"));
         assert!(json.contains("birthright"));
+    }
+
+    #[test]
+    fn snapshot_assignments_json_does_not_store_empty_on_serialize() {
+        let v = snapshot_assignments_json(&serde_json::json!({"total_count": 3})).unwrap();
+        assert_eq!(v["total_count"], 3);
+        let src = include_str!("gov_access_snapshot.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("snapshot_assignments_json(")
+                && !production.contains("unwrap_or_else(|_| serde_json::json!"),
+            "access snapshot persist must fail closed on JSON serialize"
+        );
+    }
+
+    #[test]
+    fn parse_assignments_does_not_default_on_invalid_json() {
+        let snapshot = GovAccessSnapshot {
+            id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            event_id: Uuid::new_v4(),
+            snapshot_type: AccessSnapshotType::Current,
+            assignments: serde_json::json!("not-assignments"),
+            created_at: Utc::now(),
+        };
+        assert!(snapshot.parse_assignments().is_err());
+        let src = include_str!("gov_access_snapshot.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("from_value(self.assignments.clone()).unwrap_or_default()"),
+            "access snapshot GET must fail closed on JSON parse"
+        );
     }
 }

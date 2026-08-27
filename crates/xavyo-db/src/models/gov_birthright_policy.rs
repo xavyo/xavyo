@@ -591,20 +591,22 @@ impl GovBirthrightPolicy {
     }
 
     /// Parse conditions from JSON.
-    #[must_use]
-    pub fn parse_conditions(&self) -> Vec<PolicyCondition> {
-        serde_json::from_value(self.conditions.clone()).unwrap_or_default()
+    pub fn parse_conditions(&self) -> Result<Vec<PolicyCondition>, serde_json::Error> {
+        serde_json::from_value(self.conditions.clone())
     }
 
     /// Evaluate this policy against user attributes.
     /// Returns true if all conditions match (AND logic).
+    /// Corrupt condition JSON does not match (fail closed).
     #[must_use]
     pub fn evaluate(&self, user_attrs: &serde_json::Value) -> bool {
         if !self.status.is_active() {
             return false;
         }
 
-        let conditions = self.parse_conditions();
+        let Ok(conditions) = self.parse_conditions() else {
+            return false;
+        };
         if conditions.is_empty() {
             return false; // No conditions = no match
         }
@@ -930,6 +932,21 @@ mod tests {
             production.contains("birthright_json(")
                 && !production.contains("unwrap_or_else(|_| serde_json::json!([])"),
             "birthright policy persist must fail closed on JSON serialize"
+        );
+    }
+
+    #[test]
+    fn parse_conditions_does_not_default_on_invalid_json() {
+        let src = include_str!("gov_birthright_policy.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("from_value(self.conditions.clone())")
+                && !production.contains("from_value(self.conditions.clone()).unwrap_or_default()"),
+            "birthright policy GET must fail closed on JSON parse"
+        );
+        assert!(
+            serde_json::from_value::<Vec<PolicyCondition>>(serde_json::json!("not-conditions"))
+                .is_err()
         );
     }
 }

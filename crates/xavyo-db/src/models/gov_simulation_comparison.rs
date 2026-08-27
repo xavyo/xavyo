@@ -274,15 +274,13 @@ impl GovSimulationComparison {
     }
 
     /// Parse summary statistics.
-    #[must_use]
-    pub fn parse_summary_stats(&self) -> ComparisonSummary {
-        serde_json::from_value(self.summary_stats.clone()).unwrap_or_default()
+    pub fn parse_summary_stats(&self) -> Result<ComparisonSummary, serde_json::Error> {
+        serde_json::from_value(self.summary_stats.clone())
     }
 
     /// Parse delta results.
-    #[must_use]
-    pub fn parse_delta_results(&self) -> DeltaResults {
-        serde_json::from_value(self.delta_results.clone()).unwrap_or_default()
+    pub fn parse_delta_results(&self) -> Result<DeltaResults, serde_json::Error> {
+        serde_json::from_value(self.delta_results.clone())
     }
 
     /// Check if comparison references a specific simulation.
@@ -408,7 +406,7 @@ mod tests {
             created_at: Utc::now(),
         };
 
-        let stats = comparison.parse_summary_stats();
+        let stats = comparison.parse_summary_stats().unwrap();
         assert_eq!(stats.users_in_both, 100);
         assert_eq!(stats.users_only_in_a, 10);
         assert_eq!(stats.total_additions, 15);
@@ -424,6 +422,35 @@ mod tests {
             production.contains("comparison_json(")
                 && !production.contains("unwrap_or_else(|_| serde_json::json!({})"),
             "simulation comparison persist must fail closed on JSON serialize"
+        );
+    }
+
+    #[test]
+    fn parse_comparison_does_not_default_on_invalid_json() {
+        let comparison = GovSimulationComparison {
+            id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            name: "Test".to_string(),
+            comparison_type: ComparisonType::SimulationVsSimulation,
+            simulation_a_id: None,
+            simulation_a_type: None,
+            simulation_b_id: None,
+            simulation_b_type: None,
+            summary_stats: serde_json::json!("not-stats"),
+            delta_results: serde_json::json!("not-deltas"),
+            is_stale: false,
+            created_by: Uuid::new_v4(),
+            created_at: Utc::now(),
+        };
+        assert!(comparison.parse_summary_stats().is_err());
+        assert!(comparison.parse_delta_results().is_err());
+        let src = include_str!("gov_simulation_comparison.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("from_value(self.summary_stats.clone()).unwrap_or_default()")
+                && !production
+                    .contains("from_value(self.delta_results.clone()).unwrap_or_default()"),
+            "simulation comparison GET must fail closed on JSON parse"
         );
     }
 }

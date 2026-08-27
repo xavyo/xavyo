@@ -113,7 +113,9 @@ impl SimulationService {
             return Err(GovernanceError::RoleSimulationNotDraft(simulation_id));
         }
 
-        let changes = simulation.parse_changes();
+        let changes = simulation.parse_changes().map_err(|e| {
+            GovernanceError::Validation(format!("Invalid role simulation changes JSON: {e}"))
+        })?;
         let target_role_id = simulation.target_role_id.or(changes.role_id);
 
         // Calculate impact based on scenario type
@@ -384,7 +386,9 @@ impl SimulationService {
             return Err(GovernanceError::RoleSimulationNotExecuted(simulation_id));
         }
 
-        let changes = simulation.parse_changes();
+        let changes = simulation.parse_changes().map_err(|e| {
+            GovernanceError::Validation(format!("Invalid role simulation changes JSON: {e}"))
+        })?;
         let target_role_id = simulation.target_role_id.or(changes.role_id);
 
         // Apply changes based on scenario type

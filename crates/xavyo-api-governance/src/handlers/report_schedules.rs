@@ -50,7 +50,10 @@ pub async fn list_schedules(
     let page = if limit > 0 { offset / limit } else { 0 };
 
     Ok(Json(ReportScheduleListResponse {
-        items: schedules.into_iter().map(Into::into).collect(),
+        items: schedules
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, _>>()?,
         total,
         page,
         page_size: limit,
@@ -85,7 +88,7 @@ pub async fn get_schedule(
 
     let schedule = state.report_schedule_service.get(tenant_id, id).await?;
 
-    Ok(Json(schedule.into()))
+    Ok(Json(schedule.try_into()?))
 }
 
 /// Create a new report schedule.
@@ -136,7 +139,7 @@ pub async fn create_schedule(
         )
         .await?;
 
-    Ok((StatusCode::CREATED, Json(schedule.into())))
+    Ok((StatusCode::CREATED, Json(schedule.try_into()?)))
 }
 
 /// Update a report schedule.
@@ -189,7 +192,7 @@ pub async fn update_schedule(
         )
         .await?;
 
-    Ok(Json(schedule.into()))
+    Ok(Json(schedule.try_into()?))
 }
 
 /// Delete a report schedule.
@@ -256,7 +259,7 @@ pub async fn pause_schedule(
 
     let schedule = state.report_schedule_service.pause(tenant_id, id).await?;
 
-    Ok(Json(schedule.into()))
+    Ok(Json(schedule.try_into()?))
 }
 
 /// Resume a paused report schedule.
@@ -288,7 +291,7 @@ pub async fn resume_schedule(
 
     let schedule = state.report_schedule_service.resume(tenant_id, id).await?;
 
-    Ok(Json(schedule.into()))
+    Ok(Json(schedule.try_into()?))
 }
 
 /// Trigger due schedules (for scheduler jobs).

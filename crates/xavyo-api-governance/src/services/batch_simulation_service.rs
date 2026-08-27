@@ -304,7 +304,14 @@ impl BatchSimulationService {
         // Check scope warning
         if simulation.has_scope_warning() && !acknowledge_scope_warning {
             return Err(GovernanceError::ScopeWarningRequired {
-                affected_users: simulation.parse_impact_summary().affected_users as i32,
+                affected_users: simulation
+                    .parse_impact_summary()
+                    .map_err(|e| {
+                        GovernanceError::Validation(format!(
+                            "Invalid batch simulation impact JSON: {e}"
+                        ))
+                    })?
+                    .affected_users as i32,
                 threshold: SCOPE_WARNING_THRESHOLD,
             });
         }
@@ -817,7 +824,11 @@ impl BatchSimulationService {
                 Ok(simulation.user_ids.clone())
             }
             SelectionMode::Filter => {
-                let filter = simulation.parse_filter_criteria();
+                let filter = simulation.parse_filter_criteria().map_err(|e| {
+                    GovernanceError::Validation(format!(
+                        "Invalid batch simulation filter JSON: {e}"
+                    ))
+                })?;
                 let users = self.query_users_by_filter(tenant_id, &filter).await?;
 
                 tracing::debug!(
@@ -1472,7 +1483,7 @@ mod tests {
         let simulation = create_test_simulation(SelectionMode::Filter, vec![], filter.clone());
 
         assert_eq!(simulation.selection_mode, SelectionMode::Filter);
-        let parsed_filter = simulation.parse_filter_criteria();
+        let parsed_filter = simulation.parse_filter_criteria().unwrap();
         assert_eq!(
             parsed_filter.department,
             Some(vec!["Engineering".to_string()])

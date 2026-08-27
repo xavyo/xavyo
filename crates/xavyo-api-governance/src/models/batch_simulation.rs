@@ -279,19 +279,25 @@ pub struct ExportBatchSimulationQuery {
 // Conversion Implementations
 // ============================================================================
 
-impl From<xavyo_db::GovBatchSimulation> for BatchSimulationResponse {
-    fn from(sim: xavyo_db::GovBatchSimulation) -> Self {
+impl TryFrom<xavyo_db::GovBatchSimulation> for BatchSimulationResponse {
+    type Error = crate::error::ApiGovernanceError;
+
+    fn try_from(sim: xavyo_db::GovBatchSimulation) -> Result<Self, Self::Error> {
         let impact_summary = if sim.status == SimulationStatus::Executed
             || sim.status == SimulationStatus::Applied
         {
-            Some(sim.parse_impact_summary())
+            Some(sim.parse_impact_summary().map_err(|e| {
+                crate::error::ApiGovernanceError::Validation(format!(
+                    "Invalid batch simulation impact JSON: {e}"
+                ))
+            })?)
         } else {
             None
         };
 
         let has_scope_warning = sim.has_scope_warning();
 
-        Self {
+        Ok(Self {
             id: sim.id,
             tenant_id: sim.tenant_id,
             name: sim.name,
@@ -310,21 +316,35 @@ impl From<xavyo_db::GovBatchSimulation> for BatchSimulationResponse {
             executed_at: sim.executed_at,
             applied_at: sim.applied_at,
             applied_by: sim.applied_by,
-        }
+        })
     }
 }
 
-impl From<xavyo_db::GovBatchSimulationResult> for BatchSimulationResultResponse {
-    fn from(result: xavyo_db::GovBatchSimulationResult) -> Self {
-        Self {
+impl TryFrom<xavyo_db::GovBatchSimulationResult> for BatchSimulationResultResponse {
+    type Error = crate::error::ApiGovernanceError;
+
+    fn try_from(result: xavyo_db::GovBatchSimulationResult) -> Result<Self, Self::Error> {
+        Ok(Self {
             id: result.id,
             simulation_id: result.simulation_id,
             user_id: result.user_id,
-            access_gained: result.parse_access_gained(),
-            access_lost: result.parse_access_lost(),
-            warnings: result.parse_warnings(),
+            access_gained: result.parse_access_gained().map_err(|e| {
+                crate::error::ApiGovernanceError::Validation(format!(
+                    "Invalid batch result access_gained JSON: {e}"
+                ))
+            })?,
+            access_lost: result.parse_access_lost().map_err(|e| {
+                crate::error::ApiGovernanceError::Validation(format!(
+                    "Invalid batch result access_lost JSON: {e}"
+                ))
+            })?,
+            warnings: result.parse_warnings().map_err(|e| {
+                crate::error::ApiGovernanceError::Validation(format!(
+                    "Invalid batch result warnings JSON: {e}"
+                ))
+            })?,
             created_at: result.created_at,
-        }
+        })
     }
 }
 
@@ -373,5 +393,21 @@ impl CreateBatchSimulationRequest {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn batch_simulation_response_does_not_default_on_invalid_json() {
+        let src = include_str!("batch_simulation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_impact_summary()")
+                && production.contains("parse_access_gained()")
+                && production.contains("TryFrom")
+                && !production.contains("impl From<xavyo_db::GovBatchSimulation>"),
+            "batch simulation GET must fail closed on JSON parse"
+        );
     }
 }

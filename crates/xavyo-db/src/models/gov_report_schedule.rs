@@ -614,9 +614,8 @@ impl GovReportSchedule {
     }
 
     /// Parse recipients from JSON.
-    #[must_use]
-    pub fn parse_recipients(&self) -> Vec<String> {
-        serde_json::from_value(self.recipients.clone()).unwrap_or_default()
+    pub fn parse_recipients(&self) -> Result<Vec<String>, serde_json::Error> {
+        serde_json::from_value(self.recipients.clone())
     }
 
     /// Check if the schedule should run now.
@@ -830,6 +829,20 @@ mod tests {
             production.contains("schedule_json(")
                 && !production.contains("unwrap_or_else(|_| serde_json::json!([])"),
             "report schedule persist must fail closed on JSON serialize"
+        );
+    }
+
+    #[test]
+    fn parse_recipients_does_not_default_on_invalid_json() {
+        let src = include_str!("gov_report_schedule.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("from_value(self.recipients.clone())")
+                && !production.contains("from_value(self.recipients.clone()).unwrap_or_default()"),
+            "report schedule GET must fail closed on JSON parse"
+        );
+        assert!(
+            serde_json::from_value::<Vec<String>>(serde_json::json!("not-recipients")).is_err()
         );
     }
 }

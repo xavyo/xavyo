@@ -51,7 +51,7 @@ pub async fn get_simulation_comparison(
         .get(tenant_id, comparison_id)
         .await?;
 
-    Ok(Json(SimulationComparisonResponse::from(comparison)))
+    Ok(Json(comparison.try_into()?))
 }
 
 /// List simulation comparisons.
@@ -93,8 +93,8 @@ pub async fn list_simulation_comparisons(
 
     let items: Vec<SimulationComparisonResponse> = comparisons
         .into_iter()
-        .map(std::convert::Into::into)
-        .collect();
+        .map(TryInto::try_into)
+        .collect::<Result<Vec<_>, _>>()?;
 
     Ok(Json(PaginatedResponse {
         items,
@@ -152,7 +152,7 @@ pub async fn create_simulation_comparison(
         )
         .await?;
 
-    Ok(Json(SimulationComparisonResponse::from(comparison)))
+    Ok(Json(comparison.try_into()?))
 }
 
 /// Delete a simulation comparison.
@@ -244,9 +244,9 @@ pub async fn export_simulation_comparison(
         // Generate CSV export
         let mut csv_output = String::from("type,user_id,impact_a,impact_b,diff\n");
 
-        // Parse delta results
-        let delta: xavyo_db::DeltaResults =
-            serde_json::from_value(comparison.delta_results.clone()).unwrap_or_default();
+        let delta = comparison.parse_delta_results().map_err(|e| {
+            ApiGovernanceError::Validation(format!("Invalid simulation comparison delta JSON: {e}"))
+        })?;
 
         // Add entries
         for entry in delta.added {
@@ -301,7 +301,7 @@ pub async fn export_simulation_comparison(
     } else {
         // JSON export (default)
         let export_data = SimulationComparisonExport {
-            comparison: SimulationComparisonResponse::from(comparison),
+            comparison: comparison.try_into()?,
         };
 
         let json = serde_json::to_string_pretty(&export_data)
@@ -328,4 +328,19 @@ pub async fn export_simulation_comparison(
 pub struct SimulationComparisonExport {
     /// The comparison metadata and results.
     pub comparison: SimulationComparisonResponse,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn comparison_export_does_not_default_on_invalid_json() {
+        let src = include_str!("simulation_comparisons.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_delta_results()")
+                && !production
+                    .contains("from_value(comparison.delta_results.clone()).unwrap_or_default()"),
+            "simulation comparison CSV export must fail closed on JSON parse"
+        );
+    }
 }

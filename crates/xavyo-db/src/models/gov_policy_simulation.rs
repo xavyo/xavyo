@@ -368,9 +368,8 @@ impl GovPolicySimulation {
     }
 
     /// Parse the impact summary.
-    #[must_use]
-    pub fn parse_impact_summary(&self) -> ImpactSummary {
-        serde_json::from_value(self.impact_summary.clone()).unwrap_or_default()
+    pub fn parse_impact_summary(&self) -> Result<ImpactSummary, serde_json::Error> {
+        serde_json::from_value(self.impact_summary.clone())
     }
 
     /// Check if the simulation is stale (data changed since execution).
@@ -490,7 +489,7 @@ mod tests {
             applied_by: None,
         };
 
-        let summary = simulation.parse_impact_summary();
+        let summary = simulation.parse_impact_summary().unwrap();
         assert_eq!(summary.total_users_analyzed, 100);
         assert_eq!(summary.affected_users, 5);
         assert_eq!(summary.by_severity.critical, 2);
@@ -528,6 +527,38 @@ mod tests {
             production.contains("policy_sim_json(")
                 && !production.contains("unwrap_or_else(|_| serde_json::json!({})"),
             "policy simulation persist must fail closed on JSON serialize"
+        );
+    }
+
+    #[test]
+    fn parse_impact_summary_does_not_default_on_invalid_json() {
+        let simulation = GovPolicySimulation {
+            id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            name: "Test".to_string(),
+            simulation_type: PolicySimulationType::SodRule,
+            policy_id: None,
+            policy_config: serde_json::json!({}),
+            status: SimulationStatus::Executed,
+            affected_users: vec![],
+            impact_summary: serde_json::json!("not-summary"),
+            detailed_results: serde_json::json!({}),
+            data_snapshot_at: None,
+            is_archived: false,
+            retain_until: None,
+            notes: None,
+            created_by: Uuid::new_v4(),
+            created_at: Utc::now(),
+            executed_at: None,
+            applied_at: None,
+            applied_by: None,
+        };
+        assert!(simulation.parse_impact_summary().is_err());
+        let src = include_str!("gov_policy_simulation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("from_value(self.impact_summary.clone()).unwrap_or_default()"),
+            "policy simulation GET must fail closed on JSON parse"
         );
     }
 }

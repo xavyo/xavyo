@@ -516,12 +516,27 @@ impl SimulationComparisonService {
                 .map_err(GovernanceError::Database)?;
 
                 for result in results {
+                    let access_gained = result.parse_access_gained().map_err(|e| {
+                        GovernanceError::Validation(format!(
+                            "Invalid batch result access_gained JSON: {e}"
+                        ))
+                    })?;
+                    let access_lost = result.parse_access_lost().map_err(|e| {
+                        GovernanceError::Validation(format!(
+                            "Invalid batch result access_lost JSON: {e}"
+                        ))
+                    })?;
+                    let warnings = result.parse_warnings().map_err(|e| {
+                        GovernanceError::Validation(format!(
+                            "Invalid batch result warnings JSON: {e}"
+                        ))
+                    })?;
                     let impact = serde_json::json!({
-                        "access_gained": result.parse_access_gained(),
-                        "access_lost": result.parse_access_lost(),
-                        "warnings": result.parse_warnings(),
-                        "entitlements_gained": result.parse_access_gained().len(),
-                        "entitlements_lost": result.parse_access_lost().len(),
+                        "access_gained": access_gained,
+                        "access_lost": access_lost,
+                        "warnings": warnings,
+                        "entitlements_gained": access_gained.len(),
+                        "entitlements_lost": access_lost.len(),
                     });
                     impacts.insert(result.user_id, impact);
                 }

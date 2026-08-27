@@ -53,7 +53,10 @@ pub async fn list_policies(
     let page = if limit > 0 { offset / limit } else { 0 };
 
     Ok(Json(BirthrightPolicyListResponse {
-        items: policies.into_iter().map(Into::into).collect(),
+        items: policies
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, _>>()?,
         total,
         page,
         page_size: limit,
@@ -88,7 +91,7 @@ pub async fn get_policy(
 
     let policy = state.birthright_policy_service.get(tenant_id, id).await?;
 
-    Ok(Json(policy.into()))
+    Ok(Json(policy.try_into()?))
 }
 
 /// Create a new birthright policy.
@@ -137,7 +140,7 @@ pub async fn create_policy(
         )
         .await?;
 
-    Ok((StatusCode::CREATED, Json(policy.into())))
+    Ok((StatusCode::CREATED, Json(policy.try_into()?)))
 }
 
 /// Update a birthright policy.
@@ -190,7 +193,7 @@ pub async fn update_policy(
         )
         .await?;
 
-    Ok(Json(policy.into()))
+    Ok(Json(policy.try_into()?))
 }
 
 /// Archive (soft-delete) a birthright policy.
@@ -227,7 +230,7 @@ pub async fn archive_policy(
         .archive(tenant_id, id)
         .await?;
 
-    Ok(Json(policy.into()))
+    Ok(Json(policy.try_into()?))
 }
 
 /// Enable a birthright policy.
@@ -265,7 +268,7 @@ pub async fn enable_policy(
         .enable(tenant_id, id)
         .await?;
 
-    Ok(Json(policy.into()))
+    Ok(Json(policy.try_into()?))
 }
 
 /// Disable a birthright policy.
@@ -303,7 +306,7 @@ pub async fn disable_policy(
         .disable(tenant_id, id)
         .await?;
 
-    Ok(Json(policy.into()))
+    Ok(Json(policy.try_into()?))
 }
 
 /// Simulate a single policy against user attributes.

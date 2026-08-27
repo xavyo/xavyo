@@ -312,7 +312,9 @@ impl BirthrightPolicyService {
         attributes: &serde_json::Value,
     ) -> Result<SimulatePolicyResponse> {
         let policy = self.get(tenant_id, policy_id).await?;
-        let conditions = policy.parse_conditions();
+        let conditions = policy.parse_conditions().map_err(|e| {
+            GovernanceError::Validation(format!("Invalid birthright policy conditions JSON: {e}"))
+        })?;
 
         let mut condition_results = Vec::new();
         let mut all_match = true;
@@ -515,7 +517,11 @@ impl BirthrightPolicyService {
                     })
                     .collect()
             } else {
-                policy.parse_conditions()
+                policy.parse_conditions().map_err(|e| {
+                    GovernanceError::Validation(format!(
+                        "Invalid birthright policy conditions JSON: {e}"
+                    ))
+                })?
             };
 
         // Determine entitlement IDs to use (proposed or current)

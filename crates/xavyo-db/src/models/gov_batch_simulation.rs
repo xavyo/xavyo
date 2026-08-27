@@ -435,9 +435,8 @@ impl GovBatchSimulation {
     }
 
     /// Parse the filter criteria.
-    #[must_use]
-    pub fn parse_filter_criteria(&self) -> FilterCriteria {
-        serde_json::from_value(self.filter_criteria.clone()).unwrap_or_default()
+    pub fn parse_filter_criteria(&self) -> Result<FilterCriteria, serde_json::Error> {
+        serde_json::from_value(self.filter_criteria.clone())
     }
 
     /// Parse the change specification.
@@ -447,15 +446,18 @@ impl GovBatchSimulation {
     }
 
     /// Parse the impact summary.
-    #[must_use]
-    pub fn parse_impact_summary(&self) -> BatchImpactSummary {
-        serde_json::from_value(self.impact_summary.clone()).unwrap_or_default()
+    pub fn parse_impact_summary(&self) -> Result<BatchImpactSummary, serde_json::Error> {
+        serde_json::from_value(self.impact_summary.clone())
     }
 
     /// Check if the simulation exceeds the scope warning threshold.
+    /// Corrupt JSON is treated as a warning (fail closed).
     #[must_use]
     pub fn has_scope_warning(&self) -> bool {
-        self.parse_impact_summary().affected_users > i64::from(SCOPE_WARNING_THRESHOLD)
+        match self.parse_impact_summary() {
+            Ok(summary) => summary.affected_users > i64::from(SCOPE_WARNING_THRESHOLD),
+            Err(_) => true,
+        }
     }
 }
 
@@ -566,6 +568,44 @@ mod tests {
             production.contains("batch_run_json(")
                 && !production.contains("unwrap_or_else(|_| serde_json::json!({})"),
             "batch simulation persist must fail closed on JSON serialize"
+        );
+    }
+
+    #[test]
+    fn parse_filter_and_impact_do_not_default_on_invalid_json() {
+        let simulation = GovBatchSimulation {
+            id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            name: "Test".to_string(),
+            batch_type: BatchSimulationType::RoleAdd,
+            selection_mode: SelectionMode::Filter,
+            user_ids: vec![],
+            filter_criteria: serde_json::json!("not-filter"),
+            change_spec: serde_json::json!({}),
+            status: SimulationStatus::Draft,
+            total_users: 0,
+            processed_users: 0,
+            impact_summary: serde_json::json!("not-summary"),
+            data_snapshot_at: None,
+            is_archived: false,
+            retain_until: None,
+            notes: None,
+            created_by: Uuid::new_v4(),
+            created_at: Utc::now(),
+            executed_at: None,
+            applied_at: None,
+            applied_by: None,
+        };
+        assert!(simulation.parse_filter_criteria().is_err());
+        assert!(simulation.parse_impact_summary().is_err());
+        assert!(simulation.has_scope_warning());
+        let src = include_str!("gov_batch_simulation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("from_value(self.filter_criteria.clone()).unwrap_or_default()")
+                && !production
+                    .contains("from_value(self.impact_summary.clone()).unwrap_or_default()"),
+            "batch simulation GET must fail closed on JSON parse"
         );
     }
 }

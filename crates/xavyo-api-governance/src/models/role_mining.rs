@@ -509,11 +509,16 @@ impl From<xavyo_db::GovConsolidationSuggestion> for ConsolidationSuggestionRespo
     }
 }
 
-impl From<xavyo_db::GovRoleSimulation> for SimulationResponse {
-    fn from(s: xavyo_db::GovRoleSimulation) -> Self {
-        // Parse changes before moving any fields
-        let changes = s.parse_changes();
-        Self {
+impl TryFrom<xavyo_db::GovRoleSimulation> for SimulationResponse {
+    type Error = crate::error::ApiGovernanceError;
+
+    fn try_from(s: xavyo_db::GovRoleSimulation) -> Result<Self, Self::Error> {
+        let changes = s.parse_changes().map_err(|e| {
+            crate::error::ApiGovernanceError::Validation(format!(
+                "Invalid role simulation changes JSON: {e}"
+            ))
+        })?;
+        Ok(Self {
             id: s.id,
             tenant_id: s.tenant_id,
             name: s.name,
@@ -528,13 +533,15 @@ impl From<xavyo_db::GovRoleSimulation> for SimulationResponse {
             applied_at: s.applied_at,
             created_by: s.created_by,
             created_at: s.created_at,
-        }
+        })
     }
 }
 
-impl From<xavyo_db::GovRoleMetrics> for RoleMetricsResponse {
-    fn from(m: xavyo_db::GovRoleMetrics) -> Self {
-        Self {
+impl TryFrom<xavyo_db::GovRoleMetrics> for RoleMetricsResponse {
+    type Error = crate::error::ApiGovernanceError;
+
+    fn try_from(m: xavyo_db::GovRoleMetrics) -> Result<Self, Self::Error> {
+        Ok(Self {
             id: m.id,
             tenant_id: m.tenant_id,
             role_id: m.role_id,
@@ -542,10 +549,14 @@ impl From<xavyo_db::GovRoleMetrics> for RoleMetricsResponse {
             coverage_rate: m.coverage_rate,
             user_count: m.user_count,
             active_user_count: m.active_user_count,
-            entitlement_usage: m.parse_entitlement_usage(),
+            entitlement_usage: m.parse_entitlement_usage().map_err(|e| {
+                crate::error::ApiGovernanceError::Validation(format!(
+                    "Invalid role metrics entitlement usage JSON: {e}"
+                ))
+            })?,
             trend_direction: m.trend_direction,
             calculated_at: m.calculated_at,
-        }
+        })
     }
 }
 
@@ -561,5 +572,21 @@ impl From<MiningJobParametersRequest> for MiningJobParameters {
             deviation_threshold: p.deviation_threshold,
             peer_group_attribute: p.peer_group_attribute,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn simulation_and_metrics_do_not_default_on_invalid_json() {
+        let src = include_str!("role_mining.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_changes()")
+                && production.contains("parse_entitlement_usage()")
+                && production.contains("TryFrom")
+                && !production.contains("let changes = s.parse_changes();"),
+            "role simulation and metrics GET must fail closed on JSON parse"
+        );
     }
 }

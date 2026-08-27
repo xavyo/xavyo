@@ -109,7 +109,8 @@ pub async fn get_event(
     )
     .await
     .map_err(ApiGovernanceError::Database)?
-    .map(crate::models::AccessSnapshotSummary::from);
+    .map(crate::models::AccessSnapshotSummary::try_from)
+    .transpose()?;
 
     Ok(Json(LifecycleEventWithActionsResponse {
         event: LifecycleEventResponse::from(event),

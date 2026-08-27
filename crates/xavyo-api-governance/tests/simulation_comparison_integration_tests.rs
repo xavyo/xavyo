@@ -198,7 +198,7 @@ mod tests {
             created_at: Utc::now(),
         };
 
-        let parsed_summary = comparison.parse_summary_stats();
+        let parsed_summary = comparison.parse_summary_stats().unwrap();
         assert_eq!(parsed_summary.users_in_both, 100);
         assert_eq!(parsed_summary.users_only_in_a, 10);
         assert_eq!(parsed_summary.different_impacts, 20);

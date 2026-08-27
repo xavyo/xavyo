@@ -60,7 +60,10 @@ pub async fn list_snapshots(
     let page = if limit > 0 { offset / limit } else { 0 };
 
     Ok(Json(AccessSnapshotListResponse {
-        items: snapshots.into_iter().map(Into::into).collect(),
+        items: snapshots
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, _>>()?,
         total,
         page,
         page_size: limit,
@@ -101,7 +104,7 @@ pub async fn get_snapshot(
                 "Access snapshot {id} not found"
             )))?;
 
-    Ok(Json(snapshot.into()))
+    Ok(Json(snapshot.try_into()?))
 }
 
 /// List access snapshots for a specific user.
@@ -153,7 +156,10 @@ pub async fn list_user_snapshots(
     let page = if limit > 0 { offset / limit } else { 0 };
 
     Ok(Json(AccessSnapshotListResponse {
-        items: snapshots.into_iter().map(Into::into).collect(),
+        items: snapshots
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, _>>()?,
         total,
         page,
         page_size: limit,

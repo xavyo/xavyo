@@ -272,15 +272,21 @@ fn default_format() -> String {
 // Conversion Implementations
 // ============================================================================
 
-impl From<xavyo_db::GovPolicySimulation> for PolicySimulationResponse {
-    fn from(sim: xavyo_db::GovPolicySimulation) -> Self {
+impl TryFrom<xavyo_db::GovPolicySimulation> for PolicySimulationResponse {
+    type Error = crate::error::ApiGovernanceError;
+
+    fn try_from(sim: xavyo_db::GovPolicySimulation) -> Result<Self, Self::Error> {
         let impact_summary = if sim.status == SimulationStatus::Executed {
-            Some(sim.parse_impact_summary())
+            Some(sim.parse_impact_summary().map_err(|e| {
+                crate::error::ApiGovernanceError::Validation(format!(
+                    "Invalid policy simulation impact JSON: {e}"
+                ))
+            })?)
         } else {
             None
         };
 
-        Self {
+        Ok(Self {
             id: sim.id,
             tenant_id: sim.tenant_id,
             name: sim.name,
@@ -297,7 +303,7 @@ impl From<xavyo_db::GovPolicySimulation> for PolicySimulationResponse {
             created_by: sim.created_by,
             created_at: sim.created_at,
             executed_at: sim.executed_at,
-        }
+        })
     }
 }
 
@@ -312,5 +318,20 @@ impl From<xavyo_db::GovPolicySimulationResult> for PolicySimulationResultRespons
             severity: result.severity,
             created_at: result.created_at,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn policy_simulation_response_does_not_default_on_invalid_json() {
+        let src = include_str!("policy_simulation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_impact_summary()")
+                && production.contains("TryFrom")
+                && !production.contains("impl From<xavyo_db::GovPolicySimulation>"),
+            "policy simulation GET must fail closed on JSON parse"
+        );
     }
 }

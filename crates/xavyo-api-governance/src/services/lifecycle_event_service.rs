@@ -350,7 +350,10 @@ impl LifecycleEventService {
                 .into_iter()
                 .map(LifecycleActionResponse::from)
                 .collect(),
-            snapshot: Some(AccessSnapshotSummary::from(snapshot)),
+            snapshot: Some(
+                AccessSnapshotSummary::try_from(snapshot)
+                    .map_err(|e| GovernanceError::Validation(e.to_string()))?,
+            ),
             summary,
         })
     }
@@ -590,7 +593,10 @@ impl LifecycleEventService {
                 .into_iter()
                 .map(LifecycleActionResponse::from)
                 .collect(),
-            snapshot: Some(AccessSnapshotSummary::from(snapshot)),
+            snapshot: Some(
+                AccessSnapshotSummary::try_from(snapshot)
+                    .map_err(|e| GovernanceError::Validation(e.to_string()))?,
+            ),
             summary,
         })
     }

@@ -52,7 +52,7 @@ pub async fn get_policy_simulation(
         .get(tenant_id, simulation_id)
         .await?;
 
-    Ok(Json(PolicySimulationResponse::from(simulation)))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// List policy simulations.
@@ -96,8 +96,8 @@ pub async fn list_policy_simulations(
 
     let items: Vec<PolicySimulationResponse> = simulations
         .into_iter()
-        .map(std::convert::Into::into)
-        .collect();
+        .map(TryInto::try_into)
+        .collect::<Result<Vec<_>, _>>()?;
 
     Ok(Json(PaginatedResponse {
         items,
@@ -149,7 +149,7 @@ pub async fn create_policy_simulation(
         )
         .await?;
 
-    Ok(Json(PolicySimulationResponse::from(simulation)))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// Execute a policy simulation (calculate impact).
@@ -186,7 +186,7 @@ pub async fn execute_policy_simulation(
         .execute(tenant_id, simulation_id, request.user_ids)
         .await?;
 
-    Ok(Json(PolicySimulationResponse::from(simulation)))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// Cancel a policy simulation.
@@ -221,7 +221,7 @@ pub async fn cancel_policy_simulation(
         .cancel(tenant_id, simulation_id)
         .await?;
 
-    Ok(Json(PolicySimulationResponse::from(simulation)))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// Archive a policy simulation.
@@ -255,7 +255,7 @@ pub async fn archive_policy_simulation(
         .archive(tenant_id, simulation_id)
         .await?;
 
-    Ok(Json(PolicySimulationResponse::from(simulation)))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// Restore an archived policy simulation.
@@ -289,7 +289,7 @@ pub async fn restore_policy_simulation(
         .restore(tenant_id, simulation_id)
         .await?;
 
-    Ok(Json(PolicySimulationResponse::from(simulation)))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// Update notes on a policy simulation.
@@ -329,7 +329,7 @@ pub async fn update_policy_simulation_notes(
         .update_notes(tenant_id, simulation_id, request.notes)
         .await?;
 
-    Ok(Json(PolicySimulationResponse::from(simulation)))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// Get policy simulation results (per-user impacts).
@@ -556,7 +556,7 @@ pub async fn export_policy_simulation(
     } else {
         // JSON export (default)
         let export_data = PolicySimulationExport {
-            simulation: PolicySimulationResponse::from(simulation),
+            simulation: simulation.try_into()?,
             results: results.into_iter().map(std::convert::Into::into).collect(),
         };
 

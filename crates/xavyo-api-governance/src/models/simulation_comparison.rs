@@ -150,13 +150,22 @@ pub struct ExportSimulationComparisonQuery {
 // Conversion Implementations
 // ============================================================================
 
-impl From<xavyo_db::GovSimulationComparison> for SimulationComparisonResponse {
-    fn from(comp: xavyo_db::GovSimulationComparison) -> Self {
-        // Parse before consuming string fields
-        let summary_stats = comp.parse_summary_stats();
-        let delta_results = comp.parse_delta_results();
+impl TryFrom<xavyo_db::GovSimulationComparison> for SimulationComparisonResponse {
+    type Error = crate::error::ApiGovernanceError;
 
-        Self {
+    fn try_from(comp: xavyo_db::GovSimulationComparison) -> Result<Self, Self::Error> {
+        let summary_stats = comp.parse_summary_stats().map_err(|e| {
+            crate::error::ApiGovernanceError::Validation(format!(
+                "Invalid simulation comparison summary JSON: {e}"
+            ))
+        })?;
+        let delta_results = comp.parse_delta_results().map_err(|e| {
+            crate::error::ApiGovernanceError::Validation(format!(
+                "Invalid simulation comparison delta JSON: {e}"
+            ))
+        })?;
+
+        Ok(Self {
             id: comp.id,
             tenant_id: comp.tenant_id,
             name: comp.name,
@@ -170,7 +179,7 @@ impl From<xavyo_db::GovSimulationComparison> for SimulationComparisonResponse {
             is_stale: comp.is_stale,
             created_by: comp.created_by,
             created_at: comp.created_at,
-        }
+        })
     }
 }
 
@@ -301,5 +310,18 @@ mod tests {
         let result = request.validate();
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("must be 'policy' or 'batch'"));
+    }
+
+    #[test]
+    fn comparison_response_does_not_default_on_invalid_json() {
+        let src = include_str!("simulation_comparison.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_summary_stats()")
+                && production.contains("parse_delta_results()")
+                && !production.contains("parse_summary_stats();")
+                && production.contains("TryFrom"),
+            "simulation comparison GET must fail closed on JSON parse"
+        );
     }
 }

@@ -766,7 +766,10 @@ pub async fn list_simulations(
     let page = if limit > 0 { offset / limit } else { 0 };
 
     Ok(Json(SimulationListResponse {
-        items: simulations.into_iter().map(Into::into).collect(),
+        items: simulations
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, _>>()?,
         total,
         page,
         page_size: limit,
@@ -804,7 +807,7 @@ pub async fn get_simulation(
         .get(tenant_id, simulation_id)
         .await?;
 
-    Ok(Json(simulation.into()))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// Create a new simulation.
@@ -848,7 +851,7 @@ pub async fn create_simulation(
         )
         .await?;
 
-    Ok((StatusCode::CREATED, Json(simulation.into())))
+    Ok((StatusCode::CREATED, Json(simulation.try_into()?)))
 }
 
 /// Execute a simulation.
@@ -882,7 +885,7 @@ pub async fn execute_simulation(
         .execute_simulation(tenant_id, simulation_id)
         .await?;
 
-    Ok(Json(simulation.into()))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// Apply a simulation (commit the changes).
@@ -917,7 +920,7 @@ pub async fn apply_simulation(
         .apply_simulation(tenant_id, simulation_id, user_id)
         .await?;
 
-    Ok(Json(simulation.into()))
+    Ok(Json(simulation.try_into()?))
 }
 
 /// Cancel a simulation.
@@ -951,7 +954,7 @@ pub async fn cancel_simulation(
         .cancel_simulation(tenant_id, simulation_id)
         .await?;
 
-    Ok(Json(simulation.into()))
+    Ok(Json(simulation.try_into()?))
 }
 
 // ============================================================================
@@ -1000,7 +1003,10 @@ pub async fn list_metrics(
     let page = if limit > 0 { offset / limit } else { 0 };
 
     Ok(Json(RoleMetricsListResponse {
-        items: metrics.into_iter().map(Into::into).collect(),
+        items: metrics
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, _>>()?,
         total,
         page,
         page_size: limit,
@@ -1038,7 +1044,7 @@ pub async fn get_role_metrics(
         .get_latest_by_role(tenant_id, role_id)
         .await?;
 
-    Ok(Json(metrics.into()))
+    Ok(Json(metrics.try_into()?))
 }
 
 /// Calculate metrics for roles.
@@ -1072,7 +1078,10 @@ pub async fn calculate_metrics(
         .await?;
 
     Ok(Json(RoleMetricsListResponse {
-        items: metrics.into_iter().map(Into::into).collect(),
+        items: metrics
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, _>>()?,
         total: role_ids.len() as i64,
         page: 0,
         page_size: role_ids.len() as i64,
