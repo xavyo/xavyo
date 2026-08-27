@@ -339,11 +339,9 @@ impl TicketingProvider for WebhookProvider {
                 status: ticket_status,
                 resolution_notes: webhook_response.resolution_notes,
                 resolved_by: webhook_response.resolved_by,
-                last_updated: webhook_response.last_updated.and_then(|s| {
-                    chrono::DateTime::parse_from_rfc3339(&s)
-                        .ok()
-                        .map(|dt| dt.with_timezone(&chrono::Utc))
-                }),
+                last_updated: super::parse_optional_rfc3339(
+                    webhook_response.last_updated.as_deref(),
+                )?,
                 raw_response: Some(raw_response),
             })
         } else if status == StatusCode::NOT_FOUND {
@@ -528,6 +526,14 @@ mod tests {
         assert!(
             !get_status.contains("raw_response: None"),
             "status checks must persist the provider body"
+        );
+        assert!(
+            !get_status.contains("parse_from_rfc3339(&s)\n                        .ok()"),
+            "unparseable last_updated must not be dropped"
+        );
+        assert!(
+            get_status.contains("parse_optional_rfc3339"),
+            "webhook status must fail closed on invalid last_updated"
         );
     }
 }

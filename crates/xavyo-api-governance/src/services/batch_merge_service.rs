@@ -127,13 +127,24 @@ impl BatchMergeService {
 
         let preview_items: Vec<BatchMergeCandidatePreview> = candidates
             .into_iter()
-            .map(|c| BatchMergeCandidatePreview {
-                candidate_id: c.id,
-                source_identity_id: c.identity_a_id,
-                target_identity_id: c.identity_b_id,
-                confidence_score: c.confidence_score.to_string().parse().unwrap_or(0.0),
+            .map(|c| {
+                let confidence_score = rust_decimal::prelude::ToPrimitive::to_f64(
+                    &c.confidence_score,
+                )
+                .ok_or_else(|| {
+                    GovernanceError::Validation(format!(
+                        "Invalid confidence score for candidate {}",
+                        c.id
+                    ))
+                })?;
+                Ok(BatchMergeCandidatePreview {
+                    candidate_id: c.id,
+                    source_identity_id: c.identity_a_id,
+                    target_identity_id: c.identity_b_id,
+                    confidence_score,
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(BatchMergePreview {
             total_candidates: total,
@@ -404,6 +415,20 @@ mod tests {
         let _ = AttributeResolutionRule::NewestWins;
         let _ = AttributeResolutionRule::OldestWins;
         let _ = AttributeResolutionRule::PreferNonNull;
+    }
+
+    #[test]
+    fn preview_confidence_does_not_default_to_zero() {
+        let src = include_str!("batch_merge_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("parse().unwrap_or(0.0)"),
+            "unparseable merge confidence must not silently become 0.0"
+        );
+        assert!(
+            production.contains("to_f64"),
+            "confidence must convert via Decimal::to_f64"
+        );
     }
 
     #[test]
