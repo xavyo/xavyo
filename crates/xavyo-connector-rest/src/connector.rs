@@ -138,9 +138,7 @@ impl RestConnector {
         match &self.config.auth {
             AuthConfig::None => Ok(None),
             AuthConfig::Basic { username, password } => {
-                let credentials = format!("{}:{}", username, password.as_deref().unwrap_or(""));
-                let encoded = base64_encode(&credentials);
-                Ok(Some(format!("Basic {encoded}")))
+                Ok(Some(basic_auth_header(username, password.as_deref())?))
             }
             AuthConfig::Bearer { token } => Ok(Some(format!("Bearer {token}"))),
             AuthConfig::ApiKey {
@@ -655,6 +653,16 @@ impl RestConnector {
 
         params
     }
+}
+
+/// Build a Basic Authorization header. Missing password must not become empty.
+fn basic_auth_header(username: &str, password: Option<&str>) -> ConnectorResult<String> {
+    let password = password.ok_or_else(|| ConnectorError::InvalidConfiguration {
+        message: "Basic authentication requires a password".to_string(),
+    })?;
+    let credentials = format!("{username}:{password}");
+    let encoded = base64_encode(&credentials);
+    Ok(format!("Basic {encoded}"))
 }
 
 /// Base64 encode bytes to string.
@@ -1457,6 +1465,22 @@ impl RestConnector {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn basic_auth_requires_password() {
+        assert!(basic_auth_header("admin", Some("secret")).is_ok());
+        assert!(basic_auth_header("admin", None).is_err());
+        let src = include_str!("connector.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let auth = production
+            .split("fn basic_auth_header")
+            .nth(1)
+            .expect("basic_auth_header");
+        assert!(
+            !auth.contains("unwrap_or(\"\")"),
+            "Basic auth must not send an empty password when none is configured"
+        );
+    }
 
     #[test]
     fn test_rest_connector_new() {

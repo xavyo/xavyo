@@ -186,10 +186,15 @@ fn normalize_url(url_str: &str) -> SamlResult<String> {
     let parsed = url::Url::parse(url_str)
         .map_err(|e| SamlError::InvalidAuthnRequest(format!("Invalid ACS URL format: {e}")))?;
 
+    let host = parsed
+        .host_str()
+        .filter(|h| !h.is_empty())
+        .ok_or_else(|| SamlError::InvalidAuthnRequest("ACS URL is missing a host".to_string()))?;
+
     let mut normalized = format!(
         "{}://{}",
         parsed.scheme().to_lowercase(),
-        parsed.host_str().unwrap_or("").to_lowercase()
+        host.to_lowercase()
     );
 
     if let Some(port) = parsed.port() {
@@ -534,6 +539,25 @@ mod tests {
         assert!(
             production.contains("slo_session_recorded(") && !production.contains("non-fatal"),
             "SSO must not issue an assertion when SLO session persist fails"
+        );
+    }
+
+    #[test]
+    fn acs_normalize_requires_host() {
+        assert!(super::normalize_url("https://sp.example.com/acs").is_ok());
+        assert!(
+            super::normalize_url("mailto:user@example.com").is_err(),
+            "hostless URLs must not normalize to an empty host"
+        );
+        let src = include_str!("sso.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let normalize = production
+            .split("fn normalize_url")
+            .nth(1)
+            .expect("normalize_url");
+        assert!(
+            !normalize.contains("unwrap_or(\"\")"),
+            "ACS URL normalize must not treat a missing host as empty"
         );
     }
 }

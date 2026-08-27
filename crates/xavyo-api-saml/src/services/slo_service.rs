@@ -409,7 +409,9 @@ fn is_safe_slo_url(url: &str) -> bool {
     };
 
     let scheme = parsed.scheme();
-    let host = parsed.host_str().unwrap_or("");
+    let Some(host) = parsed.host_str().filter(|h| !h.is_empty()) else {
+        return false;
+    };
 
     // Allow HTTP only for localhost (development)
     if scheme == "http" {
@@ -471,4 +473,27 @@ fn is_safe_slo_url(url: &str) -> bool {
     }
 
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn slo_url_without_host_is_not_safe() {
+        assert!(is_safe_slo_url("https://sp.example.com/slo"));
+        assert!(is_safe_slo_url("http://localhost/slo"));
+        assert!(!is_safe_slo_url("mailto:user@example.com"));
+        assert!(!is_safe_slo_url("not-a-url"));
+        let src = include_str!("slo_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let check = production
+            .split("fn is_safe_slo_url")
+            .nth(1)
+            .expect("is_safe_slo_url");
+        assert!(
+            !check.contains("unwrap_or(\"\")"),
+            "SLO URL safety must not treat a missing host as empty"
+        );
+    }
 }

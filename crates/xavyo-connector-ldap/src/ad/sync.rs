@@ -114,11 +114,11 @@ pub fn map_ad_user(entry: &AttributeSet) -> Option<MappedUser> {
     let external_id = extract_object_guid(entry)?;
     debug!(external_id = %external_id, "Mapping AD user entry");
 
-    // Extract DN
+    // Extract DN. Missing DN must not look like a valid AD user.
     let dn = entry
         .get_string("distinguishedName")
         .or_else(|| entry.get_string("dn"))
-        .unwrap_or("")
+        .filter(|s| !s.is_empty())?
         .to_string();
 
     let mut attrs = HashMap::new();
@@ -835,6 +835,23 @@ mod tests {
         assert_eq!(
             member_of[0].as_str().unwrap(),
             "CN=Developers,OU=Groups,DC=example,DC=com"
+        );
+    }
+
+    #[test]
+    fn map_ad_user_requires_dn() {
+        let mut entry = sample_ad_user_entry();
+        entry.remove("distinguishedName");
+        assert!(map_ad_user(&entry).is_none());
+        let src = include_str!("sync.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let map = production
+            .split("pub fn map_ad_user")
+            .nth(1)
+            .expect("map_ad_user");
+        assert!(
+            !map.contains("unwrap_or(\"\")"),
+            "AD user mapping must not treat a missing DN as empty"
         );
     }
 
