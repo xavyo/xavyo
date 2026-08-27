@@ -7,7 +7,7 @@ use tracing::instrument;
 use uuid::Uuid;
 
 use super::change::InboundChange;
-use super::error::SyncResult;
+use super::error::{SyncError, SyncResult};
 use super::types::{ConflictType, ResolutionStrategy};
 
 /// A sync conflict between inbound and outbound changes.
@@ -142,7 +142,7 @@ impl SyncConflictDetector {
         .fetch_one(&self.pool)
         .await?;
 
-        Ok(result.into_conflict())
+        result.into_conflict()
     }
 
     /// Resolve a conflict.
@@ -177,7 +177,7 @@ impl SyncConflictDetector {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(SyncConflictRow::into_conflict))
+        result.map(SyncConflictRow::into_conflict).transpose()
     }
 
     /// Get pending conflicts for a connector.
@@ -209,10 +209,9 @@ impl SyncConflictDetector {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows
-            .into_iter()
+        rows.into_iter()
             .map(SyncConflictRow::into_conflict)
-            .collect())
+            .collect()
     }
 
     /// Count pending conflicts for a connector.
@@ -300,8 +299,8 @@ struct SyncConflictRow {
 }
 
 impl SyncConflictRow {
-    fn into_conflict(self) -> SyncConflict {
-        SyncConflict {
+    fn into_conflict(self) -> SyncResult<SyncConflict> {
+        Ok(SyncConflict {
             id: self.id,
             tenant_id: self.tenant_id,
             inbound_change_id: self.inbound_change_id,
@@ -309,19 +308,19 @@ impl SyncConflictRow {
             conflict_type: self
                 .conflict_type
                 .parse()
-                .unwrap_or(ConflictType::ConcurrentUpdate),
+                .map_err(|e| SyncError::Internal { message: e })?,
             affected_attributes: self.affected_attributes,
             inbound_value: self.inbound_value,
             outbound_value: self.outbound_value,
             resolution_strategy: self
                 .resolution_strategy
                 .parse()
-                .unwrap_or(ResolutionStrategy::Pending),
+                .map_err(|e| SyncError::Internal { message: e })?,
             resolved_by: self.resolved_by,
             resolved_at: self.resolved_at,
             resolution_notes: self.resolution_notes,
             created_at: self.created_at,
-        }
+        })
     }
 }
 
@@ -375,5 +374,18 @@ mod tests {
             !production.contains("JOIN gov_inbound_changes ic ON c.inbound_change_id = ic.id\n"),
             "must not join inbound changes by id alone"
         );
+    }
+
+    #[test]
+    fn into_conflict_does_not_default_unknown_type_or_strategy() {
+        let src = include_str!("conflict.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(ConflictType::ConcurrentUpdate)")
+                && !production.contains("unwrap_or(ResolutionStrategy::Pending)"),
+            "unknown stored conflict type/strategy must not silently default"
+        );
+        assert!("nope".parse::<ConflictType>().is_err());
+        assert!("bogus".parse::<ResolutionStrategy>().is_err());
     }
 }

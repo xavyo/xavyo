@@ -81,16 +81,17 @@ pub struct IdempotentRequest {
 }
 
 impl IdempotentRequest {
-    /// Get the typed state.
-    #[must_use]
-    pub fn state(&self) -> IdempotentState {
-        IdempotentState::from_db(&self.state).unwrap_or(IdempotentState::Processing)
+    /// Get the typed state. Unknown stored values must not become `Processing`.
+    pub fn state(&self) -> Result<IdempotentState, String> {
+        IdempotentState::from_db(&self.state)
+            .ok_or_else(|| format!("Unknown idempotent state: {}", self.state))
     }
 
     /// Check if this request has timed out while processing.
+    /// Unknown stored states are not treated as in-flight processing.
     #[must_use]
     pub fn is_processing_timed_out(&self) -> bool {
-        if self.state() != IdempotentState::Processing {
+        if !matches!(self.state(), Ok(IdempotentState::Processing)) {
             return false;
         }
         let timeout = Duration::seconds(PROCESSING_TIMEOUT_SECONDS);
@@ -345,5 +346,32 @@ mod tests {
             !production.contains("WHERE id = $1\n            \""),
             "must not complete/fail idempotent requests by id alone"
         );
+    }
+
+    #[test]
+    fn idempotent_state_does_not_default_to_processing() {
+        let src = include_str!("idempotent_request.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(IdempotentState::Processing)"),
+            "unknown stored idempotent state must not silently become processing"
+        );
+        let unknown = IdempotentRequest {
+            id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            idempotency_key: "k".into(),
+            request_hash: "h".into(),
+            endpoint: "/x".into(),
+            http_method: "POST".into(),
+            response_status: None,
+            response_body: None,
+            response_headers: None,
+            state: "bogus".into(),
+            created_at: Utc::now(),
+            completed_at: None,
+            expires_at: Utc::now(),
+        };
+        assert!(unknown.state().is_err());
+        assert!(!unknown.is_processing_timed_out());
     }
 }

@@ -60,26 +60,20 @@ pub struct ReconciliationAction {
 }
 
 impl ReconciliationAction {
-    /// Get action type enum.
-    #[must_use]
-    pub fn action_type(&self) -> ReconciliationActionType {
-        self.action_type
-            .parse()
-            .unwrap_or(ReconciliationActionType::Update)
+    /// Get action type enum. Unknown stored values must not become `Update`.
+    pub fn action_type(&self) -> Result<ReconciliationActionType, String> {
+        self.action_type.parse()
     }
 
-    /// Get result enum.
-    #[must_use]
-    pub fn result(&self) -> ReconciliationActionResult {
-        self.result
-            .parse()
-            .unwrap_or(ReconciliationActionResult::Failure)
+    /// Get result enum. Unknown stored values must not become `Failure` or `Success`.
+    pub fn result(&self) -> Result<ReconciliationActionResult, String> {
+        self.result.parse()
     }
 
-    /// Check if action succeeded.
+    /// Check if action succeeded. Unknown stored results are not success.
     #[must_use]
     pub fn is_success(&self) -> bool {
-        self.result().eq(&ReconciliationActionResult::Success)
+        matches!(self.result(), Ok(ReconciliationActionResult::Success))
     }
 
     /// Create a new action record.
@@ -519,5 +513,18 @@ mod tests {
 
         assert_eq!(action.before_state, Some(before));
         assert_eq!(action.after_state, Some(after));
+    }
+
+    #[test]
+    fn reconciliation_action_enums_do_not_silently_default() {
+        let src = include_str!("reconciliation_action.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(ReconciliationActionType::Update)")
+                && !production.contains("unwrap_or(ReconciliationActionResult::Failure)"),
+            "unknown reconciliation action type/result must not silently default"
+        );
+        assert!("nope".parse::<ReconciliationActionResult>().is_err());
+        assert!("bogus".parse::<ReconciliationActionType>().is_err());
     }
 }

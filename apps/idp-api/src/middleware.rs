@@ -651,6 +651,8 @@ pub enum IdempotencyError {
     Mismatch,
     /// Database error.
     Database(sqlx::Error),
+    /// Cached replay is missing a valid HTTP status or stored state.
+    InvalidCachedResponse(String),
 }
 
 impl IdempotencyError {
@@ -670,6 +672,14 @@ impl IdempotencyError {
             ),
             Self::Database(e) => {
                 tracing::error!(error = %e, "Idempotency database error");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "internal_error",
+                    "An internal error occurred".to_string(),
+                )
+            }
+            Self::InvalidCachedResponse(msg) => {
+                tracing::error!(error = %msg, "Idempotency cached response is invalid");
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "internal_error",
@@ -740,6 +750,29 @@ pub fn hash_request_body(body: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(body);
     hex::encode(hasher.finalize())
+}
+
+/// HTTP status for a cached idempotent replay.
+///
+/// Missing or invalid stored statuses must not become HTTP 200.
+pub fn cached_idempotent_status(
+    response_status: Option<i16>,
+) -> Result<StatusCode, IdempotencyError> {
+    let code = response_status.ok_or_else(|| {
+        IdempotencyError::InvalidCachedResponse(
+            "cached idempotent response is missing status".to_string(),
+        )
+    })?;
+    let code = u16::try_from(code).map_err(|_| {
+        IdempotencyError::InvalidCachedResponse(format!(
+            "cached idempotent status {code} is not a valid HTTP status"
+        ))
+    })?;
+    StatusCode::from_u16(code).map_err(|_| {
+        IdempotencyError::InvalidCachedResponse(format!(
+            "cached idempotent status {code} is not a valid HTTP status"
+        ))
+    })
 }
 
 /// State needed for idempotency middleware.
@@ -904,7 +937,8 @@ async fn idempotency_middleware_inner(
         InsertResult::Conflict(existing) => {
             // Key already exists - check state and hash
             match existing.state() {
-                IdempotentState::Processing => {
+                Err(e) => IdempotencyError::InvalidCachedResponse(e).into_response(),
+                Ok(IdempotentState::Processing) => {
                     // Check for stale lock
                     if existing.is_processing_timed_out() {
                         // Try to delete stale record and retry
@@ -921,16 +955,17 @@ async fn idempotency_middleware_inner(
                     }
                     IdempotencyError::Conflict.into_response()
                 }
-                IdempotentState::Completed | IdempotentState::Failed => {
+                Ok(IdempotentState::Completed | IdempotentState::Failed) => {
                     // Check hash match
                     if existing.request_hash != request_hash {
                         return IdempotencyError::Mismatch.into_response();
                     }
 
-                    // Return cached response
-                    let status =
-                        StatusCode::from_u16(existing.response_status.unwrap_or(200) as u16)
-                            .unwrap_or(StatusCode::OK);
+                    // Return cached response. Missing/invalid status must not become HTTP 200.
+                    let status = match cached_idempotent_status(existing.response_status) {
+                        Ok(status) => status,
+                        Err(e) => return e.into_response(),
+                    };
 
                     let body_bytes = existing.response_body.unwrap_or_default();
                     let mut response = Response::new(Body::from(body_bytes));
@@ -1354,6 +1389,29 @@ mod tests {
         // SHA-256 produces 64 hex characters
         assert_eq!(hash.len(), 64);
         assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn cached_idempotent_status_does_not_default_to_ok() {
+        assert_eq!(
+            super::cached_idempotent_status(Some(409)).unwrap(),
+            axum::http::StatusCode::CONFLICT
+        );
+        assert!(super::cached_idempotent_status(None).is_err());
+        assert!(super::cached_idempotent_status(Some(-1)).is_err());
+        assert!(super::cached_idempotent_status(Some(99)).is_err());
+
+        let src = include_str!("middleware.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("cached_idempotent_status("),
+            "idempotent replay must fail closed on missing status"
+        );
+        assert!(
+            !production.contains("unwrap_or(200)")
+                && !production.contains("unwrap_or(StatusCode::OK)"),
+            "missing/invalid cached status must not become HTTP 200"
+        );
     }
 
     #[test]
