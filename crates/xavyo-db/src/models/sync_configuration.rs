@@ -101,17 +101,13 @@ pub struct SyncConfiguration {
 
 impl SyncConfiguration {
     /// Get the sync mode enum.
-    #[must_use]
-    pub fn sync_mode(&self) -> SyncMode {
-        self.sync_mode.parse().unwrap_or(SyncMode::Polling)
+    pub fn sync_mode(&self) -> Result<SyncMode, String> {
+        self.sync_mode.parse()
     }
 
     /// Get the conflict resolution enum.
-    #[must_use]
-    pub fn conflict_resolution(&self) -> SyncConflictResolution {
-        self.conflict_resolution
-            .parse()
-            .unwrap_or(SyncConflictResolution::InboundWins)
+    pub fn conflict_resolution(&self) -> Result<SyncConflictResolution, String> {
+        self.conflict_resolution.parse()
     }
 
     /// Create a new sync configuration.
@@ -458,5 +454,18 @@ mod tests {
             SyncConflictResolution::InboundWins
         );
         assert!(!config.auto_create_identity);
+    }
+
+    #[test]
+    fn sync_enum_getters_do_not_silently_default() {
+        let src = include_str!("sync_configuration.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(SyncMode::Polling)")
+                && !production.contains("unwrap_or(SyncConflictResolution::InboundWins)"),
+            "unknown sync mode/conflict must not silently default to polling/inbound-wins"
+        );
+        assert!("nope".parse::<SyncMode>().is_err());
+        assert!("overwrite".parse::<SyncConflictResolution>().is_err());
     }
 }

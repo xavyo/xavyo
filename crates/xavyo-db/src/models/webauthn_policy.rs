@@ -86,9 +86,8 @@ pub struct UpsertWebAuthnPolicy {
 
 impl TenantWebAuthnPolicy {
     /// Get the user verification requirement as an enum.
-    #[must_use]
-    pub fn user_verification_requirement(&self) -> UserVerification {
-        self.user_verification.parse().unwrap_or_default()
+    pub fn user_verification_requirement(&self) -> Result<UserVerification, String> {
+        self.user_verification.parse()
     }
 
     /// Check if a specific authenticator type is allowed.
@@ -263,8 +262,19 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            policy.user_verification_requirement(),
+            policy.user_verification_requirement().unwrap(),
             UserVerification::Required
+        );
+        let invalid = TenantWebAuthnPolicy {
+            user_verification: "never".to_string(),
+            ..Default::default()
+        };
+        assert!(invalid.user_verification_requirement().is_err());
+        let src = include_str!("webauthn_policy.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or_default()"),
+            "unknown WebAuthn user_verification must not silently become Preferred"
         );
     }
 }

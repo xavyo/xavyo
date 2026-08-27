@@ -80,15 +80,13 @@ pub struct ReconciliationSchedule {
 
 impl ReconciliationSchedule {
     /// Get mode enum.
-    #[must_use]
-    pub fn mode(&self) -> ConnectorReconciliationMode {
-        self.mode.parse().unwrap_or_default()
+    pub fn mode(&self) -> Result<ConnectorReconciliationMode, String> {
+        self.mode.parse()
     }
 
     /// Get frequency enum.
-    #[must_use]
-    pub fn frequency(&self) -> ReconciliationScheduleFrequency {
-        self.frequency.parse().unwrap_or_default()
+    pub fn frequency(&self) -> Result<ReconciliationScheduleFrequency, String> {
+        self.frequency.parse()
     }
 
     /// Create or update (upsert) a schedule.
@@ -284,7 +282,7 @@ impl ReconciliationSchedule {
 
     /// Validate schedule configuration.
     pub fn validate(&self) -> Result<(), String> {
-        let freq = self.frequency();
+        let freq = self.frequency()?;
         match freq {
             ReconciliationScheduleFrequency::Weekly if self.day_of_week.is_none() => {
                 Err("day_of_week is required for weekly schedule".to_string())
@@ -459,5 +457,17 @@ mod tests {
         let json = r#"{"mode":"full","frequency":"daily"}"#;
         let input: UpsertReconciliationSchedule = serde_json::from_str(json).unwrap();
         assert_eq!(input.enabled, None);
+    }
+
+    #[test]
+    fn schedule_mode_and_frequency_do_not_silently_default() {
+        let src = include_str!("reconciliation_schedule.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or_default()"),
+            "unknown recon schedule mode/frequency must not silently default"
+        );
+        assert!("nope".parse::<ConnectorReconciliationMode>().is_err());
+        assert!("never".parse::<ReconciliationScheduleFrequency>().is_err());
     }
 }
