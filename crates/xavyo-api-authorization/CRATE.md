@@ -12,9 +12,9 @@ api
 
 ## Status
 
-🟡 **beta**
+🟢 **stable**
 
-Functional with comprehensive integration test coverage (77+ tests). Policy CRUD operations fully tested (36 tests) including validation, authorization checks, tenant isolation, and edge cases. Authorization decision endpoints fully tested (24 tests) including single/batch decisions, caching, and tenant isolation. Audit logging infrastructure added (17 tests) for policy change tracking, version history, and audit queries. Ready for production use with monitoring.
+Production-ready with 138+ tests (26 unit + 112 integration). Policy CRUD, authorization decisions, and audit logging are covered by integration suites gated behind the `integration` feature and enforced in CI via `.github/workflows/authorization-integration.yml`.
 
 ## Dependencies
 
