@@ -230,44 +230,13 @@ impl SpService {
 
         // SECURITY: Enforce HTTPS for ACS URLs to prevent assertion interception via MITM.
         for acs_url in &req.acs_urls {
-            if let Ok(parsed) = url::Url::parse(acs_url) {
-                if parsed.scheme() != "https" {
-                    return Err(SamlError::InvalidAuthnRequest(format!(
-                        "ACS URL must use HTTPS: {acs_url}"
-                    )));
-                }
-            } else {
-                return Err(SamlError::InvalidAuthnRequest(format!(
-                    "Invalid ACS URL format: {acs_url}"
-                )));
-            }
+            require_https_url_with_host(acs_url, "ACS URL")?;
         }
 
         // SECURITY: Validate SLO URL if provided (must be HTTPS or localhost)
         if let Some(ref slo_url) = req.slo_url {
             if !slo_url.is_empty() {
-                if let Ok(parsed) = url::Url::parse(slo_url) {
-                    let scheme = parsed.scheme();
-                    let host = parsed.host_str().unwrap_or("");
-                    if scheme == "http"
-                        && host != "localhost"
-                        && host != "127.0.0.1"
-                        && host != "[::1]"
-                    {
-                        return Err(SamlError::InvalidAuthnRequest(
-                            "SLO URL must use HTTPS (HTTP only for localhost)".to_string(),
-                        ));
-                    }
-                    if scheme != "http" && scheme != "https" {
-                        return Err(SamlError::InvalidAuthnRequest(format!(
-                            "SLO URL must use HTTPS, got scheme: {scheme}"
-                        )));
-                    }
-                } else {
-                    return Err(SamlError::InvalidAuthnRequest(
-                        "Invalid SLO URL format".to_string(),
-                    ));
-                }
+                require_https_or_localhost_url(slo_url, "SLO URL")?;
             }
         }
 
@@ -354,17 +323,7 @@ impl SpService {
 
         // SECURITY: Re-validate HTTPS for ACS URLs on update (same check as create_sp).
         for acs_url in &acs_urls {
-            if let Ok(parsed) = url::Url::parse(acs_url) {
-                if parsed.scheme() != "https" {
-                    return Err(SamlError::InvalidAuthnRequest(format!(
-                        "ACS URL must use HTTPS: {acs_url}"
-                    )));
-                }
-            } else {
-                return Err(SamlError::InvalidAuthnRequest(format!(
-                    "Invalid ACS URL format: {acs_url}"
-                )));
-            }
+            require_https_url_with_host(acs_url, "ACS URL")?;
         }
         let certificate = req.certificate.or(existing.certificate);
         let attribute_mapping = req.attribute_mapping.unwrap_or(existing.attribute_mapping);
@@ -389,28 +348,7 @@ impl SpService {
         // SECURITY: Validate SLO URL if provided (must be HTTPS or localhost)
         if let Some(ref slo_url) = req.slo_url {
             if !slo_url.is_empty() {
-                if let Ok(parsed) = url::Url::parse(slo_url) {
-                    let scheme = parsed.scheme();
-                    let host = parsed.host_str().unwrap_or("");
-                    if scheme == "http"
-                        && host != "localhost"
-                        && host != "127.0.0.1"
-                        && host != "[::1]"
-                    {
-                        return Err(SamlError::InvalidAuthnRequest(
-                            "SLO URL must use HTTPS (HTTP only for localhost)".to_string(),
-                        ));
-                    }
-                    if scheme != "http" && scheme != "https" {
-                        return Err(SamlError::InvalidAuthnRequest(format!(
-                            "SLO URL must use HTTPS, got scheme: {scheme}"
-                        )));
-                    }
-                } else {
-                    return Err(SamlError::InvalidAuthnRequest(
-                        "Invalid SLO URL format".to_string(),
-                    ));
-                }
+                require_https_or_localhost_url(slo_url, "SLO URL")?;
             }
         }
 
@@ -762,4 +700,66 @@ fn decrypt_private_key(encrypted: &[u8], encryption_key: &[u8]) -> SamlResult<St
 
     String::from_utf8(plaintext)
         .map_err(|e| SamlError::PrivateKeyError(format!("Invalid UTF-8: {e}")))
+}
+
+/// ACS URLs must be HTTPS and include a host so they cannot collide as empty.
+fn require_https_url_with_host(url: &str, kind: &str) -> SamlResult<()> {
+    let parsed = url::Url::parse(url)
+        .map_err(|_| SamlError::InvalidAuthnRequest(format!("Invalid {kind} format: {url}")))?;
+    if parsed.scheme() != "https" {
+        return Err(SamlError::InvalidAuthnRequest(format!(
+            "{kind} must use HTTPS: {url}"
+        )));
+    }
+    if parsed.host_str().filter(|h| !h.is_empty()).is_none() {
+        return Err(SamlError::InvalidAuthnRequest(format!(
+            "{kind} is missing a host: {url}"
+        )));
+    }
+    Ok(())
+}
+
+/// SLO URLs must be HTTPS (HTTP only for localhost) and include a host.
+fn require_https_or_localhost_url(url: &str, kind: &str) -> SamlResult<()> {
+    let parsed = url::Url::parse(url)
+        .map_err(|_| SamlError::InvalidAuthnRequest(format!("Invalid {kind} format")))?;
+    let host = parsed
+        .host_str()
+        .filter(|h| !h.is_empty())
+        .ok_or_else(|| SamlError::InvalidAuthnRequest(format!("{kind} is missing a host")))?;
+    let scheme = parsed.scheme();
+    if scheme == "http" {
+        if host != "localhost" && host != "127.0.0.1" && host != "[::1]" {
+            return Err(SamlError::InvalidAuthnRequest(format!(
+                "{kind} must use HTTPS (HTTP only for localhost)"
+            )));
+        }
+    } else if scheme != "https" {
+        return Err(SamlError::InvalidAuthnRequest(format!(
+            "{kind} must use HTTPS, got scheme: {scheme}"
+        )));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn acs_and_slo_urls_require_host() {
+        assert!(require_https_url_with_host("https://sp.example.com/acs", "ACS URL").is_ok());
+        assert!(require_https_url_with_host("mailto:user@example.com", "ACS URL").is_err());
+        assert!(require_https_url_with_host("http://sp.example.com/acs", "ACS URL").is_err());
+        assert!(require_https_or_localhost_url("https://sp.example.com/slo", "SLO URL").is_ok());
+        assert!(require_https_or_localhost_url("http://localhost/slo", "SLO URL").is_ok());
+        assert!(require_https_or_localhost_url("mailto:user@example.com", "SLO URL").is_err());
+        assert!(require_https_or_localhost_url("http://evil.example/slo", "SLO URL").is_err());
+        let src = include_str!("sp_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("host_str().unwrap_or(\"\")"),
+            "SP ACS/SLO URL validation must not treat a missing host as empty"
+        );
+    }
 }

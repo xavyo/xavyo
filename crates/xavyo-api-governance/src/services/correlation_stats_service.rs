@@ -6,7 +6,7 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use xavyo_governance::error::Result;
+use xavyo_governance::error::{GovernanceError, Result};
 
 use crate::models::correlation::{
     CorrelationStatisticsResponse, CorrelationTrendsResponse, DailyTrendData,
@@ -232,20 +232,22 @@ impl CorrelationStatsService {
         .fetch_all(&self.pool)
         .await?;
 
-        // Map rows to daily trend data
+        // Map rows to daily trend data. NULL AVG must not look like zero confidence.
         let daily_trends: Vec<DailyTrendData> = rows
             .into_iter()
             .map(
-                |(date, total, auto_confirmed, manual_review, no_match, avg_conf)| DailyTrendData {
-                    date,
-                    total_evaluated: total,
-                    auto_confirmed,
-                    manual_review,
-                    no_match,
-                    average_confidence: avg_conf.unwrap_or(0.0),
+                |(date, total, auto_confirmed, manual_review, no_match, avg_conf)| {
+                    Ok(DailyTrendData {
+                        date,
+                        total_evaluated: total,
+                        auto_confirmed,
+                        manual_review,
+                        no_match,
+                        average_confidence: trend_average_confidence(avg_conf)?,
+                    })
                 },
             )
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
 
         // Calculate overall statistics for suggestions
         let total_evaluated: i64 = daily_trends.iter().map(|d| d.total_evaluated).sum();
@@ -358,6 +360,13 @@ impl CorrelationStatsService {
     }
 }
 
+/// Daily trend AVG. NULL must not be reported as 0.0 confidence.
+pub(crate) fn trend_average_confidence(avg_conf: Option<f64>) -> Result<f64> {
+    avg_conf.ok_or_else(|| {
+        GovernanceError::Validation("correlation trend average_confidence is missing".to_string())
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -428,5 +437,18 @@ mod tests {
         assert!(suggestions
             .iter()
             .any(|s| s.contains("Low average confidence")));
+    }
+
+    #[test]
+    fn trend_average_confidence_does_not_default_to_zero() {
+        assert_eq!(trend_average_confidence(Some(0.42)).unwrap(), 0.42);
+        assert!(trend_average_confidence(None).is_err());
+        let src = include_str!("correlation_stats_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("trend_average_confidence(")
+                && !production.contains("avg_conf.unwrap_or(0.0)"),
+            "correlation trend average_confidence must not treat NULL AVG as 0.0"
+        );
     }
 }

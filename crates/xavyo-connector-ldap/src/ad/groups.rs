@@ -65,10 +65,11 @@ pub struct MappedGroup {
 pub fn map_ad_group(entry: &AttributeSet) -> Option<MappedGroup> {
     let external_id = extract_group_guid(entry)?;
 
+    // Missing DN must not look like a valid AD group.
     let dn = entry
         .get_string("distinguishedName")
         .or_else(|| entry.get_string("dn"))
-        .unwrap_or("")
+        .filter(|s| !s.is_empty())?
         .to_string();
 
     let mut attrs = HashMap::new();
@@ -732,6 +733,23 @@ mod tests {
         assert_eq!(
             mapped.attributes["dn"],
             "CN=Developers,OU=Groups,DC=example,DC=com"
+        );
+    }
+
+    #[test]
+    fn map_ad_group_requires_dn() {
+        let mut entry = sample_ad_group_entry();
+        entry.remove("distinguishedName");
+        assert!(map_ad_group(&entry).is_none());
+        let src = include_str!("groups.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let map = production
+            .split("pub fn map_ad_group")
+            .nth(1)
+            .expect("map_ad_group");
+        assert!(
+            !map.contains("unwrap_or(\"\")"),
+            "AD group mapping must not treat a missing DN as empty"
         );
     }
 
