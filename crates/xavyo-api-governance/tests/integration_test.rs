@@ -109,7 +109,7 @@ mod integration_tests {
 
             // List requests
             let (requests, total) = service
-                .list_my_requests(tenant_id, user_id, None, 10, 0)
+                .list_my_requests(tenant_id, user_id, None, None, None, 10, 0)
                 .await
                 .expect("Failed to list requests");
 

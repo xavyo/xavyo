@@ -38,6 +38,7 @@ impl DelegationService {
         user_id: Uuid,
         is_active: Option<bool>,
         active_now: Option<bool>,
+        status: Option<DelegationStatus>,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<GovApprovalDelegation>, i64)> {
@@ -46,6 +47,7 @@ impl DelegationService {
             delegate_id: None,
             is_active,
             active_now,
+            status,
             ..Default::default()
         };
 
@@ -64,6 +66,7 @@ impl DelegationService {
         user_id: Uuid,
         is_active: Option<bool>,
         active_now: Option<bool>,
+        status: Option<DelegationStatus>,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<GovApprovalDelegation>, i64)> {
@@ -72,6 +75,7 @@ impl DelegationService {
             delegate_id: Some(user_id),
             is_active,
             active_now,
+            status,
             ..Default::default()
         };
 

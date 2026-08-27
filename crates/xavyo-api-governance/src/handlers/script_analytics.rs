@@ -171,15 +171,8 @@ pub async fn list_execution_logs(
     let limit = params.page_size.unwrap_or(50).min(100);
     let offset = params.page.map_or(0, |p| (p.max(1) - 1) * limit);
 
-    // Parse date strings into DateTime<Utc> if provided.
-    let from_date = params
-        .from_date
-        .as_deref()
-        .and_then(|s| s.parse::<chrono::DateTime<chrono::Utc>>().ok());
-    let to_date = params
-        .to_date
-        .as_deref()
-        .and_then(|s| s.parse::<chrono::DateTime<chrono::Utc>>().ok());
+    let from_date = parse_optional_datetime("from_date", params.from_date.as_deref())?;
+    let to_date = parse_optional_datetime("to_date", params.to_date.as_deref())?;
 
     let execution_status = params
         .status
@@ -346,6 +339,22 @@ fn map_execution_log(
     }
 }
 
+/// Invalid date filters must not silently drop the bound and list every log.
+fn parse_optional_datetime(
+    field: &str,
+    value: Option<&str>,
+) -> Result<Option<chrono::DateTime<chrono::Utc>>, ApiGovernanceError> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) => s.parse().map(Some).map_err(|_| {
+            ApiGovernanceError::Validation(format!(
+                "Invalid {field} '{s}'. Must be an ISO-8601 datetime"
+            ))
+        }),
+    }
+}
+
 /// Parse a query enum. Unknown values are 400, not an unfiltered list.
 fn parse_query_enum<T: serde::de::DeserializeOwned>(
     field: &str,
@@ -373,6 +382,20 @@ mod tests {
                 && !production
                     .contains("from_value(serde_json::Value::String(s.to_string())).ok()"),
             "script analytics filters must not treat invalid enums as unfiltered"
+        );
+    }
+
+    #[test]
+    fn invalid_execution_log_dates_do_not_drop_the_filter() {
+        assert_eq!(parse_optional_datetime("from_date", None).unwrap(), None);
+        assert!(parse_optional_datetime("from_date", Some("2024-01-01T00:00:00Z")).is_ok());
+        assert!(parse_optional_datetime("from_date", Some("not-a-date")).is_err());
+        let src = include_str!("script_analytics.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_datetime(")
+                && !production.contains("parse::<chrono::DateTime<chrono::Utc>>().ok()"),
+            "invalid execution-log dates must be 400, not an unfiltered list"
         );
     }
 }

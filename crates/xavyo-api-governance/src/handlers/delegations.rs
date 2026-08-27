@@ -11,6 +11,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use xavyo_auth::JwtClaims;
+use xavyo_db::models::DelegationStatus;
 
 use crate::error::{ApiGovernanceError, ApiResult};
 use crate::models::{
@@ -49,6 +50,7 @@ pub async fn list_my_delegations(
 
     let limit = query.limit.unwrap_or(50).min(100);
     let offset = query.offset.unwrap_or(0).max(0);
+    let status = parse_optional_delegation_status(query.status.as_deref())?;
 
     let (delegations, total) = state
         .delegation_service
@@ -57,6 +59,7 @@ pub async fn list_my_delegations(
             user_id,
             query.is_active,
             query.active_now,
+            status,
             limit,
             offset,
         )
@@ -310,6 +313,7 @@ pub async fn list_delegations_as_deputy(
 
     let limit = query.limit.unwrap_or(50).min(100);
     let offset = query.offset.unwrap_or(0).max(0);
+    let status = parse_optional_delegation_status(query.status.as_deref())?;
 
     let (delegations, total) = state
         .delegation_service
@@ -318,6 +322,7 @@ pub async fn list_delegations_as_deputy(
             user_id,
             query.is_active,
             query.active_now,
+            status,
             limit,
             offset,
         )
@@ -479,6 +484,19 @@ pub async fn list_delegation_audit(
     }))
 }
 
+/// Advertised `status` filters must not silently list every delegation.
+fn parse_optional_delegation_status(value: Option<&str>) -> ApiResult<Option<DelegationStatus>> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) => serde_json::from_value(serde_json::Value::String(s.to_string())).map_err(|_| {
+            ApiGovernanceError::Validation(format!(
+                "Invalid status '{s}'. Must be one of: pending, active, expired, revoked"
+            ))
+        }),
+    }
+}
+
 /// Invalid work-item-type filters must not silently list every delegated item.
 fn parse_optional_work_item_type(value: Option<&str>) -> ApiResult<Option<&str>> {
     match value {
@@ -511,6 +529,26 @@ mod tests {
             production.contains("parse_optional_work_item_type(")
                 && !production.contains("query.work_item_type.as_deref(),"),
             "invalid delegated work_item_type must be 400, not an unfiltered list"
+        );
+    }
+
+    #[test]
+    fn invalid_delegation_status_does_not_list_all() {
+        assert_eq!(parse_optional_delegation_status(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_delegation_status(Some("active")).unwrap(),
+            Some(DelegationStatus::Active)
+        );
+        assert!(parse_optional_delegation_status(Some("bogus")).is_err());
+        let src = include_str!("delegations.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_delegation_status(")
+                && production
+                    .matches("parse_optional_delegation_status(")
+                    .count()
+                    >= 2,
+            "GET /delegations and /delegations/as-deputy must apply advertised status filters"
         );
     }
 }
