@@ -544,13 +544,15 @@ pub async fn list_reconciliation_runs(
 ) -> Result<Json<ListRunsResponse>, ApiError> {
     let tenant_id = extract_tenant_id(&claims)?;
 
+    let mode = parse_optional_recon_mode(query.mode.as_deref())?;
+    let status = parse_optional_recon_status(query.status.as_deref())?;
     let (runs, total) = state
         .reconciliation_service
         .list_runs(
             tenant_id,
             connector_id,
-            query.mode.as_deref(),
-            query.status.as_deref(),
+            mode,
+            status,
             query.limit.unwrap_or(50).min(100),
             query.offset.unwrap_or(0).max(0),
         )
@@ -1322,6 +1324,32 @@ fn extract_user_id(claims: &JwtClaims) -> Result<Uuid, ApiError> {
     })
 }
 
+/// Invalid reconciliation status filters must not silently list every run.
+fn parse_optional_recon_status(status: Option<&str>) -> Result<Option<&str>, ApiError> {
+    match status {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "pending" | "running" | "completed" | "failed" | "cancelled") => {
+            Ok(Some(s))
+        }
+        Some(s) => Err(ApiError::bad_request(format!(
+            "Invalid reconciliation status '{s}'. Must be one of: pending, running, completed, failed, cancelled"
+        ))),
+    }
+}
+
+/// Invalid reconciliation mode filters must not silently list every run.
+fn parse_optional_recon_mode(mode: Option<&str>) -> Result<Option<&str>, ApiError> {
+    match mode {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "full" | "delta") => Ok(Some(s)),
+        Some(s) => Err(ApiError::bad_request(format!(
+            "Invalid reconciliation mode '{s}'. Must be one of: full, delta"
+        ))),
+    }
+}
+
 /// Map reconciliation service errors to API errors with proper status codes.
 fn parse_run_statistics(value: serde_json::Value) -> Result<ReconciliationStatistics, ApiError> {
     serde_json::from_value(value)
@@ -1398,6 +1426,30 @@ mod tests {
             production.contains("extract_user_id(")
                 && !production.contains("Uuid::parse_str(&claims.sub).ok()"),
             "reconciliation mutations must not drop a malformed JWT sub"
+        );
+    }
+
+    #[test]
+    fn invalid_recon_filters_do_not_list_all_runs() {
+        assert_eq!(parse_optional_recon_status(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_recon_status(Some("pending")).unwrap(),
+            Some("pending")
+        );
+        assert!(parse_optional_recon_status(Some("bogus")).is_err());
+        assert_eq!(parse_optional_recon_mode(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_recon_mode(Some("full")).unwrap(),
+            Some("full")
+        );
+        assert!(parse_optional_recon_mode(Some("bogus")).is_err());
+        let src = include_str!("reconciliation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_recon_status(")
+                && production.contains("parse_optional_recon_mode(")
+                && !production.contains("query.status.as_deref(),"),
+            "invalid reconciliation filters must be 400, not an unfiltered list"
         );
     }
 }

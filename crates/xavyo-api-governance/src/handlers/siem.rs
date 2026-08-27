@@ -21,6 +21,18 @@ use crate::models::siem::{
 };
 use crate::router::GovernanceState;
 
+/// Invalid batch-export status filters must not silently list every export.
+fn parse_optional_export_status(status: Option<&str>) -> Result<Option<&str>, ApiGovernanceError> {
+    match status {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "pending" | "processing" | "completed" | "failed") => Ok(Some(s)),
+        Some(s) => Err(ApiGovernanceError::Validation(format!(
+            "Invalid batch export status '{s}'. Must be one of: pending, processing, completed, failed"
+        ))),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Destination CRUD
 // ---------------------------------------------------------------------------
@@ -329,14 +341,10 @@ pub async fn list_batch_exports(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
+    let status = parse_optional_export_status(query.status.as_deref())?;
     let (exports, total) = state
         .siem_batch_export_service
-        .list_exports(
-            tenant_id,
-            query.status.as_deref(),
-            query.limit,
-            query.offset,
-        )
+        .list_exports(tenant_id, status, query.limit, query.offset)
         .await?;
 
     Ok(Json(SiemBatchExportListResponse {
@@ -627,4 +635,26 @@ pub async fn redeliver_dead_letter(
         .await?;
 
     Ok(Json(RedeliverResponse { events_requeued }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_export_status_does_not_list_all_exports() {
+        assert_eq!(parse_optional_export_status(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_export_status(Some("pending")).unwrap(),
+            Some("pending")
+        );
+        assert!(parse_optional_export_status(Some("bogus")).is_err());
+        let src = include_str!("siem.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_export_status(")
+                && !production.contains("query.status.as_deref(),"),
+            "invalid SIEM export status must be 400, not an unfiltered list"
+        );
+    }
 }

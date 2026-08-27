@@ -232,9 +232,9 @@ pub async fn list_import_jobs(
 
     let limit = params.limit.clamp(1, 100);
     let offset = params.offset.max(0);
+    let status = parse_optional_import_status(params.status.as_deref())?;
 
-    let (jobs, total) =
-        ImportService::list_jobs(&pool, tenant_id, params.status.as_deref(), limit, offset).await?;
+    let (jobs, total) = ImportService::list_jobs(&pool, tenant_id, status, limit, offset).await?;
 
     let items: Vec<ImportJobSummary> = jobs.into_iter().map(ImportJobSummary::from).collect();
 
@@ -289,6 +289,25 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ImportError> {
 /// JWT `sub` must be a real actor UUID for import-job attribution.
 fn extract_user_id(claims: &JwtClaims) -> Result<Uuid, ImportError> {
     Uuid::parse_str(&claims.sub).map_err(|_| ImportError::Unauthorized)
+}
+
+/// Invalid import-job status filters must not silently list every job.
+fn parse_optional_import_status(status: Option<&str>) -> Result<Option<&str>, ImportError> {
+    match status {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s)
+            if matches!(
+                s,
+                "pending" | "processing" | "completed" | "failed" | "cancelled"
+            ) =>
+        {
+            Ok(Some(s))
+        }
+        Some(s) => Err(ImportError::Validation(format!(
+            "Invalid import job status '{s}'. Must be one of: pending, processing, completed, failed, cancelled"
+        ))),
+    }
 }
 
 #[cfg(test)]
@@ -372,6 +391,23 @@ mod tests {
             production.contains("extract_user_id(")
                 && !production.contains("Uuid::parse_str(&claims.sub).ok()"),
             "import job create must not drop a malformed JWT sub"
+        );
+    }
+
+    #[test]
+    fn invalid_import_status_does_not_list_all_jobs() {
+        assert_eq!(parse_optional_import_status(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_import_status(Some("pending")).unwrap(),
+            Some("pending")
+        );
+        assert!(parse_optional_import_status(Some("bogus")).is_err());
+        let src = include_str!("import.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_import_status(")
+                && !production.contains("params.status.as_deref(), limit, offset"),
+            "invalid import job status must be 400, not an unfiltered list"
         );
     }
 }

@@ -98,13 +98,14 @@ pub async fn list_provisioning_state(
 
     let limit = query.limit.clamp(1, 100);
     let offset = query.offset.max(0);
+    let status = parse_optional_provisioning_status(query.status.as_deref())?;
 
     let (items, total_count) = ScimProvisioningState::list_by_target(
         pool,
         tenant_id,
         target_id,
         query.resource_type.as_deref(),
-        query.status.as_deref(),
+        status,
         limit,
         offset,
     )
@@ -190,4 +191,51 @@ pub async fn retry_provisioning(
             message: "Provisioning state reset to pending for retry".to_string(),
         }),
     ))
+}
+
+/// Invalid provisioning-state status filters must not silently list every row.
+fn parse_optional_provisioning_status(status: Option<&str>) -> Result<Option<&str>> {
+    match status {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s)
+            if matches!(
+                s,
+                "pending"
+                    | "synced"
+                    | "error"
+                    | "conflict"
+                    | "pending_update"
+                    | "pending_deprovision"
+                    | "deprovisioned"
+            ) =>
+        {
+            Ok(Some(s))
+        }
+        Some(s) => Err(ConnectorApiError::Validation(format!(
+            "Invalid provisioning status '{s}'. Must be one of: pending, synced, error, conflict, pending_update, pending_deprovision, deprovisioned"
+        ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_provisioning_status_does_not_list_all_states() {
+        assert_eq!(parse_optional_provisioning_status(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_provisioning_status(Some("error")).unwrap(),
+            Some("error")
+        );
+        assert!(parse_optional_provisioning_status(Some("bogus")).is_err());
+        let src = include_str!("scim_provisioning.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_provisioning_status(")
+                && !production.contains("query.status.as_deref(),"),
+            "invalid SCIM provisioning status must be 400, not an unfiltered list"
+        );
+    }
 }
