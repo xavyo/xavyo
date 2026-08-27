@@ -216,13 +216,9 @@ impl ClaimsService {
                 }
             }
             "join" => {
-                // Join array with comma
+                // Join array with comma. Non-string elements must not be dropped.
                 if let Some(arr) = value.as_array() {
-                    let parts: Vec<String> = arr
-                        .iter()
-                        .filter_map(|v| v.as_str().map(String::from))
-                        .collect();
-                    Ok(Value::String(parts.join(",")))
+                    Ok(Value::String(join_claim_strings(arr)?))
                 } else {
                     Ok(value.clone())
                 }
@@ -272,20 +268,23 @@ impl ClaimsService {
             return Ok(value.clone());
         }
 
-        // Handle array of strings (groups)
+        // Handle array of strings (groups). Non-string elements must not be dropped.
         if let Some(arr) = value.as_array() {
-            let mapped: Vec<Value> = arr
+            let mapped = arr
                 .iter()
-                .filter_map(|v| {
-                    v.as_str().map(|s| {
-                        if let Some(mapped) = group_map.get(s) {
-                            Value::String(mapped.clone())
-                        } else {
-                            Value::String(s.to_string())
-                        }
+                .map(|v| {
+                    let s = v.as_str().ok_or_else(|| {
+                        FederationError::InvalidClaimMapping(
+                            "group claim array must contain strings".to_string(),
+                        )
+                    })?;
+                    Ok(if let Some(mapped) = group_map.get(s) {
+                        Value::String(mapped.clone())
+                    } else {
+                        Value::String(s.to_string())
                     })
                 })
-                .collect();
+                .collect::<FederationResult<Vec<_>>>()?;
             return Ok(Value::Array(mapped));
         }
 
@@ -313,6 +312,21 @@ impl ClaimsService {
         // Default to sub
         claims.sub.clone()
     }
+}
+
+/// Join claim array values. Non-string elements must not be dropped.
+fn join_claim_strings(arr: &[Value]) -> FederationResult<String> {
+    let parts = arr
+        .iter()
+        .map(|v| {
+            v.as_str().map(str::to_string).ok_or_else(|| {
+                FederationError::InvalidClaimMapping(
+                    "join transform requires string array elements".to_string(),
+                )
+            })
+        })
+        .collect::<FederationResult<Vec<_>>>()?;
+    Ok(parts.join(","))
 }
 
 #[cfg(test)]
@@ -447,5 +461,20 @@ mod tests {
 
         let subject = service.extract_subject(&mapping, &claims);
         assert_eq!(subject, "user@example.com");
+    }
+
+    #[test]
+    fn join_claim_strings_does_not_drop_non_strings() {
+        assert_eq!(
+            join_claim_strings(&[Value::String("a".into()), Value::String("b".into())]).unwrap(),
+            "a,b"
+        );
+        assert!(join_claim_strings(&[Value::Number(1.into())]).is_err());
+        let src = include_str!("claims.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("filter_map(|v| v.as_str()"),
+            "OIDC claim join/group mapping must not drop non-string array elements"
+        );
     }
 }

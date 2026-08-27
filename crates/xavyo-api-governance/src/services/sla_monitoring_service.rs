@@ -378,13 +378,13 @@ impl SlaMonitoringService {
     ) -> Result<(String, String)> {
         let app = GovApplication::find_by_id(&self.pool, tenant_id, app_id)
             .await?
-            .map_or_else(|| "Unknown".to_string(), |a| a.name);
+            .ok_or(GovernanceError::ApplicationNotFound(app_id))?;
 
         let ent = GovEntitlement::find_by_id(&self.pool, tenant_id, ent_id)
             .await?
-            .map_or_else(|| "Unknown".to_string(), |e| e.name);
+            .ok_or(GovernanceError::EntitlementNotFound(ent_id))?;
 
-        Ok((app, ent))
+        Ok((app.name, ent.name))
     }
 
     /// Lookup user email by ID (include `tenant_id` for defense-in-depth).
@@ -904,6 +904,23 @@ mod tests {
         assert!(
             !production.contains("filter_map(|v| v.as_str().map(String::from))"),
             "SLA contacts must not hide corrupt emails as nobody to notify"
+        );
+    }
+
+    #[test]
+    fn sla_task_names_do_not_invent_unknown() {
+        let src = include_str!("sla_monitoring_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let names = production
+            .split("async fn get_task_names")
+            .nth(1)
+            .and_then(|s| s.split("    async fn ").next())
+            .expect("get_task_names");
+        assert!(
+            names.contains("ApplicationNotFound")
+                && names.contains("EntitlementNotFound")
+                && !names.contains("\"Unknown\""),
+            "SLA notifications must not invent Unknown app/entitlement names"
         );
     }
 }

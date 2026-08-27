@@ -747,8 +747,7 @@ impl MetaRoleSimulationService {
                     .await
                     .map_err(GovernanceError::Database)?;
 
-            let affected_role_name =
-                affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
+            let affected_role_name = simulation_entitlement_name(affected_role, *role_id)?;
 
             let other_inheritances = GovMetaRoleInheritance::list_by_child_role(
                 &self.pool,
@@ -835,8 +834,7 @@ impl MetaRoleSimulationService {
                     .await
                     .map_err(GovernanceError::Database)?;
 
-            let affected_role_name =
-                affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
+            let affected_role_name = simulation_entitlement_name(affected_role, *role_id)?;
 
             let other_inheritances = GovMetaRoleInheritance::list_by_child_role(
                 &self.pool,
@@ -922,8 +920,7 @@ impl MetaRoleSimulationService {
                     .await
                     .map_err(GovernanceError::Database)?;
 
-            let affected_role_name =
-                affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
+            let affected_role_name = simulation_entitlement_name(affected_role, *role_id)?;
 
             let other_inheritances = GovMetaRoleInheritance::list_by_child_role(
                 &self.pool,
@@ -1006,8 +1003,7 @@ impl MetaRoleSimulationService {
                     .await
                     .map_err(GovernanceError::Database)?;
 
-            let affected_role_name =
-                affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
+            let affected_role_name = simulation_entitlement_name(affected_role, *role_id)?;
 
             let conflicts: Vec<GovMetaRoleConflict> = sqlx::query_as(
                 r"
@@ -1087,7 +1083,7 @@ impl MetaRoleSimulationService {
                     .map_err(GovernanceError::Database)?;
 
             let affected_role_name =
-                affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
+                simulation_entitlement_name(affected_role, conflict.affected_role_id)?;
 
             let meta_role_a =
                 GovMetaRole::find_by_id(&self.pool, tenant_id, conflict.meta_role_a_id)
@@ -1145,7 +1141,7 @@ impl MetaRoleSimulationService {
                     .map_err(GovernanceError::Database)?;
 
             let affected_role_name =
-                affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
+                simulation_entitlement_name(affected_role, conflict.affected_role_id)?;
 
             let meta_role_a =
                 GovMetaRole::find_by_id(&self.pool, tenant_id, conflict.meta_role_a_id)
@@ -1169,6 +1165,14 @@ impl MetaRoleSimulationService {
         }
 
         Ok(result)
+    }
+}
+
+/// Stored entitlement name for simulation output. Missing must not invent a placeholder name.
+fn simulation_entitlement_name(ent: Option<GovEntitlement>, id: Uuid) -> Result<String> {
+    match ent {
+        Some(e) if !e.name.is_empty() => Ok(e.name),
+        _ => Err(GovernanceError::EntitlementNotFound(id)),
     }
 }
 
@@ -1200,5 +1204,18 @@ mod tests {
         assert!(result.potential_conflicts.is_empty());
         assert!(result.summary.is_safe);
         assert!(result.summary.warnings.is_empty());
+    }
+
+    #[test]
+    fn simulation_entitlement_name_does_not_invent_unknown() {
+        let id = Uuid::new_v4();
+        assert!(simulation_entitlement_name(None, id).is_err());
+        let src = include_str!("meta_role_simulation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("map_or_else(|| \"Unknown\"")
+                && production.contains("simulation_entitlement_name("),
+            "meta-role simulation must not invent Unknown role names"
+        );
     }
 }

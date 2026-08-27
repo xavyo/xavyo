@@ -341,18 +341,8 @@ impl TicketingProvider for JiraProvider {
             request.task_id
         );
 
-        // Get labels from field mappings
-        let labels = self
-            .field_mappings
-            .as_ref()
-            .and_then(|m| m.get("labels"))
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str())
-                    .map(std::string::ToString::to_string)
-                    .collect()
-            });
+        // Get labels from field mappings. Corrupt JSON must not drop labels.
+        let labels = jira_labels(self.field_mappings.as_ref())?;
 
         let jira_request = JiraCreateRequest {
             fields: JiraIssueFields {
@@ -508,6 +498,31 @@ impl TicketingProvider for JiraProvider {
     }
 }
 
+/// Stored Jira labels. Non-string entries must not be silently dropped.
+fn jira_labels(mappings: Option<&serde_json::Value>) -> TicketingResult<Option<Vec<String>>> {
+    let Some(labels) = mappings.and_then(|m| m.get("labels")) else {
+        return Ok(None);
+    };
+    if labels.is_null() {
+        return Ok(None);
+    }
+    let arr = labels.as_array().ok_or_else(|| {
+        TicketingError::InvalidConfiguration("Jira labels must be a JSON array".to_string())
+    })?;
+    let parsed = arr
+        .iter()
+        .map(|v| {
+            v.as_str()
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .ok_or_else(|| {
+                    TicketingError::InvalidConfiguration("Jira labels must be strings".to_string())
+                })
+        })
+        .collect::<TicketingResult<Vec<_>>>()?;
+    Ok(Some(parsed))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -594,6 +609,23 @@ mod tests {
         assert_eq!(
             provider.map_status_category("done", "Cancelled"),
             TicketStatus::Cancelled
+        );
+    }
+
+    #[test]
+    fn jira_labels_does_not_drop_non_strings() {
+        assert!(jira_labels(None).unwrap().is_none());
+        assert_eq!(
+            jira_labels(Some(&serde_json::json!({"labels": ["a", "b"]}))).unwrap(),
+            Some(vec!["a".to_string(), "b".to_string()])
+        );
+        assert!(jira_labels(Some(&serde_json::json!({"labels": "a"}))).is_err());
+        assert!(jira_labels(Some(&serde_json::json!({"labels": [1]}))).is_err());
+        let src = include_str!("jira.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("filter_map(|v| v.as_str())"),
+            "Jira ticket create must not drop non-string labels"
         );
     }
 }
