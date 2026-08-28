@@ -187,15 +187,13 @@ impl ReconciliationService {
                         if existing.is_none() {
                             // Create new detection
                             let days_inactive = if reason == DetectionReason::Inactive {
-                                Self::calculate_days_inactive(&pool, tenant_id, &user)
-                                    .await
-                                    .ok()
+                                Some(Self::calculate_days_inactive(&pool, tenant_id, &user).await?)
                             } else {
                                 None
                             };
 
                             let last_activity =
-                                Self::get_last_activity(&pool, tenant_id, &user).await.ok();
+                                Self::get_last_activity(&pool, tenant_id, &user).await?;
 
                             GovOrphanDetection::create(
                                 &pool,
@@ -204,7 +202,7 @@ impl ReconciliationService {
                                     user_id: user.id,
                                     run_id,
                                     detection_reason: reason,
-                                    last_activity_at: last_activity,
+                                    last_activity_at: Some(last_activity),
                                     days_inactive: days_inactive.map(|d| d as i32),
                                 },
                             )
@@ -770,9 +768,7 @@ impl ReconciliationService {
             match self.trigger_reconciliation(schedule.tenant_id, None).await {
                 Ok(run) => {
                     // Update last_run_at and calculate next_run_at
-                    self.update_schedule_after_run(schedule.tenant_id)
-                        .await
-                        .ok();
+                    self.update_schedule_after_run(schedule.tenant_id).await?;
                     triggered.push((schedule.tenant_id, run.id));
                 }
                 Err(GovernanceError::ReconciliationAlreadyRunning) => {
@@ -1243,6 +1239,47 @@ mod tests {
         assert!(
             update.contains("WHERE tenant_id = $1 AND connector_id IS NULL"),
             "must not clobber per-connector next_run_at"
+        );
+    }
+
+    #[test]
+    fn orphan_detection_does_not_swallow_activity_lookup() {
+        let src = include_str!("reconciliation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let create = production
+            .split("GovOrphanDetection::create")
+            .next()
+            .expect("create call site");
+        let window = create
+            .rsplit("if existing.is_none()")
+            .next()
+            .expect("existing check");
+        assert!(
+            window.contains("calculate_days_inactive") && window.contains(".await?"),
+            "inactive-day lookup errors must fail closed"
+        );
+        assert!(
+            window.contains("get_last_activity") && !window.contains(".ok()"),
+            "last-activity lookup errors must not look like missing activity: {window}"
+        );
+    }
+
+    #[test]
+    fn scheduled_run_does_not_swallow_next_run_persist() {
+        let src = include_str!("reconciliation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let trigger = production
+            .split("pub async fn trigger_scheduled_runs")
+            .nth(1)
+            .and_then(|s| s.split("/// Validate schedule parameters").next())
+            .expect("trigger_scheduled_runs");
+        assert!(
+            trigger.contains("update_schedule_after_run") && trigger.contains(".await?"),
+            "schedule persist after a run must fail closed"
+        );
+        assert!(
+            !trigger.contains(".ok()"),
+            "must not drop next_run_at persist: {trigger}"
         );
     }
 }
