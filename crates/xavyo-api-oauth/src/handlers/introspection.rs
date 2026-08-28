@@ -23,6 +23,7 @@ struct RefreshTokenRow {
     #[allow(dead_code)]
     id: Uuid,
     user_id: Uuid,
+    client_id: Option<String>,
     scope: String,
     revoked: bool,
     created_at: chrono::DateTime<chrono::Utc>,
@@ -250,8 +251,9 @@ async fn try_introspect_refresh_token(
     // Look up the refresh token using the same connection
     let row: Option<RefreshTokenRow> = sqlx::query_as(
         r"
-        SELECT rt.id, rt.user_id, rt.scope, rt.revoked, rt.created_at, rt.expires_at
+        SELECT rt.id, rt.user_id, oc.client_id, rt.scope, rt.revoked, rt.created_at, rt.expires_at
         FROM oauth_refresh_tokens rt
+        LEFT JOIN oauth_clients oc ON oc.id = rt.client_id AND oc.tenant_id = rt.tenant_id
         WHERE rt.token_hash = $1 AND rt.tenant_id = $2
         ",
     )
@@ -272,7 +274,7 @@ async fn try_introspect_refresh_token(
     Some(IntrospectionResponse {
         active: true,
         sub: Some(rt.user_id.to_string()),
-        client_id: None, // Could join with oauth_clients if needed
+        client_id: rt.client_id,
         scope: Some(rt.scope),
         exp: Some(rt.expires_at.timestamp()),
         iat: Some(rt.created_at.timestamp()),
@@ -312,6 +314,16 @@ mod tests {
         assert!(
             !production.contains("if let Some(token_tid) = claims.tid"),
             "must not skip tenant match when tid is absent"
+        );
+        let refresh = production
+            .split("async fn try_introspect_refresh_token")
+            .nth(1)
+            .expect("try_introspect_refresh_token");
+        assert!(
+            refresh.contains("oc.client_id")
+                && refresh.contains("oauth_clients")
+                && !refresh.contains("client_id: None"),
+            "refresh-token introspection must return the OAuth client_id"
         );
     }
 }

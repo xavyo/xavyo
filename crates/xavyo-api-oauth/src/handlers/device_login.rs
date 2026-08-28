@@ -1078,13 +1078,34 @@ pub async fn device_mfa_handler(
         }
     };
 
+    let email =
+        match xavyo_db::models::User::find_by_id_in_tenant(&state.pool, tenant_id, user_id).await {
+            Ok(Some(user)) => user.email,
+            Ok(None) => {
+                warn!(user_id = %user_id, "User not found for device MFA audit");
+                return render_mfa_error_with_csrf(
+                    &user_code,
+                    &request.mfa_session_id,
+                    "An error occurred. Please try again.",
+                );
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to look up user for device MFA audit");
+                return render_mfa_error_with_csrf(
+                    &user_code,
+                    &request.mfa_session_id,
+                    "An error occurred. Please try again.",
+                );
+            }
+        };
+
     // Audit log successful MFA
     if let Err(e) = audit_service
         .record_login_attempt(
             tenant_id,
             xavyo_api_auth::RecordLoginAttemptInput {
                 user_id: Some(user_id),
-                email: String::new(), // Email not available in MFA flow
+                email,
                 success: true,
                 failure_reason: None,
                 auth_method: AuthMethod::Mfa,
@@ -1610,6 +1631,12 @@ mod tests {
             success.contains("record_login_attempt")
                 && success.contains("render_mfa_error_with_csrf"),
             "device MFA must fail closed when the audit row cannot be written"
+        );
+        assert!(
+            production.contains("User not found for device MFA audit")
+                && production.contains("find_by_id_in_tenant")
+                && !production.contains("email: String::new()"),
+            "device MFA audit must look up the user's email"
         );
     }
 }
