@@ -17,11 +17,12 @@ use tracing::warn;
 use uuid::Uuid;
 
 use xavyo_db::models::{
-    CreateMicroCertEvent, CreateMicroCertification, DecideMicroCertification, GovAssignmentFilter,
-    GovAssignmentStatus, GovAssignmentTargetType, GovEntitlement, GovEntitlementAssignment,
-    GovMicroCertEvent, GovMicroCertTrigger, GovMicroCertification, MicroCertDecision,
-    MicroCertEventType, MicroCertReviewerType, MicroCertStatus, MicroCertTriggerType,
-    MicroCertificationFilter, MicroCertificationStats, User,
+    CreateGovSodExemption, CreateMicroCertEvent, CreateMicroCertification,
+    DecideMicroCertification, GovAssignmentFilter, GovAssignmentStatus, GovAssignmentTargetType,
+    GovEntitlement, GovEntitlementAssignment, GovMicroCertEvent, GovMicroCertTrigger,
+    GovMicroCertification, GovSodExemption, GovSodViolation, MicroCertDecision, MicroCertEventType,
+    MicroCertReviewerType, MicroCertStatus, MicroCertTriggerType, MicroCertificationFilter,
+    MicroCertificationStats, User,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -655,7 +656,7 @@ impl MicroCertificationService {
 
         let mut auto_revoked = false;
         let mut revoked_assignment_id = None;
-        let created_exemption_id = None;
+        let mut created_exemption_id = None;
 
         match decision {
             MicroCertDecision::Approve => {
@@ -671,16 +672,18 @@ impl MicroCertificationService {
                 )
                 .await?;
 
-                // For SoD violations, create an exemption (would need SodExemptionService)
-                // This is a placeholder - actual implementation depends on SoD integration
                 if rule
                     .as_ref()
                     .is_some_and(|r| r.trigger_type == MicroCertTriggerType::SodViolation)
                 {
-                    // TODO: Create SoD exemption via SodExemptionService
-                    info!(
-                        certification_id = %certification_id,
-                        "SoD violation approved - exemption should be created"
+                    created_exemption_id = Some(
+                        self.create_sod_exemption_for_approval(
+                            tenant_id,
+                            &certification,
+                            decided_by,
+                            comment.as_deref(),
+                        )
+                        .await?,
                     );
                 }
 
@@ -795,6 +798,79 @@ impl MicroCertificationService {
             revoked_assignment_id,
             created_exemption_id,
         })
+    }
+
+    /// Create (or reuse) a SoD exemption when a SoD micro-cert is approved.
+    async fn create_sod_exemption_for_approval(
+        &self,
+        tenant_id: Uuid,
+        certification: &GovMicroCertification,
+        decided_by: Uuid,
+        comment: Option<&str>,
+    ) -> Result<Uuid> {
+        let violation_id = sod_violation_id_from_event(
+            certification.triggering_event_data.as_ref(),
+        )
+        .ok_or_else(|| {
+            GovernanceError::Validation(
+                "SoD micro-certification is missing violation_id; cannot create exemption"
+                    .to_string(),
+            )
+        })?;
+
+        let violation = GovSodViolation::find_by_id(&self.pool, tenant_id, violation_id)
+            .await?
+            .ok_or_else(|| {
+                GovernanceError::Validation(format!("SoD violation {violation_id} not found"))
+            })?;
+
+        if let Some(existing) = GovSodExemption::find_active_for_rule_user(
+            &self.pool,
+            tenant_id,
+            violation.rule_id,
+            certification.user_id,
+        )
+        .await
+        .map_err(GovernanceError::Database)?
+        {
+            return Ok(existing.id);
+        }
+
+        let justification = comment
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .unwrap_or("Approved via micro-certification")
+            .to_string();
+
+        let exemption = GovSodExemption::create(
+            &self.pool,
+            tenant_id,
+            CreateGovSodExemption {
+                rule_id: violation.rule_id,
+                user_id: certification.user_id,
+                approver_id: decided_by,
+                justification,
+                expires_at: Utc::now() + Duration::days(90),
+            },
+        )
+        .await
+        .map_err(GovernanceError::Database)?;
+
+        if let Some(active) = GovSodViolation::find_active_for_rule_user(
+            &self.pool,
+            tenant_id,
+            violation.rule_id,
+            certification.user_id,
+        )
+        .await
+        .map_err(GovernanceError::Database)?
+        {
+            GovSodViolation::mark_exempted(&self.pool, tenant_id, active.id)
+                .await
+                .map_err(GovernanceError::Database)?;
+        }
+
+        Ok(exemption.id)
     }
 
     // =========================================================================
@@ -1658,6 +1734,12 @@ impl MicroCertificationService {
     }
 }
 
+fn sod_violation_id_from_event(data: Option<&serde_json::Value>) -> Option<Uuid> {
+    data.and_then(|v| v.get("violation_id"))
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1685,6 +1767,35 @@ mod tests {
 
         assert!(result.auto_revoked);
         assert!(result.revoked_assignment_id.is_some());
+    }
+
+    #[test]
+    fn sod_approve_creates_exemption_instead_of_todo() {
+        let production = include_str!("micro_certification_service.rs");
+        let decide = production
+            .split("pub async fn decide(")
+            .nth(1)
+            .expect("decide")
+            .split("pub async fn delegate(")
+            .next()
+            .expect("delegate");
+        assert!(
+            !decide.contains("TODO: Create SoD exemption"),
+            "SoD approve must not skip exemption creation"
+        );
+        assert!(
+            decide.contains("create_sod_exemption_for_approval"),
+            "SoD approve must create an exemption"
+        );
+    }
+
+    #[test]
+    fn sod_violation_id_parses_event_payload() {
+        let id = Uuid::new_v4();
+        let data = serde_json::json!({ "violation_id": id.to_string() });
+        assert_eq!(sod_violation_id_from_event(Some(&data)), Some(id));
+        assert!(sod_violation_id_from_event(None).is_none());
+        assert!(sod_violation_id_from_event(Some(&serde_json::json!({}))).is_none());
     }
 
     #[test]
