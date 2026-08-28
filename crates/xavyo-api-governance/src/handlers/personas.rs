@@ -12,8 +12,8 @@ use validator::Validate;
 
 use xavyo_auth::JwtClaims;
 use xavyo_db::models::{
-    CreatePersonaArchetype, PersonaArchetypeFilter, PersonaFilter, UpdatePersona,
-    UpdatePersonaArchetype,
+    CreatePersonaArchetype, GovPersonaSession, PersonaArchetypeFilter, PersonaFilter,
+    UpdatePersona, UpdatePersonaArchetype, User,
 };
 
 use crate::error::{ApiGovernanceError, ApiResult};
@@ -29,6 +29,24 @@ use crate::models::{
     UpdatePersonaRequest, UserPersonasResponse,
 };
 use crate::router::GovernanceState;
+
+/// Prefer a non-empty display name, otherwise the user's email.
+fn user_display_name(display_name: Option<&str>, email: &str) -> String {
+    display_name
+        .filter(|name| !name.is_empty())
+        .unwrap_or(email)
+        .to_string()
+}
+
+async fn load_user_display_name(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    user_id: Uuid,
+) -> ApiResult<Option<String>> {
+    Ok(User::find_by_id_in_tenant(pool, tenant_id, user_id)
+        .await?
+        .map(|user| user_display_name(user.display_name.as_deref(), &user.email)))
+}
 
 // ============================================================================
 // Archetype Handlers
@@ -859,11 +877,17 @@ pub async fn get_user_personas(
         .list_for_user(tenant_id, user_id, include_archived)
         .await?;
 
+    let physical_user_name = load_user_display_name(state.pool(), tenant_id, user_id).await?;
+    let active_persona_id =
+        GovPersonaSession::find_active_for_user(state.pool(), tenant_id, user_id)
+            .await?
+            .and_then(|session| session.active_persona_id);
+
     let response = UserPersonasResponse {
         physical_user_id: user_id,
-        physical_user_name: None, // Would be filled with user lookup
+        physical_user_name,
         personas: personas.into_iter().map(PersonaResponse::from).collect(),
-        active_persona_id: None, // Would be filled with session lookup
+        active_persona_id,
     };
 
     Ok(Json(response))
@@ -1085,6 +1109,7 @@ pub async fn get_current_context(
         .persona_session_service
         .get_current_context(tenant_id, user_id)
         .await?;
+    let physical_user_name = load_user_display_name(state.pool(), tenant_id, user_id).await?;
 
     let response = if let Some(info) = context_info {
         let active_persona = if let Some(persona_id) = info.persona_id {
@@ -1096,7 +1121,7 @@ pub async fn get_current_context(
 
         CurrentContextResponse {
             physical_user_id: user_id,
-            physical_user_name: None, // Would be filled with user lookup
+            physical_user_name,
             is_persona_active: info.persona_id.is_some(),
             active_persona,
             session_started_at: info.session_expires_at - chrono::Duration::hours(8), // Approximate
@@ -1106,7 +1131,7 @@ pub async fn get_current_context(
         // No active session - user is operating as physical identity
         CurrentContextResponse {
             physical_user_id: user_id,
-            physical_user_name: None,
+            physical_user_name,
             is_persona_active: false,
             active_persona: None,
             session_started_at: chrono::Utc::now(),
@@ -1395,6 +1420,28 @@ mod tests {
         assert!(
             !ctx.contains(".await.ok()") && ctx.contains("persona_service.get("),
             "persona current-context must not treat lookup errors as no active persona"
+        );
+        assert!(
+            ctx.contains("load_user_display_name(") && !ctx.contains("physical_user_name: None"),
+            "GET /governance/context/current must look up the physical user display name"
+        );
+    }
+
+    #[test]
+    fn get_user_personas_fills_display_name_and_active_persona() {
+        let src = include_str!("personas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn get_user_personas")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_user_personas");
+        assert!(
+            list.contains("load_user_display_name(")
+                && list.contains("find_active_for_user(")
+                && !list.contains("physical_user_name: None")
+                && !list.contains("active_persona_id: None"),
+            "GET /governance/users/{{id}}/personas must look up the user name and active persona"
         );
     }
 

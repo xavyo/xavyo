@@ -2,6 +2,8 @@
 //!
 //! Provides HTTP handlers for managing role constructions.
 
+use std::collections::HashMap;
+
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
@@ -11,6 +13,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use xavyo_auth::JwtClaims;
+use xavyo_db::models::GovRole;
 
 use crate::error::{ApiGovernanceError, ApiResult};
 use crate::models::{
@@ -20,6 +23,30 @@ use crate::models::{
     UserEffectiveConstructionsResponse,
 };
 use crate::router::GovernanceState;
+
+async fn load_role_names(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    role_ids: impl IntoIterator<Item = Uuid>,
+) -> ApiResult<HashMap<Uuid, String>> {
+    let mut names = HashMap::new();
+    for role_id in role_ids {
+        if names.contains_key(&role_id) {
+            continue;
+        }
+        if let Some(role) = GovRole::find_by_id(pool, tenant_id, role_id).await? {
+            names.insert(role_id, role.name);
+        }
+    }
+    Ok(names)
+}
+
+fn role_display_name(names: &HashMap<Uuid, String>, role_id: Uuid) -> String {
+    names
+        .get(&role_id)
+        .cloned()
+        .unwrap_or_else(|| format!("Unknown ({role_id})"))
+}
 
 /// List role constructions with filtering and pagination.
 #[utoipa::path(
@@ -92,13 +119,16 @@ pub async fn get_role_effective_constructions(
         .get_effective_constructions(tenant_id, role_id, &state.role_inducement_service)
         .await?;
 
+    let role_ids: Vec<Uuid> = constructions.iter().map(|c| c.role_id).collect();
+    let role_names = load_role_names(state.pool(), tenant_id, role_ids).await?;
+
     // Convert to response with source role info
     let effective_constructions = constructions
         .into_iter()
         .map(|c| EffectiveConstructionResponse {
             is_direct: c.role_id == role_id,
             source_role_id: c.role_id,
-            source_role_name: String::new(), // Would need role lookup for full info
+            source_role_name: role_display_name(&role_names, c.role_id),
             construction: c,
         })
         .collect();
@@ -383,16 +413,18 @@ pub async fn get_user_effective_constructions(
         .get_user_effective_constructions(tenant_id, user_id)
         .await?;
 
+    let role_ids: Vec<Uuid> = constructions.iter().map(|c| c.role_id).collect();
+    let role_names = load_role_names(state.pool(), tenant_id, role_ids).await?;
+
     // Wrap each construction in UserEffectiveConstructionResponse
-    // Note: In a full implementation, we'd track which roles provide each construction
     let user_constructions = constructions
         .into_iter()
         .map(|c| UserEffectiveConstructionResponse {
-            construction: c.clone(),
             source_roles: vec![SourceRoleInfo {
                 role_id: c.role_id,
-                role_name: String::new(), // Would need role lookup
+                role_name: role_display_name(&role_names, c.role_id),
             }],
+            construction: c,
         })
         .collect();
 
@@ -400,4 +432,49 @@ pub async fn get_user_effective_constructions(
         user_id,
         constructions: user_constructions,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn role_display_name_falls_back_to_unknown() {
+        let id = Uuid::new_v4();
+        let mut names = HashMap::new();
+        names.insert(id, "Engineer".to_string());
+        assert_eq!(role_display_name(&names, id), "Engineer");
+        let missing = Uuid::new_v4();
+        assert_eq!(
+            role_display_name(&names, missing),
+            format!("Unknown ({missing})")
+        );
+    }
+
+    #[test]
+    fn effective_constructions_look_up_source_role_names() {
+        let src = include_str!("role_constructions.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let role = production
+            .split("pub async fn get_role_effective_constructions")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_role_effective_constructions");
+        assert!(
+            role.contains("load_role_names(")
+                && role.contains("role_display_name(")
+                && !role.contains("source_role_name: String::new()"),
+            "GET /governance/roles/{{id}}/effective-constructions must look up source role names"
+        );
+        let user = production
+            .split("pub async fn get_user_effective_constructions")
+            .nth(1)
+            .expect("get_user_effective_constructions");
+        assert!(
+            user.contains("load_role_names(")
+                && user.contains("role_display_name(")
+                && !user.contains("role_name: String::new()"),
+            "GET /governance/users/{{id}}/effective-constructions must look up source role names"
+        );
+    }
 }

@@ -12,13 +12,63 @@ use validator::Validate;
 use xavyo_auth::JwtClaims;
 use xavyo_db::GovDecisionType;
 
+use xavyo_db::models::User;
+
 use crate::error::{ApiGovernanceError, ApiResult};
 use crate::models::{
-    ApprovalActionResponse, ApproveRequestRequest, DecisionSummary, ListPendingApprovalsQuery,
-    PendingApprovalItem, PendingApprovalListResponse, RejectRequestRequest,
+    access_request_sod_violations, ApprovalActionResponse, ApproveRequestRequest, DecisionSummary,
+    ListPendingApprovalsQuery, PendingApprovalItem, PendingApprovalListResponse,
+    RejectRequestRequest, SodViolationSummary, SodWarningSummary,
 };
 use crate::router::GovernanceState;
 use xavyo_webhooks::{EventPublisher, WebhookEvent};
+
+/// Prefer a non-empty display name, otherwise the user's email.
+fn user_display_name(display_name: Option<&str>, email: &str) -> String {
+    display_name
+        .filter(|name| !name.is_empty())
+        .unwrap_or(email)
+        .to_string()
+}
+
+async fn load_user_display_names(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    user_ids: impl IntoIterator<Item = Uuid>,
+) -> ApiResult<HashMap<Uuid, String>> {
+    let mut names = HashMap::new();
+    for user_id in user_ids {
+        if names.contains_key(&user_id) {
+            continue;
+        }
+        if let Some(user) = User::find_by_id_in_tenant(pool, tenant_id, user_id).await? {
+            names.insert(
+                user_id,
+                user_display_name(user.display_name.as_deref(), &user.email),
+            );
+        }
+    }
+    Ok(names)
+}
+
+fn pending_sod_warnings(
+    sod: Option<&[SodViolationSummary]>,
+    entitlement_names: &HashMap<Uuid, String>,
+) -> Option<Vec<SodWarningSummary>> {
+    sod.map(|items| {
+        items
+            .iter()
+            .map(|v| SodWarningSummary {
+                rule_name: v.rule_name.clone(),
+                severity: v.severity,
+                conflicting_entitlement_name: entitlement_names
+                    .get(&v.conflicting_entitlement_id)
+                    .cloned()
+                    .unwrap_or_else(|| format!("Unknown ({})", v.conflicting_entitlement_id)),
+            })
+            .collect()
+    })
+}
 
 /// Get pending approvals for the current user.
 #[utoipa::path(
@@ -48,11 +98,21 @@ pub async fn list_pending_approvals(
         .get_pending_approvals(tenant_id, user_id, limit, offset)
         .await?;
 
-    // Batch fetch entitlement names for all pending approvals
-    let entitlement_ids: Vec<Uuid> = approvals
+    // Batch fetch entitlement names for requested and SoD-conflicting entitlements.
+    let mut entitlement_ids: Vec<Uuid> = approvals
         .iter()
         .map(|info| info.request.entitlement_id)
         .collect();
+    let mut sod_by_request: HashMap<Uuid, Option<Vec<SodViolationSummary>>> = HashMap::new();
+    for info in &approvals {
+        let sod = access_request_sod_violations(info.request.sod_violations.clone())?;
+        if let Some(items) = &sod {
+            for v in items {
+                entitlement_ids.push(v.conflicting_entitlement_id);
+            }
+        }
+        sod_by_request.insert(info.request.id, sod);
+    }
 
     let mut entitlement_names: HashMap<Uuid, String> = HashMap::new();
     for entitlement_id in entitlement_ids {
@@ -73,6 +133,17 @@ pub async fn list_pending_approvals(
         }
     }
 
+    let mut user_ids: Vec<Uuid> = approvals
+        .iter()
+        .map(|info| info.request.requester_id)
+        .collect();
+    for info in &approvals {
+        for decision in &info.previous_decisions {
+            user_ids.push(decision.approver_id);
+        }
+    }
+    let user_names = load_user_display_names(state.pool(), tenant_id, user_ids).await?;
+
     // Convert to API response format
     let items: Vec<PendingApprovalItem> = approvals
         .into_iter()
@@ -84,7 +155,7 @@ pub async fn list_pending_approvals(
                     step_order: d.step_order,
                     decision: d.decision,
                     approver_id: d.approver_id,
-                    approver_name: None, // Would need user lookup
+                    approver_name: user_names.get(&d.approver_id).cloned(),
                     comments: d.comments,
                     decided_at: d.decided_at,
                 })
@@ -94,18 +165,24 @@ pub async fn list_pending_approvals(
                 .get(&info.request.entitlement_id)
                 .cloned()
                 .unwrap_or_else(|| format!("Unknown ({})", info.request.entitlement_id));
+            let sod_warnings = pending_sod_warnings(
+                sod_by_request
+                    .get(&info.request.id)
+                    .and_then(Option::as_deref),
+                &entitlement_names,
+            );
 
             PendingApprovalItem {
                 request_id: info.request.id,
                 requester_id: info.request.requester_id,
-                requester_name: None, // Would need user lookup
+                requester_name: user_names.get(&info.request.requester_id).cloned(),
                 entitlement_id: info.request.entitlement_id,
                 entitlement_name,
                 justification: info.request.justification.clone(),
                 current_step: info.current_step,
                 total_steps: info.total_steps,
                 has_sod_warning: info.request.has_sod_warning,
-                sod_warnings: None, // Would need to parse from JSON
+                sod_warnings,
                 is_delegate: info.is_delegate,
                 delegator_id: info.delegator_id,
                 submitted_at: info.request.created_at,
@@ -258,6 +335,38 @@ pub async fn reject_request(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use xavyo_db::GovSodSeverity;
+
+    #[test]
+    fn user_display_name_prefers_non_empty_display_name() {
+        assert_eq!(user_display_name(Some("Ada"), "ada@example.com"), "Ada");
+        assert_eq!(
+            user_display_name(Some(""), "ada@example.com"),
+            "ada@example.com"
+        );
+        assert_eq!(
+            user_display_name(None, "ada@example.com"),
+            "ada@example.com"
+        );
+    }
+
+    #[test]
+    fn pending_sod_warnings_fill_conflicting_entitlement_names() {
+        let entitlement_id = Uuid::new_v4();
+        let mut names = HashMap::new();
+        names.insert(entitlement_id, "Payroll".to_string());
+        let sod = [SodViolationSummary {
+            rule_id: Uuid::new_v4(),
+            rule_name: "no-pay".to_string(),
+            severity: GovSodSeverity::High,
+            conflicting_entitlement_id: entitlement_id,
+        }];
+        let warnings = pending_sod_warnings(Some(&sod), &names).expect("warnings");
+        assert_eq!(warnings[0].conflicting_entitlement_name, "Payroll");
+        assert_eq!(warnings[0].rule_name, "no-pay");
+    }
+
     #[test]
     fn pending_approvals_do_not_skip_entitlement_lookup_errors() {
         let src = include_str!("approvals.rs");
@@ -270,6 +379,15 @@ mod tests {
         assert!(
             !list.contains("if let Ok(entitlement)") && list.contains("EntitlementNotFound"),
             "pending approvals must not hide entitlement lookup errors as unknown names"
+        );
+        assert!(
+            list.contains("load_user_display_names(")
+                && list.contains("pending_sod_warnings(")
+                && list.contains("access_request_sod_violations(")
+                && !list.contains("requester_name: None")
+                && !list.contains("approver_name: None")
+                && !list.contains("sod_warnings: None"),
+            "pending approvals must look up requester/approver names and parse SoD warnings"
         );
     }
 }
