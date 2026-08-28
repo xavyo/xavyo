@@ -11,9 +11,18 @@ use xavyo_db::models::{
     CreateGovDelegationAudit, DelegationActionType, DelegationAuditFilter, GovApprovalDelegation,
     GovDelegationAudit, WorkItemType,
 };
-use xavyo_governance::error::Result;
+use xavyo_db::User;
+use xavyo_governance::error::{GovernanceError, Result};
 
 use crate::models::DelegationAuditEntry;
+
+/// Prefer a non-empty display name, otherwise the user's email.
+fn user_display_name(display_name: Option<&str>, email: &str) -> String {
+    display_name
+        .filter(|name| !name.is_empty())
+        .unwrap_or(email)
+        .to_string()
+}
 
 /// Service for delegation audit operations.
 pub struct DelegationAuditService {
@@ -174,21 +183,33 @@ impl DelegationAuditService {
     /// Enrich audit records with display names.
     async fn enrich_audit_entries(
         &self,
-        _tenant_id: Uuid,
+        tenant_id: Uuid,
         records: Vec<GovDelegationAudit>,
     ) -> Result<Vec<DelegationAuditEntry>> {
-        // Note: In a full implementation, we would lookup user display names
-        // from the users table. For now, we return the entries without
-        // display name enrichment.
+        let mut names: std::collections::HashMap<Uuid, Option<String>> =
+            std::collections::HashMap::new();
+        for record in &records {
+            for user_id in [record.deputy_id, record.delegator_id] {
+                if names.contains_key(&user_id) {
+                    continue;
+                }
+                let display = User::find_by_id_in_tenant(&self.pool, tenant_id, user_id)
+                    .await
+                    .map_err(GovernanceError::Database)?
+                    .map(|u| user_display_name(u.display_name.as_deref(), &u.email));
+                names.insert(user_id, display);
+            }
+        }
+
         let entries = records
             .into_iter()
             .map(|r| DelegationAuditEntry {
                 id: r.id,
                 delegation_id: r.delegation_id,
                 deputy_id: r.deputy_id,
-                deputy_display: None, // TODO: Lookup from users table
+                deputy_display: names.get(&r.deputy_id).cloned().flatten(),
                 delegator_id: r.delegator_id,
-                delegator_display: None, // TODO: Lookup from users table
+                delegator_display: names.get(&r.delegator_id).cloned().flatten(),
                 action_type: r.action_type.to_string(),
                 work_item_id: r.work_item_id,
                 work_item_type: r.work_item_type.to_string(),
@@ -309,5 +330,36 @@ mod tests {
 
         assert_eq!(params.action_type, DelegationActionType::ApproveRequest);
         assert!(params.metadata.is_some());
+    }
+
+    #[test]
+    fn user_display_name_prefers_non_empty_display_name() {
+        assert_eq!(user_display_name(Some("Ada"), "ada@example.com"), "Ada");
+        assert_eq!(
+            user_display_name(Some(""), "ada@example.com"),
+            "ada@example.com"
+        );
+        assert_eq!(
+            user_display_name(None, "ada@example.com"),
+            "ada@example.com"
+        );
+    }
+
+    #[test]
+    fn enrich_audit_entries_looks_up_users() {
+        let src = include_str!("delegation_audit_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let enrich = production
+            .split("async fn enrich_audit_entries")
+            .nth(1)
+            .expect("enrich_audit_entries");
+        assert!(
+            enrich.contains("find_by_id_in_tenant") && enrich.contains("user_display_name("),
+            "audit entries must look up user display names"
+        );
+        assert!(
+            !enrich.contains("deputy_display: None") && !enrich.contains("delegator_display: None"),
+            "must not stub empty display names: {enrich}"
+        );
     }
 }

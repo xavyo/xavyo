@@ -9,19 +9,38 @@ use uuid::Uuid;
 
 use xavyo_db::{
     CreateGovRiskScoreHistory, GovAssignmentFilter, GovAssignmentStatus, GovAssignmentTargetType,
-    GovEntitlementAssignment, GovRiskEvent, GovRiskFactor, GovRiskScore, GovRiskScoreHistory,
-    GovRiskThreshold, GovSodViolation, GovViolationStatus, RiskFactorCategory, RiskFactorFilter,
-    RiskLevel, RiskScoreFilter, RiskScoreSortBy, SodViolationFilter, ThresholdAction,
-    TrendDirection, UpsertGovRiskScore,
+    GovEntitlementAssignment, GovPeerGroup, GovPeerGroupMember, GovRiskEvent, GovRiskFactor,
+    GovRiskScore, GovRiskScoreHistory, GovRiskThreshold, GovSodViolation, GovViolationStatus,
+    RiskFactorCategory, RiskFactorFilter, RiskLevel, RiskScoreFilter, RiskScoreSortBy,
+    SodViolationFilter, ThresholdAction, TrendDirection, UpsertGovRiskScore,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
 use crate::models::{
-    BatchCalculateResponse, EnforcementAction, FactorBreakdown, LevelCount,
+    BatchCalculateResponse, EnforcementAction, FactorBreakdown, LevelCount, PeerComparisonData,
     RiskEnforcementResponse, RiskScoreHistoryEntry, RiskScoreHistoryResponse,
     RiskScoreListResponse, RiskScoreResponse, RiskScoreSortOption, RiskScoreSummary,
     RiskTrendResponse,
 };
+
+/// Minimum peer-group size for a statistically valid comparison.
+const MIN_PEER_GROUP_SIZE: i32 = 5;
+
+/// Outlier threshold in standard deviations.
+const DEFAULT_OUTLIER_THRESHOLD: f64 = 2.0;
+
+/// The comparison with the largest absolute deviation, if any.
+fn strongest_peer_comparison(
+    mut comparisons: Vec<PeerComparisonData>,
+) -> Option<PeerComparisonData> {
+    comparisons.sort_by(|a, b| {
+        b.deviation
+            .abs()
+            .partial_cmp(&a.deviation.abs())
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    comparisons.into_iter().next()
+}
 
 /// Service for risk score operations.
 pub struct RiskScoreService {
@@ -89,11 +108,9 @@ impl RiskScoreService {
         let mut factor_breakdown = static_breakdown;
         factor_breakdown.extend(dynamic_breakdown);
 
-        // Optionally include peer comparison
+        // Optionally include peer comparison. Errors must not look like "no comparison".
         let peer_comparison = if include_peer_comparison {
-            self.calculate_peer_comparison(tenant_id, user_id)
-                .await
-                .ok()
+            self.calculate_peer_comparison(tenant_id, user_id).await?
         } else {
             None
         };
@@ -350,15 +367,58 @@ impl RiskScoreService {
     }
 
     /// Calculate peer comparison for a user.
+    ///
+    /// Picks the peer group with the largest |z-score|. Missing groups are
+    /// `None` (honest empty), not a swallowed error.
     async fn calculate_peer_comparison(
         &self,
-        _tenant_id: Uuid,
-        _user_id: Uuid,
-    ) -> Result<serde_json::Value> {
-        // TODO: Implement peer group comparison in US4
-        Err(GovernanceError::Validation(
-            "Peer comparison not yet implemented".to_string(),
-        ))
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Option<serde_json::Value>> {
+        let filter = GovAssignmentFilter {
+            target_type: Some(GovAssignmentTargetType::User),
+            target_id: Some(user_id),
+            ..Default::default()
+        };
+        let user_entitlement_count =
+            GovEntitlementAssignment::count_by_tenant(&self.pool, tenant_id, &filter)
+                .await
+                .map_err(GovernanceError::Database)? as i32;
+
+        let group_ids = GovPeerGroupMember::list_groups_for_user(&self.pool, tenant_id, user_id)
+            .await
+            .map_err(GovernanceError::Database)?;
+
+        let mut candidates = Vec::new();
+        for group_id in group_ids {
+            let Some(group) = GovPeerGroup::find_by_id(&self.pool, tenant_id, group_id)
+                .await
+                .map_err(GovernanceError::Database)?
+            else {
+                continue;
+            };
+            if group.user_count < MIN_PEER_GROUP_SIZE {
+                continue;
+            }
+            let Some(comparison) =
+                group.check_outlier(user_entitlement_count, DEFAULT_OUTLIER_THRESHOLD)
+            else {
+                continue;
+            };
+            candidates.push(PeerComparisonData {
+                group_id: comparison.group_id,
+                group_name: comparison.group_name,
+                user_entitlement_count,
+                group_average: comparison.group_avg_entitlements,
+                group_stddev: comparison.group_stddev,
+                deviation: comparison.deviation_from_mean,
+                is_outlier: comparison.is_outlier,
+            });
+        }
+
+        strongest_peer_comparison(candidates)
+            .map(|data| serde_json::to_value(data).map_err(GovernanceError::from))
+            .transpose()
     }
 
     /// Save or update the risk score for a user.
@@ -821,6 +881,67 @@ mod tests {
                 && !production
                     .contains("Placeholder - would check if account has no manager/owner"),
             "unknown/unimplemented static factors must error, not score 0.0"
+        );
+    }
+
+    #[test]
+    fn strongest_peer_comparison_picks_largest_abs_deviation() {
+        let gid = uuid::Uuid::new_v4();
+        let a = super::PeerComparisonData {
+            group_id: gid,
+            group_name: "eng".into(),
+            user_entitlement_count: 12,
+            group_average: 8.0,
+            group_stddev: 2.0,
+            deviation: 2.0,
+            is_outlier: true,
+        };
+        let b = super::PeerComparisonData {
+            group_id: uuid::Uuid::new_v4(),
+            group_name: "ops".into(),
+            user_entitlement_count: 12,
+            group_average: 10.0,
+            group_stddev: 1.0,
+            deviation: -0.5,
+            is_outlier: false,
+        };
+        let picked = super::strongest_peer_comparison(vec![b, a.clone()]).expect("comparison");
+        assert_eq!(picked.group_name, "eng");
+        assert!((picked.deviation - 2.0).abs() < 0.001);
+        assert!(super::strongest_peer_comparison(vec![]).is_none());
+    }
+
+    #[test]
+    fn calculate_score_does_not_swallow_peer_comparison() {
+        let src = include_str!("risk_score_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let calc = production
+            .split("pub async fn calculate_score")
+            .nth(1)
+            .and_then(|s| s.split("async fn calculate_static_factors").next())
+            .expect("calculate_score");
+        assert!(
+            calc.contains("calculate_peer_comparison") && calc.contains(".await?"),
+            "requested peer comparison errors must fail closed"
+        );
+        assert!(
+            !calc.contains(".ok()"),
+            "must not drop peer comparison on error: {calc}"
+        );
+
+        let peer = production
+            .split("async fn calculate_peer_comparison")
+            .nth(1)
+            .and_then(|s| s.split("async fn save_score").next())
+            .expect("calculate_peer_comparison");
+        assert!(
+            peer.contains("list_groups_for_user") && peer.contains("check_outlier"),
+            "peer comparison must use stored peer groups"
+        );
+        assert!(
+            !peer.contains("TODO: Implement peer group comparison")
+                && !peer.contains("Peer comparison not yet implemented"),
+            "must not stub peer comparison: {peer}"
         );
     }
 }
