@@ -11,6 +11,7 @@ use xavyo_db::models::{
     CreateGovApprovalDelegation, CreateGovDelegationScope, DelegationFilter, DelegationStatus,
     GovApprovalDelegation, GovDelegationScope,
 };
+use xavyo_db::User;
 use xavyo_governance::error::{GovernanceError, Result};
 
 use crate::models::{CreateDelegationScopeRequest, DelegatedWorkItem};
@@ -450,13 +451,22 @@ impl DelegationService {
                 } else {
                     None
                 };
+                let delegator_display =
+                    User::find_by_id_in_tenant(&self.pool, tenant_id, delegation.delegator_id)
+                        .await
+                        .map_err(GovernanceError::Database)?
+                        .map(|u| {
+                            u.display_name
+                                .filter(|name| !name.is_empty())
+                                .unwrap_or(u.email)
+                        });
 
                 all_work_items.push(DelegatedWorkItem {
                     id: request_id,
                     work_item_type: "access_request".to_string(),
                     delegation_id: delegation.id,
                     delegator_id: delegation.delegator_id,
-                    delegator_display: None, // Could fetch user email
+                    delegator_display,
                     access_request_id: Some(request_id),
                     certification_item_id: None,
                     application_id: app_id,
@@ -608,6 +618,20 @@ mod tests {
         assert!(
             !production.contains("JOIN gov_applications a ON a.id = e.application_id\n"),
             "must not join applications by id alone"
+        );
+    }
+
+    #[test]
+    fn delegated_work_items_lookup_delegator_display() {
+        let src = include_str!("delegation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("find_by_id_in_tenant") && production.contains("delegator_display"),
+            "delegated work items must look up delegator display names"
+        );
+        assert!(
+            !production.contains("delegator_display: None"),
+            "must not stub empty delegator_display"
         );
     }
 }
