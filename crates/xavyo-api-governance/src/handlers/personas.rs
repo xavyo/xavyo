@@ -12,7 +12,7 @@ use validator::Validate;
 
 use xavyo_auth::JwtClaims;
 use xavyo_db::models::{
-    CreatePersonaArchetype, GovPersona, GovPersonaArchetype, GovPersonaSession,
+    CreatePersonaArchetype, GovApplication, GovPersona, GovPersonaArchetype, GovPersonaSession,
     PersonaArchetypeFilter, PersonaFilter, UpdatePersona, UpdatePersonaArchetype, User,
 };
 
@@ -24,9 +24,9 @@ use crate::models::{
     ExtendPersonaRequest, ExtendPersonaResponse, ExtensionStatus, ListArchetypesQuery,
     ListExpiringPersonasQuery, ListPersonasQuery, PersonaAttributesResponse,
     PersonaAuditEventResponse, PersonaAuditListResponse, PersonaDetailResponse,
-    PersonaListResponse, PersonaResponse, PersonaUserSummary, PropagateAttributesResponse,
-    SearchAuditQuery, SwitchBackRequest, SwitchContextRequest, SwitchContextResponse,
-    UpdateArchetypeRequest, UpdatePersonaRequest, UserPersonasResponse,
+    PersonaEntitlementSummary, PersonaListResponse, PersonaResponse, PersonaUserSummary,
+    PropagateAttributesResponse, SearchAuditQuery, SwitchBackRequest, SwitchContextRequest,
+    SwitchContextResponse, UpdateArchetypeRequest, UpdatePersonaRequest, UserPersonasResponse,
 };
 use crate::router::GovernanceState;
 
@@ -636,10 +636,30 @@ pub async fn get_persona(
 
     let physical_user =
         load_persona_user_summary(state.pool(), tenant_id, persona.physical_user_id).await?;
+    let access = state
+        .persona_entitlement_service
+        .get_persona_entitlements(tenant_id, persona.id, None)
+        .await?;
+    let mut entitlements = Vec::with_capacity(access.entitlements.len());
+    for effective in access.entitlements {
+        let application_name = GovApplication::find_by_id(
+            state.pool(),
+            tenant_id,
+            effective.entitlement.application_id,
+        )
+        .await?
+        .map(|app| app.name)
+        .unwrap_or_default();
+        entitlements.push(PersonaEntitlementSummary {
+            id: effective.entitlement.id,
+            name: effective.entitlement.name,
+            application_name,
+        });
+    }
     let response = PersonaDetailResponse {
         base: persona_response(state.pool(), tenant_id, persona).await?,
         attributes: PersonaAttributesResponse::from(attrs),
-        entitlements: None,
+        entitlements: Some(entitlements),
         physical_user,
     };
 
@@ -1565,6 +1585,10 @@ mod tests {
         assert!(
             get.contains("load_persona_user_summary(") && !get.contains("physical_user: None"),
             "GET /governance/personas/{{id}} must look up physical_user summary"
+        );
+        assert!(
+            get.contains("get_persona_entitlements(") && !get.contains("entitlements: None"),
+            "GET /governance/personas/{{id}} must look up assigned entitlements"
         );
     }
 
