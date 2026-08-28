@@ -25,6 +25,7 @@ struct UserProfileRow {
     user_id: Uuid,
     entitlement_count: i32,
     role_count: i32,
+    role_ids: Option<Vec<Uuid>>,
     peer_group_ids: Option<Vec<Uuid>>,
     previous_score: Option<f64>,
 }
@@ -855,13 +856,15 @@ impl OutlierScoringService {
                 u.id as user_id,
                 COALESCE(ec.entitlement_count, 0) as entitlement_count,
                 COALESCE(ec.role_count, 0) as role_count,
+                COALESCE(ec.role_ids, ARRAY[]::uuid[]) as role_ids,
                 COALESCE(pgm.peer_group_ids, ARRAY[]::uuid[]) as peer_group_ids,
                 prev.overall_score as previous_score
             FROM users u
             LEFT JOIN LATERAL (
                 SELECT
                     COUNT(DISTINCT ea.entitlement_id) as entitlement_count,
-                    COUNT(DISTINCT re.role_id) as role_count
+                    COUNT(DISTINCT re.role_id) as role_count,
+                    ARRAY_AGG(DISTINCT re.role_id) FILTER (WHERE re.role_id IS NOT NULL) as role_ids
                 FROM gov_entitlement_assignments ea
                 JOIN gov_entitlements e ON ea.entitlement_id = e.id AND e.tenant_id = ea.tenant_id
                 LEFT JOIN gov_role_entitlements re ON re.entitlement_id = e.id AND re.tenant_id = ea.tenant_id
@@ -895,7 +898,7 @@ impl OutlierScoringService {
             .map(|row| UserAccessProfile {
                 user_id: row.user_id,
                 entitlement_count: row.entitlement_count,
-                role_ids: vec![], // We don't load individual role IDs for performance
+                role_ids: row.role_ids.unwrap_or_default(),
                 role_count: row.role_count,
                 peer_group_ids: row.peer_group_ids.unwrap_or_default(),
                 previous_score: row.previous_score,
@@ -1888,6 +1891,7 @@ mod tests {
         let load = production
             .split("pub async fn load_peer_group_stats")
             .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
             .expect("load_peer_group_stats");
         assert!(
             load.contains("peer_entitlement_stats(")
@@ -1901,6 +1905,23 @@ mod tests {
         assert!(
             !load.contains("mean_roles: g.avg_entitlements"),
             "role stats must not copy entitlement averages"
+        );
+    }
+
+    #[test]
+    fn user_profiles_load_role_ids() {
+        let src = include_str!("outlier_scoring_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let load = production
+            .split("async fn load_user_profiles")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("load_user_profiles");
+        assert!(
+            load.contains("ARRAY_AGG(DISTINCT re.role_id)")
+                && load.contains("role_ids: row.role_ids")
+                && !load.contains("role_ids: vec![]"),
+            "outlier scoring must load user role_ids for role-frequency analysis"
         );
     }
 

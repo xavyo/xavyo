@@ -7,8 +7,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use xavyo_db::{
-    CreateManualTaskAuditEvent, GovManualProvisioningTask, GovManualTaskAuditEvent,
-    ManualTaskEventType, ManualTaskFilter, ManualTaskStatus,
+    CreateManualTaskAuditEvent, GovApplication, GovEntitlement, GovManualProvisioningTask,
+    GovManualTaskAuditEvent, ManualTaskEventType, ManualTaskFilter, ManualTaskStatus, User,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -61,7 +61,13 @@ impl ManualTaskService {
             GovManualProvisioningTask::count_by_tenant(&self.pool, tenant_id, &filter).await?;
 
         Ok(ManualTaskListResponse {
-            items: tasks.into_iter().map(ManualTaskResponse::from).collect(),
+            items: {
+                let mut items = Vec::with_capacity(tasks.len());
+                for task in tasks {
+                    items.push(self.task_response(tenant_id, task).await?);
+                }
+                items
+            },
             total,
             limit,
             offset,
@@ -74,7 +80,7 @@ impl ManualTaskService {
             .await?
             .ok_or(GovernanceError::ManualProvisioningTaskNotFound(id))?;
 
-        Ok(ManualTaskResponse::from(task))
+        self.task_response(tenant_id, task).await
     }
 
     /// Claim a task (assign to a user).
@@ -138,7 +144,7 @@ impl ManualTaskService {
             "Manual task claimed"
         );
 
-        Ok(ManualTaskResponse::from(updated))
+        self.task_response(tenant_id, updated).await
     }
 
     /// Start working on a task.
@@ -187,7 +193,7 @@ impl ManualTaskService {
             "Manual task started"
         );
 
-        Ok(ManualTaskResponse::from(updated))
+        self.task_response(tenant_id, updated).await
     }
 
     /// Confirm a task as completed.
@@ -225,7 +231,7 @@ impl ManualTaskService {
             "Manual task confirmed"
         );
 
-        Ok(ManualTaskResponse::from(updated))
+        self.task_response(tenant_id, updated).await
     }
 
     /// Reject a task.
@@ -264,7 +270,7 @@ impl ManualTaskService {
             "Manual task rejected"
         );
 
-        Ok(ManualTaskResponse::from(updated))
+        self.task_response(tenant_id, updated).await
     }
 
     /// Cancel a task.
@@ -312,7 +318,46 @@ impl ManualTaskService {
             "Manual task cancelled"
         );
 
-        Ok(ManualTaskResponse::from(updated))
+        self.task_response(tenant_id, updated).await
+    }
+
+    async fn task_response(
+        &self,
+        tenant_id: Uuid,
+        task: GovManualProvisioningTask,
+    ) -> Result<ManualTaskResponse> {
+        let application_name =
+            GovApplication::find_by_id(&self.pool, tenant_id, task.application_id)
+                .await?
+                .map(|app| app.name);
+        let entitlement_name =
+            GovEntitlement::find_by_id(&self.pool, tenant_id, task.entitlement_id)
+                .await?
+                .map(|entitlement| entitlement.name);
+        let user_name = User::find_by_id_in_tenant(&self.pool, tenant_id, task.user_id)
+            .await
+            .map_err(GovernanceError::Database)?
+            .map(|user| match user.display_name {
+                Some(name) if !name.is_empty() => name,
+                _ => user.email,
+            });
+        let assignee_name = if let Some(assignee_id) = task.assignee_id {
+            User::find_by_id_in_tenant(&self.pool, tenant_id, assignee_id)
+                .await
+                .map_err(GovernanceError::Database)?
+                .map(|user| match user.display_name {
+                    Some(name) if !name.is_empty() => name,
+                    _ => user.email,
+                })
+        } else {
+            None
+        };
+        let mut response = ManualTaskResponse::from(task);
+        response.application_name = application_name;
+        response.entitlement_name = entitlement_name;
+        response.user_name = user_name;
+        response.assignee_name = assignee_name;
+        Ok(response)
     }
 
     /// Get dashboard metrics for manual tasks.
@@ -484,5 +529,27 @@ mod tests {
     fn test_service_construction() {
         // This test verifies the types compile correctly
         // Actual service tests would require a database connection
+    }
+
+    #[test]
+    fn manual_tasks_look_up_display_names() {
+        let src = include_str!("manual_task_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("task_response(")
+                && production.contains("GovApplication::find_by_id")
+                && production.contains("GovEntitlement::find_by_id")
+                && production.contains("find_by_id_in_tenant"),
+            "manual task responses must look up application, entitlement, and user names"
+        );
+        let list = production
+            .split("pub async fn list_tasks")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_tasks");
+        assert!(
+            list.contains("task_response(") && !list.contains("ManualTaskResponse::from(task)"),
+            "GET /governance/manual-tasks must enrich names"
+        );
     }
 }
