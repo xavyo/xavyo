@@ -12,7 +12,8 @@ use uuid::Uuid;
 use xavyo_events::EventProducer;
 
 use xavyo_db::models::{
-    ApproveGovNhiRequest, CreateGovNhiRequest, GovNhiRequest, NhiRequestFilter, NhiRequestStatus,
+    ApproveGovNhiRequest, CreateGovAssignment, CreateGovNhiRequest, GovAssignmentTargetType,
+    GovEntitlement, GovEntitlementAssignment, GovNhiRequest, NhiRequestFilter, NhiRequestStatus,
     RejectGovNhiRequest,
 };
 use xavyo_governance::error::{GovernanceError, Result};
@@ -195,6 +196,9 @@ impl NhiRequestService {
             .requested_rotation_days
             .unwrap_or(DEFAULT_ROTATION_INTERVAL_DAYS);
 
+        self.validate_requested_permissions(tenant_id, &request.requested_permissions)
+            .await?;
+
         // Create the NHI request - requester becomes the owner
         let create_nhi_request = CreateNhiRequest {
             user_id: request.requester_id, // user_id is required
@@ -213,6 +217,16 @@ impl NhiRequestService {
             .create(tenant_id, approver_id, create_nhi_request)
             .await?;
 
+        self.assign_requested_permissions(
+            tenant_id,
+            nhi.id,
+            approver_id,
+            &request.requested_permissions,
+            request.requested_expiration,
+            &request.purpose,
+        )
+        .await?;
+
         // Update the request as approved
         let approve_data = ApproveGovNhiRequest {
             approver_id,
@@ -226,8 +240,6 @@ impl NhiRequestService {
                 .ok_or_else(|| {
                     GovernanceError::Validation("Failed to approve request".to_string())
                 })?;
-
-        // TODO: Assign requested_permissions to the NHI if any
 
         // Emit event
         #[cfg(feature = "kafka")]
@@ -335,6 +347,72 @@ impl NhiRequestService {
         Ok(count)
     }
 
+    /// Fail closed if a requested entitlement is missing or inactive.
+    async fn validate_requested_permissions(
+        &self,
+        tenant_id: Uuid,
+        entitlement_ids: &[Uuid],
+    ) -> Result<()> {
+        for entitlement_id in entitlement_ids {
+            let entitlement = GovEntitlement::find_by_id(&self.pool, tenant_id, *entitlement_id)
+                .await
+                .map_err(GovernanceError::Database)?
+                .ok_or(GovernanceError::EntitlementNotFound(*entitlement_id))?;
+            if !entitlement.is_active() {
+                return Err(GovernanceError::Validation(format!(
+                    "Cannot assign inactive entitlement {entitlement_id}"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Grant requested entitlements to the newly created NHI.
+    async fn assign_requested_permissions(
+        &self,
+        tenant_id: Uuid,
+        nhi_id: Uuid,
+        assigned_by: Uuid,
+        entitlement_ids: &[Uuid],
+        expires_at: Option<chrono::DateTime<chrono::Utc>>,
+        justification: &str,
+    ) -> Result<()> {
+        for entitlement_id in entitlement_ids {
+            if GovEntitlementAssignment::find_by_target(
+                &self.pool,
+                tenant_id,
+                *entitlement_id,
+                GovAssignmentTargetType::Nhi,
+                nhi_id,
+            )
+            .await
+            .map_err(GovernanceError::Database)?
+            .is_some()
+            {
+                continue;
+            }
+
+            GovEntitlementAssignment::create(
+                &self.pool,
+                tenant_id,
+                CreateGovAssignment {
+                    entitlement_id: *entitlement_id,
+                    target_type: GovAssignmentTargetType::Nhi,
+                    target_id: nhi_id,
+                    assigned_by,
+                    expires_at,
+                    justification: Some(justification.to_string()),
+                    parameter_hash: None,
+                    valid_from: None,
+                    valid_to: None,
+                },
+            )
+            .await
+            .map_err(GovernanceError::Database)?;
+        }
+        Ok(())
+    }
+
     /// Get request summary/stats for the tenant.
     pub async fn get_request_summary(&self, tenant_id: Uuid) -> Result<NhiRequestSummary> {
         let pending_filter = NhiRequestFilter {
@@ -414,5 +492,29 @@ mod tests {
         assert_eq!(summary.approved, 0);
         assert_eq!(summary.rejected, 0);
         assert_eq!(summary.cancelled, 0);
+    }
+
+    #[test]
+    fn approve_request_assigns_requested_permissions() {
+        let production = include_str!("nhi_request_service.rs");
+        let approve = production
+            .split("pub async fn approve_request")
+            .nth(1)
+            .expect("approve_request")
+            .split("pub async fn reject_request")
+            .next()
+            .expect("reject_request");
+        assert!(
+            !approve.contains("TODO: Assign requested_permissions"),
+            "approve must not skip requested_permissions"
+        );
+        assert!(
+            approve.contains("assign_requested_permissions"),
+            "approve must grant requested_permissions onto the created NHI"
+        );
+        assert!(
+            approve.contains("validate_requested_permissions"),
+            "approve must fail closed on unknown entitlements"
+        );
     }
 }
