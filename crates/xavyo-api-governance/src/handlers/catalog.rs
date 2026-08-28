@@ -711,8 +711,15 @@ pub async fn add_to_cart(
             request.form_values,
         )
         .await?;
+    let catalog = state
+        .catalog_service
+        .get_item(tenant_id, cart_item.catalog_item_id)
+        .await?;
 
-    Ok((StatusCode::CREATED, Json(cart_item.into())))
+    Ok((
+        StatusCode::CREATED,
+        Json(CartItemResponse::from_request_item(cart_item, &catalog)),
+    ))
 }
 
 /// Remove an item from the cart.
@@ -794,8 +801,14 @@ pub async fn update_cart_item(
             request.form_values,
         )
         .await?;
+    let catalog = state
+        .catalog_service
+        .get_item(tenant_id, cart_item.catalog_item_id)
+        .await?;
 
-    Ok(Json(cart_item.into()))
+    Ok(Json(CartItemResponse::from_request_item(
+        cart_item, &catalog,
+    )))
 }
 
 /// Clear all items from the cart.
@@ -992,6 +1005,30 @@ mod tests {
             production.contains("parse_optional_parent_id(")
                 && !production.contains("Uuid::parse_str(pid).ok()"),
             "invalid catalog parent_id must be 400, not treated as root categories"
+        );
+    }
+
+    #[test]
+    fn cart_add_and_update_look_up_catalog_item_name() {
+        let src = include_str!("catalog.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let add = production
+            .split("pub async fn add_to_cart")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("add_to_cart");
+        assert!(
+            add.contains("from_request_item(") && add.contains("get_item("),
+            "POST cart item must look up catalog item_name"
+        );
+        let update = production
+            .split("pub async fn update_cart_item")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("update_cart_item");
+        assert!(
+            update.contains("from_request_item(") && update.contains("get_item("),
+            "PUT cart item must look up catalog item_name"
         );
     }
 }

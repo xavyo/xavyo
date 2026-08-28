@@ -12,7 +12,7 @@ use validator::Validate;
 
 use xavyo_auth::JwtClaims;
 use xavyo_db::models::{
-    CreatePersonaArchetype, GovPersonaSession, PersonaArchetypeFilter, PersonaFilter,
+    CreatePersonaArchetype, GovPersona, GovPersonaSession, PersonaArchetypeFilter, PersonaFilter,
     UpdatePersona, UpdatePersonaArchetype, User,
 };
 
@@ -1173,8 +1173,10 @@ pub async fn list_context_sessions(
         .persona_session_service
         .get_session_history(tenant_id, user_id, limit, offset)
         .await?;
-    let items: Vec<ContextSessionSummary> =
-        sessions.into_iter().map(std::convert::Into::into).collect();
+    let mut items = Vec::with_capacity(sessions.len());
+    for session in sessions {
+        items.push(context_session_summary(state.pool(), tenant_id, session).await?);
+    }
 
     Ok(Json(ContextSessionListResponse {
         items,
@@ -1209,6 +1211,34 @@ fn map_expiring_persona(
         days_remaining: i32::try_from(p.days_remaining).unwrap_or(i32::MAX),
         notification_sent: false,
     })
+}
+
+async fn context_session_summary(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    session: GovPersonaSession,
+) -> ApiResult<ContextSessionSummary> {
+    Ok(ContextSessionSummary {
+        id: session.id,
+        switched_at: session.switched_at,
+        from_context: persona_context_label(pool, tenant_id, session.previous_persona_id).await?,
+        to_context: persona_context_label(pool, tenant_id, session.active_persona_id).await?,
+        reason: session.switch_reason,
+    })
+}
+
+async fn persona_context_label(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    persona_id: Option<Uuid>,
+) -> ApiResult<String> {
+    let Some(persona_id) = persona_id else {
+        return Ok("Physical User".to_string());
+    };
+    Ok(GovPersona::find_by_id(pool, tenant_id, persona_id)
+        .await?
+        .map(|persona| persona.persona_name)
+        .unwrap_or_else(|| format!("Unknown ({persona_id})")))
 }
 
 /// Extend persona validity (T073).
@@ -1304,11 +1334,15 @@ pub async fn get_expiring_personas(
         .filter_map(map_expiring_persona)
         .collect();
     let total = i64::try_from(all.len()).unwrap_or(i64::MAX);
-    let items = all
+    let mut items: Vec<ExpiringPersonaSummary> = all
         .into_iter()
         .skip(usize::try_from(offset).unwrap_or(0))
         .take(usize::try_from(limit).unwrap_or(50))
         .collect();
+    for item in &mut items {
+        item.physical_user_name =
+            load_user_display_name(state.pool(), tenant_id, item.physical_user_id).await?;
+    }
 
     Ok(Json(ExpiringPersonasResponse {
         items,
@@ -1476,6 +1510,24 @@ mod tests {
                 && sessions.contains("let (sessions, total)")
                 && !sessions.contains("sessions.len() as i64"),
             "GET /governance/context/sessions must report the filtered total, not the page length"
+        );
+        assert!(
+            sessions.contains("context_session_summary(") && !sessions.contains("Into::into"),
+            "GET /governance/context/sessions must look up persona names"
+        );
+    }
+
+    #[test]
+    fn get_expiring_personas_looks_up_physical_user_name() {
+        let src = include_str!("personas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let expiring = production
+            .split("pub async fn get_expiring_personas")
+            .nth(1)
+            .expect("get_expiring_personas");
+        assert!(
+            expiring.contains("load_user_display_name(") && expiring.contains("physical_user_name"),
+            "GET /governance/personas/expiring must look up physical user display names"
         );
     }
 

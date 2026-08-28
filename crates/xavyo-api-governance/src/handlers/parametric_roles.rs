@@ -15,8 +15,8 @@ use validator::Validate;
 
 use xavyo_auth::JwtClaims;
 use xavyo_db::{
-    CreateGovRoleParameter, ParameterAuditFilter, RoleParameterFilter, SetGovAssignmentParameter,
-    UpdateGovRoleParameter,
+    CreateGovRoleParameter, GovRoleAssignmentParameter, GovRoleParameter, ParameterAuditFilter,
+    RoleParameterFilter, SetGovAssignmentParameter, UpdateGovRoleParameter,
 };
 
 use crate::error::{ApiGovernanceError, ApiResult};
@@ -60,6 +60,43 @@ async fn lookup_role_name(
             .await?
             .map(|entitlement| entitlement.name),
     )
+}
+
+async fn assignment_parameter_responses(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    params: Vec<GovRoleAssignmentParameter>,
+) -> ApiResult<Vec<AssignmentParameterResponse>> {
+    let mut items = Vec::with_capacity(params.len());
+    for param in params {
+        items.push(enrich_assignment_parameter(pool, tenant_id, param).await?);
+    }
+    Ok(items)
+}
+
+async fn enrich_assignment_parameter(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    param: GovRoleAssignmentParameter,
+) -> ApiResult<AssignmentParameterResponse> {
+    let definition = GovRoleParameter::find_by_id(pool, tenant_id, param.parameter_id).await?;
+    Ok(AssignmentParameterResponse {
+        id: param.id,
+        assignment_id: param.assignment_id,
+        parameter_id: param.parameter_id,
+        parameter_name: definition.as_ref().map_or_else(
+            || format!("Unknown ({})", param.parameter_id),
+            |d| d.name.clone(),
+        ),
+        parameter_display_name: definition.as_ref().and_then(|d| d.display_name.clone()),
+        parameter_type: definition
+            .as_ref()
+            .map(|d| d.parameter_type.to_string())
+            .unwrap_or_else(|| "unknown".to_string()),
+        value: param.value,
+        created_at: param.created_at,
+        updated_at: param.updated_at,
+    })
 }
 
 // ============================================================================
@@ -617,10 +654,8 @@ pub async fn create_parametric_assignment(
     let is_temporally_active = assignment.valid_from.is_none_or(|vf| vf <= now)
         && assignment.valid_to.is_none_or(|vt| vt > now);
 
-    let params_response: Vec<AssignmentParameterResponse> = assignment_params
-        .into_iter()
-        .map(AssignmentParameterResponse::from)
-        .collect();
+    let params_response =
+        assignment_parameter_responses(&state.pool, tenant_id, assignment_params).await?;
 
     let role_name = lookup_role_name(&state.pool, tenant_id, role_id).await?;
 
@@ -688,10 +723,7 @@ pub async fn get_parametric_assignment(
     let is_temporally_active = assignment.valid_from.is_none_or(|vf| vf <= now)
         && assignment.valid_to.is_none_or(|vt| vt > now);
 
-    let params_response: Vec<AssignmentParameterResponse> = params
-        .into_iter()
-        .map(AssignmentParameterResponse::from)
-        .collect();
+    let params_response = assignment_parameter_responses(&state.pool, tenant_id, params).await?;
 
     let role_name = lookup_role_name(&state.pool, tenant_id, assignment.entitlement_id).await?;
 
@@ -784,10 +816,8 @@ pub async fn list_user_parametric_assignments(
             .get_assignment_parameters(tenant_id, assignment.id)
             .await?;
 
-        let params_response: Vec<AssignmentParameterResponse> = params
-            .into_iter()
-            .map(AssignmentParameterResponse::from)
-            .collect();
+        let params_response =
+            assignment_parameter_responses(&state.pool, tenant_id, params).await?;
 
         let role_name = lookup_role_name(&state.pool, tenant_id, assignment.entitlement_id).await?;
 
@@ -863,10 +893,7 @@ pub async fn get_assignment_parameters(
         .get_assignment_parameters(tenant_id, assignment_id)
         .await?;
 
-    let items: Vec<AssignmentParameterResponse> = params
-        .into_iter()
-        .map(AssignmentParameterResponse::from)
-        .collect();
+    let items = assignment_parameter_responses(&state.pool, tenant_id, params).await?;
 
     Ok(Json(items))
 }
@@ -924,10 +951,7 @@ pub async fn update_assignment_parameters(
         .update_assignment_parameters(tenant_id, assignment_id, actor_id, values)
         .await?;
 
-    let items: Vec<AssignmentParameterResponse> = params
-        .into_iter()
-        .map(AssignmentParameterResponse::from)
-        .collect();
+    let items = assignment_parameter_responses(&state.pool, tenant_id, params).await?;
 
     Ok(Json(items))
 }
@@ -1107,6 +1131,28 @@ mod tests {
             production.contains("GovRole::find_by_id")
                 && production.contains("GovEntitlement::find_by_id"),
             "role_name lookup must query tenant-scoped roles then entitlements"
+        );
+    }
+
+    #[test]
+    fn assignment_parameters_look_up_definition_names() {
+        let src = include_str!("parametric_roles.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("assignment_parameter_responses(")
+                && production.contains("GovRoleParameter::find_by_id")
+                && !production.contains("parameter_name: String::new()"),
+            "parametric assignment parameters must look up parameter_name and parameter_type"
+        );
+        let get = production
+            .split("pub async fn get_assignment_parameters")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_assignment_parameters");
+        assert!(
+            get.contains("assignment_parameter_responses(")
+                && !get.contains("AssignmentParameterResponse::from"),
+            "GET assignment parameters must enrich names from role parameter definitions"
         );
     }
 }

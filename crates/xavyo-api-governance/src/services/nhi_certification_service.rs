@@ -1399,6 +1399,13 @@ impl NhiCertificationService {
             .get_campaign_record(tenant_id, item.campaign_id)
             .await?;
 
+        let owner_name = User::find_by_id_in_tenant(&self.pool, tenant_id, nhi.owner_id)
+            .await?
+            .map(|user| match user.display_name {
+                Some(name) if !name.is_empty() => name,
+                _ => user.email,
+            });
+
         Ok(NhiCertificationItemResponse {
             id: item.id,
             campaign_id: item.campaign_id,
@@ -1406,7 +1413,7 @@ impl NhiCertificationService {
             nhi_name: nhi.name,
             nhi_purpose: nhi.purpose,
             owner_id: nhi.owner_id,
-            owner_name: None, // Would need user lookup
+            owner_name,
             reviewer_id: item.reviewer_id,
             status: item.status,
             deadline: campaign.deadline,
@@ -1726,6 +1733,23 @@ mod tests {
         assert!(
             !resolve.contains("Ok(nhi.owner_id)\n            }\n        }"),
             "owner_manager must not silently fall back to owner"
+        );
+    }
+
+    #[test]
+    fn nhi_cert_item_looks_up_owner_name() {
+        let src = include_str!("nhi_certification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let item = production
+            .split("async fn item_to_response(")
+            .nth(1)
+            .and_then(|s| s.split("    async fn ").next())
+            .expect("item_to_response");
+        assert!(
+            item.contains("find_by_id_in_tenant")
+                && item.contains("owner_name")
+                && !item.contains("owner_name: None"),
+            "NHI certification items must look up the owner display name"
         );
     }
 }

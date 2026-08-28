@@ -10,6 +10,7 @@ use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use xavyo_db::models::ConnectorConfiguration;
 use xavyo_db::{
     resolve_correlation_sort, CorrelationCaseFilter, CreateGovCorrelationCandidate,
     CreateGovCorrelationCase, GovCorrelationCandidate, GovCorrelationCase,
@@ -121,7 +122,8 @@ impl CorrelationCaseService {
             "Correlation case created"
         );
 
-        case_to_summary(case)
+        let connector_name = load_connector_name(&self.pool, tenant_id, case.connector_id).await?;
+        case_to_summary(case, connector_name)
     }
 
     /// Get a single correlation case by ID, including all candidates.
@@ -137,7 +139,8 @@ impl CorrelationCaseService {
         let candidates =
             GovCorrelationCandidate::list_by_case(&self.pool, tenant_id, case.id).await?;
 
-        case_to_detail(case, candidates)
+        let connector_name = load_connector_name(&self.pool, tenant_id, case.connector_id).await?;
+        case_to_detail(case, candidates, connector_name)
     }
 
     /// List correlation cases for a tenant with filtering, sorting, and pagination.
@@ -157,11 +160,15 @@ impl CorrelationCaseService {
 
         let total = GovCorrelationCase::count_by_tenant(&self.pool, tenant_id, &filter).await?;
 
+        let mut items = Vec::with_capacity(cases.len());
+        for case in cases {
+            let connector_name =
+                load_connector_name(&self.pool, tenant_id, case.connector_id).await?;
+            items.push(case_to_summary(case, connector_name)?);
+        }
+
         Ok(CorrelationCaseListResponse {
-            items: cases
-                .into_iter()
-                .map(case_to_summary)
-                .collect::<Result<Vec<_>>>()?,
+            items,
             total,
             limit,
             offset,
@@ -396,12 +403,27 @@ fn decimal_to_f64(value: rust_decimal::Decimal, field: &str) -> Result<f64> {
         .map_err(|_| GovernanceError::Validation(format!("Invalid stored {field} value")))
 }
 
+async fn load_connector_name(
+    pool: &PgPool,
+    tenant_id: Uuid,
+    connector_id: Uuid,
+) -> Result<Option<String>> {
+    Ok(
+        ConnectorConfiguration::find_by_id(pool, tenant_id, connector_id)
+            .await?
+            .map(|connector| connector.name),
+    )
+}
+
 /// Convert a `GovCorrelationCase` database model into a `CorrelationCaseSummaryResponse`.
-fn case_to_summary(case: GovCorrelationCase) -> Result<CorrelationCaseSummaryResponse> {
+fn case_to_summary(
+    case: GovCorrelationCase,
+    connector_name: Option<String>,
+) -> Result<CorrelationCaseSummaryResponse> {
     Ok(CorrelationCaseSummaryResponse {
         id: case.id,
         connector_id: case.connector_id,
-        connector_name: None, // Connector name requires a join; populated by caller if needed.
+        connector_name,
         account_identifier: case.account_identifier,
         status: format!("{:?}", case.status).to_lowercase(),
         trigger_type: format!("{:?}", case.trigger_type).to_lowercase(),
@@ -416,11 +438,12 @@ fn case_to_summary(case: GovCorrelationCase) -> Result<CorrelationCaseSummaryRes
 fn case_to_detail(
     case: GovCorrelationCase,
     candidates: Vec<GovCorrelationCandidate>,
+    connector_name: Option<String>,
 ) -> Result<CorrelationCaseDetailResponse> {
     Ok(CorrelationCaseDetailResponse {
         id: case.id,
         connector_id: case.connector_id,
-        connector_name: None,
+        connector_name,
         account_identifier: case.account_identifier,
         account_id: Some(case.account_id),
         status: format!("{:?}", case.status).to_lowercase(),
@@ -534,11 +557,11 @@ mod tests {
             updated_at: chrono::Utc::now(),
         };
 
-        let summary = case_to_summary(case.clone()).unwrap();
+        let summary = case_to_summary(case.clone(), Some("LDAP".to_string())).unwrap();
 
         assert_eq!(summary.id, case.id);
         assert_eq!(summary.connector_id, case.connector_id);
-        assert!(summary.connector_name.is_none());
+        assert_eq!(summary.connector_name.as_deref(), Some("LDAP"));
         assert_eq!(summary.account_identifier, "jdoe@example.com");
         assert_eq!(summary.status, "pending");
         assert_eq!(summary.trigger_type, "reconciliation");
@@ -586,7 +609,8 @@ mod tests {
             created_at: chrono::Utc::now(),
         }];
 
-        let detail = case_to_detail(case.clone(), candidates).unwrap();
+        let detail = case_to_detail(case.clone(), candidates, Some("HR".to_string())).unwrap();
+        assert_eq!(detail.connector_name.as_deref(), Some("HR"));
 
         assert_eq!(detail.id, case.id);
         assert_eq!(detail.connector_id, case.connector_id);
@@ -605,6 +629,18 @@ mod tests {
         assert!((detail.candidates[0].aggregate_confidence - 92.00).abs() < f64::EPSILON);
         assert!(!detail.candidates[0].is_deactivated);
         assert!(!detail.candidates[0].is_definitive_match);
+    }
+
+    #[test]
+    fn correlation_cases_look_up_connector_name() {
+        let src = include_str!("correlation_case_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("load_connector_name(")
+                && production.contains("ConnectorConfiguration::find_by_id")
+                && !production.contains("connector_name: None"),
+            "correlation case list/detail must look up connector_name"
+        );
     }
 
     #[test]

@@ -457,19 +457,28 @@ impl From<CartItemWithDetails> for CartItemResponse {
     }
 }
 
-impl From<RequestCartItem> for CartItemResponse {
-    fn from(item: RequestCartItem) -> Self {
+impl CartItemResponse {
+    /// Fill advertised catalog fields from the item definition.
+    pub fn from_request_item(item: RequestCartItem, catalog: &CatalogItem) -> Self {
         Self {
             id: item.id,
             catalog_item_id: item.catalog_item_id,
-            item_name: String::new(), // Will be populated from join
-            item_description: None,
-            item_type: String::new(),
-            item_enabled: true,
+            item_name: catalog.name.clone(),
+            item_description: catalog.description.clone(),
+            item_type: catalog_item_type_label(catalog.item_type),
+            item_enabled: catalog.is_enabled(),
             parameters: item.parameters,
             form_values: item.form_values,
             added_at: item.added_at,
         }
+    }
+}
+
+fn catalog_item_type_label(item_type: CatalogItemType) -> String {
+    match item_type {
+        CatalogItemType::Role => "role".to_string(),
+        CatalogItemType::Entitlement => "entitlement".to_string(),
+        CatalogItemType::Resource => "resource".to_string(),
     }
 }
 
@@ -802,5 +811,25 @@ mod tests {
 
         assert!(!response.valid);
         assert_eq!(response.issues.len(), 1);
+    }
+
+    #[test]
+    fn cart_item_type_label_is_lowercase() {
+        assert_eq!(catalog_item_type_label(CatalogItemType::Role), "role");
+        assert_eq!(
+            catalog_item_type_label(CatalogItemType::Entitlement),
+            "entitlement"
+        );
+        assert_eq!(
+            catalog_item_type_label(CatalogItemType::Resource),
+            "resource"
+        );
+        let src = include_str!("catalog.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("from_request_item(")
+                && !production.contains("item_name: String::new()"),
+            "cart item responses must fill names from the catalog item"
+        );
     }
 }

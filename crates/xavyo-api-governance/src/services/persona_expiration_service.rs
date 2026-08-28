@@ -554,22 +554,25 @@ impl PersonaExpirationService {
             .await
             .map_err(GovernanceError::Database)?;
 
-        let personas: Vec<ExpiringPersonaSummary> = expiring
-            .iter()
-            .map(|p| {
-                let days_remaining = p.valid_until.map_or(0, |v| (v - now).num_days());
+        let mut personas = Vec::with_capacity(expiring.len());
+        for p in &expiring {
+            let days_remaining = p.valid_until.map_or(0, |v| (v - now).num_days());
+            let archetype_name =
+                GovPersonaArchetype::find_by_id(&self.pool, tenant_id, p.archetype_id)
+                    .await
+                    .map_err(GovernanceError::Database)?
+                    .map(|archetype| archetype.name);
 
-                ExpiringPersonaSummary {
-                    persona_id: p.id,
-                    persona_name: p.persona_name.clone(),
-                    physical_user_id: p.physical_user_id,
-                    valid_until: p.valid_until,
-                    days_remaining,
-                    status: p.status,
-                    archetype_name: None, // Would need join to get
-                }
-            })
-            .collect();
+            personas.push(ExpiringPersonaSummary {
+                persona_id: p.id,
+                persona_name: p.persona_name.clone(),
+                physical_user_id: p.physical_user_id,
+                valid_until: p.valid_until,
+                days_remaining,
+                status: p.status,
+                archetype_name,
+            });
+        }
 
         Ok(ExpiringPersonasReport {
             expiring_count: expiring.len() as i64,
@@ -751,6 +754,23 @@ mod tests {
                 && !extend.contains("let _ =")
                 && !extend.contains("extension_days: i32"),
             "extend must take new_valid_until and fail when the persona row is not updated"
+        );
+    }
+
+    #[test]
+    fn expiring_report_looks_up_archetype_name() {
+        let src = include_str!("persona_expiration_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let report = production
+            .split("pub async fn get_expiring_report")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_expiring_report");
+        assert!(
+            report.contains("GovPersonaArchetype::find_by_id")
+                && report.contains("archetype_name")
+                && !report.contains("archetype_name: None"),
+            "GET expiring personas must look up archetype names"
         );
     }
 }
