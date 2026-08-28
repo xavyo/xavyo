@@ -1,12 +1,11 @@
 //! Common test utilities for xavyo-api-oauth integration tests.
 
-use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use std::sync::Once;
-use std::time::Duration;
 use uuid::Uuid;
 use xavyo_api_oauth::router::OAuthState;
 use xavyo_core::TenantId;
+use xavyo_db::DbPool;
 
 #[allow(dead_code)]
 static INIT: Once = Once::new();
@@ -98,8 +97,10 @@ pub fn get_superuser_database_url() -> String {
 /// Provides database pools and helpers for tenant isolation testing.
 #[allow(dead_code)]
 pub struct OAuthTestContext {
-    /// App user pool - RLS is enforced
+    /// App pool for service-layer tests (may connect as superuser in CI).
     pub pool: PgPool,
+    /// Pool with RLS enforced via `xavyo_app` for direct SQL isolation tests.
+    pub rls_pool: PgPool,
     /// Admin/superuser pool - bypasses RLS, used for test setup
     pub admin_pool: PgPool,
 }
@@ -110,21 +111,29 @@ impl OAuthTestContext {
     pub async fn new() -> Self {
         init_test_logging();
 
-        let pool = PgPoolOptions::new()
-            .max_connections(5)
-            .acquire_timeout(Duration::from_secs(5))
-            .connect(&get_app_database_url())
+        let pool = DbPool::connect(&get_app_database_url())
             .await
-            .expect("Failed to connect as app user. Is PostgreSQL running?");
+            .expect("Failed to connect as app user. Is PostgreSQL running?")
+            .inner()
+            .clone();
 
-        let admin_pool = PgPoolOptions::new()
-            .max_connections(5)
-            .acquire_timeout(Duration::from_secs(5))
-            .connect(&get_superuser_database_url())
+        let rls_pool = DbPool::connect_app(&get_app_database_url())
             .await
-            .expect("Failed to connect as superuser");
+            .expect("Failed to connect RLS-enforced pool. Is PostgreSQL running?")
+            .inner()
+            .clone();
 
-        Self { pool, admin_pool }
+        let admin_pool = DbPool::connect(&get_superuser_database_url())
+            .await
+            .expect("Failed to connect as superuser")
+            .inner()
+            .clone();
+
+        Self {
+            pool,
+            rls_pool,
+            admin_pool,
+        }
     }
 
     /// Create a test tenant and return its ID.

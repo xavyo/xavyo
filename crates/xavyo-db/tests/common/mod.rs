@@ -70,7 +70,7 @@ impl TestContext {
     pub async fn new() -> Self {
         init_test_logging();
 
-        let pool = DbPool::connect(&get_app_database_url()).await.expect(
+        let pool = DbPool::connect_app(&get_app_database_url()).await.expect(
             "Failed to connect as app user. Is PostgreSQL running? Try: ./scripts/dev-env.sh start",
         );
 

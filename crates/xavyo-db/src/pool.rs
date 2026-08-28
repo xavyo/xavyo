@@ -41,6 +41,48 @@ impl DbPool {
         Self::connect_with_options(database_url, DbPoolOptions::default()).await
     }
 
+    /// Connect as the application user with Row-Level Security enforced.
+    ///
+    /// When the connection URL uses a PostgreSQL superuser (common in CI where
+    /// `DATABASE_URL` and `DATABASE_URL_SUPERUSER` are identical), each acquired
+    /// connection executes `SET ROLE xavyo_app` so tenant isolation policies apply.
+    pub async fn connect_app(database_url: &str) -> Result<Self, DbError> {
+        Self::connect_app_with_options(database_url, DbPoolOptions::default()).await
+    }
+
+    /// Connect as the application user with custom pool options.
+    pub async fn connect_app_with_options(
+        database_url: &str,
+        options: DbPoolOptions,
+    ) -> Result<Self, DbError> {
+        let pool = PgPoolOptions::new()
+            .min_connections(options.min_connections)
+            .max_connections(options.max_connections)
+            .acquire_timeout(options.acquire_timeout)
+            .after_connect(|conn, _meta| {
+                Box::pin(async move {
+                    let is_superuser: Option<(bool,)> = sqlx::query_as(
+                        "SELECT rolsuper FROM pg_roles WHERE rolname = current_user",
+                    )
+                    .fetch_optional(&mut *conn)
+                    .await?;
+
+                    if matches!(is_superuser, Some((true,))) {
+                        sqlx::query("SET ROLE xavyo_app")
+                            .execute(&mut *conn)
+                            .await?;
+                    }
+
+                    Ok(())
+                })
+            })
+            .connect(database_url)
+            .await
+            .map_err(DbError::ConnectionFailed)?;
+
+        Ok(Self { inner: pool })
+    }
+
     /// Connect to `PostgreSQL` with custom pool options.
     ///
     /// # Arguments
