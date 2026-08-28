@@ -272,7 +272,7 @@ pub async fn get_certification(
     ),
     request_body = DecideMicroCertificationRequest,
     responses(
-        (status = 200, description = "Decision recorded", body = MicroCertificationResponse),
+        (status = 200, description = "Decision recorded", body = MicroCertificationWithDetailsResponse),
         (status = 400, description = "Invalid request"),
         (status = 401, description = "Unauthorized"),
         (status = 403, description = "Not authorized to decide"),
@@ -287,7 +287,7 @@ pub async fn decide(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
     Json(request): Json<DecideMicroCertificationRequest>,
-) -> ApiResult<Json<MicroCertificationResponse>> {
+) -> ApiResult<Json<MicroCertificationWithDetailsResponse>> {
     request.validate()?;
 
     let tenant_id = *claims
@@ -301,7 +301,9 @@ pub async fn decide(
         .decide(tenant_id, id, user_id, request.decision, request.comment)
         .await?;
 
-    Ok(Json(MicroCertificationResponse::from(result.certification)))
+    Ok(Json(
+        micro_cert_with_details(state.pool(), tenant_id, result.certification).await?,
+    ))
 }
 
 /// Delegate a micro-certification to another reviewer.
@@ -314,7 +316,7 @@ pub async fn decide(
     ),
     request_body = DelegateMicroCertificationRequest,
     responses(
-        (status = 200, description = "Delegation recorded", body = MicroCertificationResponse),
+        (status = 200, description = "Delegation recorded", body = MicroCertificationWithDetailsResponse),
         (status = 400, description = "Invalid request"),
         (status = 401, description = "Unauthorized"),
         (status = 403, description = "Not authorized to delegate"),
@@ -329,7 +331,7 @@ pub async fn delegate(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
     Json(request): Json<DelegateMicroCertificationRequest>,
-) -> ApiResult<Json<MicroCertificationResponse>> {
+) -> ApiResult<Json<MicroCertificationWithDetailsResponse>> {
     request.validate()?;
 
     let tenant_id = *claims
@@ -343,7 +345,9 @@ pub async fn delegate(
         .delegate(tenant_id, id, user_id, request.delegate_to, request.comment)
         .await?;
 
-    Ok(Json(MicroCertificationResponse::from(result)))
+    Ok(Json(
+        micro_cert_with_details(state.pool(), tenant_id, result).await?,
+    ))
 }
 
 /// Bulk decide on multiple micro-certifications.
@@ -590,7 +594,8 @@ pub async fn manual_trigger(
     };
 
     Ok(Json(ManualTriggerResponse {
-        certification: MicroCertificationResponse::from(result.certification),
+        certification: micro_cert_with_details(state.pool(), tenant_id, result.certification)
+            .await?,
         duplicate_skipped: result.duplicate_skipped,
         message,
     }))
@@ -606,7 +611,7 @@ pub async fn manual_trigger(
     ),
     request_body = SkipMicroCertificationRequest,
     responses(
-        (status = 200, description = "Micro-certification skipped", body = MicroCertificationResponse),
+        (status = 200, description = "Micro-certification skipped", body = MicroCertificationWithDetailsResponse),
         (status = 400, description = "Invalid request - reason required"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Micro-certification not found"),
@@ -620,7 +625,7 @@ pub async fn skip_certification(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
     Json(request): Json<SkipMicroCertificationRequest>,
-) -> ApiResult<Json<MicroCertificationResponse>> {
+) -> ApiResult<Json<MicroCertificationWithDetailsResponse>> {
     request.validate()?;
 
     let tenant_id = *claims
@@ -633,24 +638,22 @@ pub async fn skip_certification(
     let cert = state.micro_certification_service.get(tenant_id, id).await?;
 
     // Skip the certification - use assignment-based skip if available, otherwise skip by ID
-    if let Some(assignment_id) = cert.assignment_id {
+    let updated = if let Some(assignment_id) = cert.assignment_id {
         state
             .micro_certification_service
             .skip_by_assignment(tenant_id, assignment_id)
             .await?;
-
-        // Refetch the updated certification
-        let updated = state.micro_certification_service.get(tenant_id, id).await?;
-        Ok(Json(MicroCertificationResponse::from(updated)))
+        state.micro_certification_service.get(tenant_id, id).await?
     } else {
-        // No assignment context (e.g., manually triggered) - skip by ID directly
-        let updated = state
+        state
             .micro_certification_service
             .skip_by_id(tenant_id, id)
             .await?
-            .ok_or(ApiGovernanceError::MicroCertificationNotFound(id))?;
-        Ok(Json(MicroCertificationResponse::from(updated)))
-    }
+            .ok_or(ApiGovernanceError::MicroCertificationNotFound(id))?
+    };
+    Ok(Json(
+        micro_cert_with_details(state.pool(), tenant_id, updated).await?,
+    ))
 }
 
 #[cfg(test)]
@@ -727,5 +730,28 @@ mod tests {
                 && !get.contains("MicroCertificationResponse::from(cert)"),
             "GET /governance/micro-certifications/{{id}} must return nested user/entitlement/reviewer details"
         );
+    }
+
+    #[test]
+    fn micro_cert_actions_return_nested_details() {
+        let src = include_str!("micro_certifications.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for (fn_name, label) in [
+            ("pub async fn decide", "POST decide"),
+            ("pub async fn delegate", "POST delegate"),
+            ("pub async fn skip_certification", "POST skip"),
+            ("pub async fn manual_trigger", "POST trigger"),
+        ] {
+            let body = production
+                .split(fn_name)
+                .nth(1)
+                .and_then(|s| s.split("pub async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                body.contains("micro_cert_with_details(")
+                    && !body.contains("MicroCertificationResponse::from("),
+                "{label} must return nested user/entitlement/reviewer details"
+            );
+        }
     }
 }

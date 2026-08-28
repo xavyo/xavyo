@@ -1040,8 +1040,8 @@ pub struct ManualTriggerRequest {
 /// Response for manual trigger operation.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ManualTriggerResponse {
-    /// The created certification.
-    pub certification: MicroCertificationResponse,
+    /// The created certification with nested user, entitlement, and reviewer.
+    pub certification: MicroCertificationWithDetailsResponse,
 
     /// Whether a duplicate was detected and skipped.
     pub duplicate_skipped: bool,
