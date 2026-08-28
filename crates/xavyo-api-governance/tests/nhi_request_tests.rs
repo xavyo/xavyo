@@ -498,6 +498,17 @@ fn test_submit_request_serialization() {
 }
 
 #[test]
+fn test_submit_request_accepts_web_rotation_interval_days_alias() {
+    let json = r#"{
+        "name": "my-service",
+        "purpose": "Test service purpose for alias",
+        "rotation_interval_days": 45
+    }"#;
+    let request: SubmitNhiRequestRequest = serde_json::from_str(json).unwrap();
+    assert_eq!(request.requested_rotation_days, Some(45));
+}
+
+#[test]
 fn test_reject_request_serialization() {
     let request = RejectNhiRequestRequest {
         reason: "Not approved".to_string(),

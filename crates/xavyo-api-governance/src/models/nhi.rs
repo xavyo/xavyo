@@ -621,7 +621,7 @@ pub struct SubmitNhiRequestRequest {
 
     /// Requested rotation interval in days.
     #[validate(range(min = 1, max = 365, message = "Rotation interval must be 1-365 days"))]
-    #[serde(default)]
+    #[serde(default, alias = "rotation_interval_days")]
     pub requested_rotation_days: Option<i32>,
 }
 
