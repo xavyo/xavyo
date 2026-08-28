@@ -606,7 +606,7 @@ impl RiskEnforcementService {
             cooldown_hours,
         )
         .await
-        .unwrap_or(false);
+        .map_err(|e| RiskEnforcementError::DatabaseError(e.to_string()))?;
 
         if exists {
             return Ok(()); // Already alerted within cooldown
@@ -849,6 +849,26 @@ mod tests {
         assert!(
             !calc.contains("unwrap_or(0.0)"),
             "must not treat missing risk events as score 0"
+        );
+    }
+
+    #[test]
+    fn alert_cooldown_lookup_does_not_fail_open() {
+        let src = include_str!("risk_enforcement_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let create = production
+            .split("async fn generate_enforcement_alert")
+            .nth(1)
+            .and_then(|s| s.split("fn haversine_km").next())
+            .expect("generate_enforcement_alert");
+        assert!(
+            create.contains("exists_within_cooldown")
+                && create.contains("map_err(|e| RiskEnforcementError::DatabaseError"),
+            "cooldown lookup errors must fail closed"
+        );
+        assert!(
+            !create.contains("unwrap_or(false)"),
+            "must not skip cooldown on DB error: {create}"
         );
     }
 
