@@ -555,22 +555,27 @@ pub async fn get_poa_audit_trail(
         .list_poa_audit_events(tenant_id, id, filter, limit, offset)
         .await?;
 
-    Ok(Json(PoaAuditListResponse {
-        items: events
-            .into_iter()
-            .map(|e| PoaAuditEventResponse {
-                id: e.id,
-                event_type: e.event_type,
-                actor_id: e.actor_id,
-                actor_name: None,
-                affected_user_id: e.affected_user_id,
-                affected_user_name: None,
-                details: e.details,
-                created_at: e.created_at,
-            })
-            .collect(),
-        total,
-    }))
+    let mut items = Vec::with_capacity(events.len());
+    for e in events {
+        let actor_name = load_user_display_name(state.pool(), tenant_id, e.actor_id).await?;
+        let affected_user_name = if let Some(affected_id) = e.affected_user_id {
+            load_user_display_name(state.pool(), tenant_id, affected_id).await?
+        } else {
+            None
+        };
+        items.push(PoaAuditEventResponse {
+            id: e.id,
+            event_type: e.event_type,
+            actor_id: e.actor_id,
+            actor_name,
+            affected_user_id: e.affected_user_id,
+            affected_user_name,
+            details: e.details,
+            created_at: e.created_at,
+        });
+    }
+
+    Ok(Json(PoaAuditListResponse { items, total }))
 }
 
 /// Invalid PoA status filters must not silently list every grant.
@@ -665,6 +670,12 @@ mod tests {
                 && trail.contains("let (events, total)")
                 && !trail.contains("events.len() as i64"),
             "GET PoA audit trail must use the service total, not the page length"
+        );
+        assert!(
+            trail.contains("load_user_display_name(")
+                && !trail.contains("actor_name: None")
+                && !trail.contains("affected_user_name: None"),
+            "GET PoA audit trail must look up actor and affected user names"
         );
     }
 

@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use xavyo_auth::JwtClaims;
 use xavyo_core::TenantId;
+use xavyo_db::models::nhi_tool::NhiTool;
 use xavyo_db::models::nhi_tool_permission::NhiToolPermission;
 
 use sqlx;
@@ -309,18 +310,31 @@ pub async fn bulk_grant_handler(
         )
         .await
         {
-            Ok(perm) => results.push(BulkGrantResult {
-                tool_id: *tool_id,
-                tool_name: None,
-                permission_id: Some(perm.id),
-                error: None,
-            }),
-            Err(e) => results.push(BulkGrantResult {
-                tool_id: *tool_id,
-                tool_name: None,
-                permission_id: None,
-                error: Some(e.to_string()),
-            }),
+            Ok(perm) => {
+                let tool_name = NhiTool::find_by_nhi_id(&state.pool, tenant_uuid, *tool_id)
+                    .await
+                    .map_err(NhiApiError::Database)?
+                    .map(|tool| tool.name);
+                results.push(BulkGrantResult {
+                    tool_id: *tool_id,
+                    tool_name,
+                    permission_id: Some(perm.id),
+                    error: None,
+                });
+            }
+            Err(e) => {
+                let tool_name = NhiTool::find_by_nhi_id(&state.pool, tenant_uuid, *tool_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|tool| tool.name);
+                results.push(BulkGrantResult {
+                    tool_id: *tool_id,
+                    tool_name,
+                    permission_id: None,
+                    error: Some(e.to_string()),
+                });
+            }
         }
     }
 
@@ -577,5 +591,22 @@ mod tests {
                 "{fn_name} must report a COUNT total"
             );
         }
+    }
+
+    #[test]
+    fn bulk_grant_looks_up_tool_name() {
+        let src = include_str!("permissions.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let bulk = production
+            .split("pub async fn bulk_grant_handler")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("bulk_grant_handler");
+        assert!(
+            bulk.contains("NhiTool::find_by_nhi_id")
+                && bulk.contains("tool.name")
+                && !bulk.contains("tool_name: None"),
+            "bulk grant must look up tool_name from the tenant-scoped tool row"
+        );
     }
 }

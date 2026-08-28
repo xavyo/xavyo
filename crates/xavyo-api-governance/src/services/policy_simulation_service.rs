@@ -498,6 +498,8 @@ impl PolicySimulationService {
             .await?
         };
 
+        let current_assignments = self.get_user_entitlement_assignments(tenant_id).await?;
+
         let mut results = Vec::with_capacity(violating_users.len());
         let mut severity_counts = SeverityCounts::default();
 
@@ -514,7 +516,13 @@ impl PolicySimulationService {
                     id: second_ent_id,
                     name: second_ent.name.clone(),
                 },
-                current_assignments: vec![], // Could enhance to show actual assignment sources
+                current_assignments: sod_current_assignment_names(
+                    current_assignments.get(user_id),
+                    first_ent_id,
+                    &first_ent.name,
+                    second_ent_id,
+                    &second_ent.name,
+                ),
             };
 
             results.push(CreatePolicySimulationResult {
@@ -921,6 +929,26 @@ impl PolicySimulationService {
 
         Ok(result)
     }
+}
+
+fn sod_current_assignment_names(
+    held: Option<&std::collections::HashSet<Uuid>>,
+    first_ent_id: Uuid,
+    first_ent_name: &str,
+    second_ent_id: Uuid,
+    second_ent_name: &str,
+) -> Vec<String> {
+    let Some(held) = held else {
+        return Vec::new();
+    };
+    let mut names = Vec::new();
+    if held.contains(&first_ent_id) {
+        names.push(first_ent_name.to_string());
+    }
+    if held.contains(&second_ent_id) {
+        names.push(second_ent_name.to_string());
+    }
+    names
 }
 
 /// Policy simulation details persist. Serialization errors must not store empty details.
@@ -1383,6 +1411,26 @@ mod tests {
         assert!(json.contains("Create Payment"));
         assert!(json.contains("Approve Payment"));
         assert!(json.contains("Finance Role"));
+    }
+
+    #[test]
+    fn sod_simulation_looks_up_current_assignments() {
+        let first = Uuid::new_v4();
+        let second = Uuid::new_v4();
+        let mut held = std::collections::HashSet::new();
+        held.insert(first);
+        assert_eq!(
+            sod_current_assignment_names(Some(&held), first, "Create", second, "Approve"),
+            vec!["Create".to_string()]
+        );
+        let src = include_str!("policy_simulation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("sod_current_assignment_names(")
+                && production.contains("get_user_entitlement_assignments(")
+                && !production.contains("current_assignments: vec![]"),
+            "SoD policy simulation must look up the user's current assignment names"
+        );
     }
 
     #[test]

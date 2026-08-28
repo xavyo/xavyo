@@ -9,19 +9,19 @@ use tracing::instrument;
 use uuid::Uuid;
 
 use xavyo_db::models::{
-    ConnectorReconciliationMode, ConnectorReconciliationRun, ConnectorReconciliationRunFilter,
-    ConnectorReconciliationStatus, CreateConnectorReconciliationRun, ReconciliationAction,
-    ReconciliationActionFilter, ReconciliationActionResult, ReconciliationActionType,
-    ReconciliationDiscrepancy, ReconciliationDiscrepancyFilter, ReconciliationDiscrepancyType,
-    ReconciliationResolutionStatus, ReconciliationSchedule, ReconciliationScheduleFrequency,
-    UpsertReconciliationSchedule,
+    ConnectorConfiguration, ConnectorReconciliationMode, ConnectorReconciliationRun,
+    ConnectorReconciliationRunFilter, ConnectorReconciliationStatus,
+    CreateConnectorReconciliationRun, ReconciliationAction, ReconciliationActionFilter,
+    ReconciliationActionResult, ReconciliationActionType, ReconciliationDiscrepancy,
+    ReconciliationDiscrepancyFilter, ReconciliationDiscrepancyType, ReconciliationResolutionStatus,
+    ReconciliationSchedule, ReconciliationScheduleFrequency, UpsertReconciliationSchedule, User,
 };
 
 use crate::handlers::reconciliation::{
-    ActionSummary, BulkRemediateItem, BulkRemediationResponse, BulkRemediationSummary,
-    DiscrepancySummary, PerformanceMetrics, PreviewItem, PreviewResponse, PreviewSummary,
-    ReconciliationStatistics, RemediationResponse, ReportResponse, RunInfo, TrendDataPoint,
-    TrendResponse,
+    ActionSummary, AttributeMismatchCount, BulkRemediateItem, BulkRemediationResponse,
+    BulkRemediationSummary, DiscrepancySummary, PerformanceMetrics, PreviewItem, PreviewResponse,
+    PreviewSummary, ReconciliationStatistics, RemediationResponse, ReportResponse, RunInfo,
+    TrendDataPoint, TrendResponse,
 };
 
 /// Error type for reconciliation service operations.
@@ -577,16 +577,45 @@ impl ReconciliationService {
                 ))
             })?;
 
-        // Get action counts
-        let action_filter = ReconciliationActionFilter::new();
-        let actions =
-            ReconciliationAction::list(&self.pool, tenant_id, &action_filter, 1000, 0).await?;
+        let disc_filter = ReconciliationDiscrepancyFilter::new().for_run(run_id);
+        let discrepancies =
+            ReconciliationDiscrepancy::list(&self.pool, tenant_id, &disc_filter, 10_000, 0).await?;
+        let top_mismatched_attributes = top_mismatched_attributes(&discrepancies);
+
+        let action_rows: Vec<(String, String)> = sqlx::query_as(
+            r"
+            SELECT a.action_type, a.result
+            FROM gov_reconciliation_actions a
+            JOIN gov_reconciliation_discrepancies d
+              ON d.id = a.discrepancy_id AND d.tenant_id = a.tenant_id
+            WHERE a.tenant_id = $1 AND d.run_id = $2
+            ",
+        )
+        .bind(tenant_id)
+        .bind(run_id)
+        .fetch_all(&self.pool)
+        .await?;
         let mut by_action_type: HashMap<String, u32> = HashMap::new();
         let mut by_result: HashMap<String, u32> = HashMap::new();
-        for a in &actions {
-            *by_action_type.entry(a.action_type.clone()).or_insert(0) += 1;
-            *by_result.entry(a.result.clone()).or_insert(0) += 1;
+        for (action_type, result) in &action_rows {
+            *by_action_type.entry(action_type.clone()).or_insert(0) += 1;
+            *by_result.entry(result.clone()).or_insert(0) += 1;
         }
+
+        let connector_name =
+            ConnectorConfiguration::find_by_id(&self.pool, tenant_id, run.connector_id)
+                .await?
+                .map(|connector| connector.name);
+        let triggered_by_name = if let Some(user_id) = run.triggered_by {
+            User::find_by_id_in_tenant(&self.pool, tenant_id, user_id)
+                .await?
+                .map(|user| match user.display_name {
+                    Some(name) if !name.is_empty() => name,
+                    _ => user.email,
+                })
+        } else {
+            None
+        };
 
         // Calculate performance
         let duration = stats.duration_seconds;
@@ -600,11 +629,11 @@ impl ReconciliationService {
             run: RunInfo {
                 id: run.id,
                 connector_id: run.connector_id,
-                connector_name: None, // Would need to join with connectors table
+                connector_name,
                 mode: run.mode,
                 status: run.status,
                 triggered_by: run.triggered_by,
-                triggered_by_name: None,
+                triggered_by_name,
                 started_at: run.started_at,
                 completed_at: run.completed_at,
                 statistics: stats,
@@ -615,11 +644,11 @@ impl ReconciliationService {
                 by_resolution,
             },
             action_summary: ActionSummary {
-                total: actions.len() as u32,
+                total: action_rows.len() as u32,
                 by_type: by_action_type,
                 by_result,
             },
-            top_mismatched_attributes: vec![], // Would need additional query
+            top_mismatched_attributes,
             performance: PerformanceMetrics {
                 accounts_per_second,
                 total_duration_seconds: duration,
@@ -747,6 +776,27 @@ impl ReconciliationService {
     }
 }
 
+/// Count mismatched attribute keys from stored discrepancy JSON.
+fn top_mismatched_attributes(
+    discrepancies: &[ReconciliationDiscrepancy],
+) -> Vec<AttributeMismatchCount> {
+    let mut counts: HashMap<String, u32> = HashMap::new();
+    for discrepancy in discrepancies {
+        if let Some(serde_json::Value::Object(map)) = &discrepancy.mismatched_attributes {
+            for key in map.keys() {
+                *counts.entry(key.clone()).or_insert(0) += 1;
+            }
+        }
+    }
+    let mut items: Vec<AttributeMismatchCount> = counts
+        .into_iter()
+        .map(|(attribute, count)| AttributeMismatchCount { attribute, count })
+        .collect();
+    items.sort_by(|a, b| b.count.cmp(&a.count).then(a.attribute.cmp(&b.attribute)));
+    items.truncate(10);
+    items
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -854,5 +904,50 @@ mod tests {
             !helper.contains("_ => \"update\"") && !helper.contains("_ => Ok(\"update\""),
             "unknown discrepancy types must not default to update"
         );
+    }
+
+    #[test]
+    fn report_looks_up_names_and_mismatch_counts() {
+        let src = include_str!("reconciliation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let report = production
+            .split("pub async fn get_report")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_report");
+        assert!(
+            report.contains("ConnectorConfiguration::find_by_id")
+                && report.contains("find_by_id_in_tenant")
+                && report.contains("top_mismatched_attributes(")
+                && report.contains("d.run_id = $2")
+                && !report.contains("connector_name: None")
+                && !report.contains("triggered_by_name: None")
+                && !report.contains("top_mismatched_attributes: vec![]"),
+            "GET reconciliation report must look up connector/user names, mismatches, and run-scoped actions"
+        );
+    }
+
+    #[test]
+    fn top_mismatched_attributes_counts_object_keys() {
+        let discrepancies = vec![ReconciliationDiscrepancy {
+            id: Uuid::new_v4(),
+            run_id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            discrepancy_type: "mismatch".to_string(),
+            identity_id: None,
+            external_uid: "uid".to_string(),
+            mismatched_attributes: Some(
+                serde_json::json!({"email": {"xavyo": "a", "target": "b"}}),
+            ),
+            resolution_status: "pending".to_string(),
+            resolved_action: None,
+            resolved_by: None,
+            resolved_at: None,
+            detected_at: Utc::now(),
+        }];
+        let top = top_mismatched_attributes(&discrepancies);
+        assert_eq!(top.len(), 1);
+        assert_eq!(top[0].attribute, "email");
+        assert_eq!(top[0].count, 1);
     }
 }

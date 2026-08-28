@@ -188,12 +188,21 @@ impl InducementTriggerService {
                             serde_json::json!({})
                         };
 
+                    let target_uid = shadow_target_uid(
+                        &self.pool,
+                        tenant_id,
+                        construction.connector_id,
+                        user_id,
+                        &construction.object_class,
+                    )
+                    .await?;
+
                     let op = CreateProvisioningOperation {
                         connector_id: construction.connector_id,
                         user_id,
                         object_class: construction.object_class.clone(),
                         operation_type,
-                        target_uid: None, // Would need shadow link lookup
+                        target_uid,
                         payload,
                         priority: Some(construction.priority),
                         max_retries: None,
@@ -449,6 +458,31 @@ impl InducementTriggerService {
     }
 }
 
+async fn shadow_target_uid(
+    pool: &PgPool,
+    tenant_id: Uuid,
+    connector_id: Uuid,
+    user_id: Uuid,
+    object_class: &str,
+) -> Result<Option<String>> {
+    sqlx::query_scalar(
+        r"
+        SELECT target_uid
+        FROM gov_shadows
+        WHERE tenant_id = $1 AND connector_id = $2 AND user_id = $3 AND object_class = $4
+        ORDER BY created_at
+        LIMIT 1
+        ",
+    )
+    .bind(tenant_id)
+    .bind(connector_id)
+    .bind(user_id)
+    .bind(object_class)
+    .fetch_optional(pool)
+    .await
+    .map_err(GovernanceError::Database)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -474,6 +508,23 @@ mod tests {
         assert!(
             !production.contains("JOIN gov_entitlement_assignments gea ON gea.entitlement_id = r.id\n            WHERE gea.tenant_id = $1"),
             "must not join assignments by entitlement id alone"
+        );
+    }
+
+    #[test]
+    fn deprovision_looks_up_shadow_target_uid() {
+        let src = include_str!("inducement_trigger_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let revoke = production
+            .split("Queue deprovisioning operations")
+            .nth(1)
+            .expect("deprovision");
+        assert!(
+            production.contains("shadow_target_uid(")
+                && production.contains("gov_shadows")
+                && revoke.contains("target_uid,")
+                && !revoke.contains("target_uid: None"),
+            "role revocation deprovision must look up the shadow target_uid"
         );
     }
 }
