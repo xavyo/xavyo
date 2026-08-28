@@ -64,6 +64,8 @@ pub struct ScriptAnalyticsData {
     pub success_rate: f64,
     /// Average execution duration in milliseconds.
     pub avg_duration_ms: f64,
+    /// 95th percentile execution duration in milliseconds.
+    pub p95_duration_ms: f64,
     /// Daily trend data points.
     pub daily_trends: Vec<DailyTrendData>,
     /// Most common errors within the window.
@@ -244,12 +246,18 @@ impl ScriptAnalyticsService {
         // 5. Get top errors
         let top_errors = self.get_top_errors(tenant_id, script_id, since).await?;
 
+        // 6. 95th percentile duration — advertised on the analytics response.
+        let p95_duration_ms = self
+            .get_p95_duration_ms(tenant_id, script_id, since)
+            .await?;
+
         Ok(ScriptAnalyticsData {
             script_id,
             name: script.name,
             total_executions,
             success_rate,
             avg_duration_ms,
+            p95_duration_ms,
             daily_trends,
             top_errors,
         })
@@ -344,6 +352,34 @@ impl ScriptAnalyticsService {
         }
 
         Ok(summaries)
+    }
+
+    /// 95th percentile of `duration_ms` for a script in the window.
+    ///
+    /// No samples yields `0.0` — the same honest empty-window value as average.
+    async fn get_p95_duration_ms(
+        &self,
+        tenant_id: Uuid,
+        script_id: Uuid,
+        since: DateTime<Utc>,
+    ) -> Result<f64> {
+        let p95: Option<f64> = sqlx::query_scalar(
+            r"
+            SELECT PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY duration_ms)
+            FROM gov_script_execution_logs
+            WHERE tenant_id = $1
+              AND script_id = $2
+              AND executed_at >= $3
+            ",
+        )
+        .bind(tenant_id)
+        .bind(script_id)
+        .bind(since)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(GovernanceError::Database)?;
+
+        Ok(p95.unwrap_or(0.0))
     }
 
     /// Get the top error messages for a script within a time window.
@@ -463,6 +499,7 @@ mod tests {
             total_executions: 300,
             success_rate: 96.7,
             avg_duration_ms: 55.0,
+            p95_duration_ms: 80.0,
             daily_trends: vec![DailyTrendData {
                 date: "2026-01-27".to_string(),
                 executions: 20,
@@ -479,9 +516,23 @@ mod tests {
 
         let json = serde_json::to_string(&analytics).unwrap();
         assert!(json.contains("\"name\":\"AD Account Setup\""));
+        assert!(
+            json.contains("\"p95_duration_ms\":80.0") || json.contains("\"p95_duration_ms\":80")
+        );
         assert!(json.contains("\"daily_trends\""));
         assert!(json.contains("\"top_errors\""));
         assert!(json.contains("\"Connection timeout\""));
+    }
+
+    #[test]
+    fn p95_is_queried_not_hardcoded() {
+        let src = include_str!("script_analytics_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("PERCENTILE_CONT(0.95)")
+                && production.contains("get_p95_duration_ms("),
+            "script analytics must compute p95 from execution durations"
+        );
     }
 
     #[test]
@@ -585,6 +636,7 @@ mod tests {
             total_executions: 0,
             success_rate: 0.0,
             avg_duration_ms: 0.0,
+            p95_duration_ms: 0.0,
             daily_trends: vec![],
             top_errors: vec![],
         };
