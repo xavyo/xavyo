@@ -188,7 +188,7 @@ pub use tenant_identity_provider::{
 pub use tenant_idp_certificate::{CertificateInfo, TenantIdpCertificate, UploadCertificateRequest};
 pub use tenant_ip_settings::{IpEnforcementMode, TenantIpSettings, UpdateIpSettings};
 pub use tenant_social_provider::{TenantSocialProvider, UpsertTenantSocialProvider};
-pub use user::User;
+pub use user::{department_from_custom_attributes, User};
 pub use user_admin_assignment::{
     AssignmentFilter, CreateAssignment, ScopeType, UserAdminAssignment,
 };
