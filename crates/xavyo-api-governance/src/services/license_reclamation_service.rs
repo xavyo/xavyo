@@ -9,7 +9,6 @@
 
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
-use tracing::warn;
 use uuid::Uuid;
 
 use xavyo_db::models::{
@@ -18,7 +17,7 @@ use xavyo_db::models::{
     LicenseReclamationRuleFilter, LicenseReclamationRuleId, LicenseReclamationTrigger,
     UpdateGovLicenseReclamationRule,
 };
-use xavyo_db::{LoginAttempt, User};
+use xavyo_db::{GovLifecycleState, LoginAttempt, User};
 use xavyo_governance::error::{GovernanceError, Result};
 
 use super::license_audit_service::LicenseAuditService;
@@ -77,6 +76,11 @@ pub(crate) fn inactivity_days(
 ) -> i32 {
     let last = last_login_at.unwrap_or(fallback);
     now.signed_duration_since(last).num_days().max(0) as i32
+}
+
+/// Lifecycle reclamation matches the user's current state name, case-insensitive.
+pub(crate) fn lifecycle_state_matches(user_state_name: Option<&str>, rule_state: &str) -> bool {
+    user_state_name.is_some_and(|name| name.eq_ignore_ascii_case(rule_state))
 }
 
 /// Validate that trigger-specific fields are present for the given trigger type.
@@ -564,45 +568,65 @@ impl LicenseReclamationService {
 
     /// Find license assignments eligible for reclamation based on lifecycle state rules.
     ///
-    /// # Current Status: Placeholder
-    ///
-    /// This method currently returns an empty list. Lifecycle-based reclamation
-    /// is designed to be event-driven rather than poll-based: when a Kafka
-    /// lifecycle event arrives with both a `user_id` and a lifecycle state, the
-    /// preferred entry point is
-    /// [`handle_lifecycle_event`](Self::handle_lifecycle_event), which is fully
-    /// implemented.
-    ///
-    /// ## What the full implementation would do
-    ///
-    /// 1. Fetch all enabled lifecycle rules matching `lifecycle_state`.
-    /// 2. For each rule, find active assignments in the rule's license pool
-    ///    whose holder has entered the specified lifecycle state.
-    /// 3. Return a `ReclaimCandidate` for every qualifying assignment.
-    ///
-    /// This method lacks a `user_id` parameter, so it cannot narrow candidates
-    /// to a specific user. Use
-    /// [`handle_lifecycle_event`](Self::handle_lifecycle_event) for the working
-    /// Kafka-driven path that receives `user_id` from the event payload.
+    /// For each enabled lifecycle rule matching `lifecycle_state`, active
+    /// assignments whose holder is currently in that state are returned.
+    /// Kafka-driven reclaim still uses
+    /// [`handle_lifecycle_event`](Self::handle_lifecycle_event).
     pub async fn find_lifecycle_reclaim_candidates(
         &self,
         tenant_id: Uuid,
         lifecycle_state: &str,
     ) -> Result<Vec<ReclaimCandidate>> {
-        // Get all enabled lifecycle rules matching this state
         let rules = GovLicenseReclamationRule::find_enabled_lifecycle_rules(
             &self.pool,
             tenant_id,
             lifecycle_state,
         )
         .await?;
+        let mut candidates = Vec::new();
 
-        let candidates = Vec::new();
+        for rule in rules {
+            let rule_state = rule.lifecycle_state.as_deref().ok_or_else(|| {
+                GovernanceError::Validation(
+                    "Lifecycle reclamation rules require lifecycle_state".to_string(),
+                )
+            })?;
+            let assignments = GovLicenseAssignment::list_active_by_pool(
+                &self.pool,
+                tenant_id,
+                rule.license_pool_id,
+            )
+            .await?;
+            let pool_name = GovLicensePool::find_by_id(&self.pool, tenant_id, rule.license_pool_id)
+                .await?
+                .map_or_else(|| "Unknown Pool".to_string(), |p| p.name);
 
-        // Placeholder: use handle_lifecycle_event for Kafka-driven reclamation.
-        // See doc comment above for details.
-        let _ = &rules;
-        warn!("find_lifecycle_reclaim_candidates is a placeholder - use handle_lifecycle_event for Kafka-driven reclamation");
+            for assignment in assignments {
+                let user = User::find_by_id_in_tenant(&self.pool, tenant_id, assignment.user_id)
+                    .await
+                    .map_err(GovernanceError::Database)?;
+                let Some(user) = user else {
+                    continue;
+                };
+                let Some(state_id) = user.lifecycle_state_id else {
+                    continue;
+                };
+                let state = GovLifecycleState::find_by_id(&self.pool, tenant_id, state_id)
+                    .await
+                    .map_err(GovernanceError::Database)?;
+                if lifecycle_state_matches(state.as_ref().map(|s| s.name.as_str()), rule_state) {
+                    candidates.push(ReclaimCandidate {
+                        assignment_id: assignment.id,
+                        user_id: assignment.user_id,
+                        pool_id: rule.license_pool_id,
+                        pool_name: pool_name.clone(),
+                        days_inactive: None,
+                        rule_id: rule.id,
+                        reason: LicenseReclaimReason::Termination,
+                    });
+                }
+            }
+        }
 
         Ok(candidates)
     }
@@ -1312,6 +1336,30 @@ mod tests {
         assert!(
             !find.contains("placeholder"),
             "must not advertise a fake empty inactivity reclamation scan"
+        );
+    }
+
+    #[test]
+    fn lifecycle_scan_matches_user_state_not_empty_stub() {
+        assert!(lifecycle_state_matches(Some("terminated"), "terminated"));
+        assert!(lifecycle_state_matches(Some("Terminated"), "terminated"));
+        assert!(!lifecycle_state_matches(Some("active"), "terminated"));
+        assert!(!lifecycle_state_matches(None, "terminated"));
+        let src = include_str!("license_reclamation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let find = production
+            .split("pub async fn find_lifecycle_reclaim_candidates")
+            .nth(1)
+            .and_then(|s| s.split("    pub async fn ").next())
+            .expect("find_lifecycle_reclaim_candidates");
+        assert!(
+            find.contains("lifecycle_state_matches(")
+                && find.contains("GovLifecycleState::find_by_id"),
+            "lifecycle reclamation must inspect the holder's current state"
+        );
+        assert!(
+            !find.contains("placeholder"),
+            "must not advertise a fake empty lifecycle reclamation scan"
         );
     }
 
