@@ -9,7 +9,6 @@ mod common;
 mod integration_tests {
     use super::common::*;
     use xavyo_api_auth::{AuthService, TokenConfig, TokenService};
-    use xavyo_core::TenantId;
 
     // Test RSA key pair for JWT signing (test only)
     const TEST_PRIVATE_KEY: &[u8] = br#"-----BEGIN PRIVATE KEY-----
@@ -62,7 +61,7 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
                 .await;
 
             assert!(result.is_ok(), "Registration should succeed");
-            let (user_id, returned_email, created_at) = result.unwrap();
+            let (_user_id, returned_email, created_at) = result.unwrap();
             assert_eq!(returned_email, email.to_lowercase());
             assert!(created_at <= chrono::Utc::now());
 

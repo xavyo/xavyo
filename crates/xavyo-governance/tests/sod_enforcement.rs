@@ -553,7 +553,7 @@ async fn test_exemption_expiration_not_honored() {
 
     // Create EXPIRED exemption (expires in the past)
     // Note: The exemption store should handle this, but we test the validation behavior
-    let expired_exemption = ctx
+    let _expired_exemption = ctx
         .services
         .sod_exemption
         .grant_exemption(

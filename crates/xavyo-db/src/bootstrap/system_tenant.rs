@@ -504,10 +504,10 @@ mod integration_tests {
         let pool = get_test_pool().await;
 
         // Run bootstrap twice
-        let result1 = run_bootstrap(&pool)
+        let _result1 = run_bootstrap(&pool)
             .await
             .expect("First bootstrap should succeed");
-        let result2 = run_bootstrap(&pool)
+        let _result2 = run_bootstrap(&pool)
             .await
             .expect("Second bootstrap should succeed");
 

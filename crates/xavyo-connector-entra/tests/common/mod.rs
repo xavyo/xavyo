@@ -1,6 +1,8 @@
 //! Common test utilities for xavyo-connector-entra integration tests.
 
 #![cfg(feature = "integration")]
+#![allow(dead_code)]
+#![allow(unused_imports)]
 
 use serde_json::{json, Value};
 use std::sync::Arc;

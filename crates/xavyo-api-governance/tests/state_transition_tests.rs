@@ -78,6 +78,7 @@ mod state_transition_tests {
                     name: "Test User Lifecycle".to_string(),
                     object_type: LifecycleObjectType::User,
                     description: Some("Test lifecycle for users".to_string()),
+                    auto_assign_initial_state: true,
                 },
             )
             .await
@@ -331,6 +332,7 @@ mod state_transition_tests {
                         name: None,
                         description: None,
                         is_active: Some(false),
+                        auto_assign_initial_state: None,
                     },
                 )
                 .await

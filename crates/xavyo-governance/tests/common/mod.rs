@@ -3,6 +3,10 @@
 //! This module provides shared utilities, fixtures, and helpers for integration testing
 //! the governance crate. All tests use in-memory stores for isolation and speed.
 
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+
 pub mod db;
 pub mod fixtures;
 

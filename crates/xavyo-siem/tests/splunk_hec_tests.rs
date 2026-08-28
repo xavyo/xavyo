@@ -3,6 +3,8 @@
 //! Tests User Story 4 (Splunk HEC Integration).
 
 #![cfg(feature = "integration")]
+#![allow(dead_code)]
+#![allow(unused_imports)]
 
 mod helpers;
 

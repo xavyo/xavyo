@@ -290,7 +290,7 @@ mod password_reset_tests {
                 create_test_user(&fixture.pool, fixture.tenant_id, &email, &password_hash).await;
 
             // Create expired token
-            let (token, token_hash) = create_test_password_reset_token();
+            let (_token, token_hash) = create_test_password_reset_token();
             insert_expired_password_reset_token(
                 &fixture.pool,
                 fixture.tenant_id,
@@ -327,7 +327,7 @@ mod password_reset_tests {
                 create_test_user(&fixture.pool, fixture.tenant_id, &email, &password_hash).await;
 
             // Create valid token and mark it as used
-            let (token, token_hash) = create_test_password_reset_token();
+            let (_token, token_hash) = create_test_password_reset_token();
             insert_valid_password_reset_token(
                 &fixture.pool,
                 fixture.tenant_id,

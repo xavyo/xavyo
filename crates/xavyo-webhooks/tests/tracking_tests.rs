@@ -4,6 +4,8 @@
 //! latency measurements, and all attempt details.
 
 #![cfg(feature = "integration")]
+#![allow(dead_code)]
+#![allow(unused_imports)]
 
 mod common;
 

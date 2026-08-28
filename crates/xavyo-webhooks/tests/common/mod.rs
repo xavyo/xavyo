@@ -3,6 +3,10 @@
 //! Provides mock servers, helper structs, and test fixtures for verifying
 //! webhook delivery behavior without requiring a real database.
 
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
