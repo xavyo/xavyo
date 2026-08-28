@@ -992,11 +992,14 @@ pub async fn simulate_changes(
                 .await?
         }
         MetaRoleSimulationType::Create | MetaRoleSimulationType::Update => {
-            // For create/update, we'd need more complex logic
-            // For now, simulate as criteria change with empty criteria to show current state
+            let data = request.meta_role_data.ok_or_else(|| {
+                ApiGovernanceError::Validation(
+                    "meta_role_data is required for Create/Update simulation".to_string(),
+                )
+            })?;
             state
                 .meta_role_simulation_service
-                .simulate_criteria_change(tenant_id, id, vec![], limit)
+                .simulate_criteria_change(tenant_id, id, data.criteria, limit)
                 .await?
         }
     };
@@ -1184,6 +1187,23 @@ mod tests {
                 && list.contains("list_events_filtered(")
                 && !list.contains("events.len() as i64"),
             "GET /governance/meta-roles/events must apply advertised event_type, actor_id, and date filters"
+        );
+    }
+
+    #[test]
+    fn simulate_create_update_does_not_use_empty_criteria() {
+        let src = include_str!("meta_roles.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let simulate = production
+            .split("pub async fn simulate_changes")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("simulate_changes");
+        assert!(
+            simulate.contains("request.meta_role_data")
+                && simulate.contains("data.criteria")
+                && !simulate.contains("vec![]"),
+            "Create/Update simulation must use submitted criteria, not an empty list"
         );
     }
 
