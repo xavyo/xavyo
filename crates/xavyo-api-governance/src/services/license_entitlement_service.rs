@@ -8,9 +8,10 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use xavyo_db::models::{
-    CreateGovLicenseAssignment, CreateGovLicenseEntitlementLink, GovLicenseAssignment,
-    GovLicenseEntitlementLink, GovLicensePool, LicenseAssignmentSource, LicenseAuditAction,
-    LicenseEntitlementLinkFilter, LicenseEntitlementLinkId, LicenseEntitlementLinkWithDetails,
+    CreateGovLicenseAssignment, CreateGovLicenseEntitlementLink, GovEntitlement,
+    GovLicenseAssignment, GovLicenseEntitlementLink, GovLicensePool, LicenseAssignmentSource,
+    LicenseAuditAction, LicenseEntitlementLinkFilter, LicenseEntitlementLinkId,
+    LicenseEntitlementLinkWithDetails,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -81,6 +82,25 @@ pub(crate) fn link_with_details_to_response(
     }
 }
 
+async fn enrich_link_response(
+    pool: &PgPool,
+    tenant_id: Uuid,
+    link: GovLicenseEntitlementLink,
+) -> Result<LicenseEntitlementLinkResponse> {
+    let mut response = LicenseEntitlementLinkResponse::from(link);
+    if let Some(license_pool) =
+        GovLicensePool::find_by_id(pool, tenant_id, response.license_pool_id).await?
+    {
+        response.pool_name = Some(license_pool.name);
+        response.pool_vendor = Some(license_pool.vendor);
+    }
+    response.entitlement_name =
+        GovEntitlement::find_by_id(pool, tenant_id, response.entitlement_id)
+            .await?
+            .map(|entitlement| entitlement.name);
+    Ok(response)
+}
+
 /// Service for license-entitlement link operations.
 pub struct LicenseEntitlementService {
     pool: PgPool,
@@ -108,10 +128,9 @@ impl LicenseEntitlementService {
         request: CreateLicenseEntitlementLinkRequest,
     ) -> Result<LicenseEntitlementLinkResponse> {
         // Validate pool exists
-        let license_pool =
-            GovLicensePool::find_by_id(&self.pool, tenant_id, request.license_pool_id)
-                .await?
-                .ok_or_else(|| GovernanceError::LicensePoolNotFound(request.license_pool_id))?;
+        GovLicensePool::find_by_id(&self.pool, tenant_id, request.license_pool_id)
+            .await?
+            .ok_or_else(|| GovernanceError::LicensePoolNotFound(request.license_pool_id))?;
 
         // Check for duplicate link (same pool + entitlement)
         let existing_links =
@@ -153,12 +172,7 @@ impl LicenseEntitlementService {
             )
             .await?;
 
-        // Enrich response with pool details
-        let mut response = LicenseEntitlementLinkResponse::from(created);
-        response.pool_name = Some(license_pool.name);
-        response.pool_vendor = Some(license_pool.vendor);
-
-        Ok(response)
+        enrich_link_response(&self.pool, tenant_id, created).await
     }
 
     /// Delete a license-entitlement link by ID.
@@ -243,7 +257,12 @@ impl LicenseEntitlementService {
         let link_typed_id: LicenseEntitlementLinkId = link_id.into();
         let link =
             GovLicenseEntitlementLink::find_by_id(&self.pool, tenant_id, link_typed_id).await?;
-        Ok(link.map(LicenseEntitlementLinkResponse::from))
+        match link {
+            Some(link) => Ok(Some(
+                enrich_link_response(&self.pool, tenant_id, link).await?,
+            )),
+            None => Ok(None),
+        }
     }
 
     /// Get a link by ID, returning an error if not found.
@@ -456,7 +475,7 @@ impl LicenseEntitlementService {
             )
             .await?;
 
-        Ok(LicenseEntitlementLinkResponse::from(updated))
+        enrich_link_response(&self.pool, tenant_id, updated).await
     }
 
     /// Update the priority of a link.
@@ -495,7 +514,7 @@ impl LicenseEntitlementService {
             )
             .await?;
 
-        Ok(LicenseEntitlementLinkResponse::from(updated))
+        enrich_link_response(&self.pool, tenant_id, updated).await
     }
 
     /// Get the underlying database pool reference.
@@ -938,6 +957,20 @@ mod tests {
                 && release.contains("log_license_deallocated")
                 && release.contains(".await?;"),
             "entitlement release must fail when decrement or audit cannot be written"
+        );
+    }
+
+    #[test]
+    fn license_link_responses_look_up_pool_and_entitlement() {
+        let src = include_str!("license_entitlement_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("enrich_link_response(")
+                && production.contains("GovLicensePool::find_by_id")
+                && production.contains("GovEntitlement::find_by_id")
+                && !production.contains(".map(LicenseEntitlementLinkResponse::from)")
+                && !production.contains("Ok(LicenseEntitlementLinkResponse::from(updated))"),
+            "license entitlement link GET/create/enable/priority must look up pool and entitlement names"
         );
     }
 }

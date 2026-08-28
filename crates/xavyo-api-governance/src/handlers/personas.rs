@@ -24,9 +24,9 @@ use crate::models::{
     ExtendPersonaRequest, ExtendPersonaResponse, ExtensionStatus, ListArchetypesQuery,
     ListExpiringPersonasQuery, ListPersonasQuery, PersonaAttributesResponse,
     PersonaAuditEventResponse, PersonaAuditListResponse, PersonaDetailResponse,
-    PersonaListResponse, PersonaResponse, PropagateAttributesResponse, SearchAuditQuery,
-    SwitchBackRequest, SwitchContextRequest, SwitchContextResponse, UpdateArchetypeRequest,
-    UpdatePersonaRequest, UserPersonasResponse,
+    PersonaListResponse, PersonaResponse, PersonaUserSummary, PropagateAttributesResponse,
+    SearchAuditQuery, SwitchBackRequest, SwitchContextRequest, SwitchContextResponse,
+    UpdateArchetypeRequest, UpdatePersonaRequest, UserPersonasResponse,
 };
 use crate::router::GovernanceState;
 
@@ -43,9 +43,28 @@ async fn load_user_display_name(
     tenant_id: Uuid,
     user_id: Uuid,
 ) -> ApiResult<Option<String>> {
+    Ok(load_persona_user_summary(pool, tenant_id, user_id)
+        .await?
+        .map(|user| user.display_name))
+}
+
+async fn load_persona_user_summary(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    user_id: Uuid,
+) -> ApiResult<Option<PersonaUserSummary>> {
     Ok(User::find_by_id_in_tenant(pool, tenant_id, user_id)
         .await?
-        .map(|user| user_display_name(user.display_name.as_deref(), &user.email)))
+        .map(|user| PersonaUserSummary {
+            id: user.id,
+            email: user.email.clone(),
+            display_name: user_display_name(user.display_name.as_deref(), &user.email),
+            status: Some(if user.is_active {
+                "active".to_string()
+            } else {
+                "inactive".to_string()
+            }),
+        }))
 }
 
 async fn persona_response(
@@ -615,11 +634,13 @@ pub async fn get_persona(
         .parse_attributes()
         .map_err(|e| ApiGovernanceError::Validation(e.to_string()))?;
 
+    let physical_user =
+        load_persona_user_summary(state.pool(), tenant_id, persona.physical_user_id).await?;
     let response = PersonaDetailResponse {
         base: persona_response(state.pool(), tenant_id, persona).await?,
         attributes: PersonaAttributesResponse::from(attrs),
         entitlements: None,
-        physical_user: None,
+        physical_user,
     };
 
     Ok(Json(response))
@@ -1529,6 +1550,21 @@ mod tests {
                 && audit.contains("let (events, total)")
                 && !audit.contains("events.len() as i64"),
             "GET /governance/personas/{{id}}/audit must report the filtered total, not the page length"
+        );
+    }
+
+    #[test]
+    fn get_persona_fills_physical_user_summary() {
+        let src = include_str!("personas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let get = production
+            .split("pub async fn get_persona")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_persona");
+        assert!(
+            get.contains("load_persona_user_summary(") && !get.contains("physical_user: None"),
+            "GET /governance/personas/{{id}} must look up physical_user summary"
         );
     }
 

@@ -9,6 +9,7 @@ use uuid::Uuid;
 use xavyo_db::models::{
     CreateGovLicenseAssignment, GovLicenseAssignment, GovLicenseIncompatibility, GovLicensePool,
     IncompatibilityViolation, LicenseAssignmentFilter, LicensePoolStatus, LicenseReclaimReason,
+    User,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -189,9 +190,7 @@ impl LicenseAssignmentService {
             )
             .await?;
 
-        let mut response = LicenseAssignmentResponse::from(assignment);
-        response.pool_name = Some(license_pool.name);
-        Ok(response)
+        assignment_response(&self.pool, tenant_id, assignment).await
     }
 
     /// Deallocate (release) an active license assignment.
@@ -241,7 +240,7 @@ impl LicenseAssignmentService {
             )
             .await?;
 
-        Ok(LicenseAssignmentResponse::from(released))
+        assignment_response(&self.pool, tenant_id, released).await
     }
 
     /// Get a license assignment by ID.
@@ -252,7 +251,12 @@ impl LicenseAssignmentService {
     ) -> Result<Option<LicenseAssignmentResponse>> {
         let assignment =
             GovLicenseAssignment::find_by_id(&self.pool, tenant_id, assignment_id).await?;
-        Ok(assignment.map(LicenseAssignmentResponse::from))
+        match assignment {
+            Some(assignment) => Ok(Some(
+                assignment_response(&self.pool, tenant_id, assignment).await?,
+            )),
+            None => Ok(None),
+        }
     }
 
     /// Get a license assignment by ID, returning an error if not found.
@@ -286,11 +290,13 @@ impl LicenseAssignmentService {
                 .await?;
         let total = GovLicenseAssignment::count_by_tenant(&self.pool, tenant_id, &filter).await?;
 
+        let mut items = Vec::with_capacity(assignments.len());
+        for assignment in assignments {
+            items.push(assignment_response(&self.pool, tenant_id, assignment).await?);
+        }
+
         Ok(LicenseAssignmentListResponse {
-            items: assignments
-                .into_iter()
-                .map(LicenseAssignmentResponse::from)
-                .collect(),
+            items,
             total,
             limit,
             offset,
@@ -488,6 +494,21 @@ impl LicenseAssignmentService {
     pub fn audit_service(&self) -> &LicenseAuditService {
         &self.audit_service
     }
+}
+
+async fn assignment_response(
+    pool: &PgPool,
+    tenant_id: Uuid,
+    assignment: GovLicenseAssignment,
+) -> Result<LicenseAssignmentResponse> {
+    let mut response = LicenseAssignmentResponse::from(assignment);
+    response.pool_name = GovLicensePool::find_by_id(pool, tenant_id, response.license_pool_id)
+        .await?
+        .map(|pool| pool.name);
+    response.user_email = User::find_by_id_in_tenant(pool, tenant_id, response.user_id)
+        .await?
+        .map(|user| user.email);
+    Ok(response)
 }
 
 #[cfg(test)]
@@ -923,6 +944,20 @@ mod tests {
         assert!(
             reclaim.contains("log_license_reclaimed") && reclaim.contains("failures.push"),
             "bulk reclaim must treat audit write errors as item failures"
+        );
+    }
+
+    #[test]
+    fn license_assignment_responses_look_up_pool_and_user() {
+        let src = include_str!("license_assignment_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("assignment_response(")
+                && production.contains("GovLicensePool::find_by_id")
+                && production.contains("User::find_by_id_in_tenant")
+                && !production.contains("Ok(LicenseAssignmentResponse::from(released))")
+                && !production.contains(".map(LicenseAssignmentResponse::from)"),
+            "license assignment GET/list/assign/deallocate must look up pool_name and user_email"
         );
     }
 }
