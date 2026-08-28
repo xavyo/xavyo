@@ -12,7 +12,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use xavyo_auth::JwtClaims;
-use xavyo_db::models::PoaStatus;
+use xavyo_db::models::{PoaStatus, User};
 
 use crate::error::{ApiGovernanceError, ApiResult};
 use xavyo_db::models::{PoaAuditEventFilter, PoaEventType as DbPoaEventType};
@@ -23,6 +23,24 @@ use crate::models::power_of_attorney::{
     PoaAuditListResponse, PoaListResponse, PoaResponse, RevokePoaRequest,
 };
 use crate::router::GovernanceState;
+
+/// Prefer a non-empty display name, otherwise the user's email.
+fn user_display_name(display_name: Option<&str>, email: &str) -> String {
+    display_name
+        .filter(|name| !name.is_empty())
+        .unwrap_or(email)
+        .to_string()
+}
+
+async fn load_user_display_name(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    user_id: Uuid,
+) -> ApiResult<Option<String>> {
+    Ok(User::find_by_id_in_tenant(pool, tenant_id, user_id)
+        .await?
+        .map(|user| user_display_name(user.display_name.as_deref(), &user.email)))
+}
 
 /// Grant a Power of Attorney.
 ///
@@ -444,15 +462,18 @@ pub async fn get_current_assumption(
         .await?;
 
     match assumption {
-        Some((session, poa)) => Ok(Json(CurrentAssumptionResponse {
-            is_assuming: true,
-            poa_id: Some(poa.id),
-            donor_id: Some(poa.donor_id),
-            donor_name: None, // Would be populated from user lookup
-            session_id: Some(session.id),
-            assumed_at: Some(session.assumed_at),
-            scope: None,
-        })),
+        Some((session, poa)) => {
+            let donor_name = load_user_display_name(state.pool(), tenant_id, poa.donor_id).await?;
+            Ok(Json(CurrentAssumptionResponse {
+                is_assuming: true,
+                poa_id: Some(poa.id),
+                donor_id: Some(poa.donor_id),
+                donor_name,
+                session_id: Some(session.id),
+                assumed_at: Some(session.assumed_at),
+                scope: None,
+            }))
+        }
         None => Ok(Json(CurrentAssumptionResponse {
             is_assuming: false,
             poa_id: None,
@@ -644,6 +665,23 @@ mod tests {
                 && trail.contains("let (events, total)")
                 && !trail.contains("events.len() as i64"),
             "GET PoA audit trail must use the service total, not the page length"
+        );
+    }
+
+    #[test]
+    fn current_assumption_looks_up_donor_name() {
+        let src = include_str!("power_of_attorney.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let current = production
+            .split("pub async fn get_current_assumption")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_current_assumption");
+        assert!(
+            current.contains("load_user_display_name(")
+                && current.contains("poa.donor_id")
+                && !current.contains("donor_name: None, // Would"),
+            "GET /governance/power-of-attorney/current-assumption must look up the donor display name"
         );
     }
 }

@@ -31,6 +31,37 @@ use crate::models::{
 use crate::router::GovernanceState;
 use crate::services::ValidationResult;
 
+async fn lookup_role_name(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    role_id: Uuid,
+) -> ApiResult<Option<String>> {
+    if let Some(role) = xavyo_db::models::GovRole::find_by_id(pool, tenant_id, role_id).await? {
+        return Ok(Some(role.name));
+    }
+    let linked: Option<String> = sqlx::query_scalar(
+        r"
+        SELECT r.name
+        FROM gov_role_entitlements re
+        JOIN gov_roles r ON r.id = re.role_id AND r.tenant_id = re.tenant_id
+        WHERE re.tenant_id = $1 AND re.entitlement_id = $2
+        LIMIT 1
+        ",
+    )
+    .bind(tenant_id)
+    .bind(role_id)
+    .fetch_optional(pool)
+    .await?;
+    if linked.is_some() {
+        return Ok(linked);
+    }
+    Ok(
+        xavyo_db::GovEntitlement::find_by_id(pool, tenant_id, role_id)
+            .await?
+            .map(|entitlement| entitlement.name),
+    )
+}
+
 // ============================================================================
 // Role Parameter CRUD Operations (User Story 1)
 // ============================================================================
@@ -591,11 +622,13 @@ pub async fn create_parametric_assignment(
         .map(AssignmentParameterResponse::from)
         .collect();
 
+    let role_name = lookup_role_name(&state.pool, tenant_id, role_id).await?;
+
     let response = ParametricAssignmentResponse {
         id: assignment.id,
         tenant_id: assignment.tenant_id,
         role_id: assignment.entitlement_id,
-        role_name: None, // Would need to fetch
+        role_name,
         target_type: request.target_type,
         target_id: assignment.target_id,
         assigned_by: assignment.assigned_by,
@@ -660,11 +693,13 @@ pub async fn get_parametric_assignment(
         .map(AssignmentParameterResponse::from)
         .collect();
 
+    let role_name = lookup_role_name(&state.pool, tenant_id, assignment.entitlement_id).await?;
+
     let response = ParametricAssignmentResponse {
         id: assignment.id,
         tenant_id: assignment.tenant_id,
         role_id: assignment.entitlement_id,
-        role_name: None,
+        role_name,
         target_type: format!("{:?}", assignment.target_type).to_lowercase(),
         target_id: assignment.target_id,
         assigned_by: assignment.assigned_by,
@@ -754,11 +789,13 @@ pub async fn list_user_parametric_assignments(
             .map(AssignmentParameterResponse::from)
             .collect();
 
+        let role_name = lookup_role_name(&state.pool, tenant_id, assignment.entitlement_id).await?;
+
         items.push(ParametricAssignmentResponse {
             id: assignment.id,
             tenant_id: assignment.tenant_id,
             role_id: assignment.entitlement_id,
-            role_name: None,
+            role_name,
             target_type: format!("{:?}", assignment.target_type).to_lowercase(),
             target_id: assignment.target_id,
             assigned_by: assignment.assigned_by,
@@ -1037,6 +1074,39 @@ mod tests {
             list.contains("include_inactive")
                 && list.contains("list_parametric_assignments_by_user_and_role("),
             "role_id filter must honor include_inactive instead of leaking revoked assignments"
+        );
+        assert!(
+            list.contains("lookup_role_name(") && !list.contains("role_name: None"),
+            "listing parametric assignments must look up role_name"
+        );
+    }
+
+    #[test]
+    fn parametric_assignment_create_and_get_look_up_role_name() {
+        let src = include_str!("parametric_roles.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let create = production
+            .split("pub async fn create_parametric_assignment")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("create_parametric_assignment");
+        assert!(
+            create.contains("lookup_role_name(") && !create.contains("role_name: None"),
+            "POST parametric assignment must look up role_name"
+        );
+        let get = production
+            .split("pub async fn get_parametric_assignment")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_parametric_assignment");
+        assert!(
+            get.contains("lookup_role_name(") && !get.contains("role_name: None"),
+            "GET /governance/assignments/{{id}} must look up role_name"
+        );
+        assert!(
+            production.contains("GovRole::find_by_id")
+                && production.contains("GovEntitlement::find_by_id"),
+            "role_name lookup must query tenant-scoped roles then entitlements"
         );
     }
 }
