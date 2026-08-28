@@ -16,8 +16,8 @@ use xavyo_auth::JwtClaims;
 use xavyo_db::{
     CreateGovMetaRole, CreateGovMetaRoleConstraint, CreateGovMetaRoleCriteria,
     CreateGovMetaRoleEntitlement, GovApplication, GovEntitlement, GovMetaRole, GovMetaRoleConflict,
-    GovMetaRoleEntitlement, GovMetaRoleInheritance, GovRiskLevel, MetaRoleFilter,
-    UpdateGovMetaRole,
+    GovMetaRoleEntitlement, GovMetaRoleInheritance, GovRiskLevel, InheritanceFilter,
+    MetaRoleConflictFilter, MetaRoleFilter, UpdateGovMetaRole,
 };
 
 use crate::error::{ApiGovernanceError, ApiResult};
@@ -158,6 +158,26 @@ async fn unresolved_conflict_count(
     .await?)
 }
 
+async fn meta_role_stats(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    meta_role_id: Uuid,
+    criteria_count: i64,
+    entitlements_count: i64,
+    constraints_count: i64,
+) -> ApiResult<MetaRoleStatsResponse> {
+    let active_inheritances =
+        GovMetaRoleInheritance::count_active_by_meta_role(pool, tenant_id, meta_role_id).await?;
+    let unresolved_conflicts = unresolved_conflict_count(pool, tenant_id, meta_role_id).await?;
+    Ok(MetaRoleStatsResponse {
+        active_inheritances,
+        unresolved_conflicts,
+        criteria_count,
+        entitlements_count,
+        constraints_count,
+    })
+}
+
 // ============================================================================
 // Meta-Role CRUD Operations
 // ============================================================================
@@ -193,6 +213,7 @@ pub async fn list_meta_roles(
         name_contains: query.name,
         priority_min: None,
         priority_max: None,
+        created_by: query.created_by,
     };
 
     let (meta_roles, total) = state
@@ -313,12 +334,18 @@ pub async fn get_meta_role(
         entitlement_items
             .push(meta_role_entitlement_response(state.pool(), tenant_id, entitlement).await?);
     }
-    let active_inheritances =
-        GovMetaRoleInheritance::count_active_by_meta_role(state.pool(), tenant_id, id).await?;
-    let unresolved_conflicts = unresolved_conflict_count(state.pool(), tenant_id, id).await?;
     let criteria_count = i64::try_from(criteria.len()).unwrap_or(i64::MAX);
     let entitlements_count = i64::try_from(entitlement_items.len()).unwrap_or(i64::MAX);
     let constraints_count = i64::try_from(constraints.len()).unwrap_or(i64::MAX);
+    let stats = meta_role_stats(
+        state.pool(),
+        tenant_id,
+        id,
+        criteria_count,
+        entitlements_count,
+        constraints_count,
+    )
+    .await?;
 
     Ok(Json(MetaRoleWithDetailsResponse {
         meta_role: MetaRoleResponse::from(meta_role),
@@ -337,13 +364,7 @@ pub async fn get_meta_role(
                 created_at: c.created_at,
             })
             .collect(),
-        stats: Some(MetaRoleStatsResponse {
-            active_inheritances,
-            unresolved_conflicts,
-            criteria_count,
-            entitlements_count,
-            constraints_count,
-        }),
+        stats: Some(stats),
     }))
 }
 
@@ -861,13 +882,14 @@ pub async fn list_inheritances(
     let limit = query.limit.unwrap_or(50).min(100);
     let offset = query.offset.unwrap_or(0).max(0);
 
-    let inheritances = state
+    let filter = InheritanceFilter {
+        meta_role_id: Some(id),
+        child_role_id: query.child_role_id,
+        status: query.status,
+    };
+    let (inheritances, total) = state
         .meta_role_matching_service
-        .list_inheritances_by_meta_role(tenant_id, id, query.status, limit, offset)
-        .await?;
-    let total = state
-        .meta_role_matching_service
-        .count_inheritances_by_meta_role(tenant_id, id, query.status)
+        .list_inheritances(tenant_id, &filter, limit, offset)
         .await?;
     let mut items = Vec::with_capacity(inheritances.len());
     for inheritance in inheritances {
@@ -908,18 +930,32 @@ pub async fn reevaluate_meta_role(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    let (added, removed) = state
+    let _ = state
         .meta_role_matching_service
         .reevaluate_meta_role(tenant_id, id)
         .await?;
 
-    Ok(Json(MetaRoleStatsResponse {
-        active_inheritances: added,
-        unresolved_conflicts: 0,
-        criteria_count: 0,
-        entitlements_count: 0,
-        constraints_count: removed,
-    }))
+    let criteria = state.meta_role_service.list_criteria(tenant_id, id).await?;
+    let entitlements = state
+        .meta_role_service
+        .list_entitlements(tenant_id, id)
+        .await?;
+    let constraints = state
+        .meta_role_service
+        .list_constraints(tenant_id, id)
+        .await?;
+
+    Ok(Json(
+        meta_role_stats(
+            state.pool(),
+            tenant_id,
+            id,
+            i64::try_from(criteria.len()).unwrap_or(i64::MAX),
+            i64::try_from(entitlements.len()).unwrap_or(i64::MAX),
+            i64::try_from(constraints.len()).unwrap_or(i64::MAX),
+        )
+        .await?,
+    ))
 }
 
 // ============================================================================
@@ -952,9 +988,15 @@ pub async fn list_conflicts(
     let limit = query.limit.unwrap_or(50).min(100);
     let offset = query.offset.unwrap_or(0).max(0);
 
+    let filter = MetaRoleConflictFilter {
+        affected_role_id: query.affected_role_id,
+        meta_role_id: query.meta_role_id,
+        conflict_type: query.conflict_type,
+        resolution_status: query.resolution_status,
+    };
     let (conflicts, total) = state
         .meta_role_conflict_service
-        .list_conflicts(tenant_id, query.resolution_status, limit, offset)
+        .list_conflicts(tenant_id, &filter, limit, offset)
         .await?;
 
     let mut items = Vec::with_capacity(conflicts.len());
@@ -1188,6 +1230,7 @@ pub async fn trigger_cascade(
         ));
     }
 
+    let started_at = chrono::Utc::now();
     let status = state
         .meta_role_cascade_service
         .cascade_meta_role_changes(tenant_id, id, actor_id)
@@ -1208,7 +1251,7 @@ pub async fn trigger_cascade(
         remaining_count: status.total_affected - status.processed,
         success_count: status.succeeded,
         failure_count: status.failed,
-        started_at: None,
+        started_at: Some(started_at),
         completed_at: if status.is_complete {
             Some(chrono::Utc::now())
         } else {
@@ -1369,9 +1412,81 @@ mod tests {
             .and_then(|s| s.split("pub async fn ").next())
             .expect("list_inheritances");
         assert!(
-            list.contains("count_inheritances_by_meta_role(")
+            list.contains("list_inheritances(")
+                && list.contains("query.child_role_id")
                 && !list.contains("inheritances.len() as i64"),
-            "GET /governance/meta-roles/{{id}}/inheritances must report the filtered total, not the page length"
+            "GET /governance/meta-roles/{{id}}/inheritances must report the filtered total and honor child_role_id"
+        );
+    }
+
+    #[test]
+    fn list_meta_roles_honors_created_by() {
+        let src = include_str!("meta_roles.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_meta_roles")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_meta_roles");
+        assert!(
+            list.contains("created_by: query.created_by") && list.contains("MetaRoleFilter"),
+            "GET /governance/meta-roles must apply advertised created_by"
+        );
+    }
+
+    #[test]
+    fn list_conflicts_honors_advertised_filters() {
+        let src = include_str!("meta_roles.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_conflicts")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_conflicts");
+        assert!(
+            list.contains("query.affected_role_id")
+                && list.contains("query.meta_role_id")
+                && list.contains("query.conflict_type")
+                && list.contains("query.resolution_status")
+                && list.contains("MetaRoleConflictFilter")
+                && !list.contains("conflicts.len() as i64"),
+            "GET /governance/meta-roles/conflicts must apply advertised role, type, and status filters"
+        );
+    }
+
+    #[test]
+    fn reevaluate_returns_real_stats_not_added_removed() {
+        let src = include_str!("meta_roles.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let reevaluate = production
+            .split("pub async fn reevaluate_meta_role")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("reevaluate_meta_role");
+        assert!(
+            reevaluate.contains("meta_role_stats(")
+                && reevaluate.contains("list_criteria(")
+                && !reevaluate.contains("unresolved_conflicts: 0")
+                && !reevaluate.contains("criteria_count: 0")
+                && !reevaluate.contains("active_inheritances: added")
+                && !reevaluate.contains("constraints_count: removed"),
+            "POST /governance/meta-roles/{{id}}/reevaluate must return real stats, not remapped add/remove counts"
+        );
+    }
+
+    #[test]
+    fn cascade_reports_started_at() {
+        let src = include_str!("meta_roles.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let cascade = production
+            .split("pub async fn trigger_cascade")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("trigger_cascade");
+        assert!(
+            cascade.contains("started_at: Some(started_at)")
+                && !cascade.contains("started_at: None"),
+            "POST /governance/meta-roles/{{id}}/cascade must report when the cascade started"
         );
     }
 
@@ -1386,8 +1501,7 @@ mod tests {
             .expect("get_meta_role");
         assert!(
             get.contains("meta_role_entitlement_response(")
-                && get.contains("count_active_by_meta_role(")
-                && get.contains("unresolved_conflict_count(")
+                && get.contains("meta_role_stats(")
                 && !get.contains("entitlement: None")
                 && !get.contains("stats: None"),
             "GET /governance/meta-roles/{{id}} must look up entitlement summaries and stats"

@@ -68,6 +68,7 @@ pub struct MetaRoleFilter {
     pub name_contains: Option<String>,
     pub priority_min: Option<i32>,
     pub priority_max: Option<i32>,
+    pub created_by: Option<Uuid>,
 }
 
 /// Default priority for meta-roles.
@@ -160,6 +161,10 @@ impl GovMetaRole {
             param_count += 1;
             query.push_str(&format!(" AND priority <= ${param_count}"));
         }
+        if filter.created_by.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND created_by = ${param_count}"));
+        }
 
         query.push_str(&format!(
             " ORDER BY priority ASC, name ASC LIMIT ${} OFFSET ${}",
@@ -180,6 +185,9 @@ impl GovMetaRole {
         }
         if let Some(priority_max) = filter.priority_max {
             q = q.bind(priority_max);
+        }
+        if let Some(created_by) = filter.created_by {
+            q = q.bind(created_by);
         }
 
         q.bind(limit).bind(offset).fetch_all(pool).await
@@ -210,6 +218,10 @@ impl GovMetaRole {
             param_count += 1;
             query.push_str(&format!(" AND priority <= ${param_count}"));
         }
+        if filter.created_by.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND created_by = ${param_count}"));
+        }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
 
@@ -224,6 +236,9 @@ impl GovMetaRole {
         }
         if let Some(priority_max) = filter.priority_max {
             q = q.bind(priority_max);
+        }
+        if let Some(created_by) = filter.created_by {
+            q = q.bind(created_by);
         }
 
         q.fetch_one(pool).await
@@ -416,5 +431,30 @@ mod tests {
         assert!(filter.name_contains.is_none());
         assert!(filter.priority_min.is_none());
         assert!(filter.priority_max.is_none());
+        assert!(filter.created_by.is_none());
+    }
+
+    #[test]
+    fn list_and_count_filter_created_by() {
+        let src = include_str!("gov_meta_role.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_by_tenant")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_by_tenant");
+        let count = production
+            .split("pub async fn count_by_tenant")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("count_by_tenant");
+        assert!(
+            list.contains("created_by = ${param_count}") && list.contains("filter.created_by"),
+            "meta-role list must apply created_by"
+        );
+        assert!(
+            count.contains("created_by = ${param_count}") && count.contains("filter.created_by"),
+            "meta-role count must apply created_by"
+        );
     }
 }

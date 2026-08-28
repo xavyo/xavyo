@@ -170,6 +170,90 @@ impl GovMetaRoleInheritance {
         }
     }
 
+    /// List inheritances with filtering and pagination.
+    pub async fn list_by_tenant(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        filter: &InheritanceFilter,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        let mut query =
+            String::from("SELECT * FROM gov_meta_role_inheritances WHERE tenant_id = $1");
+        let mut param_count = 1;
+
+        if filter.meta_role_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND meta_role_id = ${param_count}"));
+        }
+        if filter.child_role_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND child_role_id = ${param_count}"));
+        }
+        if filter.status.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND status = ${param_count}"));
+        }
+
+        query.push_str(&format!(
+            " ORDER BY matched_at ASC LIMIT ${} OFFSET ${}",
+            param_count + 1,
+            param_count + 2
+        ));
+
+        let mut q = sqlx::query_as::<_, Self>(&query).bind(tenant_id);
+
+        if let Some(meta_role_id) = filter.meta_role_id {
+            q = q.bind(meta_role_id);
+        }
+        if let Some(child_role_id) = filter.child_role_id {
+            q = q.bind(child_role_id);
+        }
+        if let Some(status) = filter.status {
+            q = q.bind(status);
+        }
+
+        q.bind(limit).bind(offset).fetch_all(pool).await
+    }
+
+    /// Count inheritances with the same filters as `list_by_tenant`.
+    pub async fn count_by_tenant(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        filter: &InheritanceFilter,
+    ) -> Result<i64, sqlx::Error> {
+        let mut query =
+            String::from("SELECT COUNT(*) FROM gov_meta_role_inheritances WHERE tenant_id = $1");
+        let mut param_count = 1;
+
+        if filter.meta_role_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND meta_role_id = ${param_count}"));
+        }
+        if filter.child_role_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND child_role_id = ${param_count}"));
+        }
+        if filter.status.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND status = ${param_count}"));
+        }
+
+        let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
+
+        if let Some(meta_role_id) = filter.meta_role_id {
+            q = q.bind(meta_role_id);
+        }
+        if let Some(child_role_id) = filter.child_role_id {
+            q = q.bind(child_role_id);
+        }
+        if let Some(status) = filter.status {
+            q = q.bind(status);
+        }
+
+        q.fetch_one(pool).await
+    }
+
     /// Count inheritances for a meta-role, optionally filtered by status.
     pub async fn count_by_meta_role(
         pool: &sqlx::PgPool,
@@ -397,6 +481,32 @@ mod tests {
                 && count.contains("meta_role_id = $2")
                 && count.contains("status = $3"),
             "inheritance count must stay tenant-scoped and honor optional status"
+        );
+    }
+
+    #[test]
+    fn list_and_count_by_tenant_honor_child_role() {
+        let src = include_str!("gov_meta_role_inheritance.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_by_tenant")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_by_tenant");
+        let count = production
+            .split("pub async fn count_by_tenant")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("count_by_tenant");
+        assert!(
+            list.contains("child_role_id = ${param_count}")
+                && list.contains("meta_role_id = ${param_count}")
+                && list.contains("status = ${param_count}"),
+            "inheritance list must apply child_role_id, meta_role_id, and status"
+        );
+        assert!(
+            count.contains("child_role_id = ${param_count}") && count.contains("SELECT COUNT(*)"),
+            "inheritance count must apply child_role_id"
         );
     }
 }

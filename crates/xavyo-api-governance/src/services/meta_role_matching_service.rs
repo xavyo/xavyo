@@ -13,7 +13,8 @@ use uuid::Uuid;
 use xavyo_db::{
     CreateGovMetaRoleEvent, CreateGovMetaRoleInheritance, CriteriaLogic, CriteriaOperator,
     EntitlementFilter, GovEntitlement, GovMetaRole, GovMetaRoleCriteria, GovMetaRoleEvent,
-    GovMetaRoleInheritance, InheritanceStatus, MetaRoleEventType, MetaRoleStatus,
+    GovMetaRoleInheritance, InheritanceFilter, InheritanceStatus, MetaRoleEventType,
+    MetaRoleStatus,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -469,16 +470,19 @@ impl MetaRoleMatchingService {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<GovMetaRoleInheritance>> {
-        GovMetaRoleInheritance::list_by_meta_role(
-            &self.pool,
-            tenant_id,
-            meta_role_id,
-            status,
-            limit,
-            offset,
-        )
-        .await
-        .map_err(GovernanceError::Database)
+        let (items, _) = self
+            .list_inheritances(
+                tenant_id,
+                &InheritanceFilter {
+                    meta_role_id: Some(meta_role_id),
+                    child_role_id: None,
+                    status,
+                },
+                limit,
+                offset,
+            )
+            .await?;
+        Ok(items)
     }
 
     /// Count inheritances for a meta-role (same filters as list).
@@ -488,9 +492,35 @@ impl MetaRoleMatchingService {
         meta_role_id: Uuid,
         status: Option<InheritanceStatus>,
     ) -> Result<i64> {
-        GovMetaRoleInheritance::count_by_meta_role(&self.pool, tenant_id, meta_role_id, status)
+        GovMetaRoleInheritance::count_by_tenant(
+            &self.pool,
+            tenant_id,
+            &InheritanceFilter {
+                meta_role_id: Some(meta_role_id),
+                child_role_id: None,
+                status,
+            },
+        )
+        .await
+        .map_err(GovernanceError::Database)
+    }
+
+    /// List inheritances with advertised filters and a matching total.
+    pub async fn list_inheritances(
+        &self,
+        tenant_id: Uuid,
+        filter: &InheritanceFilter,
+        limit: i64,
+        offset: i64,
+    ) -> Result<(Vec<GovMetaRoleInheritance>, i64)> {
+        let inheritances =
+            GovMetaRoleInheritance::list_by_tenant(&self.pool, tenant_id, filter, limit, offset)
+                .await
+                .map_err(GovernanceError::Database)?;
+        let total = GovMetaRoleInheritance::count_by_tenant(&self.pool, tenant_id, filter)
             .await
-            .map_err(GovernanceError::Database)
+            .map_err(GovernanceError::Database)?;
+        Ok((inheritances, total))
     }
 
     /// List inheritances for a child role.
@@ -746,8 +776,9 @@ mod tests {
         let production = src.split("mod tests").next().expect("production source");
         assert!(
             production.contains("count_inheritances_by_meta_role")
-                && production.contains("count_by_meta_role("),
-            "meta-role inheritance list must expose a count matching list filters"
+                && production.contains("count_by_tenant(")
+                && production.contains("child_role_id"),
+            "meta-role inheritance list must expose a count matching list filters including child_role_id"
         );
     }
 

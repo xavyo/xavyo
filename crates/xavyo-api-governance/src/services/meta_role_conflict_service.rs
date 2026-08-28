@@ -9,8 +9,9 @@ use uuid::Uuid;
 
 use xavyo_db::{
     CreateGovMetaRoleEvent, GovMetaRole, GovMetaRoleConflict, GovMetaRoleConstraint,
-    GovMetaRoleEntitlement, GovMetaRoleInheritance, InheritanceStatus, MetaRoleConflictType,
-    MetaRoleEventType, PermissionType, ResolutionStatus, ResolveGovMetaRoleConflict,
+    GovMetaRoleEntitlement, GovMetaRoleInheritance, InheritanceStatus, MetaRoleConflictFilter,
+    MetaRoleConflictType, MetaRoleEventType, PermissionType, ResolutionStatus,
+    ResolveGovMetaRoleConflict,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -613,20 +614,21 @@ impl MetaRoleConflictService {
     // Listing and Querying
     // =========================================================================
 
-    /// List conflicts with optional status filter.
+    /// List conflicts with advertised filters.
     /// Returns (conflicts, `total_count`) for proper pagination.
     pub async fn list_conflicts(
         &self,
         tenant_id: Uuid,
-        status: Option<ResolutionStatus>,
+        filter: &MetaRoleConflictFilter,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<GovMetaRoleConflict>, i64)> {
-        let conflicts = GovMetaRoleConflict::list(&self.pool, tenant_id, status, limit, offset)
-            .await
-            .map_err(GovernanceError::Database)?;
+        let conflicts =
+            GovMetaRoleConflict::list_by_tenant(&self.pool, tenant_id, filter, limit, offset)
+                .await
+                .map_err(GovernanceError::Database)?;
 
-        let total = GovMetaRoleConflict::count(&self.pool, tenant_id, status)
+        let total = GovMetaRoleConflict::count_by_tenant(&self.pool, tenant_id, filter)
             .await
             .map_err(GovernanceError::Database)?;
 
