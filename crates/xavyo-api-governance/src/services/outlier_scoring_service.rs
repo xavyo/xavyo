@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use chrono::{DateTime, Utc};
 
-use crate::models::OutlierReportResponse;
+use crate::models::{OutlierReportResponse, OutlierTrendPoint, PeerGroupBreakdown};
 use xavyo_db::{
     ConfigSnapshot, CreateAlert, CreateDisposition, CreateOutlierAnalysis, CreateOutlierResult,
     DispositionFilter, FactorBreakdown, FactorScore, GovOutlierAlert, GovOutlierAnalysis,
@@ -1239,21 +1239,35 @@ impl OutlierScoringService {
         include_trends: bool,
         include_peer_breakdown: bool,
     ) -> Result<OutlierReportResponse> {
-        // For now, return a basic report structure
-        // TODO: Implement full report generation with aggregations
+        let analyses = GovOutlierAnalysis::list_completed_in_range(
+            &self.pool, tenant_id, start_date, end_date,
+        )
+        .await
+        .map_err(GovernanceError::Database)?;
 
-        let summary = self.get_summary(tenant_id).await?;
+        let (total_analyses, total_users_analyzed, total_outliers_detected, average_outlier_rate) =
+            outlier_report_totals(&analyses);
+
+        let results = if include_trends || include_peer_breakdown {
+            let ids: Vec<Uuid> = analyses.iter().map(|a| a.id).collect();
+            GovOutlierResult::list_for_analyses(&self.pool, tenant_id, &ids)
+                .await
+                .map_err(GovernanceError::Database)?
+        } else {
+            Vec::new()
+        };
 
         let trends = if include_trends {
-            // Get trend data from analyses in the date range
-            Some(vec![])
+            Some(outlier_trend_points(
+                &analyses,
+                &avg_scores_by_analysis(&results),
+            ))
         } else {
             None
         };
 
         let peer_group_breakdown = if include_peer_breakdown {
-            // Get breakdown by peer group
-            Some(vec![])
+            Some(aggregate_peer_breakdown(&results))
         } else {
             None
         };
@@ -1261,14 +1275,10 @@ impl OutlierScoringService {
         Ok(OutlierReportResponse {
             start_date,
             end_date,
-            total_analyses: 0,
-            total_users_analyzed: summary.total_users,
-            total_outliers_detected: summary.outlier_count,
-            average_outlier_rate: if summary.total_users > 0 {
-                summary.outlier_count as f64 / summary.total_users as f64
-            } else {
-                0.0
-            },
+            total_analyses,
+            total_users_analyzed,
+            total_outliers_detected,
+            average_outlier_rate,
             trends,
             peer_group_breakdown,
             generated_at: Utc::now(),
@@ -1308,6 +1318,104 @@ pub struct AlertSummary {
     pub high_count: i64,
     pub medium_count: i64,
     pub low_count: i64,
+}
+
+/// Totals for a date-range report: analyses, users, outliers, outlier rate.
+fn outlier_report_totals(analyses: &[GovOutlierAnalysis]) -> (i64, i64, i64, f64) {
+    let total_analyses = analyses.len() as i64;
+    let total_users_analyzed: i64 = analyses.iter().map(|a| i64::from(a.users_analyzed)).sum();
+    let total_outliers_detected: i64 = analyses
+        .iter()
+        .map(|a| i64::from(a.outliers_detected))
+        .sum();
+    let average_outlier_rate = if total_users_analyzed > 0 {
+        total_outliers_detected as f64 / total_users_analyzed as f64
+    } else {
+        0.0
+    };
+    (
+        total_analyses,
+        total_users_analyzed,
+        total_outliers_detected,
+        average_outlier_rate,
+    )
+}
+
+/// Mean overall score per analysis from stored results.
+fn avg_scores_by_analysis(results: &[GovOutlierResult]) -> std::collections::HashMap<Uuid, f64> {
+    let mut sums: std::collections::HashMap<Uuid, (f64, i64)> = std::collections::HashMap::new();
+    for result in results {
+        let entry = sums.entry(result.analysis_id).or_insert((0.0, 0));
+        entry.0 += result.overall_score;
+        entry.1 += 1;
+    }
+    sums.into_iter()
+        .map(|(id, (sum, n))| (id, if n > 0 { sum / n as f64 } else { 0.0 }))
+        .collect()
+}
+
+/// One trend point per completed analysis in the report window.
+fn outlier_trend_points(
+    analyses: &[GovOutlierAnalysis],
+    avg_score_by_analysis: &std::collections::HashMap<Uuid, f64>,
+) -> Vec<OutlierTrendPoint> {
+    analyses
+        .iter()
+        .filter_map(|analysis| {
+            Some(OutlierTrendPoint {
+                date: analysis.completed_at?,
+                analysis_id: analysis.id,
+                outlier_count: i64::from(analysis.outliers_detected),
+                total_users: i64::from(analysis.users_analyzed),
+                avg_score: avg_score_by_analysis
+                    .get(&analysis.id)
+                    .copied()
+                    .unwrap_or(0.0),
+            })
+        })
+        .collect()
+}
+
+/// Collapse per-user peer scores into per-group outlier counts.
+fn aggregate_peer_breakdown(results: &[GovOutlierResult]) -> Vec<PeerGroupBreakdown> {
+    struct Acc {
+        name: String,
+        outlier_count: i64,
+        member_count: i64,
+        z_sum: f64,
+    }
+    let mut by_group: std::collections::HashMap<Uuid, Acc> = std::collections::HashMap::new();
+    for result in results {
+        for score in result.get_peer_scores() {
+            let acc = by_group.entry(score.peer_group_id).or_insert_with(|| Acc {
+                name: score.peer_group_name.clone(),
+                outlier_count: 0,
+                member_count: 0,
+                z_sum: 0.0,
+            });
+            acc.member_count += 1;
+            if score.is_outlier {
+                acc.outlier_count += 1;
+            }
+            acc.z_sum += score.z_score;
+        }
+    }
+    let mut breakdown: Vec<PeerGroupBreakdown> = by_group
+        .into_iter()
+        .map(|(peer_group_id, acc)| PeerGroupBreakdown {
+            peer_group_id,
+            peer_group_name: acc.name,
+            outlier_count: acc.outlier_count,
+            member_count: acc.member_count,
+            avg_deviation: if acc.member_count > 0 {
+                acc.z_sum / acc.member_count as f64
+            } else {
+                0.0
+            },
+        })
+        .collect();
+    breakdown.sort_by(|a, b| a.peer_group_name.cmp(&b.peer_group_name));
+    breakdown
 }
 
 /// Persist an outlier analysis as failed. Errors must not leave it running.
@@ -1793,6 +1901,145 @@ mod tests {
         assert!(
             !load.contains("mean_roles: g.avg_entitlements"),
             "role stats must not copy entitlement averages"
+        );
+    }
+
+    fn sample_analysis(users: i32, outliers: i32, completed: DateTime<Utc>) -> GovOutlierAnalysis {
+        GovOutlierAnalysis {
+            id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            config_snapshot: sqlx::types::Json(ConfigSnapshot {
+                confidence_threshold: 2.0,
+                frequency_threshold: 0.1,
+                min_peer_group_size: 5,
+                scoring_weights: ScoringWeights::default(),
+            }),
+            status: OutlierAnalysisStatus::Completed,
+            triggered_by: OutlierTriggerType::Manual,
+            started_at: completed,
+            completed_at: Some(completed),
+            users_analyzed: users,
+            outliers_detected: outliers,
+            progress_percent: 100,
+            error_message: None,
+            created_at: completed,
+        }
+    }
+
+    fn sample_result(
+        analysis_id: Uuid,
+        overall_score: f64,
+        peer_scores: Vec<PeerGroupScore>,
+    ) -> GovOutlierResult {
+        GovOutlierResult {
+            id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            analysis_id,
+            user_id: Uuid::new_v4(),
+            overall_score,
+            classification: OutlierClassification::Outlier,
+            peer_scores: sqlx::types::Json(peer_scores),
+            factor_breakdown: sqlx::types::Json(FactorBreakdown::default()),
+            previous_score: None,
+            score_change: None,
+            created_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn outlier_report_totals_sum_analyses_in_range() {
+        let now = Utc::now();
+        let analyses = vec![sample_analysis(10, 2, now), sample_analysis(20, 4, now)];
+        let (n, users, outliers, rate) = outlier_report_totals(&analyses);
+        assert_eq!(n, 2);
+        assert_eq!(users, 30);
+        assert_eq!(outliers, 6);
+        assert!((rate - 0.2).abs() < 0.001);
+        assert_eq!(outlier_report_totals(&[]), (0, 0, 0, 0.0));
+    }
+
+    #[test]
+    fn outlier_trend_points_use_completed_analyses() {
+        let now = Utc::now();
+        let a = sample_analysis(8, 3, now);
+        let mut avg = std::collections::HashMap::new();
+        avg.insert(a.id, 42.5);
+        let points = outlier_trend_points(std::slice::from_ref(&a), &avg);
+        assert_eq!(points.len(), 1);
+        assert_eq!(points[0].analysis_id, a.id);
+        assert_eq!(points[0].outlier_count, 3);
+        assert_eq!(points[0].total_users, 8);
+        assert!((points[0].avg_score - 42.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn aggregate_peer_breakdown_counts_outliers_per_group() {
+        let group_a = Uuid::new_v4();
+        let group_b = Uuid::new_v4();
+        let analysis_id = Uuid::new_v4();
+        let results = vec![
+            sample_result(
+                analysis_id,
+                80.0,
+                vec![PeerGroupScore {
+                    peer_group_id: group_a,
+                    peer_group_name: "A".into(),
+                    z_score: 2.0,
+                    deviation_factor: 80.0,
+                    is_outlier: true,
+                }],
+            ),
+            sample_result(
+                analysis_id,
+                20.0,
+                vec![
+                    PeerGroupScore {
+                        peer_group_id: group_a,
+                        peer_group_name: "A".into(),
+                        z_score: 0.5,
+                        deviation_factor: 20.0,
+                        is_outlier: false,
+                    },
+                    PeerGroupScore {
+                        peer_group_id: group_b,
+                        peer_group_name: "B".into(),
+                        z_score: 1.0,
+                        deviation_factor: 40.0,
+                        is_outlier: false,
+                    },
+                ],
+            ),
+        ];
+        let breakdown = aggregate_peer_breakdown(&results);
+        assert_eq!(breakdown.len(), 2);
+        let a = breakdown.iter().find(|g| g.peer_group_name == "A").unwrap();
+        assert_eq!(a.member_count, 2);
+        assert_eq!(a.outlier_count, 1);
+        assert!((a.avg_deviation - 1.25).abs() < 0.001);
+        let b = breakdown.iter().find(|g| g.peer_group_name == "B").unwrap();
+        assert_eq!(b.member_count, 1);
+        assert_eq!(b.outlier_count, 0);
+    }
+
+    #[test]
+    fn generate_report_aggregates_instead_of_empty_stub() {
+        let src = include_str!("outlier_scoring_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let generate = production
+            .split("pub async fn generate_report")
+            .nth(1)
+            .and_then(|s| s.split("fn outlier_report_totals").next())
+            .expect("generate_report");
+        assert!(
+            generate.contains("list_completed_in_range")
+                && generate.contains("outlier_report_totals("),
+            "report must aggregate completed analyses in the date range"
+        );
+        assert!(
+            !generate.contains("TODO: Implement full report generation")
+                && !generate.contains("total_analyses: 0")
+                && !generate.contains("Some(vec![])"),
+            "must not return a fake empty report: {generate}"
         );
     }
 }

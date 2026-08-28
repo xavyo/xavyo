@@ -281,6 +281,27 @@ impl GovOutlierResult {
         })
     }
 
+    /// Results for the given analyses in this tenant.
+    pub async fn list_for_analyses(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        analysis_ids: &[Uuid],
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        if analysis_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        sqlx::query_as(
+            r"
+            SELECT * FROM gov_outlier_results
+            WHERE tenant_id = $1 AND analysis_id = ANY($2)
+            ",
+        )
+        .bind(tenant_id)
+        .bind(analysis_ids)
+        .fetch_all(pool)
+        .await
+    }
+
     /// Create a new result.
     pub async fn create(
         pool: &sqlx::PgPool,

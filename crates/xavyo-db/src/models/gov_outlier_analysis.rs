@@ -193,6 +193,31 @@ impl GovOutlierAnalysis {
         q.fetch_one(pool).await
     }
 
+    /// Completed analyses whose `completed_at` falls in `[start_date, end_date]`.
+    pub async fn list_completed_in_range(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        start_date: DateTime<Utc>,
+        end_date: DateTime<Utc>,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as(
+            r"
+            SELECT * FROM gov_outlier_analyses
+            WHERE tenant_id = $1
+              AND status = 'completed'
+              AND completed_at IS NOT NULL
+              AND completed_at >= $2
+              AND completed_at <= $3
+            ORDER BY completed_at ASC
+            ",
+        )
+        .bind(tenant_id)
+        .bind(start_date)
+        .bind(end_date)
+        .fetch_all(pool)
+        .await
+    }
+
     /// Create a new analysis.
     pub async fn create(
         pool: &sqlx::PgPool,
