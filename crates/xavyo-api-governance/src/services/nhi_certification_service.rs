@@ -14,6 +14,7 @@ use tracing::info;
 use tracing::warn;
 use uuid::Uuid;
 
+use xavyo_db::models::User;
 use xavyo_db::GovServiceAccount;
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -650,7 +651,7 @@ impl NhiCertificationService {
     /// Resolve the reviewer for an NHI based on campaign settings.
     async fn resolve_reviewer(
         &self,
-        _tenant_id: Uuid,
+        tenant_id: Uuid,
         campaign: &NhiCertificationCampaign,
         nhi: &GovServiceAccount,
     ) -> Result<Uuid> {
@@ -676,9 +677,17 @@ impl NhiCertificationService {
                     })
             }
             NhiCertReviewerType::OwnerManager => {
-                // TODO: Would need manager relationship lookup
-                // For now, fall back to owner
-                Ok(nhi.owner_id)
+                let owner = User::find_by_id_in_tenant(&self.pool, tenant_id, nhi.owner_id)
+                    .await
+                    .map_err(GovernanceError::Database)?
+                    .ok_or_else(|| {
+                        GovernanceError::ReviewerNotFound("NHI owner not found".to_string())
+                    })?;
+                owner.manager_id.ok_or_else(|| {
+                    GovernanceError::ReviewerNotFound(
+                        "Owner has no manager; cannot assign owner_manager reviewer".to_string(),
+                    )
+                })
             }
         }
     }
@@ -1695,6 +1704,28 @@ mod tests {
                 && !production.contains("_ => NhiCertificationStatus::Pending")
                 && !production.contains("_ => NhiCertificationDecision::Certify"),
             "unknown stored NHI cert enums must not become draft/owner/pending/certify"
+        );
+    }
+
+    #[test]
+    fn owner_manager_does_not_fail_open_to_owner() {
+        let src = include_str!("nhi_certification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let resolve = production
+            .split("async fn resolve_reviewer(")
+            .nth(1)
+            .expect("resolve_reviewer");
+        assert!(
+            !resolve.contains("TODO: Would need manager relationship lookup"),
+            "owner_manager must look up the owner's manager"
+        );
+        assert!(
+            resolve.contains("manager_id") && resolve.contains("find_by_id_in_tenant"),
+            "owner_manager must resolve users.manager_id in-tenant"
+        );
+        assert!(
+            !resolve.contains("Ok(nhi.owner_id)\n            }\n        }"),
+            "owner_manager must not silently fall back to owner"
         );
     }
 }
