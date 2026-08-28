@@ -843,6 +843,7 @@ mod tests {
             name_contains: None,
             priority_min: None,
             priority_max: None,
+            created_by: None,
         };
 
         assert_eq!(filter.status, Some(MetaRoleStatus::Active));
@@ -855,6 +856,7 @@ mod tests {
             name_contains: Some("finance".to_string()),
             priority_min: None,
             priority_max: None,
+            created_by: None,
         };
 
         assert_eq!(filter.name_contains.as_deref(), Some("finance"));
@@ -867,6 +869,7 @@ mod tests {
             name_contains: None,
             priority_min: Some(1),
             priority_max: Some(50),
+            created_by: None,
         };
 
         assert_eq!(filter.priority_min, Some(1));

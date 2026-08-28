@@ -55,7 +55,7 @@ async fn micro_cert_user_summary(
             email: user.email.clone(),
             display_name: user_display_name(user.display_name.as_deref(), &user.email),
             department: None,
-            manager_id: None,
+            manager_id: user.manager_id,
         }))
 }
 
@@ -695,8 +695,10 @@ mod tests {
                 && production.contains("micro_cert_user_summary(")
                 && production.contains("micro_cert_entitlement_summary(")
                 && production.contains("GovEntitlement::find_by_id")
-                && production.contains("User::find_by_id_in_tenant"),
-            "micro-certification list/my-pending must look up user, entitlement, and reviewer details"
+                && production.contains("User::find_by_id_in_tenant")
+                && production.contains("manager_id: user.manager_id")
+                && !production.contains("manager_id: None"),
+            "micro-certification list/my-pending must look up user, entitlement, reviewer, and manager_id"
         );
         assert!(
             !production.contains(

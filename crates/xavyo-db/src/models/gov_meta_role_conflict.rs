@@ -238,6 +238,53 @@ impl GovMetaRoleConflict {
         q.bind(limit).bind(offset).fetch_all(pool).await
     }
 
+    /// Count conflicts with the same filters as `list_by_tenant`.
+    pub async fn count_by_tenant(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        filter: &MetaRoleConflictFilter,
+    ) -> Result<i64, sqlx::Error> {
+        let mut query =
+            String::from("SELECT COUNT(*) FROM gov_meta_role_conflicts WHERE tenant_id = $1");
+        let mut param_count = 1;
+
+        if filter.affected_role_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND affected_role_id = ${param_count}"));
+        }
+        if filter.meta_role_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(
+                " AND (meta_role_a_id = ${param_count} OR meta_role_b_id = ${param_count})"
+            ));
+        }
+        if filter.conflict_type.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND conflict_type = ${param_count}"));
+        }
+        if filter.resolution_status.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND resolution_status = ${param_count}"));
+        }
+
+        let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
+
+        if let Some(affected_role_id) = filter.affected_role_id {
+            q = q.bind(affected_role_id);
+        }
+        if let Some(meta_role_id) = filter.meta_role_id {
+            q = q.bind(meta_role_id);
+        }
+        if let Some(conflict_type) = filter.conflict_type {
+            q = q.bind(conflict_type);
+        }
+        if let Some(resolution_status) = filter.resolution_status {
+            q = q.bind(resolution_status);
+        }
+
+        q.fetch_one(pool).await
+    }
+
     /// Count unresolved conflicts for a tenant.
     pub async fn count_unresolved(
         pool: &sqlx::PgPool,
@@ -476,5 +523,36 @@ mod tests {
         assert!(filter.meta_role_id.is_none());
         assert!(filter.conflict_type.is_none());
         assert!(filter.resolution_status.is_none());
+    }
+
+    #[test]
+    fn count_by_tenant_matches_list_filters() {
+        let src = include_str!("gov_meta_role_conflict.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_by_tenant")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_by_tenant");
+        let count = production
+            .split("pub async fn count_by_tenant")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("count_by_tenant");
+        assert!(
+            list.contains("affected_role_id")
+                && list.contains("meta_role_a_id")
+                && list.contains("conflict_type")
+                && list.contains("resolution_status"),
+            "conflict list must honor advertised filters"
+        );
+        assert!(
+            count.contains("affected_role_id")
+                && count.contains("meta_role_a_id")
+                && count.contains("conflict_type")
+                && count.contains("resolution_status")
+                && count.contains("SELECT COUNT(*)"),
+            "conflict count must use the same advertised filters as list"
+        );
     }
 }
