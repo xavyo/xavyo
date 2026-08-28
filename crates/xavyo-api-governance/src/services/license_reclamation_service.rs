@@ -7,6 +7,7 @@
 //! Pure business logic functions are extracted as module-level functions
 //! so they can be tested without requiring a database connection.
 
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use tracing::warn;
 use uuid::Uuid;
@@ -17,6 +18,7 @@ use xavyo_db::models::{
     LicenseReclamationRuleFilter, LicenseReclamationRuleId, LicenseReclamationTrigger,
     UpdateGovLicenseReclamationRule,
 };
+use xavyo_db::{LoginAttempt, User};
 use xavyo_governance::error::{GovernanceError, Result};
 
 use super::license_audit_service::LicenseAuditService;
@@ -65,6 +67,16 @@ pub struct ReclamationExecutionResult {
 /// and is forbidden as `actor_id` / `remediated_by`.
 pub(crate) fn system_actor_id() -> Uuid {
     Uuid::from_u128(0x78a1_0c4e_5b92_4d31_9f6a_2c8d_e047_b1f5)
+}
+
+/// Days since last activity. Missing login history uses `fallback`, not a fake 0.
+pub(crate) fn inactivity_days(
+    last_login_at: Option<DateTime<Utc>>,
+    fallback: DateTime<Utc>,
+    now: DateTime<Utc>,
+) -> i32 {
+    let last = last_login_at.unwrap_or(fallback);
+    now.signed_duration_since(last).num_days().max(0) as i32
 }
 
 /// Validate that trigger-specific fields are present for the given trigger type.
@@ -484,37 +496,70 @@ impl LicenseReclamationService {
 
     /// Find license assignments eligible for reclamation based on inactivity rules.
     ///
-    /// # Current Status: Placeholder
-    ///
-    /// This method currently returns an empty list. The full implementation
-    /// would query the `login_history` table to find users who have not logged
-    /// in for the threshold number of days specified in each enabled inactivity
-    /// rule, then build a `ReclaimCandidate` for each match.
-    ///
-    /// ## What the full implementation would do
-    ///
-    /// 1. Fetch all enabled inactivity rules for the tenant.
-    /// 2. For each rule, query active assignments from the rule's license pool.
-    /// 3. Cross-reference with `login_history` to identify users inactive longer
-    ///    than `threshold_days`.
-    /// 4. Return a `ReclaimCandidate` for every qualifying assignment.
-    ///
-    /// ## Working alternative
-    ///
-    /// The [`execute_reclamation`](Self::execute_reclamation) method is fully
-    /// functional and can process any candidates provided to it. For
-    /// Kafka-driven lifecycle reclamation, see
-    /// [`handle_lifecycle_event`](Self::handle_lifecycle_event).
+    /// For each enabled inactivity rule, active assignments in the rule's pool
+    /// are compared against successful login history (falling back to account
+    /// creation). Assignments idle at least `threshold_days` are returned.
     pub async fn find_inactive_licenses(&self, tenant_id: Uuid) -> Result<Vec<ReclaimCandidate>> {
-        // Get all enabled inactivity rules for this tenant
-        let _rules =
+        let rules =
             GovLicenseReclamationRule::find_enabled_inactivity_rules(&self.pool, tenant_id).await?;
+        let now = Utc::now();
+        let mut candidates = Vec::new();
 
-        // Placeholder: login_history integration not yet implemented.
-        // See doc comment above for what the full implementation would do.
-        warn!("find_inactive_licenses is a placeholder - login_history integration not yet implemented");
+        for rule in rules {
+            let threshold_days = rule.threshold_days.ok_or_else(|| {
+                GovernanceError::Validation(
+                    "Inactivity reclamation rules require threshold_days".to_string(),
+                )
+            })?;
 
-        Ok(Vec::new())
+            let assignments = GovLicenseAssignment::list_active_by_pool(
+                &self.pool,
+                tenant_id,
+                rule.license_pool_id,
+            )
+            .await?;
+            let pool_name = GovLicensePool::find_by_id(&self.pool, tenant_id, rule.license_pool_id)
+                .await?
+                .map_or_else(|| "Unknown Pool".to_string(), |p| p.name);
+
+            for assignment in assignments {
+                let last_logins = LoginAttempt::get_user_history_filtered(
+                    &self.pool,
+                    tenant_id,
+                    assignment.user_id,
+                    Some(true),
+                    None,
+                    None,
+                    None,
+                    1,
+                )
+                .await
+                .map_err(GovernanceError::Database)?;
+
+                let user = User::find_by_id_in_tenant(&self.pool, tenant_id, assignment.user_id)
+                    .await
+                    .map_err(GovernanceError::Database)?;
+                let fallback = user.map(|u| u.created_at).unwrap_or(assignment.assigned_at);
+                let days_inactive = inactivity_days(
+                    last_logins.first().map(|login| login.created_at),
+                    fallback,
+                    now,
+                );
+                if days_inactive >= threshold_days {
+                    candidates.push(ReclaimCandidate {
+                        assignment_id: assignment.id,
+                        user_id: assignment.user_id,
+                        pool_id: rule.license_pool_id,
+                        pool_name: pool_name.clone(),
+                        days_inactive: Some(days_inactive),
+                        rule_id: rule.id,
+                        reason: LicenseReclaimReason::Inactivity,
+                    });
+                }
+            }
+        }
+
+        Ok(candidates)
     }
 
     /// Find license assignments eligible for reclamation based on lifecycle state rules.
@@ -1241,6 +1286,33 @@ mod tests {
         let (limit, offset) = enforce_list_limits(i64::MAX, i64::MAX);
         assert_eq!(limit, 100);
         assert_eq!(offset, i64::MAX);
+    }
+
+    #[test]
+    fn inactivity_days_uses_login_or_fallback_not_zero() {
+        let now = Utc::now();
+        let created = now - chrono::Duration::days(10);
+        assert_eq!(inactivity_days(None, created, now), 10);
+        assert_eq!(
+            inactivity_days(Some(now - chrono::Duration::days(3)), created, now),
+            3
+        );
+        let src = include_str!("license_reclamation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let find = production
+            .split("pub async fn find_inactive_licenses")
+            .nth(1)
+            .and_then(|s| s.split("    pub async fn ").next())
+            .expect("find_inactive_licenses");
+        assert!(
+            find.contains("LoginAttempt::get_user_history_filtered")
+                && find.contains("inactivity_days("),
+            "inactivity reclamation must use login history, not an empty stub"
+        );
+        assert!(
+            !find.contains("placeholder"),
+            "must not advertise a fake empty inactivity reclamation scan"
+        );
     }
 
     #[test]

@@ -13,6 +13,7 @@ use xavyo_db::{
     ReconciliationRunFilter, ReconciliationStatus,
 };
 use xavyo_governance::error::{GovernanceError, Result};
+use xavyo_governance::expression::{eval_expression, EvalContext};
 
 use crate::models::{
     ListReconciliationRunsQuery, ReconciliationRunListResponse, ReconciliationRunResponse,
@@ -41,6 +42,31 @@ fn last_activity_at(
 
 fn days_inactive_between(last_activity: chrono::DateTime<Utc>, now: chrono::DateTime<Utc>) -> i64 {
     now.signed_duration_since(last_activity).num_days().max(0)
+}
+
+/// Evaluate a custom orphan-detection expression. Missing/invalid expressions
+/// fail closed rather than silently matching nobody.
+fn custom_expression_matches(
+    expression: Option<&str>,
+    manager_id: Option<Uuid>,
+    user_id: Uuid,
+) -> Result<bool> {
+    let expression = expression
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            GovernanceError::Validation("Custom rules require a non-empty expression".to_string())
+        })?;
+
+    let mut ctx = EvalContext::new().with_attribute("user_id", user_id.to_string());
+    ctx = match manager_id {
+        Some(id) => ctx.with_attribute("manager_id", id.to_string()),
+        None => ctx.with_attribute("manager_id", serde_json::Value::Null),
+    };
+
+    eval_expression(expression, &ctx).map_err(|e| {
+        GovernanceError::Validation(format!("Invalid custom detection expression: {e}"))
+    })
 }
 
 /// Service for reconciliation operations.
@@ -284,10 +310,27 @@ impl ReconciliationService {
                     .unwrap_or(90) as i32;
                 Self::check_inactive_rule(pool, tenant_id, user, days_threshold).await
             }
-            xavyo_db::DetectionRuleType::Custom => {
-                // Custom rules not implemented yet
-                Ok(None)
-            }
+            xavyo_db::DetectionRuleType::Custom => Self::check_custom_rule(user, rule),
+        }
+    }
+
+    /// Evaluate a custom detection expression against the user.
+    ///
+    /// A missing or invalid expression is an error (fail closed), not a skip.
+    /// Matches are recorded as `HrMismatch` — the closest stored reason until
+    /// a dedicated custom enum value exists.
+    fn check_custom_rule(
+        user: &UserInfo,
+        rule: &GovDetectionRule,
+    ) -> Result<Option<DetectionReason>> {
+        if custom_expression_matches(
+            rule.parameters.get("expression").and_then(|v| v.as_str()),
+            user.manager_id,
+            user.id,
+        )? {
+            Ok(Some(DetectionReason::HrMismatch))
+        } else {
+            Ok(None)
         }
     }
 
@@ -975,6 +1018,33 @@ mod tests {
         assert!(
             production.contains("last_activity_at("),
             "inactivity must use last login or created_at"
+        );
+    }
+
+    #[test]
+    fn custom_rules_evaluate_expression_instead_of_skipping() {
+        assert!(
+            custom_expression_matches(Some("manager_id = NULL"), None, Uuid::new_v4()).unwrap()
+        );
+        assert!(!custom_expression_matches(
+            Some("manager_id = NULL"),
+            Some(Uuid::new_v4()),
+            Uuid::new_v4()
+        )
+        .unwrap());
+        assert!(custom_expression_matches(None, None, Uuid::new_v4()).is_err());
+        assert!(custom_expression_matches(Some("   "), None, Uuid::new_v4()).is_err());
+        assert!(custom_expression_matches(Some("not a filter"), None, Uuid::new_v4()).is_err());
+
+        let src = include_str!("reconciliation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("check_custom_rule(") && production.contains("eval_expression("),
+            "custom detection rules must evaluate their expression"
+        );
+        assert!(
+            !production.contains("Custom rules not implemented yet"),
+            "must not skip advertised custom detection rules"
         );
     }
 
