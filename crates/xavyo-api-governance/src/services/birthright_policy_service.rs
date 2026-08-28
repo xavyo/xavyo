@@ -660,15 +660,18 @@ impl BirthrightPolicyService {
             .collect();
 
         // Build entitlement impacts
-        let entitlement_impacts: Vec<EntitlementImpact> = entitlement_ids
-            .iter()
-            .map(|ent_id| EntitlementImpact {
+        let mut entitlement_impacts = Vec::with_capacity(entitlement_ids.len());
+        for ent_id in &entitlement_ids {
+            let entitlement_name = GovEntitlement::find_by_id(&self.pool, tenant_id, *ent_id)
+                .await?
+                .map(|entitlement| entitlement.name);
+            entitlement_impacts.push(EntitlementImpact {
                 entitlement_id: *ent_id,
-                entitlement_name: None, // Would need to fetch from entitlement table
+                entitlement_name,
                 users_gaining: *entitlement_gaining.get(ent_id).unwrap_or(&0),
                 users_already_have: *entitlement_already_have.get(ent_id).unwrap_or(&0),
-            })
-            .collect();
+            });
+        }
 
         let is_truncated = summary.total_users_affected > request.max_affected_users;
 
@@ -837,6 +840,21 @@ mod tests {
             production.contains("parse_required(")
                 && !production.contains("unwrap_or(ConditionOperator::Equals)"),
             "unknown birthright operators must fail simulation, not match as Equals"
+        );
+    }
+
+    #[test]
+    fn impact_analysis_looks_up_entitlement_names() {
+        let src = include_str!("birthright_policy_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let impact = production
+            .split("entitlement_impacts")
+            .nth(1)
+            .expect("entitlement_impacts");
+        assert!(
+            production.contains("GovEntitlement::find_by_id")
+                && !impact.contains("entitlement_name: None"),
+            "birthright impact analysis must look up entitlement names"
         );
     }
 }
