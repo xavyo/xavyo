@@ -24,7 +24,7 @@ use uuid::Uuid;
 use xavyo_db::{
     set_tenant_context, AdminAction, AdminAuditLog, AdminPermission, AdminResourceType,
     AdminRoleTemplate, AssignmentFilter, AuditLogFilter, CategorySummary, CreateAssignment,
-    CreateAuditLogEntry, CreateRoleTemplate, UpdateRoleTemplate, UserAdminAssignment,
+    CreateAuditLogEntry, CreateRoleTemplate, UpdateRoleTemplate, User, UserAdminAssignment,
 };
 
 /// Cache TTL for permission checks (5 minutes).
@@ -581,21 +581,7 @@ impl DelegatedAdminService {
             "Created assignment"
         );
 
-        Ok(AssignmentResponse {
-            id: assignment.id,
-            user_id: assignment.user_id,
-            user_email: None,
-            user_name: None,
-            template_id: assignment.template_id,
-            template_name: Some(template.name),
-            scope_type: assignment.scope_type,
-            scope_value: assignment.scope_value,
-            assigned_by: assignment.assigned_by,
-            assigned_by_name: None,
-            assigned_at: assignment.assigned_at,
-            expires_at: assignment.expires_at,
-            revoked_at: assignment.revoked_at,
-        })
+        assignment_response(&self.pool, tenant_id, assignment, Some(template.name)).await
     }
 
     /// Get an assignment by ID.
@@ -619,21 +605,7 @@ impl DelegatedAdminService {
             .await
             .map_err(ApiAuthError::Database)?;
 
-        Ok(AssignmentResponse {
-            id: assignment.id,
-            user_id: assignment.user_id,
-            user_email: None,
-            user_name: None,
-            template_id: assignment.template_id,
-            template_name: template.map(|t| t.name),
-            scope_type: assignment.scope_type,
-            scope_value: assignment.scope_value,
-            assigned_by: assignment.assigned_by,
-            assigned_by_name: None,
-            assigned_at: assignment.assigned_at,
-            expires_at: assignment.expires_at,
-            revoked_at: assignment.revoked_at,
-        })
+        assignment_response(&self.pool, tenant_id, assignment, template.map(|t| t.name)).await
     }
 
     /// List assignments with optional filters.
@@ -670,21 +642,9 @@ impl DelegatedAdminService {
                 .await
                 .map_err(ApiAuthError::Database)?;
 
-            responses.push(AssignmentResponse {
-                id: a.id,
-                user_id: a.user_id,
-                user_email: None,
-                user_name: None,
-                template_id: a.template_id,
-                template_name: template.map(|t| t.name),
-                scope_type: a.scope_type,
-                scope_value: a.scope_value,
-                assigned_by: a.assigned_by,
-                assigned_by_name: None,
-                assigned_at: a.assigned_at,
-                expires_at: a.expires_at,
-                revoked_at: a.revoked_at,
-            });
+            responses.push(
+                assignment_response(&self.pool, tenant_id, a, template.map(|t| t.name)).await?,
+            );
         }
 
         Ok((responses, total))
@@ -969,23 +929,28 @@ impl DelegatedAdminService {
             .map_err(ApiAuthError::Database)?;
 
         Ok((
-            entries
-                .into_iter()
-                .map(|e| AuditLogEntryResponse {
-                    id: e.id,
-                    admin_user_id: e.admin_user_id,
-                    admin_user_email: None,
-                    admin_user_name: None,
-                    action: e.action,
-                    resource_type: e.resource_type,
-                    resource_id: e.resource_id,
-                    old_value: e.old_value,
-                    new_value: e.new_value,
-                    ip_address: e.ip_address,
-                    user_agent: e.user_agent,
-                    created_at: e.created_at,
-                })
-                .collect(),
+            {
+                let mut items = Vec::with_capacity(entries.len());
+                for e in entries {
+                    let (admin_user_email, admin_user_name) =
+                        user_email_and_name(&self.pool, tenant_id, e.admin_user_id).await?;
+                    items.push(AuditLogEntryResponse {
+                        id: e.id,
+                        admin_user_id: e.admin_user_id,
+                        admin_user_email,
+                        admin_user_name,
+                        action: e.action,
+                        resource_type: e.resource_type,
+                        resource_id: e.resource_id,
+                        old_value: e.old_value,
+                        new_value: e.new_value,
+                        ip_address: e.ip_address,
+                        user_agent: e.user_agent,
+                        created_at: e.created_at,
+                    });
+                }
+                items
+            },
             total,
         ))
     }
@@ -1002,6 +967,56 @@ pub(crate) fn session_revoke_result<T, E: std::fmt::Display>(result: Result<T, E
             Err(e)
         }
     }
+}
+
+fn user_display_name(display_name: Option<&str>, email: &str) -> String {
+    display_name
+        .filter(|name| !name.is_empty())
+        .unwrap_or(email)
+        .to_string()
+}
+
+async fn user_email_and_name(
+    pool: &PgPool,
+    tenant_id: Uuid,
+    user_id: Uuid,
+) -> Result<(Option<String>, Option<String>), ApiAuthError> {
+    Ok(User::find_by_id_in_tenant(pool, tenant_id, user_id)
+        .await
+        .map_err(ApiAuthError::Database)?
+        .map(|user| {
+            (
+                Some(user.email.clone()),
+                Some(user_display_name(user.display_name.as_deref(), &user.email)),
+            )
+        })
+        .unwrap_or((None, None)))
+}
+
+async fn assignment_response(
+    pool: &PgPool,
+    tenant_id: Uuid,
+    assignment: UserAdminAssignment,
+    template_name: Option<String>,
+) -> Result<AssignmentResponse, ApiAuthError> {
+    let (user_email, user_name) = user_email_and_name(pool, tenant_id, assignment.user_id).await?;
+    let (_, assigned_by_name) =
+        user_email_and_name(pool, tenant_id, assignment.assigned_by).await?;
+    Ok(AssignmentResponse {
+        id: assignment.id,
+        user_id: assignment.user_id,
+        user_email,
+        user_name,
+        template_id: assignment.template_id,
+        template_name,
+        scope_type: assignment.scope_type,
+        scope_value: assignment.scope_value,
+        assigned_by: assignment.assigned_by,
+        assigned_by_name,
+        assigned_at: assignment.assigned_at,
+        expires_at: assignment.expires_at,
+        revoked_at: assignment.revoked_at,
+    })
 }
 
 #[cfg(test)]
@@ -1115,6 +1130,20 @@ mod tests {
         assert!(
             production.contains("set_permissions(&self.pool, tenant_id,"),
             "template permission writes must pass tenant_id"
+        );
+    }
+
+    #[test]
+    fn assignment_and_audit_look_up_user_names() {
+        let src = include_str!("delegated_admin_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("assignment_response(")
+                && production.contains("user_email_and_name(")
+                && production.contains("find_by_id_in_tenant")
+                && !production.contains("user_name: None")
+                && !production.contains("admin_user_name: None"),
+            "delegated admin assignments and audit must look up user display names"
         );
     }
 }

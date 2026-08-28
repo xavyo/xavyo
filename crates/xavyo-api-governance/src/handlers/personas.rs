@@ -12,8 +12,8 @@ use validator::Validate;
 
 use xavyo_auth::JwtClaims;
 use xavyo_db::models::{
-    CreatePersonaArchetype, GovPersona, GovPersonaSession, PersonaArchetypeFilter, PersonaFilter,
-    UpdatePersona, UpdatePersonaArchetype, User,
+    CreatePersonaArchetype, GovPersona, GovPersonaArchetype, GovPersonaSession,
+    PersonaArchetypeFilter, PersonaFilter, UpdatePersona, UpdatePersonaArchetype, User,
 };
 
 use crate::error::{ApiGovernanceError, ApiResult};
@@ -46,6 +46,22 @@ async fn load_user_display_name(
     Ok(User::find_by_id_in_tenant(pool, tenant_id, user_id)
         .await?
         .map(|user| user_display_name(user.display_name.as_deref(), &user.email)))
+}
+
+async fn persona_response(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    persona: GovPersona,
+) -> ApiResult<PersonaResponse> {
+    let physical_user_name =
+        load_user_display_name(pool, tenant_id, persona.physical_user_id).await?;
+    let archetype_name = GovPersonaArchetype::find_by_id(pool, tenant_id, persona.archetype_id)
+        .await?
+        .map(|archetype| archetype.name);
+    let mut response = PersonaResponse::from(persona);
+    response.physical_user_name = physical_user_name;
+    response.archetype_name = archetype_name;
+    Ok(response)
 }
 
 // ============================================================================
@@ -485,7 +501,10 @@ pub async fn list_personas(
         .list(tenant_id, &filter, limit, offset)
         .await?;
 
-    let items = personas.into_iter().map(PersonaResponse::from).collect();
+    let mut items = Vec::with_capacity(personas.len());
+    for persona in personas {
+        items.push(persona_response(state.pool(), tenant_id, persona).await?);
+    }
 
     Ok(Json(PersonaListResponse {
         items,
@@ -557,7 +576,10 @@ pub async fn create_persona(
         )
         .await?;
 
-    Ok((StatusCode::CREATED, Json(PersonaResponse::from(persona))))
+    Ok((
+        StatusCode::CREATED,
+        Json(persona_response(state.pool(), tenant_id, persona).await?),
+    ))
 }
 
 /// Get a persona by ID.
@@ -594,7 +616,7 @@ pub async fn get_persona(
         .map_err(|e| ApiGovernanceError::Validation(e.to_string()))?;
 
     let response = PersonaDetailResponse {
-        base: PersonaResponse::from(persona),
+        base: persona_response(state.pool(), tenant_id, persona).await?,
         attributes: PersonaAttributesResponse::from(attrs),
         entitlements: None,
         physical_user: None,
@@ -655,7 +677,9 @@ pub async fn update_persona(
 
     let persona = state.persona_service.update(tenant_id, id, input).await?;
 
-    Ok(Json(PersonaResponse::from(persona)))
+    Ok(Json(
+        persona_response(state.pool(), tenant_id, persona).await?,
+    ))
 }
 
 /// Activate a persona.
@@ -694,7 +718,9 @@ pub async fn activate_persona(
         .log_persona_activated(tenant_id, actor_id, id, None)
         .await?;
 
-    Ok(Json(PersonaResponse::from(persona)))
+    Ok(Json(
+        persona_response(state.pool(), tenant_id, persona).await?,
+    ))
 }
 
 /// Deactivate a persona.
@@ -741,7 +767,9 @@ pub async fn deactivate_persona(
         .log_persona_deactivated(tenant_id, actor_id, id, &request.reason)
         .await?;
 
-    Ok(Json(PersonaResponse::from(persona)))
+    Ok(Json(
+        persona_response(state.pool(), tenant_id, persona).await?,
+    ))
 }
 
 /// Archive a persona.
@@ -788,7 +816,9 @@ pub async fn archive_persona(
         .log_persona_archived(tenant_id, actor_id, id, &request.reason)
         .await?;
 
-    Ok(Json(PersonaResponse::from(persona)))
+    Ok(Json(
+        persona_response(state.pool(), tenant_id, persona).await?,
+    ))
 }
 
 /// Propagate attributes from physical user to persona.
@@ -886,7 +916,13 @@ pub async fn get_user_personas(
     let response = UserPersonasResponse {
         physical_user_id: user_id,
         physical_user_name,
-        personas: personas.into_iter().map(PersonaResponse::from).collect(),
+        personas: {
+            let mut items = Vec::with_capacity(personas.len());
+            for persona in personas {
+                items.push(persona_response(state.pool(), tenant_id, persona).await?);
+            }
+            items
+        },
         active_persona_id,
     };
 
@@ -1114,7 +1150,7 @@ pub async fn get_current_context(
     let response = if let Some(info) = context_info {
         let active_persona = if let Some(persona_id) = info.persona_id {
             let persona = state.persona_service.get(tenant_id, persona_id).await?;
-            Some(PersonaResponse::from(persona))
+            Some(persona_response(state.pool(), tenant_id, persona).await?)
         } else {
             None
         };
@@ -1291,7 +1327,7 @@ pub async fn extend_persona(
         } else {
             ExtensionStatus::Approved
         },
-        persona: Some(persona.into()),
+        persona: Some(persona_response(state.pool(), tenant_id, persona).await?),
         approval_request_id: None,
     }))
 }
@@ -1497,6 +1533,27 @@ mod tests {
     }
 
     #[test]
+    fn persona_responses_look_up_user_and_archetype_names() {
+        let src = include_str!("personas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("persona_response(")
+                && production.contains("GovPersonaArchetype::find_by_id")
+                && production.contains("load_user_display_name("),
+            "persona GET/list/create must look up physical_user_name and archetype_name"
+        );
+        let list = production
+            .split("pub async fn list_personas")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_personas");
+        assert!(
+            list.contains("persona_response(") && !list.contains("map(PersonaResponse::from)"),
+            "GET /governance/personas must not return From-impl empty names"
+        );
+    }
+
+    #[test]
     fn context_sessions_list_uses_count_not_page_length() {
         let src = include_str!("personas.rs");
         let production = src.split("mod tests").next().expect("production source");
@@ -1585,7 +1642,7 @@ mod tests {
             propagate.contains("PropagateAttributesResponse")
                 && propagate.contains("attributes_updated")
                 && propagate.contains("persona_id: persona.id")
-                && !propagate.contains("Json(PersonaResponse::from(persona))"),
+                && !propagate.contains("Json(persona_response(state.pool(), tenant_id, persona).await?)"),
             "POST /governance/personas/{{id}}/propagate-attributes must return persona_id and attributes_updated"
         );
     }

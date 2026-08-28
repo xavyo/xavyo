@@ -6,7 +6,7 @@ use sqlx::PgPool;
 use std::collections::HashMap;
 use uuid::Uuid;
 use xavyo_db::{
-    CreateGovRoleParameter, GovEntitlementAssignment, GovParameterAuditEvent,
+    CreateGovRoleParameter, GovApplication, GovEntitlementAssignment, GovParameterAuditEvent,
     GovRoleAssignmentParameter, GovRoleParameter, ParameterAuditFilter, RoleParameterFilter,
     SetGovAssignmentParameter, UpdateGovRoleParameter,
 };
@@ -585,11 +585,16 @@ impl ParameterService {
                     })
                     .collect();
 
+                let application_name =
+                    GovApplication::find_by_id(&self.pool, tenant_id, ent.application_id)
+                        .await?
+                        .map(|app| app.name);
+
                 results.push(EffectiveEntitlementWithParams {
                     entitlement_id: ent.id,
                     entitlement_name: ent.name,
                     application_id: ent.application_id,
-                    application_name: None, // Could be enriched if needed
+                    application_name,
                     assignment_id: assignment.id,
                     source: "direct".to_string(),
                     is_parametric: !parameters.is_empty(),
@@ -823,6 +828,22 @@ mod tests {
         assert!(
             production.contains("parameter_json(") && !production.contains("unwrap_or_default()"),
             "parameter audit persist must fail closed on JSON serialize"
+        );
+    }
+
+    #[test]
+    fn effective_entitlements_look_up_application_name() {
+        let src = include_str!("parameter_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let effective = production
+            .split("pub async fn get_effective_entitlements_with_params")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_effective_entitlements_with_params");
+        assert!(
+            effective.contains("GovApplication::find_by_id")
+                && !effective.contains("application_name: None"),
+            "effective entitlements with params must look up application_name"
         );
     }
 }
