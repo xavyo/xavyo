@@ -274,7 +274,7 @@ pub async fn update_identity_correlation_rule(
             .map(|w| f64_to_decimal(w, "weight"))
             .transpose()?,
         is_active: request.is_active,
-        priority: None,
+        priority: request.priority,
         source_attribute: None,
         target_attribute: None,
         expression: None,
@@ -347,6 +347,21 @@ mod tests {
         assert!(
             !production.contains("unwrap_or_default()"),
             "correlation rule writes must not default invalid decimals"
+        );
+    }
+
+    #[test]
+    fn update_correlation_rule_applies_advertised_priority() {
+        let src = include_str!("identity_correlation_rules.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let update = production
+            .split("pub async fn update_identity_correlation_rule")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("update_identity_correlation_rule");
+        assert!(
+            update.contains("priority: request.priority") && !update.contains("priority: None"),
+            "PUT identity correlation rule must apply advertised priority"
         );
     }
 }

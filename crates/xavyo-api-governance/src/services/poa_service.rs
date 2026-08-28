@@ -9,8 +9,9 @@ use std::collections::HashSet;
 use uuid::Uuid;
 
 use xavyo_db::models::{
-    CreatePoaAssumedSession, CreatePoaAuditEvent, CreatePowerOfAttorney, PoaAssumedSession,
-    PoaAuditEvent, PoaAuditEventFilter, PoaEventType, PoaFilter, PoaStatus, PowerOfAttorney, User,
+    CreateGovDelegationScope, CreatePoaAssumedSession, CreatePoaAuditEvent, CreatePowerOfAttorney,
+    GovDelegationScope, PoaAssumedSession, PoaAuditEvent, PoaAuditEventFilter, PoaEventType,
+    PoaFilter, PoaStatus, PowerOfAttorney, User,
 };
 use xavyo_db::UserRole;
 use xavyo_governance::error::{GovernanceError, Result};
@@ -749,12 +750,24 @@ impl PoaService {
     /// Create or find an existing delegation scope.
     async fn create_or_find_scope(
         &self,
-        _tenant_id: Uuid,
-        _scope_request: &PoaScopeRequest,
+        tenant_id: Uuid,
+        scope_request: &PoaScopeRequest,
     ) -> Result<Option<Uuid>> {
-        // For now, we reuse the GovDelegationScope from F053
-        // This will be implemented when scope handling is added (T056-T060)
-        Ok(None)
+        if scope_request.application_ids.is_empty() && scope_request.workflow_types.is_empty() {
+            return Ok(None);
+        }
+        let created = GovDelegationScope::create(
+            &self.pool,
+            tenant_id,
+            CreateGovDelegationScope {
+                application_ids: Some(scope_request.application_ids.clone()),
+                entitlement_ids: None,
+                role_ids: None,
+                workflow_types: Some(scope_request.workflow_types.clone()),
+            },
+        )
+        .await?;
+        Ok(Some(created.id))
     }
 
     /// Create an audit event for PoA operations.
@@ -765,9 +778,10 @@ impl PoaService {
         actor_id: Uuid,
         affected_user_id: Option<Uuid>,
         event_type: PoaEventType,
-        _reason: Option<&str>,
+        reason: Option<&str>,
         details: Option<serde_json::Value>,
     ) -> Result<PoaAuditEvent> {
+        let details = audit_details_with_reason(reason, details);
         let event = CreatePoaAuditEvent {
             poa_id,
             event_type,
@@ -789,6 +803,25 @@ impl PoaService {
         );
 
         Ok(audit_event)
+    }
+}
+
+fn audit_details_with_reason(
+    reason: Option<&str>,
+    details: Option<serde_json::Value>,
+) -> Option<serde_json::Value> {
+    match (reason, details) {
+        (Some(reason), Some(serde_json::Value::Object(mut map))) => {
+            map.entry("reason".to_string())
+                .or_insert_with(|| serde_json::Value::String(reason.to_string()));
+            Some(serde_json::Value::Object(map))
+        }
+        (Some(reason), Some(other)) => Some(serde_json::json!({
+            "reason": reason,
+            "details": other,
+        })),
+        (Some(reason), None) => Some(serde_json::json!({ "reason": reason })),
+        (None, details) => details,
     }
 }
 
@@ -868,5 +901,38 @@ mod tests {
             admin.contains("count_by_tenant(") && !admin.contains("events.len() as i64"),
             "admin PoA audit list must report the filtered total, not the page length"
         );
+    }
+
+    #[test]
+    fn grant_persists_requested_scope_and_audit_reason() {
+        let src = include_str!("poa_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let grant = production
+            .split("pub async fn grant_poa")
+            .nth(1)
+            .and_then(|s| s.split("    pub async fn ").next())
+            .expect("grant_poa");
+        assert!(
+            grant.contains("create_or_find_scope("),
+            "POST PoA grant must persist advertised scope"
+        );
+        let scope = production
+            .split("async fn create_or_find_scope")
+            .nth(1)
+            .and_then(|s| s.split("    async fn ").next())
+            .expect("create_or_find_scope");
+        assert!(
+            scope.contains("GovDelegationScope::create")
+                && scope.contains("application_ids")
+                && !scope.contains("This will be implemented"),
+            "PoA scope must be stored, not silently dropped"
+        );
+        assert!(
+            production.contains("audit_details_with_reason(")
+                && !production.contains("_reason: Option<&str>"),
+            "PoA audit events must persist the submitted reason"
+        );
+        let details = audit_details_with_reason(Some("vacation"), None);
+        assert_eq!(details.unwrap()["reason"], "vacation");
     }
 }
