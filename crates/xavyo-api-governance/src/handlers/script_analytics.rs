@@ -114,7 +114,7 @@ pub async fn get_script_analytics(
         total_executions: data.total_executions,
         success_rate: data.success_rate,
         avg_duration_ms: data.avg_duration_ms,
-        p95_duration_ms: 0.0, // p95 not yet computed by the analytics service
+        p95_duration_ms: data.p95_duration_ms,
         daily_trends: data
             .daily_trends
             .into_iter()
@@ -396,6 +396,20 @@ mod tests {
             production.contains("parse_optional_datetime(")
                 && !production.contains("parse::<chrono::DateTime<chrono::Utc>>().ok()"),
             "invalid execution-log dates must be 400, not an unfiltered list"
+        );
+    }
+
+    #[test]
+    fn script_analytics_uses_computed_p95() {
+        let src = include_str!("script_analytics.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("p95_duration_ms: data.p95_duration_ms"),
+            "p95 must come from the analytics service"
+        );
+        assert!(
+            !production.contains("p95_duration_ms: 0.0"),
+            "must not advertise a hardcoded p95 of 0.0"
         );
     }
 }

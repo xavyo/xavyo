@@ -231,8 +231,27 @@ pub fn create_provider(
 use sqlx::PgPool;
 use xavyo_db::{
     CreateExternalTicket, GovApplication, GovEntitlement, GovExternalTicket,
-    GovManualProvisioningTask, ManualTaskStatus, TicketStatusCategory,
+    GovManualProvisioningTask, ManualTaskStatus, TicketStatusCategory, User,
 };
+
+/// Prefer a non-empty display name, then email, then the user id.
+pub(crate) fn ticket_user_display_name(
+    display_name: Option<&str>,
+    email: &str,
+    user_id: Uuid,
+) -> String {
+    display_name
+        .filter(|name| !name.is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            if email.is_empty() {
+                None
+            } else {
+                Some(email.to_string())
+            }
+        })
+        .unwrap_or_else(|| user_id.to_string())
+}
 
 /// Service for orchestrating ticket creation and management.
 pub struct TicketingService {
@@ -326,6 +345,9 @@ impl TicketingService {
         // Create the provider
         let provider = create_provider(&config, &decrypted_creds)?;
 
+        let (user_display_name, user_email) =
+            ticket_user_identity(&self.pool, tenant_id, task.user_id).await?;
+
         // Update task status to pending_ticket
         GovManualProvisioningTask::update_status(
             &self.pool,
@@ -348,13 +370,13 @@ impl TicketingService {
                 Operation: {:?}\n\
                 Application: {}\n\
                 Entitlement: {}\n\
-                User ID: {}\n\n\
+                User: {}\n\n\
                 Please complete the provisioning and update the ticket status when done.",
-                task.operation_type, application.name, entitlement.name, task.user_id
+                task.operation_type, application.name, entitlement.name, user_display_name
             ),
-            priority: 3,                                 // Medium priority
-            user_display_name: task.user_id.to_string(), // TODO: Look up user name
-            user_email: None,
+            priority: 3, // Medium priority
+            user_display_name,
+            user_email,
             application_name: application.name.clone(),
             entitlement_name: entitlement.name.clone(),
             operation_type: format!("{:?}", task.operation_type),
@@ -407,6 +429,25 @@ impl TicketingService {
     }
 }
 
+/// Resolve the task subject's display name and email. A lookup failure is an
+/// error — tickets must not ship with a UUID masquerading as a name.
+async fn ticket_user_identity(
+    pool: &PgPool,
+    tenant_id: Uuid,
+    user_id: Uuid,
+) -> TicketingResult<(String, Option<String>)> {
+    match User::find_by_id_in_tenant(pool, tenant_id, user_id)
+        .await
+        .map_err(|e| TicketingError::InvalidConfiguration(format!("Database error: {e}")))?
+    {
+        Some(user) => Ok((
+            ticket_user_display_name(user.display_name.as_deref(), &user.email, user_id),
+            Some(user.email),
+        )),
+        None => Ok((user_id.to_string(), None)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -441,5 +482,46 @@ mod tests {
     fn not_supported_is_not_success() {
         let err = TicketingError::NotSupported("comments".into());
         assert!(err.to_string().contains("comments"));
+    }
+
+    #[test]
+    fn ticket_user_display_name_prefers_non_empty_display_name() {
+        let user_id = Uuid::new_v4();
+        assert_eq!(
+            ticket_user_display_name(Some("Ada"), "ada@example.com", user_id),
+            "Ada"
+        );
+        assert_eq!(
+            ticket_user_display_name(Some(""), "ada@example.com", user_id),
+            "ada@example.com"
+        );
+        assert_eq!(
+            ticket_user_display_name(None, "ada@example.com", user_id),
+            "ada@example.com"
+        );
+        assert_eq!(
+            ticket_user_display_name(None, "", user_id),
+            user_id.to_string()
+        );
+    }
+
+    #[test]
+    fn create_ticket_looks_up_user_identity() {
+        let src = include_str!("mod.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("ticket_user_identity(")
+                && production.contains("find_by_id_in_tenant")
+                && production.contains("ticket_user_display_name("),
+            "ticket creation must look up the subject's display name and email"
+        );
+        assert!(
+            !production.contains("user_display_name: task.user_id.to_string()"),
+            "must not advertise a UUID as the ticket user display name"
+        );
+        assert!(
+            !production.contains("user_email: None,"),
+            "must not drop the subject's email on ticket create"
+        );
     }
 }
