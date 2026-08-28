@@ -15,22 +15,148 @@ use validator::Validate;
 use xavyo_auth::JwtClaims;
 use xavyo_db::{
     CreateGovMetaRole, CreateGovMetaRoleConstraint, CreateGovMetaRoleCriteria,
-    CreateGovMetaRoleEntitlement, MetaRoleFilter, UpdateGovMetaRole,
+    CreateGovMetaRoleEntitlement, GovApplication, GovEntitlement, GovMetaRole, GovMetaRoleConflict,
+    GovMetaRoleEntitlement, GovMetaRoleInheritance, GovRiskLevel, MetaRoleFilter,
+    UpdateGovMetaRole,
 };
 
 use crate::error::{ApiGovernanceError, ApiResult};
 use crate::models::{
     AddMetaRoleConstraintRequest, AddMetaRoleEntitlementRequest, CascadeFailure,
-    CascadeStatusResponse, ConflictListResponse, ConflictResponse, CreateMetaRoleRequest,
-    EventListResponse, EventResponse, EventStatsResponse, InheritanceListResponse,
-    InheritanceResponse, ListConflictsQuery, ListEventsQuery, ListInheritancesQuery,
-    ListMetaRolesQuery, MetaRoleConstraintResponse, MetaRoleCriteriaResponse,
-    MetaRoleEntitlementResponse, MetaRoleListResponse, MetaRoleResponse, MetaRoleStatsResponse,
+    CascadeStatusResponse, ChildRoleSummary, ConflictListResponse, ConflictResponse,
+    CreateMetaRoleRequest, EventListResponse, EventResponse, EventStatsResponse,
+    InheritanceListResponse, InheritanceResponse, ListConflictsQuery, ListEventsQuery,
+    ListInheritancesQuery, ListMetaRolesQuery, MetaRoleConstraintResponse,
+    MetaRoleCriteriaResponse, MetaRoleEntitlementResponse, MetaRoleEntitlementSummary,
+    MetaRoleListResponse, MetaRoleResponse, MetaRoleStatsResponse, MetaRoleSummary,
     MetaRoleWithDetailsResponse, ResolveConflictRequest, RoleMatchResponse,
     SimulateMetaRoleRequest, SimulationResultResponse, TriggerCascadeRequest,
     UpdateMetaRoleRequest,
 };
 use crate::router::GovernanceState;
+
+fn entitlement_risk_level(level: GovRiskLevel) -> String {
+    match level {
+        GovRiskLevel::Low => "low",
+        GovRiskLevel::Medium => "medium",
+        GovRiskLevel::High => "high",
+        GovRiskLevel::Critical => "critical",
+    }
+    .to_string()
+}
+
+async fn entitlement_summary(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    entitlement_id: Uuid,
+) -> ApiResult<Option<MetaRoleEntitlementSummary>> {
+    let Some(entitlement) = GovEntitlement::find_by_id(pool, tenant_id, entitlement_id).await?
+    else {
+        return Ok(None);
+    };
+    let application_name = GovApplication::find_by_id(pool, tenant_id, entitlement.application_id)
+        .await?
+        .map(|app| app.name);
+    Ok(Some(MetaRoleEntitlementSummary {
+        id: entitlement.id,
+        name: entitlement.name,
+        application_id: entitlement.application_id,
+        application_name,
+        risk_level: Some(entitlement_risk_level(entitlement.risk_level)),
+    }))
+}
+
+async fn meta_role_entitlement_response(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    entitlement: GovMetaRoleEntitlement,
+) -> ApiResult<MetaRoleEntitlementResponse> {
+    let summary = entitlement_summary(pool, tenant_id, entitlement.entitlement_id).await?;
+    Ok(MetaRoleEntitlementResponse {
+        id: entitlement.id,
+        meta_role_id: entitlement.meta_role_id,
+        entitlement_id: entitlement.entitlement_id,
+        permission_type: entitlement.permission_type,
+        created_at: entitlement.created_at,
+        entitlement: summary,
+    })
+}
+
+async fn meta_role_summary(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    meta_role_id: Uuid,
+) -> ApiResult<Option<MetaRoleSummary>> {
+    Ok(GovMetaRole::find_by_id(pool, tenant_id, meta_role_id)
+        .await?
+        .map(|meta_role| MetaRoleSummary {
+            id: meta_role.id,
+            name: meta_role.name,
+            priority: meta_role.priority,
+            status: meta_role.status,
+        }))
+}
+
+async fn child_role_summary(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    role_id: Uuid,
+) -> ApiResult<Option<ChildRoleSummary>> {
+    let Some(entitlement) = GovEntitlement::find_by_id(pool, tenant_id, role_id).await? else {
+        return Ok(None);
+    };
+    let application_name = GovApplication::find_by_id(pool, tenant_id, entitlement.application_id)
+        .await?
+        .map(|app| app.name);
+    Ok(Some(ChildRoleSummary {
+        id: entitlement.id,
+        name: entitlement.name,
+        application_id: Some(entitlement.application_id),
+        application_name,
+    }))
+}
+
+async fn inheritance_response(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    inheritance: GovMetaRoleInheritance,
+) -> ApiResult<InheritanceResponse> {
+    let mut response = InheritanceResponse::from(inheritance);
+    response.meta_role = meta_role_summary(pool, tenant_id, response.meta_role_id).await?;
+    response.child_role = child_role_summary(pool, tenant_id, response.child_role_id).await?;
+    Ok(response)
+}
+
+async fn conflict_response(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    conflict: GovMetaRoleConflict,
+) -> ApiResult<ConflictResponse> {
+    let mut response = ConflictResponse::from(conflict);
+    response.meta_role_a = meta_role_summary(pool, tenant_id, response.meta_role_a_id).await?;
+    response.meta_role_b = meta_role_summary(pool, tenant_id, response.meta_role_b_id).await?;
+    response.affected_role = child_role_summary(pool, tenant_id, response.affected_role_id).await?;
+    Ok(response)
+}
+
+async fn unresolved_conflict_count(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    meta_role_id: Uuid,
+) -> ApiResult<i64> {
+    Ok(sqlx::query_scalar(
+        r"
+        SELECT COUNT(*) FROM gov_meta_role_conflicts
+        WHERE tenant_id = $1
+          AND resolution_status = 'unresolved'
+          AND (meta_role_a_id = $2 OR meta_role_b_id = $2)
+        ",
+    )
+    .bind(tenant_id)
+    .bind(meta_role_id)
+    .fetch_one(pool)
+    .await?)
+}
 
 // ============================================================================
 // Meta-Role CRUD Operations
@@ -182,23 +308,25 @@ pub async fn get_meta_role(
         .list_constraints(tenant_id, id)
         .await?;
 
+    let mut entitlement_items = Vec::with_capacity(entitlements.len());
+    for entitlement in entitlements {
+        entitlement_items
+            .push(meta_role_entitlement_response(state.pool(), tenant_id, entitlement).await?);
+    }
+    let active_inheritances =
+        GovMetaRoleInheritance::count_active_by_meta_role(state.pool(), tenant_id, id).await?;
+    let unresolved_conflicts = unresolved_conflict_count(state.pool(), tenant_id, id).await?;
+    let criteria_count = i64::try_from(criteria.len()).unwrap_or(i64::MAX);
+    let entitlements_count = i64::try_from(entitlement_items.len()).unwrap_or(i64::MAX);
+    let constraints_count = i64::try_from(constraints.len()).unwrap_or(i64::MAX);
+
     Ok(Json(MetaRoleWithDetailsResponse {
         meta_role: MetaRoleResponse::from(meta_role),
         criteria: criteria
             .into_iter()
             .map(MetaRoleCriteriaResponse::from)
             .collect(),
-        entitlements: entitlements
-            .into_iter()
-            .map(|e| MetaRoleEntitlementResponse {
-                id: e.id,
-                meta_role_id: e.meta_role_id,
-                entitlement_id: e.entitlement_id,
-                permission_type: e.permission_type,
-                created_at: e.created_at,
-                entitlement: None,
-            })
-            .collect(),
+        entitlements: entitlement_items,
         constraints: constraints
             .into_iter()
             .map(|c| MetaRoleConstraintResponse {
@@ -209,7 +337,13 @@ pub async fn get_meta_role(
                 created_at: c.created_at,
             })
             .collect(),
-        stats: None,
+        stats: Some(MetaRoleStatsResponse {
+            active_inheritances,
+            unresolved_conflicts,
+            criteria_count,
+            entitlements_count,
+            constraints_count,
+        }),
     }))
 }
 
@@ -505,14 +639,9 @@ pub async fn add_entitlement(
         .add_entitlement(tenant_id, id, input)
         .await?;
 
-    Ok(Json(MetaRoleEntitlementResponse {
-        id: result.id,
-        meta_role_id: result.meta_role_id,
-        entitlement_id: result.entitlement_id,
-        permission_type: result.permission_type,
-        created_at: result.created_at,
-        entitlement: None,
-    }))
+    meta_role_entitlement_response(state.pool(), tenant_id, result)
+        .await
+        .map(Json)
 }
 
 /// Remove an entitlement from a meta-role.
@@ -740,10 +869,10 @@ pub async fn list_inheritances(
         .meta_role_matching_service
         .count_inheritances_by_meta_role(tenant_id, id, query.status)
         .await?;
-    let items: Vec<InheritanceResponse> = inheritances
-        .into_iter()
-        .map(InheritanceResponse::from)
-        .collect();
+    let mut items = Vec::with_capacity(inheritances.len());
+    for inheritance in inheritances {
+        items.push(inheritance_response(state.pool(), tenant_id, inheritance).await?);
+    }
 
     Ok(Json(InheritanceListResponse {
         items,
@@ -828,7 +957,10 @@ pub async fn list_conflicts(
         .list_conflicts(tenant_id, query.resolution_status, limit, offset)
         .await?;
 
-    let items: Vec<ConflictResponse> = conflicts.into_iter().map(ConflictResponse::from).collect();
+    let mut items = Vec::with_capacity(conflicts.len());
+    for conflict in conflicts {
+        items.push(conflict_response(state.pool(), tenant_id, conflict).await?);
+    }
 
     Ok(Json(ConflictListResponse {
         items,
@@ -921,7 +1053,9 @@ pub async fn resolve_conflict(
         }
     };
 
-    Ok(Json(ConflictResponse::from(resolved_conflict)))
+    conflict_response(state.pool(), tenant_id, resolved_conflict)
+        .await
+        .map(Json)
 }
 
 // ============================================================================
@@ -1238,6 +1372,64 @@ mod tests {
             list.contains("count_inheritances_by_meta_role(")
                 && !list.contains("inheritances.len() as i64"),
             "GET /governance/meta-roles/{{id}}/inheritances must report the filtered total, not the page length"
+        );
+    }
+
+    #[test]
+    fn meta_role_details_look_up_nested_summaries() {
+        let src = include_str!("meta_roles.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let get = production
+            .split("pub async fn get_meta_role")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_meta_role");
+        assert!(
+            get.contains("meta_role_entitlement_response(")
+                && get.contains("count_active_by_meta_role(")
+                && get.contains("unresolved_conflict_count(")
+                && !get.contains("entitlement: None")
+                && !get.contains("stats: None"),
+            "GET /governance/meta-roles/{{id}} must look up entitlement summaries and stats"
+        );
+        let add = production
+            .split("pub async fn add_entitlement")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("add_entitlement");
+        assert!(
+            add.contains("meta_role_entitlement_response(") && !add.contains("entitlement: None"),
+            "POST /governance/meta-roles/{{id}}/entitlements must look up entitlement summary"
+        );
+        let inherit = production
+            .split("pub async fn list_inheritances")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_inheritances");
+        assert!(
+            inherit.contains("inheritance_response(")
+                && !inherit.contains(".map(InheritanceResponse::from)"),
+            "GET inheritances must look up meta_role and child_role summaries"
+        );
+        let conflicts = production
+            .split("pub async fn list_conflicts")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_conflicts");
+        assert!(
+            conflicts.contains("conflict_response(")
+                && !conflicts.contains(".map(ConflictResponse::from)"),
+            "GET conflicts must look up meta-role and affected role summaries"
+        );
+        let resolve = production
+            .split("pub async fn resolve_conflict")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("resolve_conflict");
+        assert!(
+            resolve.contains("conflict_response(")
+                && !resolve.contains("ConflictResponse::from(resolved_conflict)"),
+            "POST resolve conflict must look up nested role summaries"
         );
     }
 }
