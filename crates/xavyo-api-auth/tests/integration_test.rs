@@ -97,43 +97,29 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
             fixture.cleanup().await;
         }
 
-        /// T019: Test weak password rejection
+        /// T019: Weak passwords are rejected by the shared validator used by
+        /// register handlers before calling `AuthService::register`.
         #[tokio::test]
         async fn test_weak_password_rejection() {
-            let fixture = TestFixture::new().await;
-            let auth_service = AuthService::new(fixture.pool.clone());
+            use xavyo_api_auth::validate_password;
 
-            let email = valid_test_email();
+            let short = validate_password(invalid_test_password_short());
+            assert!(!short.is_valid, "short password should be rejected");
+            assert!(!short.errors.is_empty());
 
-            // Too short
-            let result = auth_service
-                .register(fixture.tenant_id, &email, invalid_test_password_short())
-                .await;
-            assert!(result.is_err());
-            match result.unwrap_err() {
-                xavyo_api_auth::ApiAuthError::WeakPassword(errors) => {
-                    assert!(!errors.is_empty());
-                }
-                other => panic!("Expected WeakPassword error, got {:?}", other),
-            }
+            let no_special = validate_password(invalid_test_password_no_special());
+            assert!(!no_special.is_valid, "password without special should be rejected");
+            assert!(
+                no_special
+                    .errors
+                    .iter()
+                    .any(|e| e.to_string().to_lowercase().contains("special")),
+                "expected a special-character error, got {:?}",
+                no_special.errors
+            );
 
-            // Missing special char
-            let result = auth_service
-                .register(
-                    fixture.tenant_id,
-                    &email,
-                    invalid_test_password_no_special(),
-                )
-                .await;
-            assert!(result.is_err());
-            match result.unwrap_err() {
-                xavyo_api_auth::ApiAuthError::WeakPassword(errors) => {
-                    assert!(errors.iter().any(|e| e.contains("special")));
-                }
-                other => panic!("Expected WeakPassword error, got {:?}", other),
-            }
-
-            fixture.cleanup().await;
+            let valid = validate_password(valid_test_password());
+            assert!(valid.is_valid, "valid test password should pass");
         }
 
         /// T020: Test invalid email rejection
