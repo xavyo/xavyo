@@ -67,6 +67,26 @@ async fn load_persona_user_summary(
         }))
 }
 
+async fn persona_audit_event_response(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    event: xavyo_db::models::GovPersonaAuditEvent,
+) -> ApiResult<PersonaAuditEventResponse> {
+    let mut response = PersonaAuditEventResponse::from(event);
+    if let Some(persona_id) = response.persona_id {
+        response.persona_name = GovPersona::find_by_id(pool, tenant_id, persona_id)
+            .await?
+            .map(|persona| persona.persona_name);
+    }
+    if let Some(archetype_id) = response.archetype_id {
+        response.archetype_name = GovPersonaArchetype::find_by_id(pool, tenant_id, archetype_id)
+            .await?
+            .map(|archetype| archetype.name);
+    }
+    response.actor_name = load_user_display_name(pool, tenant_id, response.actor_id).await?;
+    Ok(response)
+}
+
 async fn persona_response(
     pool: &sqlx::PgPool,
     tenant_id: Uuid,
@@ -1020,10 +1040,10 @@ pub async fn list_audit_events(
         .list(tenant_id, &filter, limit, offset)
         .await?;
 
-    let items = events
-        .into_iter()
-        .map(PersonaAuditEventResponse::from)
-        .collect();
+    let mut items = Vec::with_capacity(events.len());
+    for event in events {
+        items.push(persona_audit_event_response(state.pool(), tenant_id, event).await?);
+    }
 
     Ok(Json(PersonaAuditListResponse {
         items,
@@ -1073,11 +1093,13 @@ pub async fn get_persona_audit(
         .list_for_persona(tenant_id, id, limit, offset)
         .await?;
 
+    let mut items = Vec::with_capacity(events.len());
+    for event in events {
+        items.push(persona_audit_event_response(state.pool(), tenant_id, event).await?);
+    }
+
     Ok(Json(PersonaAuditListResponse {
-        items: events
-            .into_iter()
-            .map(PersonaAuditEventResponse::from)
-            .collect(),
+        items,
         total,
         limit,
         offset,
@@ -1570,6 +1592,21 @@ mod tests {
                 && audit.contains("let (events, total)")
                 && !audit.contains("events.len() as i64"),
             "GET /governance/personas/{{id}}/audit must report the filtered total, not the page length"
+        );
+        assert!(
+            audit.contains("persona_audit_event_response(")
+                && !audit.contains("PersonaAuditEventResponse::from"),
+            "GET /governance/personas/{{id}}/audit must look up persona, archetype, and actor names"
+        );
+        let list = production
+            .split("pub async fn list_audit_events")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_audit_events");
+        assert!(
+            list.contains("persona_audit_event_response(")
+                && !list.contains("PersonaAuditEventResponse::from"),
+            "GET /governance/persona-audit must look up persona, archetype, and actor names"
         );
     }
 

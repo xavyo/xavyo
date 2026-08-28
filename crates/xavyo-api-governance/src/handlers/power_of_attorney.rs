@@ -12,7 +12,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use xavyo_auth::JwtClaims;
-use xavyo_db::models::{PoaStatus, User};
+use xavyo_db::models::{GovDelegationScope, PoaStatus, User};
 
 use crate::error::{ApiGovernanceError, ApiResult};
 use xavyo_db::models::{PoaAuditEventFilter, PoaEventType as DbPoaEventType};
@@ -20,7 +20,7 @@ use xavyo_db::models::{PoaAuditEventFilter, PoaEventType as DbPoaEventType};
 use crate::models::power_of_attorney::{
     AdminListPoaQuery, AssumeIdentityResponse, CurrentAssumptionResponse, DropIdentityResponse,
     ExtendPoaRequest, GrantPoaRequest, ListPoaAuditQuery, ListPoaQuery, PoaAuditEventResponse,
-    PoaAuditListResponse, PoaListResponse, PoaResponse, RevokePoaRequest,
+    PoaAuditListResponse, PoaListResponse, PoaResponse, PoaScopeResponse, RevokePoaRequest,
 };
 use crate::router::GovernanceState;
 
@@ -40,6 +40,22 @@ async fn load_user_display_name(
     Ok(User::find_by_id_in_tenant(pool, tenant_id, user_id)
         .await?
         .map(|user| user_display_name(user.display_name.as_deref(), &user.email)))
+}
+
+async fn load_poa_scope(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    scope_id: Option<Uuid>,
+) -> ApiResult<Option<PoaScopeResponse>> {
+    let Some(scope_id) = scope_id else {
+        return Ok(None);
+    };
+    Ok(GovDelegationScope::find_by_id(pool, tenant_id, scope_id)
+        .await?
+        .map(|scope| PoaScopeResponse {
+            application_ids: scope.application_ids,
+            workflow_types: scope.workflow_types,
+        }))
 }
 
 /// Grant a Power of Attorney.
@@ -464,6 +480,7 @@ pub async fn get_current_assumption(
     match assumption {
         Some((session, poa)) => {
             let donor_name = load_user_display_name(state.pool(), tenant_id, poa.donor_id).await?;
+            let scope = load_poa_scope(state.pool(), tenant_id, poa.scope_id).await?;
             Ok(Json(CurrentAssumptionResponse {
                 is_assuming: true,
                 poa_id: Some(poa.id),
@@ -471,7 +488,7 @@ pub async fn get_current_assumption(
                 donor_name,
                 session_id: Some(session.id),
                 assumed_at: Some(session.assumed_at),
-                scope: None,
+                scope,
             }))
         }
         None => Ok(Json(CurrentAssumptionResponse {
@@ -693,6 +710,10 @@ mod tests {
                 && current.contains("poa.donor_id")
                 && !current.contains("donor_name: None, // Would"),
             "GET /governance/power-of-attorney/current-assumption must look up the donor display name"
+        );
+        assert!(
+            current.contains("load_poa_scope(") && current.contains("poa.scope_id"),
+            "GET current-assumption must look up advertised PoA scope"
         );
     }
 }
