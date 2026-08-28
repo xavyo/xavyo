@@ -8,7 +8,10 @@ use uuid::Uuid;
 use validator::Validate;
 
 use xavyo_auth::JwtClaims;
-use xavyo_db::models::MicroCertificationFilter;
+use xavyo_db::models::{
+    GovApplication, GovEntitlement, GovMicroCertTrigger, GovMicroCertification, GovRiskLevel,
+    MicroCertificationFilter, User,
+};
 use xavyo_db::MicroCertEventFilter;
 
 use crate::error::{ApiGovernanceError, ApiResult};
@@ -16,11 +19,110 @@ use crate::models::{
     BulkDecisionFailure, BulkDecisionRequest, BulkDecisionResponse,
     DecideMicroCertificationRequest, DelegateMicroCertificationRequest, ListMicroCertEventsQuery,
     ListMicroCertificationsQuery, ManualTriggerRequest, ManualTriggerResponse,
-    MicroCertEventListResponse, MicroCertEventResponse, MicroCertificationListResponse,
-    MicroCertificationResponse, MicroCertificationStatsResponse,
-    MicroCertificationWithDetailsResponse, SkipMicroCertificationRequest,
+    MicroCertEntitlementSummary, MicroCertEventListResponse, MicroCertEventResponse,
+    MicroCertUserSummary, MicroCertificationListResponse, MicroCertificationResponse,
+    MicroCertificationStatsResponse, MicroCertificationWithDetailsResponse,
+    SkipMicroCertificationRequest, TriggerRuleSummary,
 };
 use crate::router::GovernanceState;
+
+fn user_display_name(display_name: Option<&str>, email: &str) -> String {
+    display_name
+        .filter(|name| !name.is_empty())
+        .unwrap_or(email)
+        .to_string()
+}
+
+fn entitlement_risk_level(level: GovRiskLevel) -> String {
+    match level {
+        GovRiskLevel::Low => "low",
+        GovRiskLevel::Medium => "medium",
+        GovRiskLevel::High => "high",
+        GovRiskLevel::Critical => "critical",
+    }
+    .to_string()
+}
+
+async fn micro_cert_user_summary(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    user_id: Uuid,
+) -> ApiResult<Option<MicroCertUserSummary>> {
+    Ok(User::find_by_id_in_tenant(pool, tenant_id, user_id)
+        .await?
+        .map(|user| MicroCertUserSummary {
+            id: user.id,
+            email: user.email.clone(),
+            display_name: user_display_name(user.display_name.as_deref(), &user.email),
+            department: None,
+            manager_id: None,
+        }))
+}
+
+async fn micro_cert_entitlement_summary(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    entitlement_id: Uuid,
+) -> ApiResult<Option<MicroCertEntitlementSummary>> {
+    let Some(entitlement) = GovEntitlement::find_by_id(pool, tenant_id, entitlement_id).await?
+    else {
+        return Ok(None);
+    };
+    let application_name = GovApplication::find_by_id(pool, tenant_id, entitlement.application_id)
+        .await?
+        .map(|app| app.name)
+        .unwrap_or_default();
+    Ok(Some(MicroCertEntitlementSummary {
+        id: entitlement.id,
+        name: entitlement.name,
+        description: entitlement.description,
+        application_id: entitlement.application_id,
+        application_name,
+        risk_level: Some(entitlement_risk_level(entitlement.risk_level)),
+        is_sensitive: matches!(
+            entitlement.risk_level,
+            GovRiskLevel::High | GovRiskLevel::Critical
+        ),
+    }))
+}
+
+async fn micro_cert_trigger_summary(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    trigger_rule_id: Option<Uuid>,
+) -> ApiResult<Option<TriggerRuleSummary>> {
+    let Some(trigger_rule_id) = trigger_rule_id else {
+        return Ok(None);
+    };
+    Ok(
+        GovMicroCertTrigger::find_by_id(pool, tenant_id, trigger_rule_id)
+            .await?
+            .map(|trigger| TriggerRuleSummary {
+                id: trigger.id,
+                name: trigger.name,
+                trigger_type: trigger.trigger_type,
+            }),
+    )
+}
+
+async fn micro_cert_with_details(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    cert: GovMicroCertification,
+) -> ApiResult<MicroCertificationWithDetailsResponse> {
+    let user = micro_cert_user_summary(pool, tenant_id, cert.user_id).await?;
+    let entitlement = micro_cert_entitlement_summary(pool, tenant_id, cert.entitlement_id).await?;
+    let reviewer = micro_cert_user_summary(pool, tenant_id, cert.reviewer_id).await?;
+    let trigger_rule = micro_cert_trigger_summary(pool, tenant_id, cert.trigger_rule_id).await?;
+    Ok(MicroCertificationWithDetailsResponse {
+        certification: MicroCertificationResponse::from(cert),
+        user,
+        entitlement,
+        reviewer,
+        trigger_rule,
+        events: None,
+    })
+}
 
 /// List micro-certifications with filtering.
 #[utoipa::path(
@@ -66,18 +168,10 @@ pub async fn list_certifications(
         .list(tenant_id, &filter, limit, offset)
         .await?;
 
-    // Convert to response models with details
-    let items: Vec<MicroCertificationWithDetailsResponse> = certs
-        .into_iter()
-        .map(|c| MicroCertificationWithDetailsResponse {
-            certification: MicroCertificationResponse::from(c),
-            user: None,
-            entitlement: None,
-            reviewer: None,
-            trigger_rule: None,
-            events: None,
-        })
-        .collect();
+    let mut items = Vec::with_capacity(certs.len());
+    for cert in certs {
+        items.push(micro_cert_with_details(state.pool(), tenant_id, cert).await?);
+    }
 
     Ok(Json(MicroCertificationListResponse {
         items,
@@ -122,17 +216,10 @@ pub async fn my_pending(
         .get_my_pending(tenant_id, user_id, limit, offset)
         .await?;
 
-    let items: Vec<MicroCertificationWithDetailsResponse> = certs
-        .into_iter()
-        .map(|c| MicroCertificationWithDetailsResponse {
-            certification: MicroCertificationResponse::from(c),
-            user: None,
-            entitlement: None,
-            reviewer: None,
-            trigger_rule: None,
-            events: None,
-        })
-        .collect();
+    let mut items = Vec::with_capacity(certs.len());
+    for cert in certs {
+        items.push(micro_cert_with_details(state.pool(), tenant_id, cert).await?);
+    }
 
     Ok(Json(MicroCertificationListResponse {
         items,
@@ -596,6 +683,26 @@ mod tests {
                 && !events.contains("limit: 100")
                 && !events.contains("events.len() as i64"),
             "GET micro-certification events must paginate with a real total, not a fake limit of 100"
+        );
+    }
+
+    #[test]
+    fn micro_certification_lists_include_related_details() {
+        let src = include_str!("micro_certifications.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("micro_cert_with_details(")
+                && production.contains("micro_cert_user_summary(")
+                && production.contains("micro_cert_entitlement_summary(")
+                && production.contains("GovEntitlement::find_by_id")
+                && production.contains("User::find_by_id_in_tenant"),
+            "micro-certification list/my-pending must look up user, entitlement, and reviewer details"
+        );
+        assert!(
+            !production.contains(
+                "user: None,\n            entitlement: None,\n            reviewer: None"
+            ),
+            "must not return micro-certifications with empty related details"
         );
     }
 }
