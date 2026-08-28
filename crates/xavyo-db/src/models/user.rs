@@ -127,11 +127,28 @@ impl std::fmt::Debug for User {
     }
 }
 
+/// Department from well-known `custom_attributes`, if present.
+#[must_use]
+pub fn department_from_custom_attributes(attrs: &serde_json::Value) -> Option<String> {
+    attrs
+        .get("department")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+}
+
 impl User {
     /// Get the user ID as a typed `UserId`.
     #[must_use]
     pub fn user_id(&self) -> UserId {
         UserId::from_uuid(self.id)
+    }
+
+    /// Department stored on the user, if any.
+    #[must_use]
+    pub fn department(&self) -> Option<String> {
+        department_from_custom_attributes(&self.custom_attributes)
     }
 
     /// Get the tenant ID as a typed `TenantId`.
@@ -596,6 +613,20 @@ impl User {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn department_from_custom_attributes_reads_nonempty_string() {
+        assert_eq!(
+            department_from_custom_attributes(&serde_json::json!({"department": "Engineering"}))
+                .as_deref(),
+            Some("Engineering")
+        );
+        assert!(
+            department_from_custom_attributes(&serde_json::json!({"department": "  "})).is_none()
+        );
+        assert!(department_from_custom_attributes(&serde_json::json!({})).is_none());
+        assert!(department_from_custom_attributes(&serde_json::json!({"department": 1})).is_none());
+    }
 
     #[test]
     fn get_email_by_id_scopes_by_tenant() {

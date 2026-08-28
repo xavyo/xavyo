@@ -481,12 +481,7 @@ impl CatalogService {
             false
         };
 
-        // Extract department from custom_attributes if available
-        let beneficiary_department = beneficiary
-            .custom_attributes
-            .get("department")
-            .and_then(|v| v.as_str())
-            .map(String::from);
+        let beneficiary_department = beneficiary.department();
 
         // Get archetype name if user has one
         let beneficiary_archetype = if let Some(archetype_id) = beneficiary.archetype_id {

@@ -62,8 +62,11 @@ async fn user_summary(
     let summary = UserSummary {
         id: user.id,
         email: user.email.clone(),
-        display_name: user.display_name.unwrap_or_else(|| user.email.clone()),
-        department: None,
+        display_name: user
+            .display_name
+            .clone()
+            .unwrap_or_else(|| user.email.clone()),
+        department: user.department(),
     };
     cache.users.insert(user_id, summary.clone());
     Ok(Some(summary))
@@ -513,8 +516,10 @@ mod tests {
             production.contains("item_with_details(")
                 && production.contains("user_summary(")
                 && production.contains("entitlement_summary(")
-                && production.contains("campaign_summary("),
-            "certification item responses must load user, entitlement, and campaign details"
+                && production.contains("campaign_summary(")
+                && production.contains("department: user.department()")
+                && !production.contains("department: None"),
+            "certification item responses must load user, entitlement, campaign details, and department"
         );
         assert!(
             !production.contains(

@@ -54,7 +54,7 @@ async fn micro_cert_user_summary(
             id: user.id,
             email: user.email.clone(),
             display_name: user_display_name(user.display_name.as_deref(), &user.email),
-            department: None,
+            department: user.department(),
             manager_id: user.manager_id,
         }))
 }
@@ -238,7 +238,7 @@ pub async fn my_pending(
         ("id" = Uuid, Path, description = "Micro-certification ID")
     ),
     responses(
-        (status = 200, description = "Micro-certification details", body = MicroCertificationResponse),
+        (status = 200, description = "Micro-certification details", body = MicroCertificationWithDetailsResponse),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Micro-certification not found"),
         (status = 500, description = "Internal server error")
@@ -249,7 +249,7 @@ pub async fn get_certification(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
-) -> ApiResult<Json<MicroCertificationResponse>> {
+) -> ApiResult<Json<MicroCertificationWithDetailsResponse>> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -257,7 +257,9 @@ pub async fn get_certification(
 
     let cert = state.micro_certification_service.get(tenant_id, id).await?;
 
-    Ok(Json(MicroCertificationResponse::from(cert)))
+    Ok(Json(
+        micro_cert_with_details(state.pool(), tenant_id, cert).await?,
+    ))
 }
 
 /// Make a decision on a micro-certification.
@@ -697,14 +699,33 @@ mod tests {
                 && production.contains("GovEntitlement::find_by_id")
                 && production.contains("User::find_by_id_in_tenant")
                 && production.contains("manager_id: user.manager_id")
-                && !production.contains("manager_id: None"),
-            "micro-certification list/my-pending must look up user, entitlement, reviewer, and manager_id"
+                && production.contains("department: user.department()")
+                && !production.contains("manager_id: None")
+                && !production.contains("department: None"),
+            "micro-certification list/my-pending must look up user, entitlement, reviewer, manager_id, and department"
         );
         assert!(
             !production.contains(
                 "user: None,\n            entitlement: None,\n            reviewer: None"
             ),
             "must not return micro-certifications with empty related details"
+        );
+    }
+
+    #[test]
+    fn get_certification_returns_nested_details() {
+        let src = include_str!("micro_certifications.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let get = production
+            .split("pub async fn get_certification")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_certification");
+        assert!(
+            get.contains("micro_cert_with_details(")
+                && get.contains("MicroCertificationWithDetailsResponse")
+                && !get.contains("MicroCertificationResponse::from(cert)"),
+            "GET /governance/micro-certifications/{{id}} must return nested user/entitlement/reviewer details"
         );
     }
 }

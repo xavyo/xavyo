@@ -22,8 +22,8 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use xavyo_db::models::{
-    CreateGovMergeOperation, GovArchivedIdentity, GovDuplicateCandidate, GovEntitlementStrategy,
-    GovMergeAudit, GovMergeOperation, GovSodRule,
+    department_from_custom_attributes, CreateGovMergeOperation, GovArchivedIdentity,
+    GovDuplicateCandidate, GovEntitlementStrategy, GovMergeAudit, GovMergeOperation, GovSodRule,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -641,13 +641,16 @@ impl IdentityMergeService {
             .map_err(GovernanceError::Database)?;
 
         match row {
-            Some((email, display_name, attributes)) => Ok(IdentitySummary {
-                id: user_id,
-                email,
-                display_name,
-                department: None,
-                attributes: attributes.unwrap_or_else(|| json!({})),
-            }),
+            Some((email, display_name, attributes)) => {
+                let attributes = attributes.unwrap_or_else(|| json!({}));
+                Ok(IdentitySummary {
+                    id: user_id,
+                    email,
+                    display_name,
+                    department: department_from_custom_attributes(&attributes),
+                    attributes,
+                })
+            }
             None => Err(GovernanceError::IdentityNotFound(user_id)),
         }
     }
@@ -1535,6 +1538,22 @@ mod tests {
                 && !production.contains("to_value(&target_summary).unwrap_or_default()")
                 && !production.contains("to_value(&merged_preview).unwrap_or_default()"),
             "identity merge persist must fail closed on JSON serialize"
+        );
+    }
+
+    #[test]
+    fn identity_summary_fills_department_from_custom_attributes() {
+        let src = include_str!("identity_merge_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let summary = production
+            .split("async fn get_identity_summary")
+            .nth(1)
+            .and_then(|s| s.split("fn generate_merged_preview").next())
+            .expect("get_identity_summary");
+        assert!(
+            summary.contains("department_from_custom_attributes(")
+                && !summary.contains("department: None"),
+            "GET /governance/duplicates/{{id}} must fill IdentitySummary.department from custom_attributes"
         );
     }
 
