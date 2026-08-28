@@ -2,7 +2,8 @@
 
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{header, StatusCode},
+    response::IntoResponse,
     Extension, Json,
 };
 use uuid::Uuid;
@@ -448,27 +449,45 @@ pub async fn download_batch_export(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
-) -> ApiResult<(StatusCode, Json<serde_json::Value>)> {
+) -> ApiResult<impl IntoResponse> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    let _file_path = state
+    let file_path = state
         .siem_batch_export_service
         .get_download_path(tenant_id, id)
         .await?;
 
-    // In production, this would stream the file via StreamBody or
-    // return a pre-signed URL from object storage. For now, confirm
-    // the export is ready without exposing the internal server path.
+    let bytes = tokio::fs::read(&file_path)
+        .await
+        .map_err(|e| ApiGovernanceError::Internal(format!("Failed to read export file: {e}")))?;
+
+    let filename = std::path::Path::new(&file_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("export");
+    let safe_name: String = filename
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_' || *c == '.')
+        .collect();
+    let download_name = if safe_name.is_empty() {
+        "export"
+    } else {
+        &safe_name
+    };
+
     Ok((
         StatusCode::OK,
-        Json(serde_json::json!({
-            "export_id": id,
-            "status": "ready",
-            "message": "Export file is ready for download"
-        })),
+        [
+            (header::CONTENT_TYPE, "application/octet-stream".to_string()),
+            (
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"{download_name}\""),
+            ),
+        ],
+        bytes,
     ))
 }
 
@@ -655,6 +674,23 @@ mod tests {
             production.contains("parse_optional_export_status(")
                 && !production.contains("query.status.as_deref(),"),
             "invalid SIEM export status must be 400, not an unfiltered list"
+        );
+    }
+
+    #[test]
+    fn download_serves_file_bytes_not_ready_json_stub() {
+        let src = include_str!("siem.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let download = production
+            .split("pub async fn download_batch_export")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("download_batch_export");
+        assert!(
+            download.contains("tokio::fs::read")
+                && download.contains("CONTENT_DISPOSITION")
+                && !download.contains("Export file is ready for download"),
+            "GET /governance/siem/exports/{{id}}/download must return the export file, not a fake ready JSON"
         );
     }
 }
