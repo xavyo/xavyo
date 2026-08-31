@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 use xavyo_api_auth::services::EmailSender;
@@ -321,13 +321,10 @@ This is an automated notification from xavyo. Do not reply to this email.
         );
 
         // Send emails using the email sender if configured
-        #[allow(unused_assignments)]
-        let mut _sent_count = 0;
         if let Some(ref email_sender) = self.email_sender {
             for recipient in &recipients {
                 match email_sender.send(recipient, &subject, &body).await {
                     Ok(()) => {
-                        _sent_count += 1;
                         info!(
                             task_id = %notification.task_id,
                             recipient = %recipient,
@@ -346,22 +343,7 @@ This is an automated notification from xavyo. Do not reply to this email.
                 }
             }
         } else {
-            // No email sender configured - log the notification
-            for recipient in &recipients {
-                info!(
-                    task_id = %notification.task_id,
-                    recipient = %recipient,
-                    subject = %subject,
-                    "Would send SLA warning email (no email sender configured)"
-                );
-                debug!(body = %body, "Email body");
-            }
-            warn!(
-                task_id = %notification.task_id,
-                recipients = ?recipients,
-                "Email sender not configured - notification logged only"
-            );
-            _sent_count = recipients.len(); // Count as "sent" for logging purposes
+            sla_email_sender_required(false)?;
         }
 
         Ok(recipients.len())
@@ -421,13 +403,10 @@ This is an automated notification from xavyo. Do not reply to this email.
         );
 
         // Send emails using the email sender if configured
-        #[allow(unused_assignments)]
-        let mut _sent_count = 0;
         if let Some(ref email_sender) = self.email_sender {
             for recipient in &recipients {
                 match email_sender.send(recipient, &subject, &body).await {
                     Ok(()) => {
-                        _sent_count += 1;
                         info!(
                             task_id = %notification.task_id,
                             recipient = %recipient,
@@ -446,22 +425,7 @@ This is an automated notification from xavyo. Do not reply to this email.
                 }
             }
         } else {
-            // No email sender configured - log the notification
-            for recipient in &recipients {
-                info!(
-                    task_id = %notification.task_id,
-                    recipient = %recipient,
-                    subject = %subject,
-                    "Would send SLA breach email (no email sender configured)"
-                );
-                debug!(body = %body, "Email body");
-            }
-            warn!(
-                task_id = %notification.task_id,
-                recipients = ?recipients,
-                "Email sender not configured - notification logged only"
-            );
-            _sent_count = recipients.len(); // Count as "sent" for logging purposes
+            sla_email_sender_required(false)?;
         }
 
         Ok(recipients.len())
@@ -576,6 +540,17 @@ impl NotificationSendResult {
     }
 }
 
+/// Recipients exist. A missing email sender must not count the message as sent.
+pub(crate) fn sla_email_sender_required(sender_configured: bool) -> SlaNotificationResult<()> {
+    if sender_configured {
+        Ok(())
+    } else {
+        Err(SlaNotificationError::SendFailed(
+            "Email sender not configured".to_string(),
+        ))
+    }
+}
+
 /// Channel send persist. Errors must not look like the warning or breach
 /// was delivered.
 pub(crate) fn sla_channels_recorded(result: &NotificationSendResult) -> SlaNotificationResult<()> {
@@ -634,6 +609,29 @@ mod tests {
         assert!(!result_with_error.any_sent());
         assert!(sla_channels_recorded(&result).is_ok());
         assert!(sla_channels_recorded(&result_with_error).is_err());
+    }
+
+    #[test]
+    fn sla_email_sender_required_does_not_count_unsent() {
+        assert!(sla_email_sender_required(true).is_ok());
+        let err = sla_email_sender_required(false).expect_err("must reject");
+        assert!(err.to_string().contains("not configured"));
+    }
+
+    #[test]
+    fn sla_email_sends_do_not_fake_success_without_sender() {
+        let src = include_str!("sla_notification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("sla_email_sender_required("),
+            "warning and breach email sends must require a configured sender"
+        );
+        assert!(
+            !production.contains("Would send SLA warning email")
+                && !production.contains("Would send SLA breach email")
+                && !production.contains("Count as \"sent\""),
+            "must not count SLA emails as sent when no sender is configured"
+        );
     }
 
     #[test]

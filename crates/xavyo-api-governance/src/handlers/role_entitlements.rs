@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use xavyo_auth::JwtClaims;
+use xavyo_db::{GovApplication, GovEntitlement};
 
 use crate::error::{ApiGovernanceError, ApiResult};
 use crate::router::GovernanceState;
@@ -35,21 +36,10 @@ pub struct RoleEntitlementResponse {
     pub role_id: Option<Uuid>,
     pub role_name: String,
     pub entitlement_id: Uuid,
+    pub entitlement_name: String,
+    pub application_name: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub created_by: Uuid,
-}
-
-impl From<xavyo_db::models::GovRoleEntitlement> for RoleEntitlementResponse {
-    fn from(e: xavyo_db::models::GovRoleEntitlement) -> Self {
-        Self {
-            id: e.id,
-            role_id: e.role_id,
-            role_name: e.role_name,
-            entitlement_id: e.entitlement_id,
-            created_at: e.created_at,
-            created_by: e.created_by,
-        }
-    }
 }
 
 /// Effective entitlement response (includes inheritance info).
@@ -122,10 +112,10 @@ pub async fn list_role_entitlements(
         .list_role_entitlements(tenant_id, role_id)
         .await?;
 
-    let items: Vec<RoleEntitlementResponse> = entitlements
-        .into_iter()
-        .map(RoleEntitlementResponse::from)
-        .collect();
+    let mut items = Vec::with_capacity(entitlements.len());
+    for mapping in entitlements {
+        items.push(role_entitlement_details(state.pool(), tenant_id, mapping).await?);
+    }
 
     Ok(Json(items))
 }
@@ -166,7 +156,37 @@ pub async fn add_role_entitlement(
         .add_role_entitlement(tenant_id, role_id, request.entitlement_id, created_by)
         .await?;
 
-    Ok(Json(RoleEntitlementResponse::from(mapping)))
+    Ok(Json(
+        role_entitlement_details(state.pool(), tenant_id, mapping).await?,
+    ))
+}
+
+async fn role_entitlement_details(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    mapping: xavyo_db::models::GovRoleEntitlement,
+) -> ApiResult<RoleEntitlementResponse> {
+    let entitlement = GovEntitlement::find_by_id(pool, tenant_id, mapping.entitlement_id)
+        .await?
+        .ok_or_else(|| {
+            ApiGovernanceError::NotFound(format!(
+                "Entitlement {} not found",
+                mapping.entitlement_id
+            ))
+        })?;
+    let application_name = GovApplication::find_by_id(pool, tenant_id, entitlement.application_id)
+        .await?
+        .map(|app| app.name);
+    Ok(RoleEntitlementResponse {
+        id: mapping.id,
+        role_id: mapping.role_id,
+        role_name: mapping.role_name,
+        entitlement_id: mapping.entitlement_id,
+        entitlement_name: entitlement.name,
+        application_name,
+        created_at: mapping.created_at,
+        created_by: mapping.created_by,
+    })
 }
 
 /// Remove an entitlement from a role.
@@ -292,4 +312,34 @@ pub async fn recompute_effective_entitlements(
 pub struct RecomputeResponse {
     /// Number of roles affected by the recomputation.
     pub affected_count: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn role_entitlement_handlers_return_entitlement_details() {
+        let src = include_str!("role_entitlements.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for (fn_name, label) in [
+            (
+                "pub async fn list_role_entitlements",
+                "GET role entitlements",
+            ),
+            (
+                "pub async fn add_role_entitlement",
+                "POST role entitlements",
+            ),
+        ] {
+            let body = production
+                .split(fn_name)
+                .nth(1)
+                .and_then(|s| s.split("pub async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                body.contains("role_entitlement_details(")
+                    && !body.contains("RoleEntitlementResponse::from"),
+                "{label} must return entitlement_name and application_name"
+            );
+        }
+    }
 }

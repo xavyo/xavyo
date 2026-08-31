@@ -15,9 +15,9 @@ use xavyo_db::{
 
 use crate::error::{ApiGovernanceError, ApiResult};
 use crate::models::{
-    CampaignSummary, DecisionRequest, EntitlementSummary, ItemListResponse, ItemResponse,
-    ItemWithDecisionResponse, ItemWithDetailsResponse, ListItemsQuery, MyCertificationsQuery,
-    ReassignRequest, ReviewerCampaignSummary, ReviewerSummaryResponse, UserSummary,
+    CampaignSummary, DecisionRequest, EntitlementSummary, ItemListResponse,
+    ItemWithDetailsResponse, ListItemsQuery, MyCertificationsQuery, ReassignRequest,
+    ReviewerCampaignSummary, ReviewerSummaryResponse, UserSummary,
 };
 use crate::router::GovernanceState;
 
@@ -271,7 +271,7 @@ pub async fn get_item(
     ),
     request_body = DecisionRequest,
     responses(
-        (status = 200, description = "Decision recorded", body = ItemWithDecisionResponse),
+        (status = 200, description = "Decision recorded", body = ItemWithDetailsResponse),
         (status = 400, description = "Invalid request"),
         (status = 401, description = "Unauthorized"),
         (status = 403, description = "Not authorized to decide on this item"),
@@ -287,7 +287,7 @@ pub async fn decide_item(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
     Json(request): Json<DecisionRequest>,
-) -> ApiResult<Json<ItemWithDecisionResponse>> {
+) -> ApiResult<Json<ItemWithDetailsResponse>> {
     // Validate justification for revocations
     if request.decision_type == CertDecisionType::Revoked {
         if let Some(ref just) = request.justification {
@@ -325,7 +325,7 @@ pub async fn decide_item(
         ));
     }
 
-    let (updated_item, decision) = state
+    let (updated_item, _) = state
         .certification_item_service
         .decide(
             tenant_id,
@@ -342,10 +342,10 @@ pub async fn decide_item(
         .check_and_complete_campaign(tenant_id, item.campaign_id)
         .await?;
 
-    Ok(Json(ItemWithDecisionResponse {
-        item: updated_item.into(),
-        decision: decision.into(),
-    }))
+    let mut cache = ItemDetailCache::new();
+    Ok(Json(
+        item_with_details(&state, tenant_id, updated_item, &mut cache, true).await?,
+    ))
 }
 
 /// Reassign a certification item to a different reviewer.
@@ -358,7 +358,7 @@ pub async fn decide_item(
     ),
     request_body = ReassignRequest,
     responses(
-        (status = 200, description = "Item reassigned", body = ItemResponse),
+        (status = 200, description = "Item reassigned", body = ItemWithDetailsResponse),
         (status = 400, description = "Invalid request"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Item not found"),
@@ -372,7 +372,7 @@ pub async fn reassign_item(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
     Json(request): Json<ReassignRequest>,
-) -> ApiResult<Json<ItemResponse>> {
+) -> ApiResult<Json<ItemWithDetailsResponse>> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -387,7 +387,10 @@ pub async fn reassign_item(
         .reassign(tenant_id, id, request.new_reviewer_id)
         .await?;
 
-    Ok(Json(item.into()))
+    let mut cache = ItemDetailCache::new();
+    Ok(Json(
+        item_with_details(&state, tenant_id, item, &mut cache, false).await?,
+    ))
 }
 
 /// Get pending certification items for the current user.
@@ -527,6 +530,28 @@ mod tests {
             ),
             "must not return certification items with empty related details"
         );
+    }
+
+    #[test]
+    fn certification_item_actions_return_nested_details() {
+        let src = include_str!("certification_items.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for (fn_name, label) in [
+            ("pub async fn decide_item", "POST decide"),
+            ("pub async fn reassign_item", "POST reassign"),
+        ] {
+            let body = production
+                .split(fn_name)
+                .nth(1)
+                .and_then(|s| s.split("pub async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                body.contains("item_with_details(")
+                    && !body.contains("ItemWithDecisionResponse")
+                    && !body.contains("item.into()"),
+                "{label} must return nested user/entitlement/campaign details"
+            );
+        }
     }
 
     #[test]

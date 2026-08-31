@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use xavyo_auth::JwtClaims;
+use xavyo_db::{GovApplication, GovEntitlement};
 
 use crate::error::{ApiGovernanceError, ApiResult};
 use crate::router::GovernanceState;
@@ -128,7 +129,7 @@ pub async fn list_inheritance_blocks(
     ),
     request_body = AddInheritanceBlockRequest,
     responses(
-        (status = 201, description = "Inheritance block added", body = InheritanceBlockResponse),
+        (status = 201, description = "Inheritance block added", body = InheritanceBlockDetailsResponse),
         (status = 400, description = "Invalid request"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Role or entitlement not found"),
@@ -142,7 +143,7 @@ pub async fn add_inheritance_block(
     Extension(claims): Extension<JwtClaims>,
     Path(role_id): Path<Uuid>,
     Json(request): Json<AddInheritanceBlockRequest>,
-) -> ApiResult<Json<InheritanceBlockResponse>> {
+) -> ApiResult<Json<InheritanceBlockDetailsResponse>> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -154,7 +155,32 @@ pub async fn add_inheritance_block(
         .add_inheritance_block(tenant_id, role_id, request.entitlement_id, created_by)
         .await?;
 
-    Ok(Json(InheritanceBlockResponse::from(block)))
+    Ok(Json(
+        inheritance_block_details(state.pool(), tenant_id, block).await?,
+    ))
+}
+
+async fn inheritance_block_details(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    block: xavyo_db::models::GovRoleInheritanceBlock,
+) -> ApiResult<InheritanceBlockDetailsResponse> {
+    let entitlement = GovEntitlement::find_by_id(pool, tenant_id, block.entitlement_id)
+        .await?
+        .ok_or_else(|| {
+            ApiGovernanceError::NotFound(format!("Entitlement {} not found", block.entitlement_id))
+        })?;
+    let application_name = GovApplication::find_by_id(pool, tenant_id, entitlement.application_id)
+        .await?
+        .map(|app| app.name);
+    Ok(InheritanceBlockDetailsResponse {
+        id: block.id,
+        entitlement_id: block.entitlement_id,
+        entitlement_name: entitlement.name,
+        application_name,
+        created_by: block.created_by,
+        created_at: block.created_at,
+    })
 }
 
 /// Remove an inheritance block from a role.
@@ -191,4 +217,24 @@ pub async fn remove_inheritance_block(
         .await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn add_inheritance_block_returns_entitlement_details() {
+        let src = include_str!("role_inheritance_blocks.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let add = production
+            .split("pub async fn add_inheritance_block")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("add_inheritance_block");
+        assert!(
+            add.contains("inheritance_block_details(")
+                && add.contains("InheritanceBlockDetailsResponse")
+                && !add.contains("InheritanceBlockResponse::from(block)"),
+            "POST inheritance-blocks must return entitlement_name and application_name"
+        );
+    }
 }
