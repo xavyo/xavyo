@@ -10,6 +10,7 @@ use validator::Validate;
 
 use xavyo_auth::JwtClaims;
 use xavyo_db::models::CreateGovRoleEntitlement;
+use xavyo_db::{GovApplication, GovEntitlement};
 
 use crate::error::{ApiGovernanceError, ApiResult};
 use crate::models::{
@@ -17,6 +18,34 @@ use crate::models::{
     RoleEntitlementResponse,
 };
 use crate::router::GovernanceState;
+
+async fn role_mapping_details(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    mapping: xavyo_db::models::GovRoleEntitlement,
+) -> ApiResult<RoleEntitlementResponse> {
+    let entitlement = GovEntitlement::find_by_id(pool, tenant_id, mapping.entitlement_id)
+        .await?
+        .ok_or_else(|| {
+            ApiGovernanceError::NotFound(format!(
+                "Entitlement {} not found",
+                mapping.entitlement_id
+            ))
+        })?;
+    let application_name = GovApplication::find_by_id(pool, tenant_id, entitlement.application_id)
+        .await?
+        .map(|app| app.name);
+    Ok(RoleEntitlementResponse {
+        id: mapping.id,
+        tenant_id: mapping.tenant_id,
+        entitlement_id: mapping.entitlement_id,
+        entitlement_name: entitlement.name,
+        application_name,
+        role_name: mapping.role_name,
+        created_at: mapping.created_at,
+        created_by: mapping.created_by,
+    })
+}
 
 /// List role-entitlement mappings with optional filtering and pagination.
 #[utoipa::path(
@@ -52,8 +81,13 @@ pub async fn list_role_entitlements(
         )
         .await?;
 
+    let mut items = Vec::with_capacity(mappings.len());
+    for mapping in mappings {
+        items.push(role_mapping_details(state.pool(), tenant_id, mapping).await?);
+    }
+
     Ok(Json(RoleEntitlementListResponse {
-        items: mappings.into_iter().map(Into::into).collect(),
+        items,
         total,
         limit: query.limit,
         offset: query.offset,
@@ -104,7 +138,10 @@ pub async fn create_role_entitlement(
         .create_role_entitlement(tenant_id, input)
         .await?;
 
-    Ok((StatusCode::CREATED, Json(mapping.into())))
+    Ok((
+        StatusCode::CREATED,
+        Json(role_mapping_details(state.pool(), tenant_id, mapping).await?),
+    ))
 }
 
 /// Delete a role-entitlement mapping.
@@ -143,4 +180,35 @@ pub async fn delete_role_entitlement(
         .await?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn role_mapping_handlers_return_entitlement_details() {
+        let src = include_str!("role_mappings.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for (fn_name, label) in [
+            (
+                "pub async fn list_role_entitlements",
+                "GET /governance/role-entitlements",
+            ),
+            (
+                "pub async fn create_role_entitlement",
+                "POST /governance/role-entitlements",
+            ),
+        ] {
+            let body = production
+                .split(fn_name)
+                .nth(1)
+                .and_then(|s| s.split("pub async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                body.contains("role_mapping_details(")
+                    && !body.contains("Into::into")
+                    && !body.contains("mapping.into()"),
+                "{label} must return entitlement_name and application_name"
+            );
+        }
+    }
 }

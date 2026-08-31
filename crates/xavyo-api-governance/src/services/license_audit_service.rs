@@ -236,9 +236,22 @@ impl LicenseAuditService {
             Self::fetch_pool_names(&self.pool, tenant_id, &pool_ids).await?
         };
 
+        let user_ids: Vec<Uuid> = events
+            .iter()
+            .flat_map(|e| e.user_id.into_iter().chain(std::iter::once(e.actor_id)))
+            .collect::<std::collections::HashSet<Uuid>>()
+            .into_iter()
+            .collect();
+
+        let user_email_map = if user_ids.is_empty() {
+            HashMap::new()
+        } else {
+            Self::fetch_user_emails(&self.pool, tenant_id, &user_ids).await?
+        };
+
         let entries = events
             .into_iter()
-            .map(|event| event_to_entry(event, &pool_name_map))
+            .map(|event| event_to_entry(event, &pool_name_map, &user_email_map))
             .collect();
 
         Ok(entries)
@@ -264,6 +277,26 @@ impl LicenseAuditService {
         Ok(rows.into_iter().collect())
     }
 
+    /// Batch-fetch user emails for the given IDs in a single query.
+    async fn fetch_user_emails(
+        db: &PgPool,
+        tenant_id: Uuid,
+        user_ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, String>> {
+        let rows: Vec<(Uuid, String)> = sqlx::query_as(
+            r"
+            SELECT id, email FROM users
+            WHERE id = ANY($1) AND tenant_id = $2
+            ",
+        )
+        .bind(user_ids)
+        .bind(tenant_id)
+        .fetch_all(db)
+        .await?;
+
+        Ok(rows.into_iter().collect())
+    }
+
     /// Get a single audit event by ID.
     pub async fn get_by_id(
         &self,
@@ -282,16 +315,23 @@ impl LicenseAuditService {
                     None
                 };
 
+                let mut user_ids = vec![e.actor_id];
+                if let Some(user_id) = e.user_id {
+                    user_ids.push(user_id);
+                }
+                let user_email_map =
+                    Self::fetch_user_emails(&self.pool, tenant_id, &user_ids).await?;
+
                 Ok(Some(LicenseAuditEntry {
                     id: e.id,
                     pool_id: e.license_pool_id,
                     pool_name,
                     assignment_id: e.license_assignment_id,
                     user_id: e.user_id,
-                    user_email: None,
+                    user_email: e.user_id.and_then(|uid| user_email_map.get(&uid).cloned()),
                     action: e.action.clone(),
                     actor_id: e.actor_id,
-                    actor_email: None,
+                    actor_email: user_email_map.get(&e.actor_id).cloned(),
                     details: e.details,
                     created_at: e.created_at,
                 }))
@@ -612,14 +652,19 @@ impl LicenseAuditService {
 }
 
 /// Convert a `GovLicenseAuditEvent` to a `LicenseAuditEntry`, resolving
-/// the pool name from the pre-fetched map.
+/// the pool name and user emails from the pre-fetched maps.
 fn event_to_entry(
     event: GovLicenseAuditEvent,
     pool_name_map: &HashMap<Uuid, String>,
+    user_email_map: &HashMap<Uuid, String>,
 ) -> LicenseAuditEntry {
     let pool_name = event
         .license_pool_id
         .and_then(|pid| pool_name_map.get(&pid).cloned());
+    let user_email = event
+        .user_id
+        .and_then(|uid| user_email_map.get(&uid).cloned());
+    let actor_email = user_email_map.get(&event.actor_id).cloned();
 
     LicenseAuditEntry {
         id: event.id,
@@ -627,10 +672,10 @@ fn event_to_entry(
         pool_name,
         assignment_id: event.license_assignment_id,
         user_id: event.user_id,
-        user_email: None,
+        user_email,
         action: event.action,
         actor_id: event.actor_id,
-        actor_email: None,
+        actor_email,
         details: event.details,
         created_at: event.created_at,
     }
@@ -672,7 +717,7 @@ mod tests {
         let mut map = HashMap::new();
         map.insert(pool_id, "Office 365 E3".to_string());
 
-        let entry = event_to_entry(event, &map);
+        let entry = event_to_entry(event, &map, &HashMap::new());
 
         assert_eq!(entry.pool_id, Some(pool_id));
         assert_eq!(entry.pool_name.as_deref(), Some("Office 365 E3"));
@@ -690,7 +735,7 @@ mod tests {
         // creation and lookup.
         let map = HashMap::new();
 
-        let entry = event_to_entry(event, &map);
+        let entry = event_to_entry(event, &map, &HashMap::new());
 
         assert_eq!(entry.pool_id, Some(pool_id));
         assert!(entry.pool_name.is_none());
@@ -701,7 +746,7 @@ mod tests {
         let event = make_event(None, None, None, "pool_created");
         let map = HashMap::new();
 
-        let entry = event_to_entry(event, &map);
+        let entry = event_to_entry(event, &map, &HashMap::new());
 
         assert!(entry.pool_id.is_none());
         assert!(entry.pool_name.is_none());
@@ -725,7 +770,7 @@ mod tests {
         let mut map = HashMap::new();
         map.insert(pool_id, "Jira Licenses".to_string());
 
-        let entry = event_to_entry(event, &map);
+        let entry = event_to_entry(event, &map, &HashMap::new());
 
         assert_eq!(entry.id, event_id);
         assert_eq!(entry.pool_id, Some(pool_id));
@@ -747,11 +792,52 @@ mod tests {
         let mut map = HashMap::new();
         map.insert(pool_id, "Shared Pool".to_string());
 
-        let entry1 = event_to_entry(event1, &map);
-        let entry2 = event_to_entry(event2, &map);
+        let entry1 = event_to_entry(event1, &map, &HashMap::new());
+        let entry2 = event_to_entry(event2, &map, &HashMap::new());
 
         assert_eq!(entry1.pool_name.as_deref(), Some("Shared Pool"));
         assert_eq!(entry2.pool_name.as_deref(), Some("Shared Pool"));
+    }
+
+    #[test]
+    fn event_to_entry_fills_user_and_actor_emails() {
+        let user_id = Uuid::new_v4();
+        let event = make_event(None, None, Some(user_id), "license_assigned");
+        let actor_id = event.actor_id;
+        let mut emails = HashMap::new();
+        emails.insert(user_id, "user@example.com".to_string());
+        emails.insert(actor_id, "actor@example.com".to_string());
+
+        let entry = event_to_entry(event, &HashMap::new(), &emails);
+
+        assert_eq!(entry.user_email.as_deref(), Some("user@example.com"));
+        assert_eq!(entry.actor_email.as_deref(), Some("actor@example.com"));
+    }
+
+    #[test]
+    fn get_recent_and_get_by_id_look_up_user_emails() {
+        let src = include_str!("license_audit_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let recent = production
+            .split("pub async fn get_recent")
+            .nth(1)
+            .and_then(|s| s.split("async fn fetch_pool_names").next())
+            .expect("get_recent");
+        assert!(
+            recent.contains("fetch_user_emails(") && recent.contains("user_email_map"),
+            "GET license dashboard recent events must look up user_email and actor_email"
+        );
+        let by_id = production
+            .split("pub async fn get_by_id")
+            .nth(1)
+            .and_then(|s| s.split("fn to_entry").next())
+            .expect("get_by_id");
+        assert!(
+            by_id.contains("fetch_user_emails(")
+                && !by_id.contains("user_email: None")
+                && !by_id.contains("actor_email: None"),
+            "license audit GET by id must look up user_email and actor_email"
+        );
     }
 
     // --------------- existing param tests ---------------

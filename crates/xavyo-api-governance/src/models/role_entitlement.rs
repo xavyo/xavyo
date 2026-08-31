@@ -6,8 +6,6 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 use validator::Validate;
 
-use xavyo_db::models::GovRoleEntitlement;
-
 /// Request to create a new role-entitlement mapping.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct CreateRoleEntitlementRequest {
@@ -57,6 +55,13 @@ pub struct RoleEntitlementResponse {
     /// The entitlement being mapped.
     pub entitlement_id: Uuid,
 
+    /// Entitlement display name.
+    pub entitlement_name: String,
+
+    /// Application the entitlement belongs to.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub application_name: Option<String>,
+
     /// The role name being mapped.
     pub role_name: String,
 
@@ -65,19 +70,6 @@ pub struct RoleEntitlementResponse {
 
     /// Who created this mapping.
     pub created_by: Uuid,
-}
-
-impl From<GovRoleEntitlement> for RoleEntitlementResponse {
-    fn from(re: GovRoleEntitlement) -> Self {
-        Self {
-            id: re.id,
-            tenant_id: re.tenant_id,
-            entitlement_id: re.entitlement_id,
-            role_name: re.role_name,
-            created_at: re.created_at,
-            created_by: re.created_by,
-        }
-    }
 }
 
 /// Paginated list of role entitlements.
