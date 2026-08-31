@@ -7,8 +7,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use xavyo_db::{
-    models::GovRole, CreateRoleConstruction, RoleConstruction, RoleConstructionFilter,
-    UpdateRoleConstruction,
+    models::{ConnectorConfiguration, GovRole},
+    CreateRoleConstruction, RoleConstruction, RoleConstructionFilter, UpdateRoleConstruction,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -58,10 +58,11 @@ impl RoleConstructionService {
         let total =
             RoleConstruction::count_by_role(&self.pool, tenant_id, role_id, &filter).await?;
 
-        let items = constructions
-            .into_iter()
-            .map(ConstructionResponse::try_from)
-            .collect::<Result<Vec<_>>>()?;
+        let mut items = Vec::with_capacity(constructions.len());
+        for construction in constructions {
+            items
+                .push(construction_with_connector_name(&self.pool, tenant_id, construction).await?);
+        }
 
         Ok(ConstructionListResponse { items, total })
     }
@@ -78,7 +79,7 @@ impl RoleConstructionService {
                 .await?
                 .ok_or(GovernanceError::RoleConstructionNotFound(construction_id))?;
 
-        ConstructionResponse::try_from(construction)
+        construction_with_connector_name(&self.pool, tenant_id, construction).await
     }
 
     /// Create a new construction for a role.
@@ -132,7 +133,7 @@ impl RoleConstructionService {
         let construction =
             RoleConstruction::create(&self.pool, tenant_id, role_id, &input, created_by).await?;
 
-        ConstructionResponse::try_from(construction)
+        construction_with_connector_name(&self.pool, tenant_id, construction).await
     }
 
     /// Update a construction.
@@ -173,7 +174,9 @@ impl RoleConstructionService {
             RoleConstruction::update(&self.pool, tenant_id, construction_id, &input).await?;
 
         match updated {
-            Some(construction) => ConstructionResponse::try_from(construction),
+            Some(construction) => {
+                construction_with_connector_name(&self.pool, tenant_id, construction).await
+            }
             None => Err(GovernanceError::RoleConstructionVersionConflict),
         }
     }
@@ -214,7 +217,7 @@ impl RoleConstructionService {
             .await?
             .ok_or(GovernanceError::RoleConstructionNotFound(construction_id))?;
 
-        ConstructionResponse::try_from(updated)
+        construction_with_connector_name(&self.pool, tenant_id, updated).await
     }
 
     /// Disable a construction.
@@ -233,7 +236,7 @@ impl RoleConstructionService {
             .await?
             .ok_or(GovernanceError::RoleConstructionNotFound(construction_id))?;
 
-        ConstructionResponse::try_from(updated)
+        construction_with_connector_name(&self.pool, tenant_id, updated).await
     }
 
     /// Get all enabled constructions for a set of role IDs.
@@ -246,10 +249,12 @@ impl RoleConstructionService {
         let constructions =
             RoleConstruction::list_enabled_by_roles(&self.pool, tenant_id, role_ids).await?;
 
-        constructions
-            .into_iter()
-            .map(ConstructionResponse::try_from)
-            .collect()
+        let mut items = Vec::with_capacity(constructions.len());
+        for construction in constructions {
+            items
+                .push(construction_with_connector_name(&self.pool, tenant_id, construction).await?);
+        }
+        Ok(items)
     }
 
     /// Get effective constructions for a role (own + induced roles).
@@ -306,6 +311,18 @@ impl RoleConstructionService {
     }
 }
 
+async fn construction_with_connector_name(
+    pool: &PgPool,
+    tenant_id: Uuid,
+    construction: RoleConstruction,
+) -> Result<ConstructionResponse> {
+    let connector_name =
+        ConnectorConfiguration::find_by_id(pool, tenant_id, construction.connector_id)
+            .await?
+            .map(|connector| connector.name);
+    ConstructionResponse::from_model(construction, connector_name)
+}
+
 #[cfg(test)]
 mod tests {
     #[allow(unused_imports)]
@@ -328,6 +345,57 @@ mod tests {
         assert!(
             !production.contains("FROM connector_configurations WHERE id = $1)"),
             "must not look up connectors by id alone"
+        );
+    }
+
+    #[test]
+    fn role_construction_responses_look_up_connector_names() {
+        let src = include_str!("role_construction_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for (fn_name, label) in [
+            ("pub async fn list_by_role", "GET list constructions"),
+            ("pub async fn get_construction", "GET construction"),
+            (
+                "pub async fn create_construction",
+                "POST create construction",
+            ),
+            (
+                "pub async fn update_construction",
+                "PUT update construction",
+            ),
+            (
+                "pub async fn enable_construction",
+                "POST enable construction",
+            ),
+            (
+                "pub async fn disable_construction",
+                "POST disable construction",
+            ),
+            (
+                "pub async fn get_enabled_by_roles",
+                "GET enabled constructions by roles",
+            ),
+        ] {
+            let body = production
+                .split(fn_name)
+                .nth(1)
+                .and_then(|s| s.split("pub async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                body.contains("construction_with_connector_name(")
+                    && !body.contains("ConstructionResponse::try_from("),
+                "{label} must look up advertised connector_name"
+            );
+        }
+
+        let effective = production
+            .split("pub async fn get_effective_constructions")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_effective_constructions");
+        assert!(
+            effective.contains("get_enabled_by_roles("),
+            "GET effective constructions must inherit connector_name lookups"
         );
     }
 }

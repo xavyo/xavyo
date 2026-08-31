@@ -477,4 +477,39 @@ mod tests {
             "GET /governance/users/{{id}}/effective-constructions must look up source role names"
         );
     }
+
+    #[test]
+    fn role_construction_handlers_return_service_lookups() {
+        let src = include_str!("role_constructions.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for (fn_name, label) in [
+            ("pub async fn list_role_constructions", "GET list"),
+            ("pub async fn get_role_construction", "GET one"),
+            ("pub async fn create_role_construction", "POST create"),
+            ("pub async fn update_role_construction", "PUT update"),
+            ("pub async fn enable_role_construction", "POST enable"),
+            ("pub async fn disable_role_construction", "POST disable"),
+            (
+                "pub async fn get_role_effective_constructions",
+                "GET role effective",
+            ),
+            (
+                "pub async fn get_user_effective_constructions",
+                "GET user effective",
+            ),
+        ] {
+            let body = production
+                .split(fn_name)
+                .nth(1)
+                .and_then(|s| s.split("pub async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                (body.contains("role_construction_service")
+                    || body.contains("inducement_trigger_service"))
+                    && !body.contains("ConstructionResponse::try_from(")
+                    && !body.contains("ConstructionResponse::from_model("),
+                "{label} must return construction responses with looked-up connector names"
+            );
+        }
+    }
 }
