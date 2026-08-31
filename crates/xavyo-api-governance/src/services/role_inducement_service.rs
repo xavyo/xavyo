@@ -58,10 +58,10 @@ impl RoleInducementService {
         )
         .await?;
 
-        let items = inducements
-            .into_iter()
-            .map(InducementResponse::from)
-            .collect();
+        let mut items = Vec::with_capacity(inducements.len());
+        for inducement in inducements {
+            items.push(inducement_with_role_names(&self.pool, tenant_id, inducement).await?);
+        }
 
         Ok(InducementListResponse { items, total })
     }
@@ -82,7 +82,7 @@ impl RoleInducementService {
         .await?
         .ok_or(GovernanceError::RoleInducementNotFound(inducement_id))?;
 
-        Ok(InducementResponse::from(inducement))
+        inducement_with_role_names(&self.pool, tenant_id, inducement).await
     }
 
     /// Create a new inducement for a role.
@@ -145,7 +145,7 @@ impl RoleInducementService {
             RoleInducement::create(&self.pool, tenant_id, inducing_role_id, &input, created_by)
                 .await?;
 
-        Ok(InducementResponse::from(inducement))
+        inducement_with_role_names(&self.pool, tenant_id, inducement).await
     }
 
     /// Delete an inducement.
@@ -184,7 +184,7 @@ impl RoleInducementService {
             .await?
             .ok_or(GovernanceError::RoleInducementNotFound(inducement_id))?;
 
-        Ok(InducementResponse::from(updated))
+        inducement_with_role_names(&self.pool, tenant_id, updated).await
     }
 
     /// Disable an inducement.
@@ -203,7 +203,7 @@ impl RoleInducementService {
             .await?
             .ok_or(GovernanceError::RoleInducementNotFound(inducement_id))?;
 
-        Ok(InducementResponse::from(updated))
+        inducement_with_role_names(&self.pool, tenant_id, updated).await
     }
 
     /// Get all induced roles for a role (recursive traversal).
@@ -252,14 +252,47 @@ impl RoleInducementService {
     }
 }
 
+async fn inducement_with_role_names(
+    pool: &PgPool,
+    tenant_id: Uuid,
+    inducement: RoleInducement,
+) -> Result<InducementResponse> {
+    let inducing_role_name = GovRole::find_by_id(pool, tenant_id, inducement.inducing_role_id)
+        .await?
+        .map(|role| role.name);
+    let induced_role_name = GovRole::find_by_id(pool, tenant_id, inducement.induced_role_id)
+        .await?
+        .map(|role| role.name);
+    Ok(InducementResponse::from_model(
+        inducement,
+        inducing_role_name,
+        induced_role_name,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
-    #[allow(unused_imports)]
-    use super::*;
-
     #[test]
-    fn test_service_creation() {
-        // This is a compile-time test to ensure the service can be created
-        // Actual database tests would require a test database setup
+    fn role_inducement_responses_look_up_role_names() {
+        let src = include_str!("role_inducement_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for (fn_name, label) in [
+            ("pub async fn list_by_role", "GET list inducements"),
+            ("pub async fn get_inducement", "GET inducement"),
+            ("pub async fn create_inducement", "POST create inducement"),
+            ("pub async fn enable_inducement", "POST enable inducement"),
+            ("pub async fn disable_inducement", "POST disable inducement"),
+        ] {
+            let body = production
+                .split(fn_name)
+                .nth(1)
+                .and_then(|s| s.split("pub async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                body.contains("inducement_with_role_names(")
+                    && !body.contains("InducementResponse::from("),
+                "{label} must look up inducing_role_name and induced_role_name"
+            );
+        }
     }
 }
