@@ -284,3 +284,30 @@ pub async fn get_induced_roles(
 
     Ok(Json(induced_roles))
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn role_inducement_handlers_return_service_lookups() {
+        let src = include_str!("role_inducements.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for (fn_name, label) in [
+            ("pub async fn list_role_inducements", "GET list"),
+            ("pub async fn get_role_inducement", "GET one"),
+            ("pub async fn create_role_inducement", "POST create"),
+            ("pub async fn enable_role_inducement", "POST enable"),
+            ("pub async fn disable_role_inducement", "POST disable"),
+        ] {
+            let body = production
+                .split(fn_name)
+                .nth(1)
+                .and_then(|s| s.split("pub async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                body.contains("role_inducement_service")
+                    && !body.contains("InducementResponse::from("),
+                "{label} must return inducement responses with looked-up role names"
+            );
+        }
+    }
+}
