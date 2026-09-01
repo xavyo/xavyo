@@ -102,6 +102,8 @@ pub struct UpdateClientRequest {
     pub jwks: Option<serde_json::Value>,
     /// Registered mTLS cert `x5t#S256` (omit to leave unchanged).
     pub tls_client_cert_thumbprint: Option<String>,
+    /// Bound NHI identity (omit to leave unchanged).
+    pub nhi_id: Option<Uuid>,
 }
 
 /// `OAuth2` client response.
@@ -292,5 +294,18 @@ mod tests {
         assert!(req.fapi_profile.is_none());
         assert!(req.jwks.is_none());
         assert!(req.tls_client_cert_thumbprint.is_none());
+        assert!(req.nhi_id.is_none());
+    }
+
+    #[test]
+    fn update_request_accepts_nhi_id() {
+        let id = Uuid::new_v4();
+        let req: UpdateClientRequest = serde_json::from_value(serde_json::json!({
+            "nhi_id": id,
+            "require_dpop": true
+        }))
+        .expect("parse");
+        assert_eq!(req.nhi_id, Some(id));
+        assert_eq!(req.require_dpop, Some(true));
     }
 }

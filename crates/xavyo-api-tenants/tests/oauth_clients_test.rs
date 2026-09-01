@@ -60,6 +60,7 @@ fn test_oauth_client_details_serialization() {
         is_active: true,
         created_at: Utc::now(),
         updated_at: Utc::now(),
+        ..Default::default()
     };
 
     let json = serde_json::to_string(&details).unwrap();
@@ -83,6 +84,7 @@ fn test_oauth_client_details_public_client() {
         is_active: true,
         created_at: Utc::now(),
         updated_at: Utc::now(),
+        ..Default::default()
     };
 
     let json = serde_json::to_string(&details).unwrap();
@@ -106,6 +108,7 @@ fn test_oauth_client_list_response_serialization() {
                 is_active: true,
                 created_at: Utc::now(),
                 updated_at: Utc::now(),
+                ..Default::default()
             },
             OAuthClientDetails {
                 id: Uuid::new_v4(),
@@ -118,6 +121,7 @@ fn test_oauth_client_list_response_serialization() {
                 is_active: false,
                 created_at: Utc::now(),
                 updated_at: Utc::now(),
+                ..Default::default()
             },
         ],
         total: 2,

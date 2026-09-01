@@ -482,6 +482,7 @@ impl OAuth2ClientService {
         let tls_client_cert_thumbprint = request
             .tls_client_cert_thumbprint
             .or(existing.tls_client_cert_thumbprint);
+        let nhi_id = request.nhi_id.or(existing.nhi_id);
         let now = chrono::Utc::now();
 
         sqlx::query(
@@ -491,7 +492,7 @@ impl OAuth2ClientService {
                 is_active = $5, logo_url = $6, description = $7, updated_at = $8,
                 post_logout_redirect_uris = $11,
                 require_dpop = $12, fapi_profile = $13, jwks = $14,
-                tls_client_cert_thumbprint = $15
+                tls_client_cert_thumbprint = $15, nhi_id = $16
             WHERE id = $9 AND tenant_id = $10
             ",
         )
@@ -510,6 +511,7 @@ impl OAuth2ClientService {
         .bind(fapi_profile)
         .bind(&jwks)
         .bind(&tls_client_cert_thumbprint)
+        .bind(nhi_id)
         .execute(&mut *conn)
         .await
         .map_err(|e| {
@@ -531,7 +533,7 @@ impl OAuth2ClientService {
             is_active,
             logo_url,
             description,
-            nhi_id: existing.nhi_id,
+            nhi_id,
             post_logout_redirect_uris,
             created_at: existing.created_at,
             updated_at: now,

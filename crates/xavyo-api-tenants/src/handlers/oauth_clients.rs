@@ -198,21 +198,7 @@ pub async fn list_oauth_clients_handler(
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?;
 
-    let oauth_clients: Vec<OAuthClientDetails> = clients
-        .into_iter()
-        .map(|c| OAuthClientDetails {
-            id: c.id,
-            client_id: c.client_id,
-            name: c.name,
-            client_type: format!("{:?}", c.client_type).to_lowercase(),
-            redirect_uris: c.redirect_uris,
-            grant_types: c.grant_types,
-            scopes: c.scopes,
-            is_active: c.is_active,
-            created_at: c.created_at,
-            updated_at: c.updated_at,
-        })
-        .collect();
+    let oauth_clients: Vec<OAuthClientDetails> = clients.into_iter().map(Into::into).collect();
 
     let total = oauth_clients.len();
     Ok(Json(OAuthClientListResponse {
