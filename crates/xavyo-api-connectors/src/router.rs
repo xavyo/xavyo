@@ -86,7 +86,7 @@ pub fn connector_routes(state: ConnectorState) -> Router {
         .route("/:id/health", get(handlers::get_connector_health))
         // Schema discovery. Static /schema/* paths must be registered before
         // /schema/:object_class so advertised browsing routes are not captured.
-        .route("/:id/schema", get(handlers::get_schema))
+        .route("/:id/schema", get(handlers::get_cached_schema))
         .route("/:id/schema", delete(handlers::clear_schema_cache))
         .route("/:id/schema/discover", post(handlers::discover_schema))
         .route("/:id/schema/status", get(handlers::get_discovery_status))
@@ -218,6 +218,8 @@ impl SyncState {
 /// ```
 pub fn sync_routes(state: SyncState) -> Router {
     Router::new()
+        // Tenant-wide status (advertised at /connectors/sync/status)
+        .route("/sync/status", get(handlers::get_all_sync_status))
         // Sync configuration
         .route("/:id/sync/config", get(handlers::get_sync_config))
         .route("/:id/sync/config", put(handlers::update_sync_config))
@@ -295,6 +297,10 @@ pub fn reconciliation_routes(state: ReconciliationState) -> Router {
         )
         .route(
             "/:id/reconciliation/runs",
+            post(handlers::trigger_reconciliation),
+        )
+        .route(
+            "/:id/reconciliation/trigger",
             post(handlers::trigger_reconciliation),
         )
         .route(
@@ -502,6 +508,39 @@ mod tests {
         assert!(
             object_classes < object_class_param,
             "GET /schema/object-classes must be registered before /schema/:object_class"
+        );
+    }
+
+    #[test]
+    fn advertised_sync_and_reconciliation_routes_are_mounted() {
+        let src = include_str!("router.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let sync = production
+            .split("pub fn sync_routes")
+            .nth(1)
+            .and_then(|s| s.split("pub fn ").next())
+            .expect("sync_routes");
+        assert!(
+            sync.contains("get_all_sync_status") && sync.contains("\"/sync/status\""),
+            "GET /connectors/sync/status must be mounted"
+        );
+        let recon = production
+            .split("pub fn reconciliation_routes")
+            .nth(1)
+            .and_then(|s| s.split("pub fn ").next())
+            .expect("reconciliation_routes");
+        assert!(
+            recon.contains("reconciliation/trigger") && recon.contains("trigger_reconciliation"),
+            "POST /connectors/{{id}}/reconciliation/trigger must be mounted"
+        );
+        let connectors = production
+            .split("pub fn connector_routes")
+            .nth(1)
+            .and_then(|s| s.split("pub fn ").next())
+            .expect("connector_routes");
+        assert!(
+            connectors.contains("get_cached_schema") && !connectors.contains("get(handlers::get_schema)"),
+            "GET /connectors/{{id}}/schema must honor advertised version query via get_cached_schema"
         );
     }
 }

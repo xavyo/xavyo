@@ -441,21 +441,24 @@ pub async fn trigger_reconciliation(
 
     let stats = parse_run_statistics(run.statistics.clone())?;
 
-    // F085: Publish reconciliation.completed webhook event (triggered run)
-    if let Some(Extension(publisher)) = publisher {
-        publisher.publish(WebhookEvent {
-            event_id: Uuid::new_v4(),
-            event_type: "reconciliation.completed".to_string(),
-            tenant_id,
-            actor_id,
-            timestamp: chrono::Utc::now(),
-            data: serde_json::json!({
-                "run_id": run.id,
-                "connector_id": connector_id,
-                "mode": run.mode,
-                "status": run.status,
-            }),
-        });
+    // A newly persisted run is queued, not finished. Do not advertise
+    // reconciliation.completed until the worker actually completes it.
+    if run.status == "completed" {
+        if let Some(Extension(publisher)) = publisher {
+            publisher.publish(WebhookEvent {
+                event_id: Uuid::new_v4(),
+                event_type: "reconciliation.completed".to_string(),
+                tenant_id,
+                actor_id,
+                timestamp: chrono::Utc::now(),
+                data: serde_json::json!({
+                    "run_id": run.id,
+                    "connector_id": connector_id,
+                    "mode": run.mode,
+                    "status": run.status,
+                }),
+            });
+        }
     }
 
     Ok((
@@ -1503,6 +1506,22 @@ mod tests {
         assert!(
             !production.contains("from_value(run.statistics.clone()).unwrap_or_default()"),
             "reconciliation statistics GET must fail closed on JSON parse"
+        );
+    }
+
+    #[test]
+    fn trigger_does_not_publish_completed_for_queued_runs() {
+        let src = include_str!("reconciliation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let trigger = production
+            .split("pub async fn trigger_reconciliation")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("trigger_reconciliation");
+        assert!(
+            trigger.contains("run.status == \"completed\"")
+                && trigger.contains("reconciliation.completed"),
+            "POST trigger must not emit reconciliation.completed for a queued run"
         );
     }
 
