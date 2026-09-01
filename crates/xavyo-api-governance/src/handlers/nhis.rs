@@ -399,8 +399,8 @@ pub async fn certify_nhi(
 // =============================================================================
 
 use crate::models::{
-    ListNhiUsageQuery, NhiUsageListResponse, NhiUsageSummaryExtendedResponse, RecordUsageRequest,
-    StalenessReportResponse,
+    ListNhiUsageQuery, NhiUsageEventResponse, NhiUsageListResponse,
+    NhiUsageSummaryExtendedResponse, RecordUsageRequest, StalenessReportResponse,
 };
 
 /// Query parameters for staleness report.
@@ -421,7 +421,7 @@ pub struct StalenessReportParams {
     ),
     request_body = RecordUsageRequest,
     responses(
-        (status = 201, description = "Usage event recorded"),
+        (status = 201, description = "Usage event recorded", body = NhiUsageEventResponse),
         (status = 400, description = "Invalid request"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "NHI not found"),
@@ -434,7 +434,7 @@ pub async fn record_nhi_usage(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
     Json(request): Json<RecordUsageRequest>,
-) -> ApiResult<StatusCode> {
+) -> ApiResult<(StatusCode, Json<NhiUsageEventResponse>)> {
     request.validate()?;
 
     let tenant_id = *claims
@@ -442,12 +442,12 @@ pub async fn record_nhi_usage(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    state
+    let event = state
         .nhi_usage_service
         .record_usage(tenant_id, id, request)
         .await?;
 
-    Ok(StatusCode::CREATED)
+    Ok((StatusCode::CREATED, Json(event)))
 }
 
 /// List usage events for an NHI.
@@ -753,6 +753,8 @@ pub async fn create_nhi_certification_campaign(
             request.needs_certification_only,
             request.reviewer_type,
             request.specific_reviewers,
+            request.nhi_type_filter,
+            request.specific_nhi_ids,
             request.deadline,
             user_id,
         )
@@ -790,7 +792,7 @@ pub async fn launch_nhi_certification_campaign(
 
     let campaign = state
         .nhi_certification_service
-        .launch_campaign(tenant_id, campaign_id, None, true)
+        .launch_campaign(tenant_id, campaign_id)
         .await?;
 
     Ok(Json(campaign))
@@ -1560,6 +1562,51 @@ mod tests {
         assert!(
             !helper.contains("query.campaign_id,"),
             "path campaign_id must not be replaced by an optional query campaign_id"
+        );
+    }
+
+    #[test]
+    fn launch_does_not_hardcode_create_time_filters() {
+        let src = include_str!("nhis.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let launch = production
+            .split("pub async fn launch_nhi_certification_campaign")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("launch_nhi_certification_campaign");
+        assert!(
+            launch.contains("launch_campaign(tenant_id, campaign_id)")
+                && !launch.contains("None, true"),
+            "POST /governance/nhis/certification/campaigns/{{id}}/launch must not hardcode owner_filter=None needs_certification_only=true"
+        );
+        let create = production
+            .split("pub async fn create_nhi_certification_campaign")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("create_nhi_certification_campaign");
+        assert!(
+            create.contains("request.owner_filter")
+                && create.contains("request.needs_certification_only")
+                && create.contains("request.nhi_type_filter")
+                && create.contains("request.specific_nhi_ids"),
+            "POST /governance/nhis/certification/campaigns must pass advertised filters through"
+        );
+    }
+
+    #[test]
+    fn record_nhi_usage_returns_created_event() {
+        let src = include_str!("nhis.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let record = production
+            .split("pub async fn record_nhi_usage")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("record_nhi_usage");
+        assert!(
+            record.contains("NhiUsageEventResponse")
+                && record.contains("Json(event)")
+                && !record.contains("Ok(StatusCode::CREATED)"),
+            "POST /governance/nhis/{{id}}/usage must return the created usage event"
         );
     }
 }
