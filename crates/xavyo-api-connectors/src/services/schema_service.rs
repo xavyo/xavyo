@@ -302,7 +302,7 @@ impl SchemaService {
             let upsert = UpsertConnectorSchema {
                 object_class: oc.name.clone(),
                 native_name: oc.native_name.clone(),
-                attributes: schema_attributes_json(&oc.attributes)?,
+                attributes: schema_object_class_cache_json(oc)?,
                 supports_create: oc.supports_create,
                 supports_update: oc.supports_update,
                 supports_delete: oc.supports_delete,
@@ -474,7 +474,7 @@ impl SchemaService {
             let upsert = UpsertConnectorSchema {
                 object_class: oc.name.clone(),
                 native_name: oc.native_name.clone(),
-                attributes: schema_attributes_json(&oc.attributes)?,
+                attributes: schema_object_class_cache_json(oc)?,
                 supports_create: oc.supports_create,
                 supports_update: oc.supports_update,
                 supports_delete: oc.supports_delete,
@@ -688,20 +688,30 @@ impl SchemaService {
     }
 
     fn cached_schema_to_response(cached: ConnectorSchema) -> Result<ObjectClassResponse> {
-        let attributes = schema_cached_attributes(cached.attributes)?;
+        let payload = schema_cached_object_class(cached.attributes)?;
+        let inherited_attributes = payload
+            .inherited_attributes
+            .into_iter()
+            .map(|mut attr| {
+                if attr.source_class.is_none() {
+                    attr.source_class = payload.parent_classes.first().cloned();
+                }
+                attr
+            })
+            .collect();
 
         Ok(ObjectClassResponse {
             name: cached.object_class,
             native_name: cached.native_name,
-            display_name: None,
-            description: None,
-            attributes,
-            inherited_attributes: Vec::new(), // Not stored in cache yet
+            display_name: payload.display_name,
+            description: payload.description,
+            attributes: payload.attributes,
+            inherited_attributes,
             supports_create: cached.supports_create,
             supports_update: cached.supports_update,
             supports_delete: cached.supports_delete,
-            object_class_type: None,    // Not stored in cache yet
-            parent_classes: Vec::new(), // Not stored in cache yet
+            object_class_type: payload.object_class_type,
+            parent_classes: payload.parent_classes,
         })
     }
 
@@ -761,11 +771,92 @@ pub(crate) fn schema_attributes_json<T: serde::Serialize>(attrs: &T) -> Result<s
     serde_json::to_value(attrs).map_err(|e| ConnectorApiError::InvalidConfiguration(e.to_string()))
 }
 
+/// Persist advertised object-class metadata with the attribute cache.
+pub(crate) fn schema_object_class_cache_json(oc: &ObjectClass) -> Result<serde_json::Value> {
+    let attributes: Vec<AttributeResponse> = oc
+        .attributes
+        .iter()
+        .map(|a| SchemaService::attribute_to_response(a, None))
+        .collect();
+    let inherited_attributes: Vec<AttributeResponse> = oc
+        .inherited_attributes
+        .iter()
+        .map(|a| SchemaService::attribute_to_response(a, oc.parent_classes.first().cloned()))
+        .collect();
+    Ok(serde_json::json!({
+        "attributes": schema_attributes_json(&attributes)?,
+        "inherited_attributes": schema_attributes_json(&inherited_attributes)?,
+        "display_name": oc.display_name,
+        "description": oc.description,
+        "object_class_type": oc.object_class_type.as_str(),
+        "parent_classes": oc.parent_classes,
+    }))
+}
+
+/// Cached object-class body restored from the `attributes` JSON column.
+#[derive(Debug)]
+pub(crate) struct CachedObjectClass {
+    pub attributes: Vec<AttributeResponse>,
+    pub inherited_attributes: Vec<AttributeResponse>,
+    pub display_name: Option<String>,
+    pub description: Option<String>,
+    pub object_class_type: Option<String>,
+    pub parent_classes: Vec<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct CachedObjectClassPayload {
+    attributes: serde_json::Value,
+    #[serde(default)]
+    inherited_attributes: Option<serde_json::Value>,
+    #[serde(default)]
+    display_name: Option<String>,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    object_class_type: Option<String>,
+    #[serde(default)]
+    parent_classes: Vec<String>,
+}
+
 /// Deserialize cached schema attributes. Corrupt cache must not look like
 /// an object class with no attributes.
 pub(crate) fn schema_cached_attributes(value: serde_json::Value) -> Result<Vec<AttributeResponse>> {
     serde_json::from_value(value)
         .map_err(|e| ConnectorApiError::InvalidConfiguration(e.to_string()))
+}
+
+/// Restore advertised object-class fields from cache JSON.
+///
+/// Legacy rows stored a bare attribute array; those keep names empty rather
+/// than failing. Object payloads with invalid types must not look empty.
+pub(crate) fn schema_cached_object_class(value: serde_json::Value) -> Result<CachedObjectClass> {
+    if value.is_array() {
+        return Ok(CachedObjectClass {
+            attributes: schema_cached_attributes(value)?,
+            inherited_attributes: Vec::new(),
+            display_name: None,
+            description: None,
+            object_class_type: None,
+            parent_classes: Vec::new(),
+        });
+    }
+
+    let payload: CachedObjectClassPayload = serde_json::from_value(value).map_err(|e| {
+        ConnectorApiError::InvalidConfiguration(format!("Invalid cached object class: {e}"))
+    })?;
+    let inherited = match payload.inherited_attributes {
+        None | Some(serde_json::Value::Null) => Vec::new(),
+        Some(v) => schema_cached_attributes(v)?,
+    };
+    Ok(CachedObjectClass {
+        attributes: schema_cached_attributes(payload.attributes)?,
+        inherited_attributes: inherited,
+        display_name: payload.display_name,
+        description: payload.description,
+        object_class_type: payload.object_class_type,
+        parent_classes: payload.parent_classes,
+    })
 }
 
 fn schema_json_bool(config: &serde_json::Value, field: &str) -> Result<bool> {
@@ -937,6 +1028,7 @@ mod tests {
         let production = src.split("mod tests").next().expect("production source");
         assert!(
             production.contains("schema_cache_recorded(")
+                && production.contains("schema_object_class_cache_json(")
                 && production.contains("schema_attributes_json(")
                 && production.contains("schema_cached_attributes("),
             "schema discovery must fail closed on cache persist"
@@ -967,5 +1059,56 @@ mod tests {
             !production.contains("unwrap_or(false)") && production.contains("schema_json_bool("),
             "schema discovery must not treat a non-bool use_ad_features as LDAP"
         );
+    }
+
+    #[test]
+    fn cached_object_class_restores_advertised_metadata() {
+        use xavyo_connector::schema::{AttributeDataType, ObjectClassType, SchemaAttribute};
+
+        let oc = ObjectClass::new("user", "inetOrgPerson")
+            .with_display_name("User")
+            .with_description("A person")
+            .with_object_class_type(ObjectClassType::Structural)
+            .with_parent_classes(vec!["person".into()])
+            .with_inherited_attributes(vec![SchemaAttribute::new(
+                "objectClass",
+                "objectClass",
+                AttributeDataType::String,
+            )])
+            .with_attribute(SchemaAttribute::new(
+                "uid",
+                "uid",
+                AttributeDataType::String,
+            ));
+        let json = schema_object_class_cache_json(&oc).expect("cache json");
+        let restored = schema_cached_object_class(json).expect("restore cache");
+        assert_eq!(restored.display_name.as_deref(), Some("User"));
+        assert_eq!(restored.description.as_deref(), Some("A person"));
+        assert_eq!(restored.object_class_type.as_deref(), Some("structural"));
+        assert_eq!(restored.parent_classes, vec!["person".to_string()]);
+        assert_eq!(restored.attributes.len(), 1);
+        assert_eq!(restored.inherited_attributes.len(), 1);
+        assert_eq!(restored.inherited_attributes[0].name, "objectClass");
+    }
+
+    #[test]
+    fn cached_object_class_legacy_array_does_not_invent_names() {
+        let attrs = vec![test_attribute("uid", "string", true, false)];
+        let restored = schema_cached_object_class(serde_json::to_value(&attrs).unwrap())
+            .expect("legacy array");
+        assert!(restored.display_name.is_none());
+        assert!(restored.description.is_none());
+        assert!(restored.object_class_type.is_none());
+        assert!(restored.parent_classes.is_empty());
+        assert!(restored.inherited_attributes.is_empty());
+        assert_eq!(restored.attributes.len(), 1);
+        assert_eq!(restored.attributes[0].name, "uid");
+    }
+
+    #[test]
+    fn cached_object_class_rejects_invalid_payload() {
+        assert!(schema_cached_object_class(serde_json::json!("nope")).is_err());
+        assert!(schema_cached_object_class(serde_json::json!({"attributes": "bad"})).is_err());
+        assert!(schema_cached_object_class(serde_json::json!({"display_name": 1})).is_err());
     }
 }

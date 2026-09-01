@@ -49,6 +49,15 @@ pub fn reconciliation_router() -> Router<ConnectorsState>;
 | DELETE | `/connectors/:id` | Delete connector |
 | POST | `/connectors/:id/test` | Test connection |
 | GET | `/connectors/:id/schema` | Get schema |
+| GET | `/connectors/:id/schema/status` | Schema discovery status |
+| GET | `/connectors/:id/schema/versions` | List schema versions |
+| GET | `/connectors/:id/schema/diff` | Diff two schema versions |
+| GET | `/connectors/:id/schema/object-classes` | List object classes |
+| GET | `/connectors/:id/schema/object-classes/:name` | Object class details |
+| GET | `/connectors/:id/schema/object-classes/:name/attributes` | Object class attributes |
+| GET | `/connectors/:id/schema/schedule` | Get schema refresh schedule |
+| PUT | `/connectors/:id/schema/schedule` | Set schema refresh schedule |
+| DELETE | `/connectors/:id/schema/schedule` | Delete schema refresh schedule |
 | POST | `/connectors/:id/sync` | Trigger sync |
 | GET | `/connectors/:id/sync/status` | Sync status |
 | POST | `/reconciliation/runs` | Start reconciliation |
