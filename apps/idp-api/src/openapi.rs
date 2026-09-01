@@ -956,6 +956,7 @@ impl Modify for SecurityAddon {
         xavyo_api_governance::handlers::personas::list_context_sessions,
         // Semi-manual Resources: Manual Tasks (F064)
         xavyo_api_governance::handlers::manual_tasks::list_manual_tasks,
+        xavyo_api_governance::handlers::manual_tasks::list_manual_task_audit,
         xavyo_api_governance::handlers::manual_tasks::get_manual_task,
         xavyo_api_governance::handlers::manual_tasks::confirm_manual_task,
         xavyo_api_governance::handlers::manual_tasks::reject_manual_task,

@@ -14,8 +14,9 @@ use crate::models::{ManualProvisioningTaskListResponse, ManualProvisioningTaskRe
 use crate::{
     error::{ApiGovernanceError, ApiResult},
     models::{
-        ConfirmManualTaskRequest, ListManualTasksQuery, ManualTaskDashboardResponse,
-        ManualTaskListResponse, ManualTaskResponse, RejectManualTaskRequest,
+        ConfirmManualTaskRequest, ListManualTaskAuditQuery, ListManualTasksQuery,
+        ManualTaskAuditListResponse, ManualTaskDashboardResponse, ManualTaskListResponse,
+        ManualTaskResponse, RejectManualTaskRequest,
     },
     router::GovernanceState,
 };
@@ -60,6 +61,37 @@ pub async fn list_manual_tasks(
     let result = state
         .manual_task_service
         .list_tasks(tenant_id, &query)
+        .await?;
+
+    Ok(Json(result))
+}
+
+/// List manual task audit events.
+#[utoipa::path(
+    get,
+    path = "/governance/manual-tasks/audit",
+    tag = "Governance - Manual Provisioning Tasks",
+    params(ListManualTaskAuditQuery),
+    responses(
+        (status = 200, description = "Manual task audit events retrieved", body = ManualTaskAuditListResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn list_manual_task_audit(
+    State(state): State<GovernanceState>,
+    Extension(claims): Extension<JwtClaims>,
+    Query(query): Query<ListManualTaskAuditQuery>,
+) -> ApiResult<Json<ManualTaskAuditListResponse>> {
+    let tenant_id = *claims
+        .tenant_id()
+        .ok_or(ApiGovernanceError::Unauthorized)?
+        .as_uuid();
+
+    let result = state
+        .manual_task_service
+        .list_audit(tenant_id, &query)
         .await?;
 
     Ok(Json(result))
@@ -305,4 +337,27 @@ pub async fn start_manual_task(
     let result = state.manual_task_service.start_task(tenant_id, id).await?;
 
     Ok(Json(result))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn list_audit_is_mounted_and_uses_query() {
+        let src = include_str!("manual_tasks.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_manual_task_audit")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_manual_task_audit");
+        assert!(
+            list.contains("Query<ListManualTaskAuditQuery>")
+                && list.contains("list_audit(tenant_id, &query)"),
+            "GET /governance/manual-tasks/audit must use ListManualTaskAuditQuery"
+        );
+        assert!(
+            production.contains("path = \"/governance/manual-tasks/audit\""),
+            "audit list must be advertised on OpenAPI"
+        );
+    }
 }

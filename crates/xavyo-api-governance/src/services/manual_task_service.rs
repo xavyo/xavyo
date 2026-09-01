@@ -8,12 +8,15 @@ use uuid::Uuid;
 
 use xavyo_db::{
     CreateManualTaskAuditEvent, GovApplication, GovEntitlement, GovManualProvisioningTask,
-    GovManualTaskAuditEvent, ManualTaskEventType, ManualTaskFilter, ManualTaskStatus, User,
+    GovManualTaskAuditEvent, ManualTaskAuditFilter, ManualTaskEventType, ManualTaskFilter,
+    ManualTaskStatus, User,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
 use crate::models::{
-    ListManualTasksQuery, ManualTaskDashboardResponse, ManualTaskListResponse, ManualTaskResponse,
+    ListManualTaskAuditQuery, ListManualTasksQuery, ManualTaskAuditEventResponse,
+    ManualTaskAuditListResponse, ManualTaskDashboardResponse, ManualTaskListResponse,
+    ManualTaskResponse,
 };
 
 /// Service for managing manual provisioning tasks.
@@ -361,6 +364,60 @@ impl ManualTaskService {
         Ok(response)
     }
 
+    /// List manual task audit events with advertised filters.
+    pub async fn list_audit(
+        &self,
+        tenant_id: Uuid,
+        query: &ListManualTaskAuditQuery,
+    ) -> Result<ManualTaskAuditListResponse> {
+        let limit = query.limit.unwrap_or(50).min(100);
+        let offset = query.offset.unwrap_or(0).max(0);
+        let filter = ManualTaskAuditFilter {
+            task_id: query.task_id,
+            event_type: query.event_type.clone(),
+            actor_id: query.actor_id,
+            from_date: query.from_date,
+            to_date: query.to_date,
+        };
+
+        let events = GovManualTaskAuditEvent::query(&self.pool, tenant_id, &filter, limit, offset)
+            .await
+            .map_err(GovernanceError::Database)?;
+        let total = GovManualTaskAuditEvent::count(&self.pool, tenant_id, &filter)
+            .await
+            .map_err(GovernanceError::Database)?;
+
+        let mut items = Vec::with_capacity(events.len());
+        for event in events {
+            items.push(self.audit_event_response(tenant_id, event).await?);
+        }
+
+        Ok(ManualTaskAuditListResponse {
+            items,
+            total,
+            limit,
+            offset,
+        })
+    }
+
+    async fn audit_event_response(
+        &self,
+        tenant_id: Uuid,
+        event: GovManualTaskAuditEvent,
+    ) -> Result<ManualTaskAuditEventResponse> {
+        let mut response = ManualTaskAuditEventResponse::from(event);
+        if let Some(actor_id) = response.actor_id {
+            response.actor_name = User::find_by_id_in_tenant(&self.pool, tenant_id, actor_id)
+                .await
+                .map_err(GovernanceError::Database)?
+                .map(|user| match user.display_name {
+                    Some(name) if !name.is_empty() => name,
+                    _ => user.email,
+                });
+        }
+        Ok(response)
+    }
+
     /// Get dashboard metrics for manual tasks.
     pub async fn get_dashboard_metrics(
         &self,
@@ -555,6 +612,32 @@ mod tests {
         assert!(
             list.contains("operation: query.operation") && list.contains("status: query.status"),
             "GET /governance/manual-tasks must pass advertised operation and status filters"
+        );
+    }
+
+    #[test]
+    fn list_audit_honors_advertised_filters() {
+        let src = include_str!("manual_task_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_audit")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_audit");
+        assert!(
+            list.contains("task_id: query.task_id")
+                && list.contains("event_type: query.event_type")
+                && list.contains("actor_id: query.actor_id")
+                && list.contains("from_date: query.from_date")
+                && list.contains("to_date: query.to_date")
+                && list.contains("GovManualTaskAuditEvent::query("),
+            "GET /governance/manual-tasks/audit must honor advertised filters"
+        );
+        assert!(
+            production.contains("audit_event_response(")
+                && production.contains("actor_name")
+                && production.contains("find_by_id_in_tenant"),
+            "manual task audit responses must fill advertised actor_name"
         );
     }
 }

@@ -153,6 +153,8 @@ pub struct TicketingConfigurationResponse {
     pub project_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub issue_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub field_mappings: Option<serde_json::Value>,
     pub is_active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -170,6 +172,7 @@ impl From<GovTicketingConfiguration> for TicketingConfigurationResponse {
             default_assignment_group: config.default_assignment_group,
             project_key: config.project_key,
             issue_type: config.issue_type,
+            field_mappings: config.field_mappings,
             is_active: config.is_active,
             created_at: config.created_at,
             updated_at: config.updated_at,
@@ -323,6 +326,8 @@ pub struct SlaPolicyResponse {
     pub target_duration_human: String,
     pub warning_threshold_percent: i32,
     pub breach_notification_enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub escalation_contacts: Option<serde_json::Value>,
     pub is_active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -339,6 +344,7 @@ impl From<GovSlaPolicy> for SlaPolicyResponse {
             target_duration_human,
             warning_threshold_percent: policy.warning_threshold_percent,
             breach_notification_enabled: policy.breach_notification_enabled,
+            escalation_contacts: policy.escalation_contacts,
             is_active: policy.is_active,
             created_at: policy.created_at,
             updated_at: policy.updated_at,
@@ -991,6 +997,34 @@ mod tests {
         assert_eq!(
             response.avg_completion_time_human,
             Some("2.0 hours".to_string())
+        );
+    }
+
+    #[test]
+    fn ticketing_response_includes_field_mappings() {
+        let src = include_str!("semi_manual.rs");
+        let from_impl = src
+            .split("impl From<GovTicketingConfiguration> for TicketingConfigurationResponse")
+            .nth(1)
+            .and_then(|s| s.split("impl ").next())
+            .expect("ticketing from impl");
+        assert!(
+            from_impl.contains("field_mappings: config.field_mappings"),
+            "GET/POST ticketing-configurations must return advertised field_mappings"
+        );
+    }
+
+    #[test]
+    fn sla_response_includes_escalation_contacts() {
+        let src = include_str!("semi_manual.rs");
+        let from_impl = src
+            .split("impl From<GovSlaPolicy> for SlaPolicyResponse")
+            .nth(1)
+            .and_then(|s| s.split("impl ").next())
+            .expect("sla from impl");
+        assert!(
+            from_impl.contains("escalation_contacts: policy.escalation_contacts"),
+            "GET/POST sla-policies must return advertised escalation_contacts"
         );
     }
 }

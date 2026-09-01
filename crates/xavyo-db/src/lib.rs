@@ -482,6 +482,7 @@ pub use models::{
     LifecycleStateFilter,
     LifecycleTransitionFilter,
     LoginAttempt,
+    ManualTaskAuditFilter,
     ManualTaskEventType,
     ManualTaskFilter,
     ManualTaskOperation,
