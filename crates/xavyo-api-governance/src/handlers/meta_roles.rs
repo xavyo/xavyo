@@ -286,6 +286,38 @@ pub async fn create_meta_role(
         .create(tenant_id, created_by, input, criteria)
         .await?;
 
+    if let Some(entitlements) = request.entitlements {
+        for entitlement in entitlements {
+            state
+                .meta_role_service
+                .add_entitlement(
+                    tenant_id,
+                    result.id,
+                    CreateGovMetaRoleEntitlement {
+                        entitlement_id: entitlement.entitlement_id,
+                        permission_type: entitlement.permission_type,
+                    },
+                )
+                .await?;
+        }
+    }
+    if let Some(constraints) = request.constraints {
+        for constraint in constraints {
+            constraint.validate()?;
+            state
+                .meta_role_service
+                .add_constraint(
+                    tenant_id,
+                    result.id,
+                    CreateGovMetaRoleConstraint {
+                        constraint_type: constraint.constraint_type,
+                        constraint_value: constraint.constraint_value,
+                    },
+                )
+                .await?;
+        }
+    }
+
     Ok(Json(MetaRoleResponse::from(result)))
 }
 
@@ -1416,6 +1448,24 @@ mod tests {
                 && list.contains("query.child_role_id")
                 && !list.contains("inheritances.len() as i64"),
             "GET /governance/meta-roles/{{id}}/inheritances must report the filtered total and honor child_role_id"
+        );
+    }
+
+    #[test]
+    fn create_meta_role_persists_advertised_entitlements_and_constraints() {
+        let src = include_str!("meta_roles.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let create = production
+            .split("pub async fn create_meta_role")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("create_meta_role");
+        assert!(
+            create.contains("request.entitlements")
+                && create.contains("add_entitlement(")
+                && create.contains("request.constraints")
+                && create.contains("add_constraint("),
+            "POST /governance/meta-roles must persist advertised entitlements and constraints"
         );
     }
 

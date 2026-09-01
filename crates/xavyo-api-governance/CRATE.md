@@ -88,6 +88,9 @@ pub fn archetypes_router() -> Router<GovState>;  // F-058 Identity Archetypes
 | Lifecycle | PUT | `/lifecycle/configs/:id/states/:sid/actions` | Update state actions (F-193) |
 | Lifecycle | GET | `/users/:id/lifecycle/status` | Get user lifecycle status (F-193) |
 | Manual Tasks | GET | `/manual-tasks/audit` | List manual task audit events |
+| Personas | POST | `/personas` | Persist advertised `valid_from` / `valid_until` |
+| Meta-roles | POST | `/meta-roles` | Persist advertised entitlements and constraints |
+| Object Templates | POST | `/object-templates` | Persist advertised initial rules and scopes |
 | GDPR | GET | `/gdpr/report` | Generate tenant GDPR compliance report (F-067) |
 | GDPR | GET | `/gdpr/users/:user_id/data-protection` | Per-user data protection summary (F-067) |
 | Context | POST | `/context/switch` | 501 until identity-switch JWT issuance exists |
