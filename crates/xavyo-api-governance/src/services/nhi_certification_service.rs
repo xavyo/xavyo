@@ -15,8 +15,9 @@ use tracing::warn;
 use uuid::Uuid;
 
 use xavyo_db::models::User;
-use xavyo_db::GovServiceAccount;
+use xavyo_db::NhiIdentity;
 use xavyo_governance::error::{GovernanceError, Result};
+use xavyo_nhi::NhiType;
 
 #[cfg(feature = "kafka")]
 use xavyo_events::EventProducer;
@@ -43,6 +44,10 @@ pub struct NhiCertificationCampaign {
     pub reviewer_type: NhiCertReviewerType,
     pub specific_reviewers: Option<Vec<Uuid>>,
     pub deadline: DateTime<Utc>,
+    pub owner_filter: Option<Uuid>,
+    pub needs_certification_only: bool,
+    pub nhi_type_filter: Option<String>,
+    pub specific_nhi_ids: Option<Vec<Uuid>>,
     pub created_by: Uuid,
     pub created_at: DateTime<Utc>,
     pub launched_at: Option<DateTime<Utc>>,
@@ -121,6 +126,8 @@ impl NhiCertificationService {
         needs_certification_only: bool,
         reviewer_type: NhiCertReviewerType,
         specific_reviewers: Option<Vec<Uuid>>,
+        nhi_type_filter: Option<String>,
+        specific_nhi_ids: Option<Vec<Uuid>>,
         deadline: DateTime<Utc>,
         created_by: Uuid,
     ) -> Result<NhiCertificationCampaignResponse> {
@@ -138,7 +145,10 @@ impl NhiCertificationService {
             return Err(GovernanceError::SpecificReviewersRequired);
         }
 
-        // Create campaign in database
+        let nhi_type_filter =
+            parse_optional_nhi_type_filter(nhi_type_filter.as_deref())?.map(|t| t.to_string());
+
+        // Create campaign in database, including launch filters.
         let campaign = self
             .create_campaign_record(
                 tenant_id,
@@ -146,15 +156,17 @@ impl NhiCertificationService {
                 description,
                 reviewer_type,
                 specific_reviewers,
+                owner_filter,
+                needs_certification_only,
+                nhi_type_filter,
+                specific_nhi_ids,
                 deadline,
                 created_by,
             )
             .await?;
 
         // Count NHIs that would be included
-        let nhis = self
-            .get_nhis_for_campaign(tenant_id, owner_filter, needs_certification_only)
-            .await?;
+        let nhis = self.get_nhis_for_campaign(tenant_id, &campaign).await?;
 
         info!(
             campaign_id = %campaign.id,
@@ -170,8 +182,6 @@ impl NhiCertificationService {
         &self,
         tenant_id: Uuid,
         campaign_id: Uuid,
-        owner_filter: Option<Uuid>,
-        needs_certification_only: bool,
     ) -> Result<NhiCertificationCampaignResponse> {
         // Get the campaign
         let campaign = self.get_campaign_record(tenant_id, campaign_id).await?;
@@ -181,10 +191,8 @@ impl NhiCertificationService {
             return Err(GovernanceError::CampaignNotDraft(campaign_id));
         }
 
-        // Get NHIs to include
-        let nhis = self
-            .get_nhis_for_campaign(tenant_id, owner_filter, needs_certification_only)
-            .await?;
+        // Get NHIs using the filters stored at create time.
+        let nhis = self.get_nhis_for_campaign(tenant_id, &campaign).await?;
 
         if nhis.is_empty() {
             return Err(GovernanceError::CampaignNoItems);
@@ -395,15 +403,16 @@ impl NhiCertificationService {
         }
 
         // Get the NHI for this item
-        let nhi = GovServiceAccount::find_by_id(&self.pool, tenant_id, item.nhi_id)
-            .await?
+        let nhi = NhiIdentity::find_by_id(&self.pool, tenant_id, item.nhi_id)
+            .await
+            .map_err(GovernanceError::Database)?
             .ok_or(GovernanceError::NhiNotFound(item.nhi_id))?;
 
         // Process the decision
         let new_status = match decision {
             NhiCertificationDecision::Certify => {
                 // Update NHI's last_certified_at
-                GovServiceAccount::certify(&self.pool, tenant_id, item.nhi_id, decided_by).await?;
+                self.certify_nhi(tenant_id, item.nhi_id, decided_by).await?;
                 NhiCertificationStatus::Certified
             }
             NhiCertificationDecision::Revoke => {
@@ -467,12 +476,13 @@ impl NhiCertificationService {
         }
 
         // Get NHI to verify delegate is not the owner
-        let nhi = GovServiceAccount::find_by_id(&self.pool, tenant_id, item.nhi_id)
-            .await?
+        let nhi = NhiIdentity::find_by_id(&self.pool, tenant_id, item.nhi_id)
+            .await
+            .map_err(GovernanceError::Database)?
             .ok_or(GovernanceError::NhiNotFound(item.nhi_id))?;
 
         // Cannot delegate to NHI owner (would be self-certification)
-        if delegate_to == nhi.owner_id {
+        if nhi.owner_id == Some(delegate_to) {
             return Err(GovernanceError::MicroCertDelegationError(
                 "Cannot delegate to NHI owner".to_string(),
             ));
@@ -548,11 +558,10 @@ impl NhiCertificationService {
 
     /// Revoke an NHI: suspend the identity.
     async fn revoke_nhi(&self, tenant_id: Uuid, nhi_id: Uuid, _revoked_by: Uuid) -> Result<()> {
-        // Suspend the NHI
         sqlx::query(
             r"
-            UPDATE gov_service_accounts
-            SET status = 'suspended',
+            UPDATE nhi_identities
+            SET lifecycle_state = 'suspended',
                 suspension_reason = 'certification_revoked',
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
@@ -569,49 +578,88 @@ impl NhiCertificationService {
         Ok(())
     }
 
+    /// Mark an NHI as certified.
+    async fn certify_nhi(&self, tenant_id: Uuid, nhi_id: Uuid, certified_by: Uuid) -> Result<()> {
+        sqlx::query(
+            r"
+            UPDATE nhi_identities
+            SET last_certified_at = NOW(),
+                last_certified_by = $3,
+                updated_at = NOW()
+            WHERE id = $1 AND tenant_id = $2
+            ",
+        )
+        .bind(nhi_id)
+        .bind(tenant_id)
+        .bind(certified_by)
+        .execute(&self.pool)
+        .await
+        .map_err(GovernanceError::Database)?;
+        Ok(())
+    }
+
     /// Check if a user can make a decision on an item.
     fn can_decide(&self, item: &NhiCertificationItem, user_id: Uuid) -> bool {
         // Primary reviewer or delegated reviewer can decide
         item.reviewer_id == user_id
     }
 
-    /// Get NHIs matching campaign criteria.
+    /// Get NHIs matching campaign criteria stored at create time.
     async fn get_nhis_for_campaign(
         &self,
         tenant_id: Uuid,
-        owner_filter: Option<Uuid>,
-        needs_certification_only: bool,
-    ) -> Result<Vec<GovServiceAccount>> {
+        campaign: &NhiCertificationCampaign,
+    ) -> Result<Vec<NhiIdentity>> {
         let mut query = String::from(
             r"
-            SELECT * FROM gov_service_accounts
+            SELECT * FROM nhi_identities
             WHERE tenant_id = $1
-              AND status = 'active'
+              AND lifecycle_state = 'active'
             ",
         );
 
+        #[allow(unused_assignments)]
         let mut param_idx = 2;
 
-        if owner_filter.is_some() {
+        if campaign.owner_filter.is_some() {
             query.push_str(&format!(" AND owner_id = ${param_idx}"));
-            #[allow(unused_assignments)]
-            {
-                param_idx += 1;
-            }
+            param_idx += 1;
         }
 
-        if needs_certification_only {
+        if campaign.needs_certification_only {
             query.push_str(
                 " AND (last_certified_at IS NULL OR last_certified_at < NOW() - INTERVAL '365 days')",
             );
         }
 
+        let nhi_type = parse_optional_nhi_type_filter(campaign.nhi_type_filter.as_deref())?;
+        if nhi_type.is_some() {
+            query.push_str(&format!(" AND nhi_type = ${param_idx}"));
+            param_idx += 1;
+        }
+
+        if campaign
+            .specific_nhi_ids
+            .as_ref()
+            .is_some_and(|ids| !ids.is_empty())
+        {
+            query.push_str(&format!(" AND id = ANY(${param_idx})"));
+        }
+
         query.push_str(" ORDER BY name ASC");
 
-        let mut q = sqlx::query_as::<_, GovServiceAccount>(&query).bind(tenant_id);
+        let mut q = sqlx::query_as::<_, NhiIdentity>(&query).bind(tenant_id);
 
-        if let Some(owner_id) = owner_filter {
+        if let Some(owner_id) = campaign.owner_filter {
             q = q.bind(owner_id);
+        }
+        if let Some(nhi_type) = nhi_type {
+            q = q.bind(nhi_type.to_string());
+        }
+        if let Some(ref ids) = campaign.specific_nhi_ids {
+            if !ids.is_empty() {
+                q = q.bind(ids);
+            }
         }
 
         q.fetch_all(&self.pool)
@@ -624,7 +672,7 @@ impl NhiCertificationService {
         &self,
         tenant_id: Uuid,
         campaign: &NhiCertificationCampaign,
-        nhis: &[GovServiceAccount],
+        nhis: &[NhiIdentity],
     ) -> Result<u64> {
         let mut count = 0u64;
 
@@ -653,16 +701,19 @@ impl NhiCertificationService {
         &self,
         tenant_id: Uuid,
         campaign: &NhiCertificationCampaign,
-        nhi: &GovServiceAccount,
+        nhi: &NhiIdentity,
     ) -> Result<Uuid> {
+        let owner_id = nhi.owner_id.ok_or_else(|| {
+            GovernanceError::ReviewerNotFound(format!("NHI {} has no owner", nhi.id))
+        })?;
         match campaign.reviewer_type {
             NhiCertReviewerType::Owner => {
                 // NHI owner certifies their own NHIs
-                Ok(nhi.owner_id)
+                Ok(owner_id)
             }
             NhiCertReviewerType::BackupOwner => {
                 // Use backup owner if available, otherwise fall back to primary owner
-                Ok(nhi.backup_owner_id.unwrap_or(nhi.owner_id))
+                Ok(nhi.backup_owner_id.unwrap_or(owner_id))
             }
             NhiCertReviewerType::SpecificUsers => {
                 // Use first specific reviewer (could be round-robin in future)
@@ -677,7 +728,7 @@ impl NhiCertificationService {
                     })
             }
             NhiCertReviewerType::OwnerManager => {
-                let owner = User::find_by_id_in_tenant(&self.pool, tenant_id, nhi.owner_id)
+                let owner = User::find_by_id_in_tenant(&self.pool, tenant_id, owner_id)
                     .await
                     .map_err(GovernanceError::Database)?
                     .ok_or_else(|| {
@@ -746,6 +797,7 @@ impl NhiCertificationService {
     // Database Operations (would normally be in xavyo-db models)
     // =========================================================================
 
+    #[allow(clippy::too_many_arguments)]
     async fn create_campaign_record(
         &self,
         tenant_id: Uuid,
@@ -753,6 +805,10 @@ impl NhiCertificationService {
         description: Option<String>,
         reviewer_type: NhiCertReviewerType,
         specific_reviewers: Option<Vec<Uuid>>,
+        owner_filter: Option<Uuid>,
+        needs_certification_only: bool,
+        nhi_type_filter: Option<String>,
+        specific_nhi_ids: Option<Vec<Uuid>>,
         deadline: DateTime<Utc>,
         created_by: Uuid,
     ) -> Result<NhiCertificationCampaign> {
@@ -775,9 +831,10 @@ impl NhiCertificationService {
             r"
             INSERT INTO gov_nhi_certification_campaigns (
                 id, tenant_id, name, description, status, reviewer_type,
-                specific_reviewers, deadline, created_by, created_at
+                specific_reviewers, deadline, owner_filter, needs_certification_only,
+                nhi_type_filter, specific_nhi_ids, created_by, created_at
             )
-            VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9)
+            VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9, $10, $11, $12, $13)
             ",
         )
         .bind(id)
@@ -787,6 +844,10 @@ impl NhiCertificationService {
         .bind(reviewer_type_str)
         .bind(&reviewers_json)
         .bind(deadline)
+        .bind(owner_filter)
+        .bind(needs_certification_only)
+        .bind(&nhi_type_filter)
+        .bind(&specific_nhi_ids)
         .bind(created_by)
         .bind(now)
         .execute(&self.pool)
@@ -802,6 +863,10 @@ impl NhiCertificationService {
             reviewer_type,
             specific_reviewers,
             deadline,
+            owner_filter,
+            needs_certification_only,
+            nhi_type_filter,
+            specific_nhi_ids,
             created_by,
             created_at: now,
             launched_at: None,
@@ -814,24 +879,12 @@ impl NhiCertificationService {
         tenant_id: Uuid,
         campaign_id: Uuid,
     ) -> Result<NhiCertificationCampaign> {
-        let row: Option<(
-            Uuid,
-            Uuid,
-            String,
-            Option<String>,
-            String,
-            String,
-            Option<serde_json::Value>,
-            DateTime<Utc>,
-            Uuid,
-            DateTime<Utc>,
-            Option<DateTime<Utc>>,
-            Option<DateTime<Utc>>,
-        )> = sqlx::query_as(
+        let row: Option<CampaignRow> = sqlx::query_as(
             r"
             SELECT id, tenant_id, name, description, status, reviewer_type,
                    specific_reviewers, deadline, created_by, created_at,
-                   launched_at, completed_at
+                   launched_at, completed_at, owner_filter, needs_certification_only,
+                   nhi_type_filter, specific_nhi_ids
             FROM gov_nhi_certification_campaigns
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -843,26 +896,7 @@ impl NhiCertificationService {
         .map_err(GovernanceError::Database)?;
 
         let row = row.ok_or(GovernanceError::CampaignNotFound(campaign_id))?;
-
-        let status = parse_campaign_status(&row.4)?;
-        let reviewer_type = parse_reviewer_type(&row.5)?;
-
-        let specific_reviewers = parse_reviewers(row.6)?;
-
-        Ok(NhiCertificationCampaign {
-            id: row.0,
-            tenant_id: row.1,
-            name: row.2,
-            description: row.3,
-            status,
-            reviewer_type,
-            specific_reviewers,
-            deadline: row.7,
-            created_by: row.8,
-            created_at: row.9,
-            launched_at: row.10,
-            completed_at: row.11,
-        })
+        campaign_from_row(row)
     }
 
     async fn list_campaign_records(
@@ -877,7 +911,8 @@ impl NhiCertificationService {
             r"
             SELECT id, tenant_id, name, description, status, reviewer_type,
                    specific_reviewers, deadline, created_by, created_at,
-                   launched_at, completed_at
+                   launched_at, completed_at, owner_filter, needs_certification_only,
+                   nhi_type_filter, specific_nhi_ids
             FROM gov_nhi_certification_campaigns
             WHERE tenant_id = $1
             ",
@@ -918,22 +953,6 @@ impl NhiCertificationService {
             NhiCertCampaignStatus::Cancelled => "cancelled",
         });
 
-        // Build and execute queries
-        type CampaignRow = (
-            Uuid,
-            Uuid,
-            String,
-            Option<String>,
-            String,
-            String,
-            Option<serde_json::Value>,
-            DateTime<Utc>,
-            Uuid,
-            DateTime<Utc>,
-            Option<DateTime<Utc>>,
-            Option<DateTime<Utc>>,
-        );
-
         let mut q = sqlx::query_as::<_, CampaignRow>(&query).bind(tenant_id);
         let mut cq = sqlx::query_scalar::<_, i64>(&count_query).bind(tenant_id);
 
@@ -960,22 +979,7 @@ impl NhiCertificationService {
 
         let campaigns = rows
             .into_iter()
-            .map(|row| {
-                Ok(NhiCertificationCampaign {
-                    id: row.0,
-                    tenant_id: row.1,
-                    name: row.2,
-                    description: row.3,
-                    status: parse_campaign_status(&row.4)?,
-                    reviewer_type: parse_reviewer_type(&row.5)?,
-                    specific_reviewers: parse_reviewers(row.6)?,
-                    deadline: row.7,
-                    created_by: row.8,
-                    created_at: row.9,
-                    launched_at: row.10,
-                    completed_at: row.11,
-                })
-            })
+            .map(campaign_from_row)
             .collect::<Result<Vec<_>>>()?;
 
         Ok((campaigns, total))
@@ -1146,7 +1150,7 @@ impl NhiCertificationService {
                    i.decision, i.decided_by, i.decided_at, i.comment,
                    i.delegated_by, i.original_reviewer_id, i.created_at
             FROM gov_nhi_certification_items i
-            JOIN gov_service_accounts s ON i.nhi_id = s.id AND s.tenant_id = i.tenant_id
+            JOIN nhi_identities s ON i.nhi_id = s.id AND s.tenant_id = i.tenant_id
             WHERE i.tenant_id = $1
             ",
         );
@@ -1155,7 +1159,7 @@ impl NhiCertificationService {
             r"
             SELECT COUNT(*)
             FROM gov_nhi_certification_items i
-            JOIN gov_service_accounts s ON i.nhi_id = s.id AND s.tenant_id = i.tenant_id
+            JOIN nhi_identities s ON i.nhi_id = s.id AND s.tenant_id = i.tenant_id
             WHERE i.tenant_id = $1
             ",
         );
@@ -1370,6 +1374,12 @@ impl NhiCertificationService {
             name: campaign.name,
             description: campaign.description,
             status: campaign.status,
+            reviewer_type: campaign.reviewer_type,
+            specific_reviewers: campaign.specific_reviewers,
+            owner_filter: campaign.owner_filter,
+            needs_certification_only: campaign.needs_certification_only,
+            nhi_type_filter: campaign.nhi_type_filter,
+            specific_nhi_ids: campaign.specific_nhi_ids,
             total_items: total,
             pending_items: pending,
             certified_items: certified,
@@ -1390,8 +1400,9 @@ impl NhiCertificationService {
         item: NhiCertificationItem,
     ) -> Result<NhiCertificationItemResponse> {
         // Get NHI details
-        let nhi = GovServiceAccount::find_by_id(&self.pool, tenant_id, item.nhi_id)
-            .await?
+        let nhi = NhiIdentity::find_by_id(&self.pool, tenant_id, item.nhi_id)
+            .await
+            .map_err(GovernanceError::Database)?
             .ok_or(GovernanceError::NhiNotFound(item.nhi_id))?;
 
         // Get campaign deadline
@@ -1399,8 +1410,12 @@ impl NhiCertificationService {
             .get_campaign_record(tenant_id, item.campaign_id)
             .await?;
 
-        let owner_name = User::find_by_id_in_tenant(&self.pool, tenant_id, nhi.owner_id)
-            .await?
+        let owner_id = nhi.owner_id.ok_or_else(|| {
+            GovernanceError::ReviewerNotFound(format!("NHI {} has no owner", nhi.id))
+        })?;
+        let owner_name = User::find_by_id_in_tenant(&self.pool, tenant_id, owner_id)
+            .await
+            .map_err(GovernanceError::Database)?
             .map(|user| match user.display_name {
                 Some(name) if !name.is_empty() => name,
                 _ => user.email,
@@ -1411,8 +1426,8 @@ impl NhiCertificationService {
             campaign_id: item.campaign_id,
             nhi_id: item.nhi_id,
             nhi_name: nhi.name,
-            nhi_purpose: nhi.purpose,
-            owner_id: nhi.owner_id,
+            nhi_purpose: nhi.description.unwrap_or_default(),
+            owner_id,
             owner_name,
             reviewer_id: item.reviewer_id,
             status: item.status,
@@ -1459,7 +1474,7 @@ impl NhiCertificationService {
         &self,
         tenant_id: Uuid,
         item: &NhiCertificationItem,
-        nhi: &GovServiceAccount,
+        nhi: &NhiIdentity,
         decision: NhiCertificationDecision,
         decided_by: Uuid,
     ) {
@@ -1493,6 +1508,56 @@ impl NhiCertificationService {
     #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
+    }
+}
+
+type CampaignRow = (
+    Uuid,
+    Uuid,
+    String,
+    Option<String>,
+    String,
+    String,
+    Option<serde_json::Value>,
+    DateTime<Utc>,
+    Uuid,
+    DateTime<Utc>,
+    Option<DateTime<Utc>>,
+    Option<DateTime<Utc>>,
+    Option<Uuid>,
+    bool,
+    Option<String>,
+    Option<Vec<Uuid>>,
+);
+
+fn campaign_from_row(row: CampaignRow) -> Result<NhiCertificationCampaign> {
+    Ok(NhiCertificationCampaign {
+        id: row.0,
+        tenant_id: row.1,
+        name: row.2,
+        description: row.3,
+        status: parse_campaign_status(&row.4)?,
+        reviewer_type: parse_reviewer_type(&row.5)?,
+        specific_reviewers: parse_reviewers(row.6)?,
+        deadline: row.7,
+        created_by: row.8,
+        created_at: row.9,
+        launched_at: row.10,
+        completed_at: row.11,
+        owner_filter: row.12,
+        needs_certification_only: row.13,
+        nhi_type_filter: row.14,
+        specific_nhi_ids: row.15.filter(|ids| !ids.is_empty()),
+    })
+}
+
+fn parse_optional_nhi_type_filter(value: Option<&str>) -> Result<Option<NhiType>> {
+    match value.map(str::trim).filter(|s| !s.is_empty()) {
+        None => Ok(None),
+        Some(raw) => raw
+            .parse::<NhiType>()
+            .map(Some)
+            .map_err(|e| GovernanceError::Validation(e.to_string())),
     }
 }
 
@@ -1748,8 +1813,78 @@ mod tests {
         assert!(
             item.contains("find_by_id_in_tenant")
                 && item.contains("owner_name")
-                && !item.contains("owner_name: None"),
-            "NHI certification items must look up the owner display name"
+                && !item.contains("owner_name: None")
+                && item.contains("NhiIdentity::find_by_id"),
+            "NHI certification items must look up the owner display name from nhi_identities"
         );
+    }
+
+    #[test]
+    fn launch_uses_persisted_create_time_filters() {
+        let src = include_str!("nhi_certification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let launch = production
+            .split("pub async fn launch_campaign")
+            .nth(1)
+            .and_then(|s| s.split("    /// Get campaign by ID").next())
+            .expect("launch_campaign");
+        assert!(
+            launch.contains("get_nhis_for_campaign(tenant_id, &campaign)")
+                && !launch.contains("owner_filter: Option<Uuid>")
+                && !launch.contains("needs_certification_only: bool"),
+            "POST launch must use stored create-time filters, not caller-hardcoded ones"
+        );
+        let create = production
+            .split("async fn create_campaign_record")
+            .nth(1)
+            .and_then(|s| s.split("    async fn get_campaign_record").next())
+            .expect("create_campaign_record");
+        assert!(
+            create.contains("owner_filter")
+                && create.contains("needs_certification_only")
+                && create.contains("nhi_type_filter")
+                && create.contains("specific_nhi_ids"),
+            "POST create must persist advertised campaign filters"
+        );
+        let select = production
+            .split("async fn get_nhis_for_campaign")
+            .nth(1)
+            .and_then(|s| s.split("    async fn generate_certification_items").next())
+            .expect("get_nhis_for_campaign");
+        assert!(
+            select.contains("FROM nhi_identities")
+                && select.contains("campaign.owner_filter")
+                && select.contains("campaign.needs_certification_only")
+                && !select.contains("FROM gov_service_accounts"),
+            "launch must select matching NHIs from nhi_identities using stored filters"
+        );
+    }
+
+    #[test]
+    fn campaign_response_echoes_create_time_filters() {
+        let src = include_str!("nhi_certification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let to_response = production
+            .split("fn campaign_to_response(")
+            .nth(1)
+            .and_then(|s| s.split("    async fn item_to_response").next())
+            .expect("campaign_to_response");
+        assert!(
+            to_response.contains("owner_filter: campaign.owner_filter")
+                && to_response
+                    .contains("needs_certification_only: campaign.needs_certification_only")
+                && to_response.contains("reviewer_type: campaign.reviewer_type"),
+            "GET/create campaign responses must echo persisted filters"
+        );
+    }
+
+    #[test]
+    fn optional_nhi_type_filter_parses_or_fails_closed() {
+        assert!(parse_optional_nhi_type_filter(None).unwrap().is_none());
+        assert_eq!(
+            parse_optional_nhi_type_filter(Some("agent")).unwrap(),
+            Some(NhiType::Agent)
+        );
+        assert!(parse_optional_nhi_type_filter(Some("widget")).is_err());
     }
 }

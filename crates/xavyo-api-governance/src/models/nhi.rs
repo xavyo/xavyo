@@ -1171,6 +1171,14 @@ pub struct CreateNhiCertificationCampaignRequest {
     #[serde(default)]
     pub specific_reviewers: Option<Vec<Uuid>>,
 
+    /// Filter by NHI type (`service_account`, `agent`, `tool`).
+    #[serde(default)]
+    pub nhi_type_filter: Option<String>,
+
+    /// Certify only these NHI IDs (optional).
+    #[serde(default)]
+    pub specific_nhi_ids: Option<Vec<Uuid>>,
+
     /// Deadline for the campaign.
     pub deadline: DateTime<Utc>,
 }
@@ -1311,6 +1319,28 @@ pub struct NhiCertificationCampaignResponse {
 
     /// Current status.
     pub status: NhiCertCampaignStatus,
+
+    /// Reviewer assignment strategy.
+    pub reviewer_type: NhiCertReviewerType,
+
+    /// Specific reviewer IDs (if `reviewer_type` is `SpecificUsers`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub specific_reviewers: Option<Vec<Uuid>>,
+
+    /// Owner filter applied at launch.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner_filter: Option<Uuid>,
+
+    /// Whether launch includes only NHIs needing certification.
+    pub needs_certification_only: bool,
+
+    /// Optional NHI type filter applied at launch.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nhi_type_filter: Option<String>,
+
+    /// Optional explicit NHI IDs applied at launch.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub specific_nhi_ids: Option<Vec<Uuid>>,
 
     /// Total NHIs included.
     pub total_items: i64,

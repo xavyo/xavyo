@@ -22,9 +22,9 @@ use crate::models::{
 use xavyo_events::{events::nhi::NhiUsageRecorded, EventProducer};
 
 use xavyo_db::{
-    CreateGovNhiUsageEvent, GovNhiUsageEvent, GovServiceAccount, NhiUsageEventFilter,
-    NhiUsageOutcome, ServiceAccountFilter, ServiceAccountStatus,
+    CreateGovNhiUsageEvent, GovNhiUsageEvent, NhiIdentity, NhiUsageEventFilter, NhiUsageOutcome,
 };
+use xavyo_nhi::NhiLifecycleState;
 
 type Result<T> = std::result::Result<T, GovernanceError>;
 
@@ -66,7 +66,7 @@ impl NhiUsageService {
         request: RecordUsageRequest,
     ) -> Result<NhiUsageEventResponse> {
         // Validate NHI exists
-        let _ = GovServiceAccount::find_by_id(&self.pool, tenant_id, nhi_id)
+        let _ = NhiIdentity::find_by_id(&self.pool, tenant_id, nhi_id)
             .await
             .map_err(GovernanceError::Database)?
             .ok_or(GovernanceError::NhiNotFound(nhi_id))?;
@@ -91,7 +91,9 @@ impl NhiUsageService {
         // Persist errors must not look like usage was recorded for inactivity.
         if request.outcome == NhiUsageOutcome::Success {
             nhi_last_used_recorded(
-                GovServiceAccount::update_last_used(&self.pool, tenant_id, nhi_id).await,
+                touch_nhi_last_activity(&self.pool, tenant_id, nhi_id)
+                    .await
+                    .map_err(GovernanceError::Database),
             )?;
         }
 
@@ -144,7 +146,7 @@ impl NhiUsageService {
         query: NhiUsageListQuery,
     ) -> Result<NhiUsageListResponse> {
         // Validate NHI exists
-        let _ = GovServiceAccount::find_by_id(&self.pool, tenant_id, nhi_id)
+        let _ = NhiIdentity::find_by_id(&self.pool, tenant_id, nhi_id)
             .await
             .map_err(GovernanceError::Database)?
             .ok_or(GovernanceError::NhiNotFound(nhi_id))?;
@@ -189,7 +191,7 @@ impl NhiUsageService {
         period_days: Option<i32>,
     ) -> Result<NhiUsageSummaryExtendedResponse> {
         // Validate NHI exists
-        let nhi = GovServiceAccount::find_by_id(&self.pool, tenant_id, nhi_id)
+        let nhi = NhiIdentity::find_by_id(&self.pool, tenant_id, nhi_id)
             .await
             .map_err(GovernanceError::Database)?
             .ok_or(GovernanceError::NhiNotFound(nhi_id))?;
@@ -249,23 +251,30 @@ impl NhiUsageService {
     ) -> Result<StalenessReportResponse> {
         let threshold = min_inactive_days.unwrap_or(30);
 
-        // Get all active NHIs
-        let filter = ServiceAccountFilter {
-            status: Some(ServiceAccountStatus::Active),
-            inactive_days: Some(threshold),
-            ..Default::default()
-        };
-
-        let nhis = GovServiceAccount::list(&self.pool, tenant_id, &filter, 1000, 0)
-            .await
-            .map_err(GovernanceError::Database)?;
+        let nhis = sqlx::query_as::<_, NhiIdentity>(
+            r"
+            SELECT * FROM nhi_identities
+            WHERE tenant_id = $1
+              AND lifecycle_state = $2
+            ORDER BY name ASC
+            LIMIT 1000
+            ",
+        )
+        .bind(tenant_id)
+        .bind(NhiLifecycleState::Active.to_string())
+        .fetch_all(&self.pool)
+        .await
+        .map_err(GovernanceError::Database)?;
 
         let now = Utc::now();
         let mut stale_nhis: Vec<StaleNhiInfo> = Vec::new();
 
         for nhi in nhis {
+            let Some(owner_id) = nhi.owner_id else {
+                continue;
+            };
             let days_inactive = nhi
-                .last_used_at
+                .last_activity_at
                 .map_or((now - nhi.created_at).num_days(), |last| {
                     (now - last).num_days()
                 });
@@ -273,15 +282,17 @@ impl NhiUsageService {
             let individual_threshold = nhi.inactivity_threshold_days.unwrap_or(90);
 
             // Only include if truly stale (beyond individual threshold)
-            if days_inactive >= i64::from(individual_threshold) {
+            if days_inactive >= i64::from(individual_threshold)
+                && days_inactive >= i64::from(threshold)
+            {
                 stale_nhis.push(StaleNhiInfo {
                     nhi_id: nhi.id,
                     name: nhi.name.clone(),
-                    owner_id: nhi.owner_id,
+                    owner_id,
                     days_inactive: days_inactive as i32,
-                    last_used_at: nhi.last_used_at,
+                    last_used_at: nhi.last_activity_at,
                     inactivity_threshold_days: individual_threshold,
-                    in_grace_period: nhi.is_in_grace_period(),
+                    in_grace_period: nhi.grace_period_ends_at.is_some_and(|ends| ends > now),
                     grace_period_ends_at: nhi.grace_period_ends_at,
                 });
             }
@@ -336,6 +347,25 @@ fn nhi_last_used_recorded<T, E>(result: std::result::Result<T, E>) -> std::resul
     result
 }
 
+async fn touch_nhi_last_activity(
+    pool: &PgPool,
+    tenant_id: Uuid,
+    nhi_id: Uuid,
+) -> std::result::Result<u64, sqlx::Error> {
+    let result = sqlx::query(
+        r"
+        UPDATE nhi_identities
+        SET last_activity_at = NOW(), updated_at = NOW()
+        WHERE id = $1 AND tenant_id = $2
+        ",
+    )
+    .bind(nhi_id)
+    .bind(tenant_id)
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -362,12 +392,26 @@ mod tests {
             .expect("record_usage");
         assert!(
             record.contains("nhi_last_used_recorded(")
-                && record.contains("GovServiceAccount::update_last_used"),
-            "last_used persist must fail closed"
+                && record.contains("touch_nhi_last_activity(")
+                && record.contains("NhiIdentity::find_by_id"),
+            "last_used persist must fail closed against nhi_identities"
         );
         assert!(
-            !record.contains("let _ = GovServiceAccount::update_last_used"),
+            !record.contains("GovServiceAccount::update_last_used")
+                && !record.contains("let _ = touch_nhi_last_activity"),
             "must not swallow last_used persist after successful usage"
+        );
+    }
+
+    #[test]
+    fn usage_queries_unified_nhi_identities() {
+        let src = include_str!("nhi_usage_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("NhiIdentity::find_by_id")
+                && production.contains("FROM nhi_identities")
+                && !production.contains("GovServiceAccount::"),
+            "NHI usage GET/POST must look up nhi_identities, not the dropped gov_service_accounts table"
         );
     }
 }
