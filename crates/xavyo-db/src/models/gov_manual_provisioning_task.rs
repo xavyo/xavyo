@@ -91,6 +91,7 @@ pub struct ManualTaskFilter {
     pub assignment_id: Option<Uuid>,
     pub sla_breached: Option<bool>,
     pub assignee_id: Option<Uuid>,
+    pub operation: Option<ManualTaskOperation>,
 }
 
 impl GovManualProvisioningTask {
@@ -184,7 +185,20 @@ impl GovManualProvisioningTask {
             param_count += 1;
             query.push_str(&format!(" AND assignee_id = ${param_count}"));
         }
-        // Note: status filtering with array is handled separately
+        if let Some(ref statuses) = filter.status {
+            if !statuses.is_empty() {
+                let start = param_count + 1;
+                let placeholders: Vec<String> = (0..statuses.len())
+                    .map(|i| format!("${}", start + i as i32))
+                    .collect();
+                query.push_str(&format!(" AND status IN ({})", placeholders.join(", ")));
+                param_count += statuses.len() as i32;
+            }
+        }
+        if filter.operation.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND operation_type = ${param_count}"));
+        }
 
         query.push_str(&format!(
             " ORDER BY created_at DESC LIMIT ${} OFFSET ${}",
@@ -208,6 +222,14 @@ impl GovManualProvisioningTask {
         }
         if let Some(assignee_id) = filter.assignee_id {
             q = q.bind(assignee_id);
+        }
+        if let Some(ref statuses) = filter.status {
+            for status in statuses {
+                q = q.bind(*status);
+            }
+        }
+        if let Some(operation) = filter.operation {
+            q = q.bind(operation);
         }
 
         q.bind(limit).bind(offset).fetch_all(pool).await
@@ -235,9 +257,31 @@ impl GovManualProvisioningTask {
             param_count += 1;
             query.push_str(&format!(" AND user_id = ${param_count}"));
         }
+        if filter.assignment_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND assignment_id = ${param_count}"));
+        }
         if filter.sla_breached.is_some() {
             param_count += 1;
             query.push_str(&format!(" AND sla_breached = ${param_count}"));
+        }
+        if filter.assignee_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND assignee_id = ${param_count}"));
+        }
+        if let Some(ref statuses) = filter.status {
+            if !statuses.is_empty() {
+                let start = param_count + 1;
+                let placeholders: Vec<String> = (0..statuses.len())
+                    .map(|i| format!("${}", start + i as i32))
+                    .collect();
+                query.push_str(&format!(" AND status IN ({})", placeholders.join(", ")));
+                param_count += statuses.len() as i32;
+            }
+        }
+        if filter.operation.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND operation_type = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -248,8 +292,22 @@ impl GovManualProvisioningTask {
         if let Some(user_id) = filter.user_id {
             q = q.bind(user_id);
         }
+        if let Some(assignment_id) = filter.assignment_id {
+            q = q.bind(assignment_id);
+        }
         if let Some(sla_breached) = filter.sla_breached {
             q = q.bind(sla_breached);
+        }
+        if let Some(assignee_id) = filter.assignee_id {
+            q = q.bind(assignee_id);
+        }
+        if let Some(ref statuses) = filter.status {
+            for status in statuses {
+                q = q.bind(*status);
+            }
+        }
+        if let Some(operation) = filter.operation {
+            q = q.bind(operation);
         }
 
         q.fetch_one(pool).await
@@ -672,6 +730,30 @@ mod tests {
         };
 
         assert_eq!(input.operation_type, ManualTaskOperation::Grant);
+    }
+
+    #[test]
+    fn list_and_count_honor_status_and_operation_filters() {
+        let src = include_str!("gov_manual_provisioning_task.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for fn_name in ["list_by_tenant", "count_by_tenant"] {
+            let body = production
+                .split(&format!("pub async fn {fn_name}"))
+                .nth(1)
+                .and_then(|s| s.split("pub async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                body.contains("AND status IN")
+                    && body.contains("AND operation_type =")
+                    && body.contains("filter.status")
+                    && body.contains("filter.operation"),
+                "{fn_name} must apply advertised status and operation filters"
+            );
+            assert!(
+                !body.contains("handled separately"),
+                "{fn_name} must not skip status filtering"
+            );
+        }
     }
 
     #[test]

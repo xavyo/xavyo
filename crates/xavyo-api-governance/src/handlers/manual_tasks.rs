@@ -36,6 +36,7 @@ fn user_id_from_claims(claims: &JwtClaims) -> Result<Uuid, ApiGovernanceError> {
         ("user_id" = Option<Uuid>, Query, description = "Filter by target user"),
         ("sla_breached" = Option<bool>, Query, description = "Filter by SLA breach status"),
         ("assignee_id" = Option<Uuid>, Query, description = "Filter by assignee"),
+        ("operation" = Option<String>, Query, description = "Filter by operation type"),
         ("limit" = Option<i64>, Query, description = "Maximum results to return"),
         ("offset" = Option<i64>, Query, description = "Results to skip")
     ),
