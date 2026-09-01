@@ -574,8 +574,6 @@ pub struct ListManualTasksQuery {
     pub operation: Option<ManualTaskOperation>,
     /// Filter for SLA breached tasks.
     pub sla_breached: Option<bool>,
-    /// Filter by priority (1-10).
-    pub priority: Option<i32>,
     /// Maximum number of items to return.
     #[param(default = 50, maximum = 100)]
     pub limit: Option<i64>,

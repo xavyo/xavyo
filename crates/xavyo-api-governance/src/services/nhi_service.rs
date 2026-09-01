@@ -1480,6 +1480,22 @@ mod tests {
     }
 
     #[test]
+    fn list_nhis_passes_rotation_and_inactivity_filters() {
+        let src = include_str!("nhi_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list(")
+            .nth(1)
+            .and_then(|s| s.split("    pub async fn ").next())
+            .expect("list");
+        assert!(
+            list.contains("needs_rotation: query.needs_rotation")
+                && list.contains("inactive_days: if query.inactive_only == Some(true)"),
+            "GET /governance/nhis must pass advertised needs_rotation and inactive_only filters"
+        );
+    }
+
+    #[test]
     fn test_nhi_summary_default() {
         let summary = NhiSummary {
             total: 0,

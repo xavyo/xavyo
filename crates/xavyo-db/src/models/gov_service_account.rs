@@ -402,6 +402,23 @@ impl GovServiceAccount {
             );
         }
 
+        if filter.needs_rotation == Some(true) {
+            query.push_str(
+                " AND (last_rotation_at IS NULL OR last_rotation_at <= NOW() - (COALESCE(rotation_interval_days, 90) || ' days')::interval)",
+            );
+        } else if filter.needs_rotation == Some(false) {
+            query.push_str(
+                " AND last_rotation_at IS NOT NULL AND last_rotation_at > NOW() - (COALESCE(rotation_interval_days, 90) || ' days')::interval",
+            );
+        }
+
+        if filter.inactive_days.is_some() {
+            query.push_str(&format!(
+                " AND (last_used_at IS NULL OR last_used_at <= NOW() - (COALESCE(inactivity_threshold_days, ${param_idx}) || ' days')::interval)"
+            ));
+            param_idx += 1;
+        }
+
         query.push_str(&format!(
             " ORDER BY name ASC LIMIT ${} OFFSET ${}",
             param_idx,
@@ -420,6 +437,10 @@ impl GovServiceAccount {
 
         if let Some(days) = filter.expiring_within_days {
             q = q.bind(days);
+        }
+
+        if let Some(inactive_days) = filter.inactive_days {
+            q = q.bind(inactive_days);
         }
 
         q = q.bind(limit).bind(offset);
@@ -456,12 +477,29 @@ impl GovServiceAccount {
             query.push_str(&format!(
                 " AND expires_at IS NOT NULL AND expires_at <= NOW() + (${param_idx} || ' days')::interval AND expires_at > NOW()"
             ));
+            param_idx += 1;
         }
 
         if filter.needs_certification == Some(true) {
             query.push_str(
                 " AND (last_certified_at IS NULL OR last_certified_at < NOW() - INTERVAL '365 days')",
             );
+        }
+
+        if filter.needs_rotation == Some(true) {
+            query.push_str(
+                " AND (last_rotation_at IS NULL OR last_rotation_at <= NOW() - (COALESCE(rotation_interval_days, 90) || ' days')::interval)",
+            );
+        } else if filter.needs_rotation == Some(false) {
+            query.push_str(
+                " AND last_rotation_at IS NOT NULL AND last_rotation_at > NOW() - (COALESCE(rotation_interval_days, 90) || ' days')::interval",
+            );
+        }
+
+        if filter.inactive_days.is_some() {
+            query.push_str(&format!(
+                " AND (last_used_at IS NULL OR last_used_at <= NOW() - (COALESCE(inactivity_threshold_days, ${param_idx}) || ' days')::interval)"
+            ));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -476,6 +514,10 @@ impl GovServiceAccount {
 
         if let Some(days) = filter.expiring_within_days {
             q = q.bind(days);
+        }
+
+        if let Some(inactive_days) = filter.inactive_days {
+            q = q.bind(inactive_days);
         }
 
         q.fetch_one(pool).await
@@ -749,5 +791,25 @@ mod tests {
         let expired = ServiceAccountStatus::Expired;
         let json = serde_json::to_string(&expired).unwrap();
         assert_eq!(json, "\"expired\"");
+    }
+
+    #[test]
+    fn list_and_count_honor_rotation_and_inactivity_filters() {
+        let src = include_str!("gov_service_account.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for fn_name in ["pub async fn list(", "pub async fn count("] {
+            let body = production
+                .split(fn_name)
+                .nth(1)
+                .and_then(|s| s.split("pub async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                body.contains("filter.needs_rotation")
+                    && body.contains("last_rotation_at")
+                    && body.contains("filter.inactive_days")
+                    && body.contains("last_used_at"),
+                "{fn_name} must apply advertised needs_rotation and inactive_only filters"
+            );
+        }
     }
 }

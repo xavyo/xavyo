@@ -47,6 +47,7 @@ impl ManualTaskService {
             assignment_id: None,
             sla_breached: query.sla_breached,
             assignee_id: query.assignee_id,
+            operation: query.operation,
         };
 
         let limit = query.limit.unwrap_or(50).min(100);
@@ -550,6 +551,10 @@ mod tests {
         assert!(
             list.contains("task_response(") && !list.contains("ManualTaskResponse::from(task)"),
             "GET /governance/manual-tasks must enrich names"
+        );
+        assert!(
+            list.contains("operation: query.operation") && list.contains("status: query.status"),
+            "GET /governance/manual-tasks must pass advertised operation and status filters"
         );
     }
 }

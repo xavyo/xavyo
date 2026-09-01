@@ -272,6 +272,81 @@ impl NhiDelegationGrant {
         .await
     }
 
+    /// List grants with optional principal and actor filters (AND when both are set).
+    pub async fn list_filtered(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        principal_id: Option<Uuid>,
+        actor_nhi_id: Option<Uuid>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        let limit = limit.min(100);
+        let offset = offset.max(0);
+        let mut sql = String::from(
+            r"
+            SELECT * FROM nhi_delegation_grants
+            WHERE tenant_id = $1
+            ",
+        );
+        let mut param_count = 1;
+        if principal_id.is_some() {
+            param_count += 1;
+            sql.push_str(&format!(" AND principal_id = ${param_count}"));
+        }
+        if actor_nhi_id.is_some() {
+            param_count += 1;
+            sql.push_str(&format!(" AND actor_nhi_id = ${param_count}"));
+        }
+        sql.push_str(&format!(
+            " ORDER BY granted_at DESC LIMIT ${} OFFSET ${}",
+            param_count + 1,
+            param_count + 2
+        ));
+
+        let mut q = sqlx::query_as::<_, Self>(&sql).bind(tenant_id);
+        if let Some(principal_id) = principal_id {
+            q = q.bind(principal_id);
+        }
+        if let Some(actor_nhi_id) = actor_nhi_id {
+            q = q.bind(actor_nhi_id);
+        }
+        q.bind(limit).bind(offset).fetch_all(pool).await
+    }
+
+    /// Count grants with optional principal and actor filters (AND when both are set).
+    pub async fn count_filtered(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        principal_id: Option<Uuid>,
+        actor_nhi_id: Option<Uuid>,
+    ) -> Result<i64, sqlx::Error> {
+        let mut sql = String::from(
+            r"
+            SELECT COUNT(*) FROM nhi_delegation_grants
+            WHERE tenant_id = $1
+            ",
+        );
+        let mut param_count = 1;
+        if principal_id.is_some() {
+            param_count += 1;
+            sql.push_str(&format!(" AND principal_id = ${param_count}"));
+        }
+        if actor_nhi_id.is_some() {
+            param_count += 1;
+            sql.push_str(&format!(" AND actor_nhi_id = ${param_count}"));
+        }
+
+        let mut q = sqlx::query_scalar::<_, i64>(&sql).bind(tenant_id);
+        if let Some(principal_id) = principal_id {
+            q = q.bind(principal_id);
+        }
+        if let Some(actor_nhi_id) = actor_nhi_id {
+            q = q.bind(actor_nhi_id);
+        }
+        q.fetch_one(pool).await
+    }
+
     /// Mark expired grants as 'expired' for a tenant.
     pub async fn cleanup_expired(pool: &PgPool, tenant_id: Uuid) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
@@ -429,5 +504,25 @@ mod tests {
         let json_str = serde_json::to_string(&input).unwrap();
         let deserialized: CreateNhiDelegationGrant = serde_json::from_str(&json_str).unwrap();
         assert_eq!(input.principal_id, deserialized.principal_id);
+    }
+
+    #[test]
+    fn list_filtered_ands_principal_and_actor() {
+        let src = include_str!("nhi_delegation_grant.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for fn_name in ["list_filtered", "count_filtered"] {
+            let body = production
+                .split(&format!("pub async fn {fn_name}"))
+                .nth(1)
+                .and_then(|s| s.split("pub async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                body.contains("AND principal_id =")
+                    && body.contains("AND actor_nhi_id =")
+                    && body.contains("if let Some(principal_id)")
+                    && body.contains("if let Some(actor_nhi_id)"),
+                "{fn_name} must AND optional principal_id and actor_nhi_id filters"
+            );
+        }
     }
 }

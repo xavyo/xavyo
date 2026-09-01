@@ -235,35 +235,28 @@ pub async fn list_delegation_grants(
     let limit = query.limit.clamp(1, 100);
     let offset = query.offset.max(0);
 
-    let (data, total) = if let Some(principal_id) = query.principal_id {
-        let data = NhiDelegationGrant::list_by_principal(
-            &state.pool,
-            tenant_uuid,
-            principal_id,
-            limit,
-            offset,
-        )
-        .await?;
-        let total =
-            NhiDelegationGrant::count_by_principal(&state.pool, tenant_uuid, principal_id).await?;
-        (data, total)
-    } else if let Some(actor_nhi_id) = query.actor_nhi_id {
-        let data = NhiDelegationGrant::list_by_actor(
-            &state.pool,
-            tenant_uuid,
-            actor_nhi_id,
-            limit,
-            offset,
-        )
-        .await?;
-        let total =
-            NhiDelegationGrant::count_by_actor(&state.pool, tenant_uuid, actor_nhi_id).await?;
-        (data, total)
-    } else {
+    if query.principal_id.is_none() && query.actor_nhi_id.is_none() {
         return Err(NhiApiError::BadRequest(
             "Either principal_id or actor_nhi_id query parameter is required".into(),
         ));
-    };
+    }
+
+    let data = NhiDelegationGrant::list_filtered(
+        &state.pool,
+        tenant_uuid,
+        query.principal_id,
+        query.actor_nhi_id,
+        limit,
+        offset,
+    )
+    .await?;
+    let total = NhiDelegationGrant::count_filtered(
+        &state.pool,
+        tenant_uuid,
+        query.principal_id,
+        query.actor_nhi_id,
+    )
+    .await?;
 
     Ok(Json(PaginatedDelegationResponse {
         data,
@@ -363,6 +356,7 @@ pub async fn revoke_delegation_grant(
     path = "/nhi/{id}/delegations/incoming",
     params(
         ("id" = Uuid, Path, description = "NHI identity ID (actor)"),
+        ListDelegationsQuery,
     ),
     responses(
         (status = 200, description = "Incoming delegation grants", body = PaginatedDelegationResponse),
@@ -385,9 +379,22 @@ pub async fn list_incoming_delegations(
     let limit = query.limit.clamp(1, 100);
     let offset = query.offset.max(0);
 
-    let data =
-        NhiDelegationGrant::list_by_actor(&state.pool, tenant_uuid, nhi_id, limit, offset).await?;
-    let total = NhiDelegationGrant::count_by_actor(&state.pool, tenant_uuid, nhi_id).await?;
+    let data = NhiDelegationGrant::list_filtered(
+        &state.pool,
+        tenant_uuid,
+        query.principal_id,
+        Some(nhi_id),
+        limit,
+        offset,
+    )
+    .await?;
+    let total = NhiDelegationGrant::count_filtered(
+        &state.pool,
+        tenant_uuid,
+        query.principal_id,
+        Some(nhi_id),
+    )
+    .await?;
 
     Ok(Json(PaginatedDelegationResponse {
         data,
@@ -403,6 +410,7 @@ pub async fn list_incoming_delegations(
     path = "/nhi/{id}/delegations/outgoing",
     params(
         ("id" = Uuid, Path, description = "NHI identity ID (principal)"),
+        ListDelegationsQuery,
     ),
     responses(
         (status = 200, description = "Outgoing delegation grants", body = PaginatedDelegationResponse),
@@ -425,10 +433,22 @@ pub async fn list_outgoing_delegations(
     let limit = query.limit.clamp(1, 100);
     let offset = query.offset.max(0);
 
-    let data =
-        NhiDelegationGrant::list_by_principal(&state.pool, tenant_uuid, nhi_id, limit, offset)
-            .await?;
-    let total = NhiDelegationGrant::count_by_principal(&state.pool, tenant_uuid, nhi_id).await?;
+    let data = NhiDelegationGrant::list_filtered(
+        &state.pool,
+        tenant_uuid,
+        Some(nhi_id),
+        query.actor_nhi_id,
+        limit,
+        offset,
+    )
+    .await?;
+    let total = NhiDelegationGrant::count_filtered(
+        &state.pool,
+        tenant_uuid,
+        Some(nhi_id),
+        query.actor_nhi_id,
+    )
+    .await?;
 
     Ok(Json(PaginatedDelegationResponse {
         data,
@@ -527,10 +547,12 @@ mod tests {
             .and_then(|s| s.split("pub async fn ").next())
             .expect("list_delegation_grants");
         assert!(
-            list.contains("count_by_principal")
-                && list.contains("count_by_actor")
+            list.contains("list_filtered(")
+                && list.contains("count_filtered(")
+                && list.contains("query.principal_id")
+                && list.contains("query.actor_nhi_id")
                 && list.contains("total"),
-            "GET /nhi/delegations must report the filtered total, not only the page"
+            "GET /nhi/delegations must AND advertised principal_id and actor_nhi_id filters"
         );
         let incoming = production
             .split("pub async fn list_incoming_delegations")
@@ -538,8 +560,11 @@ mod tests {
             .and_then(|s| s.split("pub async fn ").next())
             .expect("list_incoming_delegations");
         assert!(
-            incoming.contains("count_by_actor"),
-            "incoming delegations must report a real total"
+            incoming.contains("list_filtered(")
+                && incoming.contains("count_filtered(")
+                && incoming.contains("query.principal_id")
+                && incoming.contains("Some(nhi_id)"),
+            "incoming delegations must honor advertised principal_id"
         );
         let outgoing = production
             .split("pub async fn list_outgoing_delegations")
@@ -547,8 +572,11 @@ mod tests {
             .and_then(|s| s.split("pub async fn ").next())
             .expect("list_outgoing_delegations");
         assert!(
-            outgoing.contains("count_by_principal"),
-            "outgoing delegations must report a real total"
+            outgoing.contains("list_filtered(")
+                && outgoing.contains("count_filtered(")
+                && outgoing.contains("query.actor_nhi_id")
+                && outgoing.contains("Some(nhi_id)"),
+            "outgoing delegations must honor advertised actor_nhi_id"
         );
     }
 }
