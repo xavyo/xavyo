@@ -138,7 +138,8 @@ pub async fn list_nhis(
             .map_err(|_| NhiApiError::BadRequest("Invalid user ID".into()))?;
 
         let user_perms =
-            NhiUserPermission::list_by_user(&state.pool, tenant_uuid, user_id, 10000, 0).await?;
+            NhiUserPermission::list_by_user(&state.pool, tenant_uuid, user_id, None, 10000, 0)
+                .await?;
         let mut permitted_nhi_ids: Vec<Uuid> = user_perms.iter().map(|p| p.nhi_id).collect();
         permitted_nhi_ids.sort();
         permitted_nhi_ids.dedup();

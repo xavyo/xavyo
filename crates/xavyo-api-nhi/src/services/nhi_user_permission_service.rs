@@ -110,10 +110,13 @@ impl NhiUserPermissionService {
         pool: &PgPool,
         tenant_id: Uuid,
         nhi_id: Uuid,
+        permission_type: Option<&str>,
         limit: i64,
         offset: i64,
     ) -> Result<Vec<NhiUserPermission>, NhiApiError> {
-        let perms = NhiUserPermission::list_by_nhi(pool, tenant_id, nhi_id, limit, offset).await?;
+        let perms =
+            NhiUserPermission::list_by_nhi(pool, tenant_id, nhi_id, permission_type, limit, offset)
+                .await?;
         Ok(perms)
     }
 
@@ -122,11 +125,19 @@ impl NhiUserPermissionService {
         pool: &PgPool,
         tenant_id: Uuid,
         user_id: Uuid,
+        permission_type: Option<&str>,
         limit: i64,
         offset: i64,
     ) -> Result<Vec<NhiUserPermission>, NhiApiError> {
-        let perms =
-            NhiUserPermission::list_by_user(pool, tenant_id, user_id, limit, offset).await?;
+        let perms = NhiUserPermission::list_by_user(
+            pool,
+            tenant_id,
+            user_id,
+            permission_type,
+            limit,
+            offset,
+        )
+        .await?;
         Ok(perms)
     }
 
