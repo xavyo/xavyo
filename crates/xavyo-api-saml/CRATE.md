@@ -57,6 +57,7 @@ Comprehensive integration guides available in `docs/`:
 - **Configurable Attribute Name**: Per-SP group attribute name (default: "groups", supports custom URIs)
 - **Value Formats**: Name (display_name), ID (UUID), or DN (Distinguished Name) formats
 - **Group Filtering**: Pattern-based (glob) or allowlist filtering per SP
+- **Admin CRUD**: Create, update, get, and list persist and return group config (`group_attribute_name`, `group_value_format`, `group_filter`, `include_groups`, `omit_empty_groups`, `group_dn_base`, or nested `group_config`)
 - **Tenant Isolation**: Groups scoped to tenant, no cross-tenant leakage
 - **Performance**: Handles 500+ groups per user in <500ms
 

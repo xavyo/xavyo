@@ -4,7 +4,7 @@ use crate::error::{SamlError, SamlResult};
 use sqlx::PgPool;
 use uuid::Uuid;
 use xavyo_db::models::{
-    CreateServiceProviderRequest, SamlServiceProvider, TenantIdpCertificate,
+    CreateServiceProviderRequest, SamlServiceProvider, SpGroupConfig, TenantIdpCertificate,
     UpdateServiceProviderRequest, UploadCertificateRequest,
 };
 
@@ -249,15 +249,29 @@ impl SpService {
             )));
         }
 
+        let group_cfg = req
+            .resolved_group_config()
+            .map_err(|e| SamlError::InvalidAuthnRequest(format!("invalid group config: {e}")))?;
         let attribute_mapping = req.attribute_mapping.unwrap_or(serde_json::json!({}));
+        let (
+            group_attribute_name,
+            group_value_format,
+            group_filter,
+            include_groups,
+            omit_empty_groups,
+            group_dn_base,
+        ) = persistable_group_config(group_cfg)?;
 
         let sp = sqlx::query_as::<_, SamlServiceProvider>(
             r"
             INSERT INTO saml_service_providers
                 (tenant_id, entity_id, name, acs_urls, certificate, attribute_mapping,
                  name_id_format, sign_assertions, validate_signatures,
-                 assertion_validity_seconds, metadata_url, slo_url, slo_binding)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                 assertion_validity_seconds, metadata_url, slo_url, slo_binding,
+                 group_attribute_name, group_value_format, group_filter,
+                 include_groups, omit_empty_groups, group_dn_base)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+                    $14, $15, $16, $17, $18, $19)
             RETURNING id, tenant_id, entity_id, name, acs_urls, certificate,
                       attribute_mapping, name_id_format, sign_assertions,
                       validate_signatures, assertion_validity_seconds, enabled,
@@ -280,6 +294,12 @@ impl SpService {
         .bind(&req.metadata_url)
         .bind(&req.slo_url)
         .bind(&req.slo_binding)
+        .bind(&group_attribute_name)
+        .bind(&group_value_format)
+        .bind(&group_filter)
+        .bind(include_groups)
+        .bind(omit_empty_groups)
+        .bind(&group_dn_base)
         .fetch_one(&self.pool)
         .await?;
 
@@ -302,6 +322,9 @@ impl SpService {
     ) -> SamlResult<SamlServiceProvider> {
         // First verify SP exists
         let existing = self.get_sp(tenant_id, sp_id).await?;
+        let group_cfg = req
+            .resolved_group_config(&existing)
+            .map_err(|e| SamlError::InvalidAuthnRequest(format!("invalid group config: {e}")))?;
 
         let name = req.name.unwrap_or(existing.name);
 
@@ -354,6 +377,14 @@ impl SpService {
 
         let slo_url = req.slo_url.or(existing.slo_url);
         let slo_binding = req.slo_binding.unwrap_or(existing.slo_binding);
+        let (
+            group_attribute_name,
+            group_value_format,
+            group_filter,
+            include_groups,
+            omit_empty_groups,
+            group_dn_base,
+        ) = persistable_group_config(group_cfg)?;
 
         let sp = sqlx::query_as::<_, SamlServiceProvider>(
             r"
@@ -361,7 +392,9 @@ impl SpService {
             SET name = $3, acs_urls = $4, certificate = $5, attribute_mapping = $6,
                 name_id_format = $7, sign_assertions = $8, validate_signatures = $9,
                 assertion_validity_seconds = $10, enabled = $11, metadata_url = $12,
-                slo_url = $13, slo_binding = $14
+                slo_url = $13, slo_binding = $14,
+                group_attribute_name = $15, group_value_format = $16, group_filter = $17,
+                include_groups = $18, omit_empty_groups = $19, group_dn_base = $20
             WHERE id = $1 AND tenant_id = $2
             RETURNING id, tenant_id, entity_id, name, acs_urls, certificate,
                       attribute_mapping, name_id_format, sign_assertions,
@@ -386,6 +419,12 @@ impl SpService {
         .bind(&metadata_url)
         .bind(&slo_url)
         .bind(&slo_binding)
+        .bind(&group_attribute_name)
+        .bind(&group_value_format)
+        .bind(&group_filter)
+        .bind(include_groups)
+        .bind(omit_empty_groups)
+        .bind(&group_dn_base)
         .fetch_one(&self.pool)
         .await?;
 
@@ -742,6 +781,47 @@ fn require_https_or_localhost_url(url: &str, kind: &str) -> SamlResult<()> {
     Ok(())
 }
 
+/// Canonicalize advertised group config for persistence.
+///
+/// Unknown value formats / filter types must not silently become "name" / "none".
+fn persistable_group_config(
+    cfg: SpGroupConfig,
+) -> SamlResult<(
+    Option<String>,
+    String,
+    Option<serde_json::Value>,
+    bool,
+    bool,
+    Option<String>,
+)> {
+    let value_format = crate::models::group_config::GroupValueFormat::parse(&cfg.value_format)
+        .map_err(SamlError::InvalidAuthnRequest)?;
+    if let Some(ref filter) = cfg.filter {
+        crate::models::group_config::GroupFilterType::parse(&filter.filter_type)
+            .map_err(SamlError::InvalidAuthnRequest)?;
+    }
+    let filter_json =
+        match cfg.filter {
+            Some(filter) => Some(serde_json::to_value(filter).map_err(|e| {
+                SamlError::InvalidAuthnRequest(format!("invalid group_filter: {e}"))
+            })?),
+            None => None,
+        };
+    let attribute_name = if cfg.attribute_name.is_empty() {
+        None
+    } else {
+        Some(cfg.attribute_name)
+    };
+    Ok((
+        attribute_name,
+        value_format.as_str().to_string(),
+        filter_json,
+        cfg.include_groups,
+        cfg.omit_empty_groups,
+        cfg.dn_base.filter(|s| !s.is_empty()),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -761,5 +841,54 @@ mod tests {
             !production.contains("host_str().unwrap_or(\"\")"),
             "SP ACS/SLO URL validation must not treat a missing host as empty"
         );
+    }
+
+    #[test]
+    fn persistable_group_config_canonicalizes_known_formats() {
+        let cfg = SpGroupConfig {
+            attribute_name: "memberOf".to_string(),
+            value_format: "identifier".to_string(),
+            filter: Some(xavyo_db::models::SpGroupFilter {
+                filter_type: "allowlist".to_string(),
+                patterns: vec![],
+                allowlist: vec!["admins".to_string()],
+            }),
+            include_groups: false,
+            omit_empty_groups: false,
+            dn_base: Some("ou=Groups,dc=example,dc=com".to_string()),
+        };
+        let (name, format, filter, include, omit, dn) =
+            persistable_group_config(cfg).expect("valid group config");
+        assert_eq!(name.as_deref(), Some("memberOf"));
+        assert_eq!(format, "id");
+        assert!(!include);
+        assert!(!omit);
+        assert_eq!(dn.as_deref(), Some("ou=Groups,dc=example,dc=com"));
+        assert_eq!(
+            filter.unwrap()["filter_type"],
+            serde_json::json!("allowlist")
+        );
+    }
+
+    #[test]
+    fn persistable_group_config_rejects_unknown_format() {
+        let cfg = SpGroupConfig {
+            value_format: "uuid".to_string(),
+            ..SpGroupConfig::default()
+        };
+        assert!(persistable_group_config(cfg).is_err());
+    }
+
+    #[test]
+    fn persistable_group_config_rejects_unknown_filter_type() {
+        let cfg = SpGroupConfig {
+            filter: Some(xavyo_db::models::SpGroupFilter {
+                filter_type: "all".to_string(),
+                patterns: vec![],
+                allowlist: vec![],
+            }),
+            ..SpGroupConfig::default()
+        };
+        assert!(persistable_group_config(cfg).is_err());
     }
 }

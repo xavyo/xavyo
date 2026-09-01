@@ -169,7 +169,7 @@ pub use recovery_code::UserRecoveryCode;
 pub use refresh_token::{RefreshToken, RefreshTokenBuilder};
 pub use saml_service_provider::{
     AttributeMap, AttributeMapping, CreateServiceProviderRequest, SamlServiceProvider,
-    UpdateServiceProviderRequest,
+    SpGroupConfig, SpGroupFilter, UpdateServiceProviderRequest,
 };
 pub use scim_attribute_mapping::{
     AttributeTransform, MappingRequest, ScimAttributeMapping, UpdateMappingsRequest,
