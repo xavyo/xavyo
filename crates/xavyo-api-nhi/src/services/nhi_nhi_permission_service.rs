@@ -148,11 +148,19 @@ impl NhiNhiPermissionService {
         pool: &PgPool,
         tenant_id: Uuid,
         target_nhi_id: Uuid,
+        permission_type: Option<&str>,
         limit: i64,
         offset: i64,
     ) -> Result<Vec<NhiNhiPermission>, NhiApiError> {
-        let perms =
-            NhiNhiPermission::list_by_target(pool, tenant_id, target_nhi_id, limit, offset).await?;
+        let perms = NhiNhiPermission::list_by_target(
+            pool,
+            tenant_id,
+            target_nhi_id,
+            permission_type,
+            limit,
+            offset,
+        )
+        .await?;
         Ok(perms)
     }
 
@@ -161,8 +169,9 @@ impl NhiNhiPermissionService {
         pool: &PgPool,
         tenant_id: Uuid,
         target_nhi_id: Uuid,
+        permission_type: Option<&str>,
     ) -> Result<i64, NhiApiError> {
-        NhiNhiPermission::count_by_target(pool, tenant_id, target_nhi_id)
+        NhiNhiPermission::count_by_target(pool, tenant_id, target_nhi_id, permission_type)
             .await
             .map_err(NhiApiError::Database)
     }
@@ -172,11 +181,19 @@ impl NhiNhiPermissionService {
         pool: &PgPool,
         tenant_id: Uuid,
         source_nhi_id: Uuid,
+        permission_type: Option<&str>,
         limit: i64,
         offset: i64,
     ) -> Result<Vec<NhiNhiPermission>, NhiApiError> {
-        let perms =
-            NhiNhiPermission::list_by_source(pool, tenant_id, source_nhi_id, limit, offset).await?;
+        let perms = NhiNhiPermission::list_by_source(
+            pool,
+            tenant_id,
+            source_nhi_id,
+            permission_type,
+            limit,
+            offset,
+        )
+        .await?;
         Ok(perms)
     }
 
@@ -185,8 +202,9 @@ impl NhiNhiPermissionService {
         pool: &PgPool,
         tenant_id: Uuid,
         source_nhi_id: Uuid,
+        permission_type: Option<&str>,
     ) -> Result<i64, NhiApiError> {
-        NhiNhiPermission::count_by_source(pool, tenant_id, source_nhi_id)
+        NhiNhiPermission::count_by_source(pool, tenant_id, source_nhi_id, permission_type)
             .await
             .map_err(NhiApiError::Database)
     }

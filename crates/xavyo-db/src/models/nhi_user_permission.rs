@@ -124,26 +124,47 @@ impl NhiUserPermission {
         pool: &PgPool,
         tenant_id: Uuid,
         user_id: Uuid,
+        permission_type: Option<&str>,
         limit: i64,
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let limit = limit.min(100);
         let offset = offset.max(0);
-        sqlx::query_as::<_, Self>(
-            r"
-            SELECT * FROM nhi_user_permissions
-            WHERE tenant_id = $1 AND user_id = $2
-              AND (expires_at IS NULL OR expires_at > NOW())
-            ORDER BY granted_at DESC
-            LIMIT $3 OFFSET $4
-            ",
-        )
-        .bind(tenant_id)
-        .bind(user_id)
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(pool)
-        .await
+        if let Some(permission_type) = permission_type {
+            sqlx::query_as::<_, Self>(
+                r"
+                SELECT * FROM nhi_user_permissions
+                WHERE tenant_id = $1 AND user_id = $2
+                  AND permission_type = $3
+                  AND (expires_at IS NULL OR expires_at > NOW())
+                ORDER BY granted_at DESC
+                LIMIT $4 OFFSET $5
+                ",
+            )
+            .bind(tenant_id)
+            .bind(user_id)
+            .bind(permission_type)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await
+        } else {
+            sqlx::query_as::<_, Self>(
+                r"
+                SELECT * FROM nhi_user_permissions
+                WHERE tenant_id = $1 AND user_id = $2
+                  AND (expires_at IS NULL OR expires_at > NOW())
+                ORDER BY granted_at DESC
+                LIMIT $3 OFFSET $4
+                ",
+            )
+            .bind(tenant_id)
+            .bind(user_id)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await
+        }
     }
 
     /// List all non-expired permissions for a specific NHI (paginated).
@@ -151,26 +172,47 @@ impl NhiUserPermission {
         pool: &PgPool,
         tenant_id: Uuid,
         nhi_id: Uuid,
+        permission_type: Option<&str>,
         limit: i64,
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let limit = limit.min(100);
         let offset = offset.max(0);
-        sqlx::query_as::<_, Self>(
-            r"
-            SELECT * FROM nhi_user_permissions
-            WHERE tenant_id = $1 AND nhi_id = $2
-              AND (expires_at IS NULL OR expires_at > NOW())
-            ORDER BY granted_at DESC
-            LIMIT $3 OFFSET $4
-            ",
-        )
-        .bind(tenant_id)
-        .bind(nhi_id)
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(pool)
-        .await
+        if let Some(permission_type) = permission_type {
+            sqlx::query_as::<_, Self>(
+                r"
+                SELECT * FROM nhi_user_permissions
+                WHERE tenant_id = $1 AND nhi_id = $2
+                  AND permission_type = $3
+                  AND (expires_at IS NULL OR expires_at > NOW())
+                ORDER BY granted_at DESC
+                LIMIT $4 OFFSET $5
+                ",
+            )
+            .bind(tenant_id)
+            .bind(nhi_id)
+            .bind(permission_type)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await
+        } else {
+            sqlx::query_as::<_, Self>(
+                r"
+                SELECT * FROM nhi_user_permissions
+                WHERE tenant_id = $1 AND nhi_id = $2
+                  AND (expires_at IS NULL OR expires_at > NOW())
+                ORDER BY granted_at DESC
+                LIMIT $3 OFFSET $4
+                ",
+            )
+            .bind(tenant_id)
+            .bind(nhi_id)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await
+        }
     }
 
     /// Revoke a permission by user-NHI-type triple.
@@ -380,5 +422,23 @@ mod tests {
                 && !check.contains("_ => return Ok(false)"),
             "unknown permission types must error, not look like a denied grant"
         );
+    }
+
+    #[test]
+    fn user_permission_lists_honor_permission_type() {
+        let src = include_str!("nhi_user_permission.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for fn_name in ["list_by_nhi", "list_by_user"] {
+            let body = production
+                .split(&format!("pub async fn {fn_name}"))
+                .nth(1)
+                .and_then(|s| s.split("pub async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                body.contains("permission_type: Option<&str>")
+                    && body.contains("AND permission_type = $3"),
+                "{fn_name} must honor advertised permission_type"
+            );
+        }
     }
 }

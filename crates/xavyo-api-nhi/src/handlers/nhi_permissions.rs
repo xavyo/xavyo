@@ -48,6 +48,8 @@ pub struct RevokeNhiPermissionRequest {
 pub struct PaginationQuery {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    /// Filter by permission type (`call` or `delegate`).
+    pub permission_type: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -163,6 +165,7 @@ pub async fn revoke_nhi_permission(
     path = "/nhi/{id}/callers",
     params(
         ("id" = Uuid, Path, description = "NHI identity ID"),
+        PaginationQuery,
     ),
     responses(
         (status = 200, description = "Paginated list of caller NHIs", body = PaginatedNhiPermissionResponse),
@@ -184,11 +187,20 @@ pub async fn list_callers(
     let tenant_uuid = *tenant_id.as_uuid();
     let limit = query.limit.unwrap_or(20).clamp(1, 100);
     let offset = query.offset.unwrap_or(0).max(0);
+    let permission_type = parse_optional_nhi_nhi_permission_type(query.permission_type.as_deref())?;
 
-    let data =
-        NhiNhiPermissionService::list_callers(&state.pool, tenant_uuid, nhi_id, limit, offset)
+    let data = NhiNhiPermissionService::list_callers(
+        &state.pool,
+        tenant_uuid,
+        nhi_id,
+        permission_type,
+        limit,
+        offset,
+    )
+    .await?;
+    let total =
+        NhiNhiPermissionService::count_callers(&state.pool, tenant_uuid, nhi_id, permission_type)
             .await?;
-    let total = NhiNhiPermissionService::count_callers(&state.pool, tenant_uuid, nhi_id).await?;
 
     Ok(Json(PaginatedNhiPermissionResponse {
         data,
@@ -204,6 +216,7 @@ pub async fn list_callers(
     path = "/nhi/{id}/callees",
     params(
         ("id" = Uuid, Path, description = "NHI identity ID"),
+        PaginationQuery,
     ),
     responses(
         (status = 200, description = "Paginated list of callee NHIs", body = PaginatedNhiPermissionResponse),
@@ -225,11 +238,20 @@ pub async fn list_callees(
     let tenant_uuid = *tenant_id.as_uuid();
     let limit = query.limit.unwrap_or(20).clamp(1, 100);
     let offset = query.offset.unwrap_or(0).max(0);
+    let permission_type = parse_optional_nhi_nhi_permission_type(query.permission_type.as_deref())?;
 
-    let data =
-        NhiNhiPermissionService::list_callees(&state.pool, tenant_uuid, nhi_id, limit, offset)
+    let data = NhiNhiPermissionService::list_callees(
+        &state.pool,
+        tenant_uuid,
+        nhi_id,
+        permission_type,
+        limit,
+        offset,
+    )
+    .await?;
+    let total =
+        NhiNhiPermissionService::count_callees(&state.pool, tenant_uuid, nhi_id, permission_type)
             .await?;
-    let total = NhiNhiPermissionService::count_callees(&state.pool, tenant_uuid, nhi_id).await?;
 
     Ok(Json(PaginatedNhiPermissionResponse {
         data,
@@ -242,6 +264,20 @@ pub async fn list_callees(
 // ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
+
+/// Invalid permission-type filters must not silently list every grant.
+fn parse_optional_nhi_nhi_permission_type(
+    value: Option<&str>,
+) -> Result<Option<&str>, NhiApiError> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "call" | "delegate") => Ok(Some(s)),
+        Some(s) => Err(NhiApiError::BadRequest(format!(
+            "Invalid permission_type '{s}'. Must be one of: call, delegate"
+        ))),
+    }
+}
 
 pub fn nhi_nhi_permission_routes(state: NhiState) -> Router {
     Router::new()
@@ -259,8 +295,10 @@ pub fn nhi_nhi_permission_routes(state: NhiState) -> Router {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn caller_and_callee_lists_report_real_totals() {
+    fn caller_and_callee_lists_honor_permission_type() {
         let src = include_str!("nhi_permissions.rs");
         let production = src.split("mod tests").next().expect("production source");
         for (fn_name, count_fn) in [
@@ -273,9 +311,22 @@ mod tests {
                 .and_then(|s| s.split("pub async fn ").next())
                 .unwrap_or_else(|| panic!("{fn_name}"));
             assert!(
-                body.contains(&format!("{count_fn}(")) && body.contains("total,"),
-                "{fn_name} must report a COUNT total"
+                body.contains(&format!("{count_fn}("))
+                    && body.contains("total,")
+                    && body.contains("permission_type")
+                    && body.contains("parse_optional_nhi_nhi_permission_type("),
+                "{fn_name} must honor advertised permission_type and report a COUNT total"
             );
         }
+    }
+
+    #[test]
+    fn invalid_permission_type_does_not_list_all_grants() {
+        assert_eq!(parse_optional_nhi_nhi_permission_type(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_nhi_nhi_permission_type(Some("call")).unwrap(),
+            Some("call")
+        );
+        assert!(parse_optional_nhi_nhi_permission_type(Some("bogus")).is_err());
     }
 }

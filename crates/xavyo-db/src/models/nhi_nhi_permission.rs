@@ -135,26 +135,47 @@ impl NhiNhiPermission {
         pool: &PgPool,
         tenant_id: Uuid,
         source_nhi_id: Uuid,
+        permission_type: Option<&str>,
         limit: i64,
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let limit = limit.min(100);
         let offset = offset.max(0);
-        sqlx::query_as::<_, Self>(
-            r"
-            SELECT * FROM nhi_nhi_permissions
-            WHERE tenant_id = $1 AND source_nhi_id = $2
-              AND (expires_at IS NULL OR expires_at > NOW())
-            ORDER BY granted_at DESC
-            LIMIT $3 OFFSET $4
-            ",
-        )
-        .bind(tenant_id)
-        .bind(source_nhi_id)
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(pool)
-        .await
+        if let Some(permission_type) = permission_type {
+            sqlx::query_as::<_, Self>(
+                r"
+                SELECT * FROM nhi_nhi_permissions
+                WHERE tenant_id = $1 AND source_nhi_id = $2
+                  AND permission_type = $3
+                  AND (expires_at IS NULL OR expires_at > NOW())
+                ORDER BY granted_at DESC
+                LIMIT $4 OFFSET $5
+                ",
+            )
+            .bind(tenant_id)
+            .bind(source_nhi_id)
+            .bind(permission_type)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await
+        } else {
+            sqlx::query_as::<_, Self>(
+                r"
+                SELECT * FROM nhi_nhi_permissions
+                WHERE tenant_id = $1 AND source_nhi_id = $2
+                  AND (expires_at IS NULL OR expires_at > NOW())
+                ORDER BY granted_at DESC
+                LIMIT $3 OFFSET $4
+                ",
+            )
+            .bind(tenant_id)
+            .bind(source_nhi_id)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await
+        }
     }
 
     /// List all non-expired permissions where this NHI is the target (callers).
@@ -162,26 +183,47 @@ impl NhiNhiPermission {
         pool: &PgPool,
         tenant_id: Uuid,
         target_nhi_id: Uuid,
+        permission_type: Option<&str>,
         limit: i64,
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let limit = limit.min(100);
         let offset = offset.max(0);
-        sqlx::query_as::<_, Self>(
-            r"
-            SELECT * FROM nhi_nhi_permissions
-            WHERE tenant_id = $1 AND target_nhi_id = $2
-              AND (expires_at IS NULL OR expires_at > NOW())
-            ORDER BY granted_at DESC
-            LIMIT $3 OFFSET $4
-            ",
-        )
-        .bind(tenant_id)
-        .bind(target_nhi_id)
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(pool)
-        .await
+        if let Some(permission_type) = permission_type {
+            sqlx::query_as::<_, Self>(
+                r"
+                SELECT * FROM nhi_nhi_permissions
+                WHERE tenant_id = $1 AND target_nhi_id = $2
+                  AND permission_type = $3
+                  AND (expires_at IS NULL OR expires_at > NOW())
+                ORDER BY granted_at DESC
+                LIMIT $4 OFFSET $5
+                ",
+            )
+            .bind(tenant_id)
+            .bind(target_nhi_id)
+            .bind(permission_type)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await
+        } else {
+            sqlx::query_as::<_, Self>(
+                r"
+                SELECT * FROM nhi_nhi_permissions
+                WHERE tenant_id = $1 AND target_nhi_id = $2
+                  AND (expires_at IS NULL OR expires_at > NOW())
+                ORDER BY granted_at DESC
+                LIMIT $3 OFFSET $4
+                ",
+            )
+            .bind(tenant_id)
+            .bind(target_nhi_id)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await
+        }
     }
 
     /// Count non-expired permissions where this NHI is the source (callees).
@@ -189,18 +231,35 @@ impl NhiNhiPermission {
         pool: &PgPool,
         tenant_id: Uuid,
         source_nhi_id: Uuid,
+        permission_type: Option<&str>,
     ) -> Result<i64, sqlx::Error> {
-        sqlx::query_scalar(
-            r"
-            SELECT COUNT(*) FROM nhi_nhi_permissions
-            WHERE tenant_id = $1 AND source_nhi_id = $2
-              AND (expires_at IS NULL OR expires_at > NOW())
-            ",
-        )
-        .bind(tenant_id)
-        .bind(source_nhi_id)
-        .fetch_one(pool)
-        .await
+        if let Some(permission_type) = permission_type {
+            sqlx::query_scalar(
+                r"
+                SELECT COUNT(*) FROM nhi_nhi_permissions
+                WHERE tenant_id = $1 AND source_nhi_id = $2
+                  AND permission_type = $3
+                  AND (expires_at IS NULL OR expires_at > NOW())
+                ",
+            )
+            .bind(tenant_id)
+            .bind(source_nhi_id)
+            .bind(permission_type)
+            .fetch_one(pool)
+            .await
+        } else {
+            sqlx::query_scalar(
+                r"
+                SELECT COUNT(*) FROM nhi_nhi_permissions
+                WHERE tenant_id = $1 AND source_nhi_id = $2
+                  AND (expires_at IS NULL OR expires_at > NOW())
+                ",
+            )
+            .bind(tenant_id)
+            .bind(source_nhi_id)
+            .fetch_one(pool)
+            .await
+        }
     }
 
     /// Count non-expired permissions where this NHI is the target (callers).
@@ -208,18 +267,35 @@ impl NhiNhiPermission {
         pool: &PgPool,
         tenant_id: Uuid,
         target_nhi_id: Uuid,
+        permission_type: Option<&str>,
     ) -> Result<i64, sqlx::Error> {
-        sqlx::query_scalar(
-            r"
-            SELECT COUNT(*) FROM nhi_nhi_permissions
-            WHERE tenant_id = $1 AND target_nhi_id = $2
-              AND (expires_at IS NULL OR expires_at > NOW())
-            ",
-        )
-        .bind(tenant_id)
-        .bind(target_nhi_id)
-        .fetch_one(pool)
-        .await
+        if let Some(permission_type) = permission_type {
+            sqlx::query_scalar(
+                r"
+                SELECT COUNT(*) FROM nhi_nhi_permissions
+                WHERE tenant_id = $1 AND target_nhi_id = $2
+                  AND permission_type = $3
+                  AND (expires_at IS NULL OR expires_at > NOW())
+                ",
+            )
+            .bind(tenant_id)
+            .bind(target_nhi_id)
+            .bind(permission_type)
+            .fetch_one(pool)
+            .await
+        } else {
+            sqlx::query_scalar(
+                r"
+                SELECT COUNT(*) FROM nhi_nhi_permissions
+                WHERE tenant_id = $1 AND target_nhi_id = $2
+                  AND (expires_at IS NULL OR expires_at > NOW())
+                ",
+            )
+            .bind(tenant_id)
+            .bind(target_nhi_id)
+            .fetch_one(pool)
+            .await
+        }
     }
 
     /// Revoke a permission by source-target-type triple.
@@ -384,5 +460,28 @@ mod tests {
 
         assert_eq!(input.permission_type, "delegate");
         assert_eq!(input.max_calls_per_hour, Some(500));
+    }
+
+    #[test]
+    fn caller_and_callee_lists_honor_permission_type() {
+        let src = include_str!("nhi_nhi_permission.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for fn_name in [
+            "list_by_source",
+            "list_by_target",
+            "count_by_source",
+            "count_by_target",
+        ] {
+            let body = production
+                .split(&format!("pub async fn {fn_name}"))
+                .nth(1)
+                .and_then(|s| s.split("pub async fn ").next())
+                .unwrap_or_else(|| panic!("{fn_name}"));
+            assert!(
+                body.contains("permission_type: Option<&str>")
+                    && body.contains("AND permission_type = $3"),
+                "{fn_name} must honor advertised permission_type"
+            );
+        }
     }
 }
