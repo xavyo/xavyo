@@ -194,3 +194,20 @@ pub async fn delete_sla_policy(
 
     Ok(StatusCode::NO_CONTENT)
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn create_and_get_return_escalation_contacts() {
+        let src = include_str!("../models/semi_manual.rs");
+        let from_impl = src
+            .split("impl From<GovSlaPolicy> for SlaPolicyResponse")
+            .nth(1)
+            .and_then(|s| s.split("impl ").next())
+            .expect("sla from impl");
+        assert!(
+            from_impl.contains("escalation_contacts: policy.escalation_contacts"),
+            "SLA policy responses must include advertised escalation_contacts"
+        );
+    }
+}

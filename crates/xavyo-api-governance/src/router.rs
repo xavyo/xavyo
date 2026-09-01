@@ -2456,6 +2456,10 @@ pub fn governance_router(
             "/manual-tasks/dashboard",
             get(manual_tasks::get_manual_task_dashboard),
         )
+        .route(
+            "/manual-tasks/audit",
+            get(manual_tasks::list_manual_task_audit),
+        )
         .route("/manual-tasks/:id", get(manual_tasks::get_manual_task))
         .route(
             "/manual-tasks/:id/claim",

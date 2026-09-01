@@ -815,7 +815,7 @@ pub use gov_manual_provisioning_task::{
     CreateManualTask, DashboardMetrics, GovManualProvisioningTask, ManualTaskFilter, RetryQueueItem,
 };
 pub use gov_manual_task_audit_event::{
-    CreateManualTaskAuditEvent, GovManualTaskAuditEvent, ManualTaskEventType,
+    CreateManualTaskAuditEvent, GovManualTaskAuditEvent, ManualTaskAuditFilter, ManualTaskEventType,
 };
 pub use gov_semi_manual_types::{
     ManualTaskOperation, ManualTaskStatus, TicketStatusCategory, TicketingType,

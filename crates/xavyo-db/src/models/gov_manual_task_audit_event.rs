@@ -96,6 +96,16 @@ pub struct CreateManualTaskAuditEvent {
     pub details: Option<serde_json::Value>,
 }
 
+/// Filter options for listing manual task audit events.
+#[derive(Debug, Clone, Default)]
+pub struct ManualTaskAuditFilter {
+    pub task_id: Option<Uuid>,
+    pub event_type: Option<String>,
+    pub actor_id: Option<Uuid>,
+    pub from_date: Option<DateTime<Utc>>,
+    pub to_date: Option<DateTime<Utc>>,
+}
+
 impl GovManualTaskAuditEvent {
     /// Get the typed event type.
     #[must_use]
@@ -181,6 +191,118 @@ impl GovManualTaskAuditEvent {
         .bind(task_id)
         .fetch_one(pool)
         .await
+    }
+
+    /// Query audit events with advertised list filters.
+    pub async fn query(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        filter: &ManualTaskAuditFilter,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        let mut query =
+            String::from("SELECT * FROM gov_manual_task_audit_events WHERE tenant_id = $1");
+        let mut param_count = 1;
+
+        if filter.task_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND task_id = ${param_count}"));
+        }
+        if filter.event_type.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND event_type = ${param_count}"));
+        }
+        if filter.actor_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND actor_id = ${param_count}"));
+        }
+        if filter.from_date.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
+        }
+        if filter.to_date.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
+        }
+
+        query.push_str(&format!(
+            " ORDER BY created_at DESC LIMIT ${} OFFSET ${}",
+            param_count + 1,
+            param_count + 2
+        ));
+
+        let mut q = sqlx::query_as::<_, Self>(&query).bind(tenant_id);
+
+        if let Some(task_id) = filter.task_id {
+            q = q.bind(task_id);
+        }
+        if let Some(ref event_type) = filter.event_type {
+            q = q.bind(event_type);
+        }
+        if let Some(actor_id) = filter.actor_id {
+            q = q.bind(actor_id);
+        }
+        if let Some(from_date) = filter.from_date {
+            q = q.bind(from_date);
+        }
+        if let Some(to_date) = filter.to_date {
+            q = q.bind(to_date);
+        }
+
+        q.bind(limit).bind(offset).fetch_all(pool).await
+    }
+
+    /// Count audit events with advertised list filters.
+    pub async fn count(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        filter: &ManualTaskAuditFilter,
+    ) -> Result<i64, sqlx::Error> {
+        let mut query =
+            String::from("SELECT COUNT(*) FROM gov_manual_task_audit_events WHERE tenant_id = $1");
+        let mut param_count = 1;
+
+        if filter.task_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND task_id = ${param_count}"));
+        }
+        if filter.event_type.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND event_type = ${param_count}"));
+        }
+        if filter.actor_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND actor_id = ${param_count}"));
+        }
+        if filter.from_date.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
+        }
+        if filter.to_date.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
+        }
+
+        let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
+
+        if let Some(task_id) = filter.task_id {
+            q = q.bind(task_id);
+        }
+        if let Some(ref event_type) = filter.event_type {
+            q = q.bind(event_type);
+        }
+        if let Some(actor_id) = filter.actor_id {
+            q = q.bind(actor_id);
+        }
+        if let Some(from_date) = filter.from_date {
+            q = q.bind(from_date);
+        }
+        if let Some(to_date) = filter.to_date {
+            q = q.bind(to_date);
+        }
+
+        q.fetch_one(pool).await
     }
 
     /// Helper: Log task created event.
@@ -380,5 +502,24 @@ mod tests {
         };
 
         assert_eq!(input.event_type, ManualTaskEventType::TaskCreated);
+    }
+
+    #[test]
+    fn query_sql_honors_advertised_filters() {
+        let src = include_str!("gov_manual_task_audit_event.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let query = production
+            .split("pub async fn query(")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("query");
+        assert!(
+            query.contains("AND task_id =")
+                && query.contains("AND event_type =")
+                && query.contains("AND actor_id =")
+                && query.contains("AND created_at >=")
+                && query.contains("AND created_at <="),
+            "manual task audit query must honor advertised filters"
+        );
     }
 }

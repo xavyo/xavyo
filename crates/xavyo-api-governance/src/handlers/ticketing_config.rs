@@ -241,3 +241,20 @@ pub async fn test_ticketing_configuration(
         error: result.error,
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn create_and_get_return_field_mappings() {
+        let src = include_str!("../models/semi_manual.rs");
+        let from_impl = src
+            .split("impl From<GovTicketingConfiguration> for TicketingConfigurationResponse")
+            .nth(1)
+            .and_then(|s| s.split("impl ").next())
+            .expect("ticketing from impl");
+        assert!(
+            from_impl.contains("field_mappings: config.field_mappings"),
+            "ticketing configuration responses must include advertised field_mappings"
+        );
+    }
+}
