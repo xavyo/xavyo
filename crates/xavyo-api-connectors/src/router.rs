@@ -84,10 +84,32 @@ pub fn connector_routes(state: ConnectorState) -> Router {
         .route("/:id/deactivate", post(handlers::deactivate_connector))
         // Health monitoring
         .route("/:id/health", get(handlers::get_connector_health))
-        // Schema discovery
+        // Schema discovery. Static /schema/* paths must be registered before
+        // /schema/:object_class so advertised browsing routes are not captured.
         .route("/:id/schema", get(handlers::get_schema))
         .route("/:id/schema", delete(handlers::clear_schema_cache))
         .route("/:id/schema/discover", post(handlers::discover_schema))
+        .route("/:id/schema/status", get(handlers::get_discovery_status))
+        .route("/:id/schema/versions", get(handlers::list_schema_versions))
+        .route("/:id/schema/diff", get(handlers::diff_schema_versions))
+        .route(
+            "/:id/schema/object-classes",
+            get(handlers::list_object_classes),
+        )
+        .route(
+            "/:id/schema/object-classes/:name",
+            get(handlers::get_object_class_details),
+        )
+        .route(
+            "/:id/schema/object-classes/:name/attributes",
+            get(handlers::list_object_class_attributes),
+        )
+        .route(
+            "/:id/schema/schedule",
+            get(handlers::get_refresh_schedule)
+                .put(handlers::set_refresh_schedule)
+                .delete(handlers::delete_refresh_schedule),
+        )
         .route("/:id/schema/:object_class", get(handlers::get_object_class))
         // Attribute mappings
         .route("/:id/mappings", get(handlers::list_mappings))
@@ -443,3 +465,43 @@ pub fn scim_target_routes(state: ScimTargetState) -> Router {
 
 // OpenAPI documentation for connector endpoints is available
 // when building with utoipa OpenAPI support.
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn advertised_schema_browsing_and_schedule_routes_are_mounted() {
+        let src = include_str!("router.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let routes = production
+            .split("pub fn connector_routes")
+            .nth(1)
+            .and_then(|s| s.split("pub fn ").next())
+            .expect("connector_routes");
+        for needle in [
+            "get_discovery_status",
+            "list_schema_versions",
+            "diff_schema_versions",
+            "list_object_classes",
+            "get_object_class_details",
+            "list_object_class_attributes",
+            "get_refresh_schedule",
+            "set_refresh_schedule",
+            "delete_refresh_schedule",
+        ] {
+            assert!(
+                routes.contains(needle),
+                "connector_routes must mount advertised schema handler {needle}"
+            );
+        }
+        let object_classes = routes
+            .find("\"/:id/schema/object-classes\"")
+            .expect("object-classes route");
+        let object_class_param = routes
+            .find("\"/:id/schema/:object_class\"")
+            .expect("object_class param route");
+        assert!(
+            object_classes < object_class_param,
+            "GET /schema/object-classes must be registered before /schema/:object_class"
+        );
+    }
+}

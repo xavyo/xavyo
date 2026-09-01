@@ -480,9 +480,13 @@ pub async fn trigger_schema_discovery(
 )]
 pub async fn get_discovery_status(
     State(state): State<ConnectorState>,
+    Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<DiscoveryStatusResponse>> {
     use xavyo_connector::schema::DiscoveryState;
+
+    let tenant_id = extract_tenant_id(&claims)?;
+    let _connector = state.connector_service.get_connector(tenant_id, id).await?;
 
     // Get status from state manager
     let discovery_status = state.schema_service.get_discovery_status(id).await;
@@ -1069,6 +1073,23 @@ fn extract_user_id(claims: &JwtClaims) -> Result<Uuid> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn discovery_status_requires_tenant_scoped_connector() {
+        let src = include_str!("schemas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let status = production
+            .split("pub async fn get_discovery_status")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_discovery_status");
+        assert!(
+            status.contains("extract_tenant_id(")
+                && status.contains("Extension(claims)")
+                && status.contains("get_connector("),
+            "GET /connectors/{{id}}/schema/status must not skip JWT tenant isolation"
+        );
+    }
+
     #[test]
     fn cached_schema_does_not_default_on_invalid_json() {
         let src = include_str!("schemas.rs");
