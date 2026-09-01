@@ -150,26 +150,36 @@ impl TenantIdentityProvider {
             .await
     }
 
-    /// List all identity providers for a tenant.
+    /// List identity providers for a tenant, optionally filtered by enabled status.
     pub async fn list_by_tenant(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
+        is_enabled: Option<bool>,
         offset: i64,
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
-        sqlx::query_as(
+        let mut query = String::from(
             r"
             SELECT * FROM tenant_identity_providers
             WHERE tenant_id = $1
-            ORDER BY created_at DESC
-            OFFSET $2 LIMIT $3
             ",
-        )
-        .bind(tenant_id)
-        .bind(offset)
-        .bind(limit)
-        .fetch_all(pool)
-        .await
+        );
+        let mut param_count = 1;
+        if is_enabled.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND is_enabled = ${param_count}"));
+        }
+        query.push_str(&format!(
+            " ORDER BY created_at DESC OFFSET ${} LIMIT ${}",
+            param_count + 1,
+            param_count + 2
+        ));
+
+        let mut q = sqlx::query_as::<_, Self>(&query).bind(tenant_id);
+        if let Some(is_enabled) = is_enabled {
+            q = q.bind(is_enabled);
+        }
+        q.bind(offset).bind(limit).fetch_all(pool).await
     }
 
     /// List enabled identity providers for a tenant.
@@ -189,14 +199,23 @@ impl TenantIdentityProvider {
         .await
     }
 
-    /// Count identity providers for a tenant.
-    pub async fn count_by_tenant(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<i64, sqlx::Error> {
-        let result: (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM tenant_identity_providers WHERE tenant_id = $1")
-                .bind(tenant_id)
-                .fetch_one(pool)
-                .await?;
-        Ok(result.0)
+    /// Count identity providers for a tenant, optionally filtered by enabled status.
+    pub async fn count_by_tenant(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        is_enabled: Option<bool>,
+    ) -> Result<i64, sqlx::Error> {
+        let mut query =
+            String::from("SELECT COUNT(*) FROM tenant_identity_providers WHERE tenant_id = $1");
+        if is_enabled.is_some() {
+            query.push_str(" AND is_enabled = $2");
+        }
+
+        let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
+        if let Some(is_enabled) = is_enabled {
+            q = q.bind(is_enabled);
+        }
+        q.fetch_one(pool).await
     }
 
     /// Check if issuer URL already exists for tenant.
@@ -390,6 +409,30 @@ mod tests {
         assert!(
             !production.contains("WHERE id = $1\""),
             "must not look up identity providers by id alone"
+        );
+    }
+
+    #[test]
+    fn list_and_count_honor_is_enabled() {
+        let src = include_str!("tenant_identity_provider.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_by_tenant")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_by_tenant");
+        assert!(
+            list.contains("is_enabled: Option<bool>") && list.contains("AND is_enabled ="),
+            "IdP list must filter advertised is_enabled"
+        );
+        let count = production
+            .split("pub async fn count_by_tenant")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("count_by_tenant");
+        assert!(
+            count.contains("is_enabled: Option<bool>") && count.contains("AND is_enabled ="),
+            "IdP count must use the same is_enabled filter as list"
         );
     }
 }

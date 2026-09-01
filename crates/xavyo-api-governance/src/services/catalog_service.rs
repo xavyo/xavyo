@@ -194,7 +194,7 @@ impl CatalogService {
 
     /// List catalog items for a tenant with filtering, search, and pagination.
     ///
-    /// This method returns items visible to end users (enabled items only by default).
+    /// `enabled` filters by catalog item status. `None` returns every item.
     pub async fn list_items(
         &self,
         tenant_id: Uuid,
@@ -202,14 +202,14 @@ impl CatalogService {
         item_type: Option<CatalogItemType>,
         search: Option<String>,
         tag: Option<String>,
-        enabled_only: bool,
+        enabled: Option<bool>,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<CatalogItem>, i64)> {
         let filter = CatalogItemFilter {
             category_id,
             item_type,
-            enabled: if enabled_only { Some(true) } else { None },
+            enabled,
             search,
             tag,
         };
@@ -232,6 +232,7 @@ impl CatalogService {
         item_type: Option<CatalogItemType>,
         search: Option<String>,
         tag: Option<String>,
+        enabled: Option<bool>,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<(CatalogItem, RequestabilityResult)>, i64)> {
@@ -242,7 +243,7 @@ impl CatalogService {
                 item_type,
                 search,
                 tag,
-                true, // enabled_only
+                enabled.or(Some(true)),
                 limit,
                 offset,
             )
@@ -1525,6 +1526,21 @@ mod tests {
                 && window.contains("map_err(GovernanceError::Database)")
                 && !window.contains("unwrap_or(false)"),
             "catalog SoD exemption lookup must fail closed, not report fake violations"
+        );
+    }
+
+    #[test]
+    fn public_catalog_list_honors_enabled() {
+        let src = include_str!("catalog_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_items_with_requestability")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_items_with_requestability");
+        assert!(
+            list.contains("enabled: Option<bool>") && list.contains("enabled.or(Some(true))"),
+            "public catalog list must honor advertised enabled and default to enabled items"
         );
     }
 }

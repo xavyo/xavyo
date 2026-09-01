@@ -41,7 +41,7 @@ pub async fn list_identity_providers(
     let clamped_limit = params.clamped_limit();
     let (idps, total) = state
         .idp_config
-        .list(tenant_id, params.offset, clamped_limit)
+        .list(tenant_id, params.is_enabled, params.offset, clamped_limit)
         .await?;
 
     let mut items = Vec::with_capacity(idps.len());
@@ -428,4 +428,22 @@ pub async fn remove_domain(
         .await?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn list_identity_providers_honors_is_enabled() {
+        let src = include_str!("admin.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_identity_providers")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_identity_providers");
+        assert!(
+            list.contains("params.is_enabled") && list.contains(".list("),
+            "GET /admin/federation/identity-providers must honor advertised is_enabled"
+        );
+    }
 }
