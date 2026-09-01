@@ -11,14 +11,16 @@ use uuid::Uuid;
 use validator::Validate;
 
 use xavyo_auth::JwtClaims;
+use xavyo_db::models::GovRequestStatus;
 
 use crate::error::{ApiGovernanceError, ApiResult};
 use crate::models::{
     AddToCartRequest, CartItemResponse, CartQuery, CartResponse, CartSubmissionResponse,
-    CartValidationResponse, CatalogItemListResponse, CatalogItemResponse, CategoryListResponse,
-    CategoryResponse, CreateCatalogItemRequest, CreateCategoryRequest, ListCatalogItemsQuery,
-    ListCategoriesQuery, SubmitCartRequest, UpdateCartItemRequest, UpdateCatalogItemRequest,
-    UpdateCategoryRequest,
+    CartValidationResponse, CatalogItemListResponse, CatalogItemResponse,
+    CatalogRequestListResponse, CatalogRequestResponse, CategoryListResponse, CategoryResponse,
+    CreateCatalogItemRequest, CreateCategoryRequest, ListCatalogItemsQuery,
+    ListCatalogRequestsQuery, ListCategoriesQuery, SubmitCartRequest, UpdateCartItemRequest,
+    UpdateCatalogItemRequest, UpdateCategoryRequest,
 };
 use crate::router::GovernanceState;
 
@@ -969,6 +971,66 @@ pub async fn submit_cart(
     ))
 }
 
+/// List catalog-originated access requests for the current tenant.
+#[utoipa::path(
+    get,
+    path = "/governance/catalog/requests",
+    tag = "Governance - Catalog",
+    params(ListCatalogRequestsQuery),
+    responses(
+        (status = 200, description = "List of catalog requests", body = CatalogRequestListResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn list_catalog_requests(
+    State(state): State<GovernanceState>,
+    Extension(claims): Extension<JwtClaims>,
+    Query(query): Query<ListCatalogRequestsQuery>,
+) -> ApiResult<Json<CatalogRequestListResponse>> {
+    let tenant_id = *claims
+        .tenant_id()
+        .ok_or(ApiGovernanceError::Unauthorized)?
+        .as_uuid();
+
+    let status = parse_optional_catalog_request_status(query.status.as_deref())?;
+
+    let (records, total) = state
+        .catalog_service
+        .list_catalog_requests(
+            tenant_id,
+            query.submission_id,
+            status,
+            query.limit,
+            query.offset,
+        )
+        .await?;
+
+    Ok(Json(CatalogRequestListResponse {
+        items: records
+            .into_iter()
+            .map(|r| CatalogRequestResponse {
+                id: r.id,
+                submission_id: Some(r.submission_id),
+                catalog_item_id: r.catalog_item_id,
+                catalog_item_name: r.catalog_item_name,
+                catalog_item_type: r.catalog_item_type,
+                requester_id: r.requester_id,
+                beneficiary_id: r.beneficiary_id,
+                status: catalog_request_status(r.status),
+                justification: Some(r.justification),
+                created_at: r.created_at,
+                updated_at: r.updated_at,
+            })
+            .collect(),
+        total,
+        limit: query.limit,
+        offset: query.offset,
+    }))
+}
+
 /// Invalid `parent_id` filters must not silently list root categories.
 fn parse_optional_parent_id(parent_id: Option<&str>) -> ApiResult<Option<Option<Uuid>>> {
     match parent_id {
@@ -983,6 +1045,35 @@ fn parse_optional_parent_id(parent_id: Option<&str>) -> ApiResult<Option<Option<
             Ok(Some(Some(id)))
         }
     }
+}
+
+/// Invalid status filters must not silently list every catalog request.
+fn parse_optional_catalog_request_status(
+    value: Option<&str>,
+) -> ApiResult<Option<GovRequestStatus>> {
+    match value {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) => serde_json::from_value(serde_json::Value::String(s.to_string())).map_err(|_| {
+            ApiGovernanceError::Validation(format!(
+                "Invalid status '{s}'. Must be one of: pending, pending_approval, approved, provisioned, rejected, cancelled, expired, failed"
+            ))
+        }),
+    }
+}
+
+fn catalog_request_status(status: GovRequestStatus) -> String {
+    match status {
+        GovRequestStatus::Pending => "pending",
+        GovRequestStatus::PendingApproval => "pending_approval",
+        GovRequestStatus::Approved => "approved",
+        GovRequestStatus::Provisioned => "provisioned",
+        GovRequestStatus::Rejected => "rejected",
+        GovRequestStatus::Cancelled => "cancelled",
+        GovRequestStatus::Expired => "expired",
+        GovRequestStatus::Failed => "failed",
+    }
+    .to_string()
 }
 
 #[cfg(test)]
@@ -1045,6 +1136,28 @@ mod tests {
         assert!(
             update.contains("from_request_item(") && update.contains("get_item("),
             "PUT cart item must look up catalog item_name"
+        );
+    }
+
+    #[test]
+    fn catalog_request_list_honors_submission_id_and_status() {
+        assert!(parse_optional_catalog_request_status(Some("bogus")).is_err());
+        assert_eq!(
+            parse_optional_catalog_request_status(Some("pending")).unwrap(),
+            Some(GovRequestStatus::Pending)
+        );
+        let src = include_str!("catalog.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_catalog_requests")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_catalog_requests");
+        assert!(
+            list.contains("query.submission_id")
+                && list.contains("parse_optional_catalog_request_status(")
+                && list.contains("list_catalog_requests("),
+            "GET /governance/catalog/requests must honor advertised submission_id and status"
         );
     }
 }

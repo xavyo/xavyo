@@ -382,6 +382,8 @@ impl MappingService {
 
     /// Validate mappings JSON structure.
     fn validate_mappings(&self, mappings: &serde_json::Value) -> Result<()> {
+        reject_empty_mappings(mappings)?;
+
         // Mappings should be an array of MappingRule objects
         if !mappings.is_array() && !mappings.is_object() {
             return Err(ConnectorApiError::Validation(
@@ -494,6 +496,21 @@ impl MappingService {
     }
 }
 
+/// Creating or updating a mapping with `{}` / `[]` must not 201 an empty rule set.
+fn reject_empty_mappings(mappings: &serde_json::Value) -> Result<()> {
+    let empty = match mappings {
+        serde_json::Value::Array(rules) => rules.is_empty(),
+        serde_json::Value::Object(obj) => obj.is_empty(),
+        _ => false,
+    };
+    if empty {
+        return Err(ConnectorApiError::Validation(
+            "Mappings must contain at least one rule".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -527,11 +544,30 @@ mod tests {
     }
 
     #[test]
+    fn empty_mappings_are_rejected() {
+        assert!(reject_empty_mappings(&serde_json::json!({})).is_err());
+        assert!(reject_empty_mappings(&serde_json::json!([])).is_err());
+        assert!(reject_empty_mappings(&serde_json::json!({"mail": "email"})).is_ok());
+        assert!(reject_empty_mappings(&serde_json::json!([{
+            "target_attribute": "mail",
+            "source": {"type": "attribute", "name": "email"}
+        }]))
+        .is_ok());
+        let src = include_str!("mapping_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("reject_empty_mappings(")
+                && production.contains("validate_mappings("),
+            "create/update mapping must reject empty advertised mappings"
+        );
+    }
+
+    #[test]
     fn test_create_mapping_request_defaults() {
         let json = r#"{
             "object_class": "user",
             "name": "test",
-            "mappings": {}
+            "mappings": {"mail": "email"}
         }"#;
 
         let request: CreateMappingRequest = serde_json::from_str(json).unwrap();

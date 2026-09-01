@@ -9,8 +9,9 @@ use uuid::Uuid;
 use xavyo_db::models::{
     AddCartItem, CartItemWithDetails, CatalogCategory, CatalogCategoryFilter, CatalogItem,
     CatalogItemFilter, CatalogItemType, CreateCatalogCategory, CreateCatalogItem, GovAccessRequest,
-    GovRole, GovSodExemption, GovSodRule, RequestCart, RequestCartItem, RequestabilityRules,
-    UpdateCartItem as DbUpdateCartItem, UpdateCatalogCategory, UpdateCatalogItem, User,
+    GovRequestStatus, GovRole, GovSodExemption, GovSodRule, RequestCart, RequestCartItem,
+    RequestabilityRules, UpdateCartItem as DbUpdateCartItem, UpdateCatalogCategory,
+    UpdateCatalogItem, User,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -75,6 +76,22 @@ pub struct CartSubmissionResult {
     pub items: Vec<SubmittedItemResult>,
     /// Number of access requests created.
     pub request_count: i64,
+}
+
+/// Catalog-originated access request joined with its submission link.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct CatalogRequestRecord {
+    pub id: Uuid,
+    pub submission_id: Uuid,
+    pub catalog_item_id: Uuid,
+    pub catalog_item_name: String,
+    pub catalog_item_type: CatalogItemType,
+    pub requester_id: Uuid,
+    pub beneficiary_id: Option<Uuid>,
+    pub status: GovRequestStatus,
+    pub justification: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
 /// Context for evaluating requestability rules.
@@ -1203,6 +1220,27 @@ impl CatalogService {
                     .await
                     .map_err(GovernanceError::Database)?;
 
+                    sqlx::query(
+                        r"
+                        INSERT INTO catalog_request_links (
+                            tenant_id, submission_id, access_request_id, catalog_item_id,
+                            cart_item_id, beneficiary_id, form_values, parameters
+                        )
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                        ",
+                    )
+                    .bind(tenant_id)
+                    .bind(submission_id)
+                    .bind(access_request.id)
+                    .bind(item.catalog_item_id)
+                    .bind(item.id)
+                    .bind(beneficiary_id.filter(|id| *id != requester_id))
+                    .bind(&item.form_values)
+                    .bind(&item.parameters)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(GovernanceError::Database)?;
+
                     submitted_items.push(SubmittedItemResult {
                         cart_item_id: item.id,
                         catalog_item_id: item.catalog_item_id,
@@ -1210,6 +1248,12 @@ impl CatalogService {
                     });
                 }
             }
+        }
+
+        if submitted_items.is_empty() {
+            return Err(GovernanceError::Validation(
+                "Cart has no requestable role or entitlement items".to_string(),
+            ));
         }
 
         // Clear the cart within the same transaction
@@ -1228,6 +1272,73 @@ impl CatalogService {
             items: submitted_items.clone(),
             request_count: submitted_items.len() as i64,
         })
+    }
+
+    /// List catalog-originated access requests, optionally by submission or status.
+    pub async fn list_catalog_requests(
+        &self,
+        tenant_id: Uuid,
+        submission_id: Option<Uuid>,
+        status: Option<GovRequestStatus>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<(Vec<CatalogRequestRecord>, i64)> {
+        let items = sqlx::query_as::<_, CatalogRequestRecord>(
+            r"
+            SELECT
+                r.id,
+                l.submission_id,
+                l.catalog_item_id,
+                i.name AS catalog_item_name,
+                i.item_type AS catalog_item_type,
+                r.requester_id,
+                l.beneficiary_id,
+                r.status,
+                r.justification,
+                r.created_at,
+                r.updated_at
+            FROM catalog_request_links l
+            JOIN gov_access_requests r
+                ON r.id = l.access_request_id AND r.tenant_id = $1
+            JOIN catalog_items i
+                ON i.id = l.catalog_item_id AND i.tenant_id = $1
+            WHERE l.tenant_id = $1
+              AND ($2::uuid IS NULL OR l.submission_id = $2)
+              AND ($3::gov_request_status IS NULL OR r.status = $3)
+            ORDER BY r.created_at DESC
+            LIMIT $4 OFFSET $5
+            ",
+        )
+        .bind(tenant_id)
+        .bind(submission_id)
+        .bind(status)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(GovernanceError::Database)?;
+
+        let total = sqlx::query_scalar::<_, i64>(
+            r"
+            SELECT COUNT(*)
+            FROM catalog_request_links l
+            JOIN gov_access_requests r
+                ON r.id = l.access_request_id AND r.tenant_id = $1
+            JOIN catalog_items i
+                ON i.id = l.catalog_item_id AND i.tenant_id = $1
+            WHERE l.tenant_id = $1
+              AND ($2::uuid IS NULL OR l.submission_id = $2)
+              AND ($3::gov_request_status IS NULL OR r.status = $3)
+            ",
+        )
+        .bind(tenant_id)
+        .bind(submission_id)
+        .bind(status)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(GovernanceError::Database)?;
+
+        Ok((items, total))
     }
 
     /// Validate form field requirements for a catalog item.
@@ -1483,6 +1594,30 @@ mod tests {
         assert!(
             !production.contains("DELETE FROM request_cart_items WHERE cart_id = $1\""),
             "must not delete cart items by cart_id alone"
+        );
+    }
+
+    #[test]
+    fn cart_submit_persists_submission_id_and_rejects_empty() {
+        let src = include_str!("catalog_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let submit = production
+            .split("pub async fn submit_cart")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("submit_cart");
+        assert!(
+            submit.contains("INSERT INTO catalog_request_links")
+                && submit.contains("submission_id")
+                && submit.contains("if submitted_items.is_empty()"),
+            "cart submit must persist submission_id and not 201 an empty mapping"
+        );
+        assert!(
+            production.contains("AND ($2::uuid IS NULL OR l.submission_id = $2)")
+                && production.contains("AND r.tenant_id = $1")
+                && production.contains("AND i.tenant_id = $1")
+                && production.contains("WHERE l.tenant_id = $1"),
+            "catalog request list must honor submission_id and filter tenant on both join sides"
         );
     }
 

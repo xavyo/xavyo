@@ -452,7 +452,8 @@ pub mod role_inducement_service;
 // Self-Service Request Catalog exports (F-062)
 pub use catalog_service::{
     CartSodViolation, CartSubmissionResult, CartValidationIssue, CartValidationResult,
-    CatalogService, RequestContext, RequestabilityResult, SubmittedItemResult,
+    CatalogRequestRecord, CatalogService, RequestContext, RequestabilityResult,
+    SubmittedItemResult,
 };
 
 // Role Inducements & Constructions exports (F-063)
