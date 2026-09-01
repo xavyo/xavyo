@@ -467,7 +467,7 @@ impl From<PersonaAttributes> for PersonaAttributesResponse {
             inherited: attrs.inherited,
             overrides: attrs.overrides,
             persona_specific: attrs.persona_specific,
-            last_propagation_at: None,
+            last_propagation_at: attrs.last_propagation_at,
         }
     }
 }
@@ -848,5 +848,23 @@ mod tests {
         assert_eq!(policy.default_validity_days, 365);
         assert_eq!(policy.max_validity_days, 730);
         assert!(policy.validate().is_ok());
+    }
+
+    #[test]
+    fn persona_attributes_response_keeps_last_propagation_at() {
+        let when = Utc::now();
+        let attrs = PersonaAttributes {
+            inherited: serde_json::Map::new(),
+            overrides: serde_json::Map::new(),
+            persona_specific: serde_json::Map::new(),
+            last_propagation_at: Some(when),
+        };
+        let response = PersonaAttributesResponse::from(attrs);
+        assert_eq!(response.last_propagation_at, Some(when));
+        assert!(
+            PersonaAttributesResponse::from(PersonaAttributes::default())
+                .last_propagation_at
+                .is_none()
+        );
     }
 }

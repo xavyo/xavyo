@@ -103,6 +103,19 @@ async fn persona_response(
     Ok(response)
 }
 
+async fn archetype_with_personas_count(
+    service: &crate::services::PersonaArchetypeService,
+    tenant_id: Uuid,
+    archetype: GovPersonaArchetype,
+) -> ApiResult<ArchetypeResponse> {
+    let count = service
+        .count_active_personas(tenant_id, archetype.id)
+        .await?;
+    let mut response = ArchetypeResponse::from(archetype);
+    response.personas_count = Some(count);
+    Ok(response)
+}
+
 // ============================================================================
 // Archetype Handlers
 // ============================================================================
@@ -143,10 +156,17 @@ pub async fn list_archetypes(
         .list(tenant_id, &filter, limit, offset)
         .await?;
 
-    let items = archetypes
-        .into_iter()
-        .map(ArchetypeResponse::from)
-        .collect();
+    let mut items = Vec::with_capacity(archetypes.len());
+    for archetype in archetypes {
+        items.push(
+            archetype_with_personas_count(
+                state.persona_archetype_service.as_ref(),
+                tenant_id,
+                archetype,
+            )
+            .await?,
+        );
+    }
 
     Ok(Json(ArchetypeListResponse {
         items,
@@ -245,7 +265,14 @@ pub async fn create_archetype(
 
     Ok((
         StatusCode::CREATED,
-        Json(ArchetypeResponse::from(archetype)),
+        Json(
+            archetype_with_personas_count(
+                state.persona_archetype_service.as_ref(),
+                tenant_id,
+                archetype,
+            )
+            .await?,
+        ),
     ))
 }
 
@@ -277,16 +304,14 @@ pub async fn get_archetype(
 
     let archetype = state.persona_archetype_service.get(tenant_id, id).await?;
 
-    // Get personas count
-    let count = state
-        .persona_archetype_service
-        .count_active_personas(tenant_id, id)
-        .await?;
-
-    let mut response = ArchetypeResponse::from(archetype);
-    response.personas_count = Some(count);
-
-    Ok(Json(response))
+    Ok(Json(
+        archetype_with_personas_count(
+            state.persona_archetype_service.as_ref(),
+            tenant_id,
+            archetype,
+        )
+        .await?,
+    ))
 }
 
 /// Update a persona archetype.
@@ -377,7 +402,14 @@ pub async fn update_archetype(
         .log_archetype_updated(tenant_id, actor_id, archetype.id, &archetype.name, changes)
         .await?;
 
-    Ok(Json(ArchetypeResponse::from(archetype)))
+    Ok(Json(
+        archetype_with_personas_count(
+            state.persona_archetype_service.as_ref(),
+            tenant_id,
+            archetype,
+        )
+        .await?,
+    ))
 }
 
 /// Delete a persona archetype.
@@ -461,7 +493,14 @@ pub async fn activate_archetype(
         .activate(tenant_id, id)
         .await?;
 
-    Ok(Json(ArchetypeResponse::from(archetype)))
+    Ok(Json(
+        archetype_with_personas_count(
+            state.persona_archetype_service.as_ref(),
+            tenant_id,
+            archetype,
+        )
+        .await?,
+    ))
 }
 
 /// Deactivate a persona archetype.
@@ -495,7 +534,14 @@ pub async fn deactivate_archetype(
         .deactivate(tenant_id, id)
         .await?;
 
-    Ok(Json(ArchetypeResponse::from(archetype)))
+    Ok(Json(
+        archetype_with_personas_count(
+            state.persona_archetype_service.as_ref(),
+            tenant_id,
+            archetype,
+        )
+        .await?,
+    ))
 }
 
 // ============================================================================
@@ -1776,6 +1822,46 @@ mod tests {
                 archetype_name: None,
             })
             .is_none()
+        );
+    }
+
+    #[test]
+    fn archetype_handlers_fill_advertised_personas_count() {
+        let src = include_str!("personas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for handler in [
+            "list_archetypes",
+            "create_archetype",
+            "get_archetype",
+            "update_archetype",
+            "activate_archetype",
+            "deactivate_archetype",
+        ] {
+            let body = production
+                .split(&format!("pub async fn {handler}"))
+                .nth(1)
+                .and_then(|s| s.split("pub async fn ").next())
+                .unwrap_or_else(|| panic!("{handler}"));
+            assert!(
+                body.contains("archetype_with_personas_count(")
+                    && !body.contains("Json(ArchetypeResponse::from"),
+                "{handler} must look up advertised personas_count"
+            );
+        }
+    }
+
+    #[test]
+    fn get_persona_does_not_drop_last_propagation_at() {
+        let src = include_str!("../models/persona.rs");
+        let from = src
+            .split("impl From<PersonaAttributes> for PersonaAttributesResponse")
+            .nth(1)
+            .and_then(|s| s.split("impl ").next())
+            .expect("PersonaAttributes From");
+        assert!(
+            from.contains("last_propagation_at: attrs.last_propagation_at")
+                && !from.contains("last_propagation_at: None"),
+            "GET /governance/personas/{{id}} must serialize last_propagation_at"
         );
     }
 }
