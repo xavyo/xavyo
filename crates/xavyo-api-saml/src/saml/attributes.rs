@@ -2,7 +2,44 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use xavyo_db::models::{AttributeMap, AttributeMapping};
+use uuid::Uuid;
+use xavyo_db::models::{AttributeMap, AttributeMapping, User};
+
+fn nonempty(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+}
+
+/// Display name from profile fields: stored display name, else given+family.
+pub(crate) fn profile_display_name(
+    display_name: Option<&str>,
+    first_name: Option<&str>,
+    last_name: Option<&str>,
+) -> Option<String> {
+    nonempty(display_name).or_else(|| {
+        let joined = [nonempty(first_name), nonempty(last_name)]
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>()
+            .join(" ");
+        if joined.is_empty() {
+            None
+        } else {
+            Some(joined)
+        }
+    })
+}
+
+fn email_username(email: &str) -> Option<String> {
+    let local = email.split('@').next().unwrap_or(email).trim();
+    if local.is_empty() {
+        None
+    } else {
+        Some(local.to_string())
+    }
+}
 
 /// User attributes available for SAML assertion mapping
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -10,8 +47,32 @@ pub struct UserAttributes {
     pub user_id: String,
     pub email: String,
     pub display_name: Option<String>,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
     pub groups: Vec<String>,
     pub tenant_id: String,
+}
+
+impl UserAttributes {
+    /// Fill advertised profile fields from the users table.
+    #[must_use]
+    pub fn from_db_user(user: &User, groups: Vec<String>, tenant_id: Uuid) -> Self {
+        let first_name = nonempty(user.first_name.as_deref());
+        let last_name = nonempty(user.last_name.as_deref());
+        Self {
+            user_id: user.id.to_string(),
+            email: user.email.clone(),
+            display_name: profile_display_name(
+                user.display_name.as_deref(),
+                first_name.as_deref(),
+                last_name.as_deref(),
+            ),
+            first_name,
+            last_name,
+            groups,
+            tenant_id: tenant_id.to_string(),
+        }
+    }
 }
 
 /// A resolved SAML attribute ready for assertion
@@ -44,6 +105,11 @@ fn build_user_field_map(user: &UserAttributes) -> HashMap<&str, Option<String>> 
     map.insert("email", Some(user.email.clone()));
     map.insert("user_id", Some(user.user_id.clone()));
     map.insert("display_name", user.display_name.clone());
+    map.insert("first_name", user.first_name.clone());
+    map.insert("given_name", user.first_name.clone());
+    map.insert("last_name", user.last_name.clone());
+    map.insert("family_name", user.last_name.clone());
+    map.insert("username", email_username(&user.email));
     map.insert("tenant_id", Some(user.tenant_id.clone()));
     // Groups handled separately as multi-value
     map
@@ -110,6 +176,24 @@ pub fn default_attributes(user: &UserAttributes) -> Vec<ResolvedAttribute> {
         });
     }
 
+    if let Some(ref given) = user.first_name {
+        attrs.push(ResolvedAttribute {
+            name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname".to_string(),
+            friendly_name: Some("givenname".to_string()),
+            format: Some("urn:oasis:names:tc:SAML:2.0:attrname-format:uri".to_string()),
+            values: vec![given.clone()],
+        });
+    }
+
+    if let Some(ref family) = user.last_name {
+        attrs.push(ResolvedAttribute {
+            name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname".to_string(),
+            friendly_name: Some("surname".to_string()),
+            format: Some("urn:oasis:names:tc:SAML:2.0:attrname-format:uri".to_string()),
+            values: vec![family.clone()],
+        });
+    }
+
     if !user.groups.is_empty() {
         attrs.push(ResolvedAttribute {
             name: "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups".to_string(),
@@ -166,9 +250,85 @@ mod tests {
             user_id: "user-123".to_string(),
             email: "test@example.com".to_string(),
             display_name: Some("Test User".to_string()),
+            first_name: Some("Test".to_string()),
+            last_name: Some("User".to_string()),
             groups: vec!["admin".to_string(), "users".to_string()],
             tenant_id: "tenant-456".to_string(),
         }
+    }
+
+    #[test]
+    fn profile_display_name_prefers_stored_then_joins_given_family() {
+        assert_eq!(
+            profile_display_name(Some("Ada Lovelace"), Some("Ada"), Some("Lovelace")).as_deref(),
+            Some("Ada Lovelace")
+        );
+        assert_eq!(
+            profile_display_name(None, Some("Ada"), Some("Lovelace")).as_deref(),
+            Some("Ada Lovelace")
+        );
+        assert_eq!(
+            profile_display_name(Some("  "), Some("Ada"), None).as_deref(),
+            Some("Ada")
+        );
+        assert!(profile_display_name(None, None, None).is_none());
+    }
+
+    #[test]
+    fn advertised_profile_sources_are_mapped() {
+        let user = test_user();
+        let mapping = AttributeMapping {
+            name_id_source: "email".to_string(),
+            attributes: vec![
+                AttributeMap {
+                    source: "first_name".to_string(),
+                    target_name: "user_first_name".to_string(),
+                    target_friendly_name: None,
+                    format: None,
+                    multi_value: false,
+                    static_value: None,
+                },
+                AttributeMap {
+                    source: "last_name".to_string(),
+                    target_name: "user_last_name".to_string(),
+                    target_friendly_name: None,
+                    format: None,
+                    multi_value: false,
+                    static_value: None,
+                },
+                AttributeMap {
+                    source: "username".to_string(),
+                    target_name: "user_name".to_string(),
+                    target_friendly_name: None,
+                    format: None,
+                    multi_value: false,
+                    static_value: None,
+                },
+            ],
+        };
+        let attrs = resolve_attributes(&user, &mapping);
+        assert!(attrs
+            .iter()
+            .any(|a| a.name == "user_first_name" && a.values == ["Test"]));
+        assert!(attrs
+            .iter()
+            .any(|a| a.name == "user_last_name" && a.values == ["User"]));
+        assert!(attrs
+            .iter()
+            .any(|a| a.name == "user_name" && a.values == ["test"]));
+        let src = include_str!("attributes.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let map_fn = production
+            .split("fn build_user_field_map")
+            .nth(1)
+            .and_then(|s| s.split("fn resolve_single_attribute").next())
+            .expect("build_user_field_map");
+        assert!(
+            map_fn.contains("first_name")
+                && map_fn.contains("last_name")
+                && map_fn.contains("username"),
+            "SAML attribute mapping must expose advertised profile sources"
+        );
     }
 
     #[test]
