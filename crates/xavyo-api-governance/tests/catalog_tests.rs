@@ -235,7 +235,7 @@ async fn test_list_items_empty() {
 
     let service = CatalogService::new(pool.clone());
     let (items, total) = service
-        .list_items(tenant_id, None, None, None, None, true, 50, 0)
+        .list_items(tenant_id, None, None, None, None, Some(true), 50, 0)
         .await
         .unwrap();
 
@@ -287,7 +287,7 @@ async fn test_list_items_with_filtering() {
 
     // Filter by category
     let (_items, total) = service
-        .list_items(tenant_id, Some(cat_id), None, None, None, true, 50, 0)
+        .list_items(tenant_id, Some(cat_id), None, None, None, Some(true), 50, 0)
         .await
         .unwrap();
     assert_eq!(total, 2);
@@ -300,7 +300,7 @@ async fn test_list_items_with_filtering() {
             Some(CatalogItemType::Role),
             None,
             None,
-            true,
+            Some(true),
             50,
             0,
         )
@@ -316,7 +316,7 @@ async fn test_list_items_with_filtering() {
             None,
             Some("Developer".to_string()),
             None,
-            true,
+            Some(true),
             50,
             0,
         )
@@ -1055,7 +1055,7 @@ async fn test_admin_list_items_includes_disabled() {
 
     // Regular list (enabled only)
     let (_items, total) = service
-        .list_items(tenant_id, None, None, None, None, true, 50, 0)
+        .list_items(tenant_id, None, None, None, None, Some(true), 50, 0)
         .await
         .unwrap();
     assert_eq!(total, 1);

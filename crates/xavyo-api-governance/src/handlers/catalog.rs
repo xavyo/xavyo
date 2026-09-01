@@ -138,6 +138,7 @@ pub async fn list_catalog_items(
             query.item_type,
             query.search.clone(),
             query.tag.clone(),
+            query.enabled,
             query.limit,
             query.offset,
         )
@@ -987,6 +988,21 @@ fn parse_optional_parent_id(parent_id: Option<&str>) -> ApiResult<Option<Option<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn catalog_item_list_honors_enabled() {
+        let src = include_str!("catalog.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_catalog_items")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_catalog_items");
+        assert!(
+            list.contains("query.enabled") && list.contains("list_items_with_requestability("),
+            "GET /governance/catalog/items must honor advertised enabled"
+        );
+    }
 
     #[test]
     fn invalid_parent_id_does_not_list_root_categories() {

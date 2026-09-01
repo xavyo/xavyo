@@ -55,12 +55,16 @@ impl IdpConfigService {
     pub async fn list(
         &self,
         tenant_id: Uuid,
+        is_enabled: Option<bool>,
         offset: i64,
         limit: i64,
     ) -> FederationResult<(Vec<TenantIdentityProvider>, i64)> {
-        let idps =
-            TenantIdentityProvider::list_by_tenant(&self.pool, tenant_id, offset, limit).await?;
-        let total = TenantIdentityProvider::count_by_tenant(&self.pool, tenant_id).await?;
+        let idps = TenantIdentityProvider::list_by_tenant(
+            &self.pool, tenant_id, is_enabled, offset, limit,
+        )
+        .await?;
+        let total =
+            TenantIdentityProvider::count_by_tenant(&self.pool, tenant_id, is_enabled).await?;
         Ok((idps, total))
     }
 
@@ -566,6 +570,24 @@ mod tests {
         assert!(
             !req_prod.contains("unwrap_or_default()"),
             "ClaimMappingConfig::to_json must not return empty mapping"
+        );
+    }
+
+    #[test]
+    fn list_forwards_is_enabled() {
+        let src = include_str!("idp_config.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list(")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list");
+        assert!(
+            list.contains("is_enabled: Option<bool>")
+                && list.contains("list_by_tenant(")
+                && list.contains("count_by_tenant(")
+                && list.contains("is_enabled,"),
+            "IdP list must pass advertised is_enabled to list and count"
         );
     }
 }
