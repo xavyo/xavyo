@@ -95,6 +95,8 @@ let tokens = issuer.issue_tokens(
     user_id,
     tenant_id,
     vec!["user".to_string()],
+    Some(user.email.clone()),
+    user.display_name.clone(),
     None,  // Optional federation claims
 ).await?;
 

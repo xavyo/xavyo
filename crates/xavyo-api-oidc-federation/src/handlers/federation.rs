@@ -228,9 +228,25 @@ pub async fn callback(
             })?;
     federation_login_allowed(user.is_active, user.is_locked())?;
 
+    let jwt_name =
+        user.display_name
+            .clone()
+            .or_else(|| match (&user.first_name, &user.last_name) {
+                (Some(given), Some(family)) => Some(format!("{given} {family}")),
+                (Some(given), None) => Some(given.clone()),
+                (None, Some(family)) => Some(family.clone()),
+                _ => None,
+            });
     let xavyo_tokens = state
         .token_issuer
-        .issue_tokens(user.id, token_result.session.tenant_id, roles, None)
+        .issue_tokens(
+            user.id,
+            token_result.session.tenant_id,
+            roles,
+            Some(user.email.clone()),
+            jwt_name,
+            None,
+        )
         .await?;
 
     // Audit log
@@ -388,6 +404,23 @@ mod tests {
         assert!(
             production.contains("federation_login_allowed(user.is_active, user.is_locked())"),
             "federation login must refuse locked/inactive accounts"
+        );
+    }
+
+    #[test]
+    fn federation_callback_issues_jwt_with_email_and_name() {
+        let src = include_str!("federation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("Some(user.email.clone())"),
+            "federation callback JWT must include advertised email"
+        );
+        let collapsed = production.split_whitespace().collect::<String>();
+        assert!(
+            collapsed.contains("user.display_name.clone()")
+                && collapsed.contains("user.first_name")
+                && collapsed.contains("user.last_name"),
+            "federation callback JWT must include advertised name from profile"
         );
     }
 

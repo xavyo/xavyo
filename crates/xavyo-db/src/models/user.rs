@@ -235,6 +235,31 @@ impl User {
         Ok(result.map(|(email,)| email))
     }
 
+    /// Display name for JWT `name`, preferring stored `display_name` then given+family.
+    ///
+    /// Tenant-scoped. Missing or blank names return `Ok(None)` — `name` is optional.
+    pub async fn get_profile_name_by_id(
+        pool: &sqlx::PgPool,
+        tenant_id: uuid::Uuid,
+        id: uuid::Uuid,
+    ) -> Result<Option<String>, sqlx::Error> {
+        let result: Option<(Option<String>,)> = sqlx::query_as(
+            r"
+            SELECT COALESCE(
+                NULLIF(BTRIM(display_name), ''),
+                NULLIF(BTRIM(CONCAT_WS(' ', first_name, last_name)), '')
+            )
+            FROM users
+            WHERE id = $1 AND tenant_id = $2
+            ",
+        )
+        .bind(id)
+        .bind(tenant_id)
+        .fetch_optional(pool)
+        .await?;
+        Ok(result.and_then(|(name,)| name))
+    }
+
     /// Check if a user exists within a specific tenant.
     pub async fn exists_in_tenant(
         pool: &sqlx::PgPool,
@@ -264,22 +289,33 @@ impl User {
     }
 
     /// Create a federated user (no password, email pre-verified).
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_federated(
         pool: &sqlx::PgPool,
         tenant_id: uuid::Uuid,
         email: String,
         display_name: Option<String>,
+        first_name: Option<String>,
+        last_name: Option<String>,
+        avatar_url: Option<String>,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
             r"
-            INSERT INTO users (tenant_id, email, password_hash, display_name, is_active, email_verified, email_verified_at)
-            VALUES ($1, $2, '', $3, true, true, NOW())
+            INSERT INTO users (
+                tenant_id, email, password_hash, display_name,
+                first_name, last_name, avatar_url,
+                is_active, email_verified, email_verified_at
+            )
+            VALUES ($1, $2, '', $3, $4, $5, $6, true, true, NOW())
             RETURNING *
             ",
         )
         .bind(tenant_id)
         .bind(&email)
         .bind(&display_name)
+        .bind(&first_name)
+        .bind(&last_name)
+        .bind(&avatar_url)
         .fetch_one(pool)
         .await
     }
@@ -636,7 +672,7 @@ mod tests {
             .split("pub async fn get_email_by_id")
             .nth(1)
             .expect("get_email_by_id")
-            .split("pub async fn exists_in_tenant")
+            .split("pub async fn get_profile_name_by_id")
             .next()
             .expect("get_email_by_id body");
         assert!(
@@ -646,6 +682,44 @@ mod tests {
         assert!(
             !lookup.contains("WHERE id = $1\""),
             "must not look up user email by id alone"
+        );
+    }
+
+    #[test]
+    fn get_profile_name_by_id_scopes_by_tenant() {
+        let src = include_str!("user.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let lookup = production
+            .split("pub async fn get_profile_name_by_id")
+            .nth(1)
+            .expect("get_profile_name_by_id")
+            .split("pub async fn exists_in_tenant")
+            .next()
+            .expect("get_profile_name_by_id body");
+        assert!(
+            lookup.contains("WHERE id = $1 AND tenant_id = $2"),
+            "JWT name lookup must include tenant_id"
+        );
+        assert!(
+            lookup.contains("first_name") && lookup.contains("last_name"),
+            "JWT name must fall back to given + family"
+        );
+    }
+
+    #[test]
+    fn create_federated_persists_advertised_profile_fields() {
+        let src = include_str!("user.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let body = production
+            .split("pub async fn create_federated")
+            .nth(1)
+            .expect("create_federated")
+            .split("pub async fn update_display_name")
+            .next()
+            .expect("create_federated body");
+        assert!(
+            body.contains("first_name, last_name, avatar_url"),
+            "federated JIT must store advertised profile fields"
         );
     }
 
