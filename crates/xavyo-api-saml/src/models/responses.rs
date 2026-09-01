@@ -60,6 +60,18 @@ pub struct ServiceProviderResponse {
     pub metadata_url: Option<String>,
     pub slo_url: Option<String>,
     pub slo_binding: String,
+    /// Custom SAML attribute name for groups (default: "groups").
+    pub group_attribute_name: Option<String>,
+    /// How to format group values: "name", "id", or "dn".
+    pub group_value_format: String,
+    /// JSON filter config for which groups to include.
+    pub group_filter: Option<serde_json::Value>,
+    /// Whether to include groups in assertions.
+    pub include_groups: bool,
+    /// Whether to omit the groups attribute when the user has no groups.
+    pub omit_empty_groups: bool,
+    /// Base DN for DN format.
+    pub group_dn_base: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
@@ -81,6 +93,12 @@ impl From<xavyo_db::models::SamlServiceProvider> for ServiceProviderResponse {
             metadata_url: sp.metadata_url,
             slo_url: sp.slo_url,
             slo_binding: sp.slo_binding,
+            group_attribute_name: sp.group_attribute_name,
+            group_value_format: sp.group_value_format,
+            group_filter: sp.group_filter,
+            include_groups: sp.include_groups,
+            omit_empty_groups: sp.omit_empty_groups,
+            group_dn_base: sp.group_dn_base,
             created_at: sp.created_at,
             updated_at: sp.updated_at,
         }
@@ -159,4 +177,68 @@ fn html_escape(s: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&#x27;")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use serde_json::json;
+    use uuid::Uuid;
+
+    fn sample_sp() -> xavyo_db::models::SamlServiceProvider {
+        xavyo_db::models::SamlServiceProvider {
+            id: Uuid::nil(),
+            tenant_id: Uuid::nil(),
+            entity_id: "https://sp.example".to_string(),
+            name: "app".to_string(),
+            acs_urls: vec!["https://sp.example/acs".to_string()],
+            certificate: None,
+            attribute_mapping: json!({}),
+            name_id_format: "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress".to_string(),
+            sign_assertions: true,
+            validate_signatures: false,
+            assertion_validity_seconds: 300,
+            enabled: true,
+            metadata_url: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            group_attribute_name: Some("Roles".to_string()),
+            group_value_format: "id".to_string(),
+            group_filter: Some(json!({"filter_type":"allowlist","allowlist":["admins"]})),
+            include_groups: false,
+            omit_empty_groups: false,
+            group_dn_base: Some("ou=Groups,dc=example,dc=com".to_string()),
+            slo_url: None,
+            slo_binding: "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST".to_string(),
+        }
+    }
+
+    #[test]
+    fn get_and_list_responses_include_group_config() {
+        let item = ServiceProviderResponse::from(sample_sp());
+        assert_eq!(item.group_attribute_name.as_deref(), Some("Roles"));
+        assert_eq!(item.group_value_format, "id");
+        assert!(!item.include_groups);
+        assert!(!item.omit_empty_groups);
+        assert_eq!(
+            item.group_dn_base.as_deref(),
+            Some("ou=Groups,dc=example,dc=com")
+        );
+
+        let list = ServiceProviderListResponse {
+            items: vec![item],
+            total: 1,
+            limit: 20,
+            offset: 0,
+        };
+        let value = serde_json::to_value(&list).unwrap();
+        assert_eq!(value["items"][0]["group_attribute_name"], "Roles");
+        assert_eq!(value["items"][0]["group_value_format"], "id");
+        assert_eq!(value["items"][0]["include_groups"], false);
+        assert_eq!(
+            value["items"][0]["group_filter"]["filter_type"],
+            "allowlist"
+        );
+    }
 }
