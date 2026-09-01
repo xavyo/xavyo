@@ -39,7 +39,7 @@ pub struct RotateOAuthSecretResponse {
 }
 
 /// Information about an OAuth client (without the secret).
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, ToSchema, Default)]
 pub struct OAuthClientDetails {
     /// Internal unique identifier for the OAuth client.
     pub id: Uuid,
@@ -65,11 +65,65 @@ pub struct OAuthClientDetails {
     /// Whether the OAuth client is active.
     pub is_active: bool,
 
+    /// Client logo URL (shown on consent page).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub logo_url: Option<String>,
+
+    /// Client description (shown on consent page).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    /// Bound NHI identity (if any).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nhi_id: Option<Uuid>,
+
+    /// Allowed post-logout redirect URIs (OIDC RP-Initiated Logout).
+    pub post_logout_redirect_uris: Vec<String>,
+
+    /// RFC 9449: client requires DPoP-bound tokens.
+    pub require_dpop: bool,
+
+    /// FAPI 2.0 Security Profile opt-in.
+    pub fapi_profile: bool,
+
+    /// Inline JWKS for `private_key_jwt`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub jwks: Option<serde_json::Value>,
+
+    /// Registered mTLS cert thumbprint.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tls_client_cert_thumbprint: Option<String>,
+
     /// When the OAuth client was created.
     pub created_at: DateTime<Utc>,
 
     /// When the OAuth client was last updated.
     pub updated_at: DateTime<Utc>,
+}
+
+impl From<xavyo_api_oauth::models::ClientResponse> for OAuthClientDetails {
+    fn from(c: xavyo_api_oauth::models::ClientResponse) -> Self {
+        Self {
+            id: c.id,
+            client_id: c.client_id,
+            name: c.name,
+            client_type: c.client_type.to_string(),
+            redirect_uris: c.redirect_uris,
+            grant_types: c.grant_types,
+            scopes: c.scopes,
+            is_active: c.is_active,
+            logo_url: c.logo_url,
+            description: c.description,
+            nhi_id: c.nhi_id,
+            post_logout_redirect_uris: c.post_logout_redirect_uris,
+            require_dpop: c.require_dpop,
+            fapi_profile: c.fapi_profile,
+            jwks: c.jwks,
+            tls_client_cert_thumbprint: c.tls_client_cert_thumbprint,
+            created_at: c.created_at,
+            updated_at: c.updated_at,
+        }
+    }
 }
 
 /// Response containing a list of OAuth clients.
@@ -123,14 +177,61 @@ mod tests {
             ],
             scopes: vec!["openid".to_string(), "profile".to_string()],
             is_active: true,
+            logo_url: Some("https://example.com/logo.png".to_string()),
+            description: Some("App".to_string()),
+            nhi_id: Some(Uuid::new_v4()),
+            post_logout_redirect_uris: vec!["https://example.com/logout".to_string()],
+            require_dpop: true,
+            fapi_profile: true,
+            jwks: Some(serde_json::json!({"keys": []})),
+            tls_client_cert_thumbprint: Some("abc".to_string()),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
 
-        let json = serde_json::to_string(&info).unwrap();
-        assert!(json.contains("My Application"));
-        assert!(json.contains("confidential"));
-        assert!(json.contains("authorization_code"));
+        let json = serde_json::to_value(&info).unwrap();
+        assert_eq!(json["name"], "My Application");
+        assert_eq!(json["client_type"], "confidential");
+        assert_eq!(json["require_dpop"], true);
+        assert_eq!(json["fapi_profile"], true);
+        assert_eq!(
+            json["post_logout_redirect_uris"][0],
+            "https://example.com/logout"
+        );
+        assert_eq!(json["logo_url"], "https://example.com/logo.png");
+    }
+
+    #[test]
+    fn tenant_list_details_round_trip_advertised_fields() {
+        use xavyo_api_oauth::models::{ClientResponse, ClientType};
+
+        let now = Utc::now();
+        let nhi = Uuid::new_v4();
+        let details = OAuthClientDetails::from(ClientResponse {
+            id: Uuid::new_v4(),
+            client_id: "cid".to_string(),
+            name: "app".to_string(),
+            client_type: ClientType::Confidential,
+            redirect_uris: vec!["https://ex/cb".to_string()],
+            grant_types: vec!["authorization_code".to_string()],
+            scopes: vec!["openid".to_string()],
+            is_active: true,
+            logo_url: Some("https://ex/logo.png".to_string()),
+            description: Some("d".to_string()),
+            nhi_id: Some(nhi),
+            post_logout_redirect_uris: vec!["https://ex/logout".to_string()],
+            created_at: now,
+            updated_at: now,
+            require_dpop: true,
+            fapi_profile: true,
+            jwks: Some(serde_json::json!({"keys": []})),
+            tls_client_cert_thumbprint: Some("thumb".to_string()),
+        });
+        assert!(details.require_dpop);
+        assert!(details.fapi_profile);
+        assert_eq!(details.nhi_id, Some(nhi));
+        assert_eq!(details.client_type, "confidential");
+        assert_eq!(details.post_logout_redirect_uris.len(), 1);
     }
 
     #[test]
