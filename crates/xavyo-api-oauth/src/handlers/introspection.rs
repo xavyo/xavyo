@@ -206,11 +206,7 @@ async fn try_introspect_access_token(
         Some(claims.aud.join(" "))
     };
 
-    let scope = if claims.roles.is_empty() {
-        None
-    } else {
-        Some(claims.roles.join(" "))
-    };
+    let scope = claims.scope.filter(|s| !s.is_empty());
 
     Some(IntrospectionResponse {
         active: true,
@@ -324,6 +320,15 @@ mod tests {
                 && refresh.contains("oauth_clients")
                 && !refresh.contains("client_id: None"),
             "refresh-token introspection must return the OAuth client_id"
+        );
+        let access = production
+            .split("async fn try_introspect_access_token")
+            .nth(1)
+            .and_then(|s| s.split("async fn try_introspect_refresh_token").next())
+            .expect("try_introspect_access_token");
+        assert!(
+            access.contains("claims.scope") && !access.contains("claims.roles"),
+            "access-token introspection must report the scope claim, not roles"
         );
     }
 }

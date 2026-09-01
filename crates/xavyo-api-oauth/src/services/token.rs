@@ -79,6 +79,40 @@ pub struct IdTokenClaims {
     /// Session ID (OIDC RP-Initiated Logout).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sid: Option<String>,
+
+    /// Email address (when `email` scope is granted).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
+
+    /// Whether email is verified (when `email` scope is granted).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email_verified: Option<bool>,
+
+    /// Display name (when `profile` scope is granted).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+
+    /// Given/first name (when `profile` scope is granted).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub given_name: Option<String>,
+
+    /// Family/last name (when `profile` scope is granted).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub family_name: Option<String>,
+}
+
+/// Profile fields looked up for access-token and ID-token claims.
+#[derive(Debug, Clone, Default)]
+pub struct TokenUserProfile {
+    pub email: Option<String>,
+    pub email_verified: bool,
+    pub name: Option<String>,
+    pub given_name: Option<String>,
+    pub family_name: Option<String>,
+}
+
+fn scope_includes(scope: &str, wanted: &str) -> bool {
+    scope.split_whitespace().any(|s| s == wanted)
 }
 
 impl IdTokenClaims {
@@ -102,6 +136,11 @@ pub struct IdTokenClaimsBuilder {
     tid: Option<Uuid>,
     at_hash: Option<String>,
     sid: Option<String>,
+    email: Option<String>,
+    email_verified: Option<bool>,
+    name: Option<String>,
+    given_name: Option<String>,
+    family_name: Option<String>,
 }
 
 impl IdTokenClaimsBuilder {
@@ -168,6 +207,30 @@ impl IdTokenClaimsBuilder {
         self
     }
 
+    /// Set email claims (OIDC `email` scope).
+    #[must_use]
+    pub fn email(mut self, email: Option<&str>, verified: bool) -> Self {
+        self.email = email.filter(|s| !s.is_empty()).map(str::to_string);
+        if self.email.is_some() {
+            self.email_verified = Some(verified);
+        }
+        self
+    }
+
+    /// Set profile name claims (OIDC `profile` scope).
+    #[must_use]
+    pub fn profile(
+        mut self,
+        name: Option<&str>,
+        given_name: Option<&str>,
+        family_name: Option<&str>,
+    ) -> Self {
+        self.name = name.filter(|s| !s.is_empty()).map(str::to_string);
+        self.given_name = given_name.filter(|s| !s.is_empty()).map(str::to_string);
+        self.family_name = family_name.filter(|s| !s.is_empty()).map(str::to_string);
+        self
+    }
+
     /// Build the ID token claims.
     ///
     /// Missing `iss`/`sub`/`aud` must not become empty strings in a signed JWT.
@@ -190,6 +253,11 @@ impl IdTokenClaimsBuilder {
             tid: self.tid,
             at_hash: self.at_hash,
             sid: self.sid,
+            email: self.email,
+            email_verified: self.email_verified,
+            name: self.name,
+            given_name: self.given_name,
+            family_name: self.family_name,
         })
     }
 }
@@ -246,28 +314,46 @@ impl TokenService {
         hex::encode(hash)
     }
 
-    /// Look up user email and display name from the database.
-    /// Returns (email, name) — both optional. Failures are logged and ignored
-    /// so token issuance is never blocked by a profile lookup failure.
-    async fn lookup_user_profile(
-        &self,
-        user_id: Uuid,
-        tenant_id: Uuid,
-    ) -> (Option<String>, Option<String>) {
-        let result = sqlx::query_as::<_, (String, Option<String>)>(
-            "SELECT email, display_name FROM users WHERE id = $1 AND tenant_id = $2",
+    /// Look up user email and name fields from the database.
+    /// Failures are logged and ignored so token issuance is never blocked by a
+    /// profile lookup failure.
+    async fn lookup_user_profile(&self, user_id: Uuid, tenant_id: Uuid) -> TokenUserProfile {
+        let result = sqlx::query_as::<_, (String, Option<String>, Option<String>, Option<String>, bool)>(
+            "SELECT email, display_name, first_name, last_name, email_verified FROM users WHERE id = $1 AND tenant_id = $2",
         )
         .bind(user_id)
         .bind(tenant_id)
         .fetch_optional(&self.pool)
-        .await
-        .map(|opt| opt.unwrap_or_default());
+        .await;
 
         match result {
-            Ok((email, name)) => (if email.is_empty() { None } else { Some(email) }, name),
+            Ok(Some((email, display_name, first_name, last_name, email_verified))) => {
+                let given_name = first_name.filter(|s| !s.is_empty());
+                let family_name = last_name.filter(|s| !s.is_empty());
+                let name = display_name.filter(|s| !s.is_empty()).or_else(|| {
+                    let joined = [given_name.as_deref(), family_name.as_deref()]
+                        .into_iter()
+                        .flatten()
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    if joined.is_empty() {
+                        None
+                    } else {
+                        Some(joined)
+                    }
+                });
+                TokenUserProfile {
+                    email: if email.is_empty() { None } else { Some(email) },
+                    email_verified,
+                    name,
+                    given_name,
+                    family_name,
+                }
+            }
+            Ok(None) => TokenUserProfile::default(),
             Err(e) => {
                 tracing::warn!("Failed to look up user profile for token claims: {e}");
-                (None, None)
+                TokenUserProfile::default()
             }
         }
     }
@@ -436,6 +522,7 @@ impl TokenService {
     /// * `nonce` - Optional nonce from authorization request
     /// * `auth_time` - Unix timestamp when user authentication occurred
     /// * `scope` - The granted scopes
+    /// * `profile` - Optional user profile for advertised OIDC claims
     ///
     /// # Returns
     ///
@@ -447,19 +534,32 @@ impl TokenService {
         tenant_id: Uuid,
         nonce: Option<&str>,
         auth_time: i64,
-        _scope: &str,
+        scope: &str,
+        profile: Option<&TokenUserProfile>,
     ) -> Result<String, OAuthError> {
         // For OIDC ID tokens, we need additional claims beyond standard JWT
         // We'll use a specialized ID token claims structure
-        let id_token_claims = IdTokenClaims::builder()
+        let mut builder = IdTokenClaims::builder()
             .issuer(&self.issuer)
             .subject(user_id.to_string())
             .audience(client_id.to_string())
             .tenant_id(tenant_id)
             .auth_time(auth_time)
             .nonce(nonce)
-            .expires_in_secs(ID_TOKEN_EXPIRY_SECS)
-            .build()?;
+            .expires_in_secs(ID_TOKEN_EXPIRY_SECS);
+        if let Some(profile) = profile {
+            if scope_includes(scope, "email") {
+                builder = builder.email(profile.email.as_deref(), profile.email_verified);
+            }
+            if scope_includes(scope, "profile") {
+                builder = builder.profile(
+                    profile.name.as_deref(),
+                    profile.given_name.as_deref(),
+                    profile.family_name.as_deref(),
+                );
+            }
+        }
+        let id_token_claims = builder.build()?;
 
         // Encode the token with key ID
         let key = jsonwebtoken::EncodingKey::from_rsa_pem(&self.private_key).map_err(|e| {
@@ -807,7 +907,7 @@ impl TokenService {
         self.ensure_account_allowed(user_id, tenant_id).await?;
 
         // Look up user profile and roles for token claims
-        let ((user_email, user_name), roles) = tokio::join!(
+        let (profile, roles) = tokio::join!(
             self.lookup_user_profile(user_id, tenant_id),
             self.lookup_user_roles(user_id, tenant_id),
         );
@@ -820,8 +920,8 @@ impl TokenService {
             tenant_id,
             scope,
             ACCESS_TOKEN_EXPIRY_SECS,
-            user_email.as_deref(),
-            user_name.as_deref(),
+            profile.email.as_deref(),
+            profile.name.as_deref(),
             roles,
             dpop_jkt,
             cert_thumbprint,
@@ -830,7 +930,15 @@ impl TokenService {
 
         // Generate ID token if openid scope is present
         let id_token = if scopes.contains(&"openid") {
-            Some(self.generate_id_token(user_id, client_id, tenant_id, nonce, auth_time, scope)?)
+            Some(self.generate_id_token(
+                user_id,
+                client_id,
+                tenant_id,
+                nonce,
+                auth_time,
+                scope,
+                Some(&profile),
+            )?)
         } else {
             None
         };
@@ -1012,7 +1120,7 @@ impl TokenService {
         self.ensure_account_allowed(user_id, tenant_id).await?;
 
         // Look up user profile and roles for token claims
-        let ((user_email, user_name), roles) = tokio::join!(
+        let (profile, roles) = tokio::join!(
             self.lookup_user_profile(user_id, tenant_id),
             self.lookup_user_roles(user_id, tenant_id),
         );
@@ -1026,8 +1134,8 @@ impl TokenService {
             tenant_id,
             scope,
             ACCESS_TOKEN_EXPIRY_SECS,
-            user_email.as_deref(),
-            user_name.as_deref(),
+            profile.email.as_deref(),
+            profile.name.as_deref(),
             roles,
             dpop_jkt,
             cert_thumbprint,
@@ -1174,7 +1282,7 @@ impl TokenService {
         self.ensure_account_allowed(user_id, tenant_id).await?;
 
         // Look up user profile and roles for token claims
-        let ((user_email, user_name), roles) = tokio::join!(
+        let (profile, roles) = tokio::join!(
             self.lookup_user_profile(user_id, tenant_id),
             self.lookup_user_roles(user_id, tenant_id),
         );
@@ -1187,15 +1295,23 @@ impl TokenService {
             tenant_id,
             scope,
             ACCESS_TOKEN_EXPIRY_SECS,
-            user_email.as_deref(),
-            user_name.as_deref(),
+            profile.email.as_deref(),
+            profile.name.as_deref(),
             roles,
         )?;
 
         // Generate ID token if openid scope is present
         // For device code flow, no nonce is typically provided
         let id_token = if scopes.contains(&"openid") {
-            Some(self.generate_id_token(user_id, client_id, tenant_id, None, auth_time, scope)?)
+            Some(self.generate_id_token(
+                user_id,
+                client_id,
+                tenant_id,
+                None,
+                auth_time,
+                scope,
+                Some(&profile),
+            )?)
         } else {
             None
         };
@@ -1533,6 +1649,39 @@ xxU7T7aU32bKZLygCDtwsN8=
         assert!(!json.contains("nonce"));
         assert!(!json.contains("tid"));
         assert!(!json.contains("at_hash"));
+        assert!(!json.contains("given_name"));
+        assert!(!json.contains("family_name"));
+    }
+
+    #[test]
+    fn id_token_claims_include_advertised_profile_fields() {
+        let claims = IdTokenClaims::builder()
+            .issuer("iss")
+            .subject("sub")
+            .audience("aud")
+            .email(Some("a@b.c"), true)
+            .profile(Some("Ada Lovelace"), Some("Ada"), Some("Lovelace"))
+            .build()
+            .unwrap();
+        let json = serde_json::to_string(&claims).unwrap();
+        assert!(json.contains("\"email\":\"a@b.c\""));
+        assert!(json.contains("\"email_verified\":true"));
+        assert!(json.contains("\"name\":\"Ada Lovelace\""));
+        assert!(json.contains("\"given_name\":\"Ada\""));
+        assert!(json.contains("\"family_name\":\"Lovelace\""));
+    }
+
+    #[test]
+    fn generate_id_token_honors_profile_and_email_scopes() {
+        let src = include_str!("token.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("scope_includes(scope, \"email\")")
+                && production.contains("scope_includes(scope, \"profile\")")
+                && production.contains("first_name")
+                && production.contains("last_name"),
+            "ID tokens must look up and emit advertised profile claims"
+        );
     }
 
     #[test]

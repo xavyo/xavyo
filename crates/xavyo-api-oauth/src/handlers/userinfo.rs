@@ -5,7 +5,7 @@ use crate::router::OAuthState;
 use crate::services::userinfo::UserClaims;
 use axum::{
     extract::State,
-    http::{header, HeaderMap},
+    http::{header, HeaderMap, Method},
     Json,
 };
 use sqlx;
@@ -27,6 +27,7 @@ use xavyo_auth::decode_token;
 )]
 pub async fn userinfo_handler(
     State(state): State<OAuthState>,
+    method: Method,
     headers: HeaderMap,
 ) -> Result<Json<UserClaims>, OAuthError> {
     // Extract the access token from Authorization header
@@ -64,7 +65,7 @@ pub async fn userinfo_handler(
         &headers,
         &claims,
         &token,
-        "GET",
+        method.as_str(),
         "/oauth/userinfo",
     )
     .await?;
@@ -156,11 +157,19 @@ pub async fn userinfo_handler(
         .tid
         .ok_or_else(|| OAuthError::InvalidToken("Missing tenant ID in token".to_string()))?;
 
-    // Extract scope from roles (our implementation stores scopes as roles)
-    let scope = claims.roles.join(" ");
+    // OAuth scopes live in the `scope` claim (RFC 9068), not `roles`.
+    let scope = claims
+        .scope
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            OAuthError::InsufficientScope(
+                "The access token must have openid scope for userinfo".to_string(),
+            )
+        })?;
 
     // Verify openid scope is present (required for userinfo)
-    if !claims.roles.iter().any(|r| r == "openid") {
+    if !scope.split_whitespace().any(|s| s == "openid") {
         return Err(OAuthError::InsufficientScope(
             "The access token must have openid scope for userinfo".to_string(),
         ));
@@ -169,7 +178,7 @@ pub async fn userinfo_handler(
     // Get user claims from the service
     let user_claims = state
         .userinfo_service
-        .get_user_claims(tenant_id, user_id, &scope)
+        .get_user_claims(tenant_id, user_id, scope)
         .await?;
 
     Ok(Json(user_claims))
@@ -260,6 +269,34 @@ mod tests {
         assert!(
             !production.contains("unwrap_or(false)"),
             "must not treat sentinel query errors as not-revoked"
+        );
+    }
+
+    #[test]
+    fn userinfo_uses_token_scope_claim_not_roles() {
+        let src = include_str!("userinfo.rs");
+        let production = src
+            .split("mod tests")
+            .next()
+            .expect("production source")
+            .split_whitespace()
+            .collect::<String>();
+        assert!(
+            production.contains("claims.scope"),
+            "GET/POST /oauth/userinfo must check the RFC 9068 `scope` claim"
+        );
+        assert!(
+            production.contains("openid"),
+            "GET/POST /oauth/userinfo must require the openid scope"
+        );
+        assert!(
+            !production.contains("claims.roles.join")
+                && !production.contains("claims.roles.iter()"),
+            "GET/POST /oauth/userinfo must not treat authorization roles as OAuth scope"
+        );
+        assert!(
+            production.contains("method.as_str()"),
+            "userinfo DPoP must bind the actual HTTP method so POST is not a GET proof"
         );
     }
 }

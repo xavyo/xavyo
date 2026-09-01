@@ -12,6 +12,9 @@ struct DbUser {
     pub email: String,
     pub email_verified: bool,
     pub is_active: bool,
+    pub display_name: Option<String>,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
 }
 
 /// User claims returned by the userinfo endpoint.
@@ -60,8 +63,15 @@ impl UserClaims {
 
     /// Add profile claims.
     #[must_use]
-    pub fn with_profile(mut self, name: Option<String>) -> Self {
-        self.name = name;
+    pub fn with_profile(
+        mut self,
+        name: Option<String>,
+        given_name: Option<String>,
+        family_name: Option<String>,
+    ) -> Self {
+        self.name = name.filter(|s| !s.is_empty());
+        self.given_name = given_name.filter(|s| !s.is_empty());
+        self.family_name = family_name.filter(|s| !s.is_empty());
         self
     }
 }
@@ -90,7 +100,7 @@ impl UserInfoService {
     /// Returns user claims filtered by the granted scopes:
     /// - `openid`: Required, returns `sub` claim
     /// - `email`: Returns `email` and `email_verified` claims
-    /// - `profile`: Returns `name` claim (if available)
+    /// - `profile`: Returns `name`, `given_name`, and `family_name` claims (if available)
     ///
     /// # Arguments
     ///
@@ -132,7 +142,7 @@ impl UserInfoService {
         // Look up the user
         let user: DbUser = sqlx::query_as(
             r"
-            SELECT id, email, email_verified, is_active
+            SELECT id, email, email_verified, is_active, display_name, first_name, last_name
             FROM users
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -166,10 +176,22 @@ impl UserInfoService {
         }
 
         // Add profile claims if profile scope is present
-        // Note: Our current user model doesn't have name fields,
-        // so we'll return None for name claims
         if Self::has_scope(&scopes, "profile") {
-            claims = claims.with_profile(None);
+            let given_name = user.first_name.filter(|s| !s.is_empty());
+            let family_name = user.last_name.filter(|s| !s.is_empty());
+            let name = user.display_name.filter(|s| !s.is_empty()).or_else(|| {
+                let joined = [given_name.as_deref(), family_name.as_deref()]
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                if joined.is_empty() {
+                    None
+                } else {
+                    Some(joined)
+                }
+            });
+            claims = claims.with_profile(name, given_name, family_name);
         }
 
         Ok(claims)
@@ -211,11 +233,34 @@ mod tests {
         let user_id = Uuid::new_v4();
         let claims = UserClaims::new(user_id)
             .with_email("test@example.com".to_string(), true)
-            .with_profile(Some("Test User".to_string()));
+            .with_profile(
+                Some("Test User".to_string()),
+                Some("Test".to_string()),
+                Some("User".to_string()),
+            );
 
         assert_eq!(claims.sub, user_id.to_string());
         assert_eq!(claims.email, Some("test@example.com".to_string()));
         assert_eq!(claims.email_verified, Some(true));
         assert_eq!(claims.name, Some("Test User".to_string()));
+        assert_eq!(claims.given_name, Some("Test".to_string()));
+        assert_eq!(claims.family_name, Some("User".to_string()));
+    }
+
+    #[test]
+    fn get_user_claims_selects_advertised_name_fields() {
+        let src = include_str!("userinfo.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("display_name")
+                && production.contains("first_name")
+                && production.contains("last_name")
+                && production.contains("with_profile(name, given_name, family_name)"),
+            "userinfo must look up and return advertised name claims"
+        );
+        assert!(
+            !production.contains("with_profile(None)"),
+            "userinfo must not stub profile names as None"
+        );
     }
 }

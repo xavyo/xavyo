@@ -356,7 +356,7 @@ impl OAuthState {
 ///
 /// ## Protected Endpoints (require valid access token)
 ///
-/// - `GET /oauth/userinfo` - `UserInfo` endpoint (requires openid scope)
+/// - `GET|POST /oauth/userinfo` - `UserInfo` endpoint (requires openid scope)
 ///
 /// ## Admin Endpoints (require admin role)
 ///
@@ -386,7 +386,7 @@ pub fn oauth_router(state: OAuthState) -> Router {
         // Token endpoint (supports authorization_code, refresh_token, client_credentials, device_code)
         .route("/token", post(token_handler))
         // UserInfo endpoint (protected - will add auth middleware)
-        .route("/userinfo", get(userinfo_handler))
+        .route("/userinfo", get(userinfo_handler).post(userinfo_handler))
         // F084: RFC 7009 Token Revocation (client-authenticated, no JWT auth)
         .route("/revoke", post(revoke_token_handler))
         // F084: RFC 7662 Token Introspection (client-authenticated, no JWT auth)
@@ -512,5 +512,15 @@ mod tests {
     fn oauth_state_creation() {
         // This test verifies the OAuthState struct can be created
         // Full testing requires database connections
+    }
+
+    #[test]
+    fn oauth_router_mounts_userinfo_get_and_post() {
+        let src = include_str!("router.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("get(userinfo_handler).post(userinfo_handler)"),
+            "OIDC UserInfo MUST support GET and POST"
+        );
     }
 }
