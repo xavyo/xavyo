@@ -54,12 +54,19 @@ pub trait AuthService: Send + Sync {
     /// * `email` - User's email address (may be None for private email providers)
     /// * `display_name` - User's display name
     /// * `email_verified` - Whether the email was verified by the provider (F116: pass through actual value)
+    /// * `first_name` - Given name from the provider
+    /// * `last_name` - Family name from the provider
+    /// * `avatar_url` - Profile picture URL from the provider
+    #[allow(clippy::too_many_arguments)]
     async fn create_social_user(
         &self,
         tenant_id: Uuid,
         email: Option<&str>,
         display_name: &str,
         email_verified: bool,
+        first_name: Option<&str>,
+        last_name: Option<&str>,
+        avatar_url: Option<&str>,
     ) -> Result<Uuid, crate::error::SocialError>;
 }
 

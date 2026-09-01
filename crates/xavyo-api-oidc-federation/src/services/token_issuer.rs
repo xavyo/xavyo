@@ -101,12 +101,14 @@ impl TokenIssuerService {
     /// # Returns
     ///
     /// Issued tokens including access token and refresh token.
-    #[instrument(skip(self, roles, federation_claims))]
+    #[instrument(skip(self, roles, email, name, federation_claims))]
     pub async fn issue_tokens(
         &self,
         user_id: Uuid,
         tenant_id: Uuid,
         roles: Vec<String>,
+        email: Option<String>,
+        name: Option<String>,
         federation_claims: Option<FederationClaims>,
     ) -> FederationResult<IssuedTokens> {
         // Build access token claims
@@ -119,6 +121,13 @@ impl TokenIssuerService {
 
         if !self.config.audience.is_empty() {
             claims_builder = claims_builder.audience(self.config.audience.clone());
+        }
+
+        if let Some(email) = email.filter(|s| !s.is_empty()) {
+            claims_builder = claims_builder.email(email);
+        }
+        if let Some(name) = name.filter(|s| !s.is_empty()) {
+            claims_builder = claims_builder.name(name);
         }
 
         let claims = claims_builder.build();
@@ -182,9 +191,19 @@ impl TokenIssuerService {
             claims_builder = claims_builder.audience(self.config.audience.clone());
         }
 
-        // Add email from mapped claims if present
+        // Add advertised profile claims from mapped IdP attributes.
         if let Some(Value::String(email)) = mapped_claims.get("email") {
-            claims_builder = claims_builder.email(email.clone());
+            if !email.is_empty() {
+                claims_builder = claims_builder.email(email.clone());
+            }
+        }
+        let mapped_name = mapped_claims
+            .get("name")
+            .or_else(|| mapped_claims.get("display_name"))
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty());
+        if let Some(name) = mapped_name {
+            claims_builder = claims_builder.name(name.to_string());
         }
 
         let claims = claims_builder.build();
@@ -238,8 +257,15 @@ impl TokenIssuerService {
         // For now, federation claims are logged but not embedded in the JWT
         // (would require extending JwtClaims to support custom claims)
         // This is intentional - the federation context is tracked server-side
-        self.issue_tokens(user_id, tenant_id, roles, Some(federation_claims))
-            .await
+        self.issue_tokens(
+            user_id,
+            tenant_id,
+            roles,
+            None,
+            None,
+            Some(federation_claims),
+        )
+        .await
     }
 
     /// Get the configured issuer.
@@ -328,7 +354,14 @@ jQIDAQAB
         let tenant_id = Uuid::new_v4();
 
         let tokens = service
-            .issue_tokens(user_id, tenant_id, vec!["user".to_string()], None)
+            .issue_tokens(
+                user_id,
+                tenant_id,
+                vec!["user".to_string()],
+                None,
+                None,
+                None,
+            )
             .await
             .unwrap();
 
@@ -345,7 +378,14 @@ jQIDAQAB
         let tenant_id = Uuid::new_v4();
 
         let tokens = service
-            .issue_tokens(user_id, tenant_id, vec!["admin".to_string()], None)
+            .issue_tokens(
+                user_id,
+                tenant_id,
+                vec!["admin".to_string()],
+                None,
+                None,
+                None,
+            )
             .await
             .unwrap();
 
@@ -367,7 +407,7 @@ jQIDAQAB
         let tenant_id = Uuid::new_v4();
 
         let tokens = service
-            .issue_tokens(user_id, tenant_id, vec![], None)
+            .issue_tokens(user_id, tenant_id, vec![], None, None, None)
             .await
             .unwrap();
 
@@ -387,7 +427,7 @@ jQIDAQAB
 
         let service = TokenIssuerService::new(config);
         let result = service
-            .issue_tokens(Uuid::new_v4(), Uuid::new_v4(), vec![], None)
+            .issue_tokens(Uuid::new_v4(), Uuid::new_v4(), vec![], None, None, None)
             .await;
 
         assert!(result.is_err());
@@ -402,7 +442,7 @@ jQIDAQAB
         let service = TokenIssuerService::new(test_config());
 
         let tokens = service
-            .issue_tokens(Uuid::new_v4(), Uuid::new_v4(), vec![], None)
+            .issue_tokens(Uuid::new_v4(), Uuid::new_v4(), vec![], None, None, None)
             .await
             .unwrap();
 
@@ -436,6 +476,8 @@ jQIDAQAB
                 user_id,
                 tenant_id,
                 vec!["user".to_string()],
+                None,
+                None,
                 Some(federation_claims),
             )
             .await
@@ -443,5 +485,48 @@ jQIDAQAB
 
         // Token should be valid
         assert_eq!(tokens.access_token.split('.').count(), 3);
+    }
+
+    #[tokio::test]
+    async fn issue_tokens_includes_advertised_email_and_name() {
+        let service = TokenIssuerService::new(test_config());
+        let tokens = service
+            .issue_tokens(
+                Uuid::new_v4(),
+                Uuid::new_v4(),
+                vec!["user".to_string()],
+                Some("ada@example.com".to_string()),
+                Some("Ada Lovelace".to_string()),
+                None,
+            )
+            .await
+            .unwrap();
+        let claims = xavyo_auth::decode_token(&tokens.access_token, TEST_PUBLIC_KEY).unwrap();
+        assert_eq!(claims.email.as_deref(), Some("ada@example.com"));
+        assert_eq!(claims.name.as_deref(), Some("Ada Lovelace"));
+    }
+
+    #[tokio::test]
+    async fn issue_tokens_with_claims_maps_name_not_only_email() {
+        let service = TokenIssuerService::new(test_config());
+        let mut mapped = HashMap::new();
+        mapped.insert("email".to_string(), Value::String("ada@example.com".into()));
+        mapped.insert(
+            "display_name".to_string(),
+            Value::String("Ada Lovelace".into()),
+        );
+        let tokens = service
+            .issue_tokens_with_claims(
+                Uuid::new_v4(),
+                Uuid::new_v4(),
+                vec!["user".to_string()],
+                mapped,
+                None,
+            )
+            .await
+            .unwrap();
+        let claims = xavyo_auth::decode_token(&tokens.access_token, TEST_PUBLIC_KEY).unwrap();
+        assert_eq!(claims.email.as_deref(), Some("ada@example.com"));
+        assert_eq!(claims.name.as_deref(), Some("Ada Lovelace"));
     }
 }

@@ -2093,26 +2093,36 @@ impl xavyo_api_social::AuthService for SocialAuthAdapter {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn create_social_user(
         &self,
         tenant_id: uuid::Uuid,
         email: Option<&str>,
         display_name: &str,
         email_verified: bool,
+        first_name: Option<&str>,
+        last_name: Option<&str>,
+        avatar_url: Option<&str>,
     ) -> Result<uuid::Uuid, xavyo_api_social::SocialError> {
         let user_id = uuid::Uuid::new_v4();
 
         // F116: Create user with provider's email_verified status (not always true)
         sqlx::query(
             r"
-            INSERT INTO users (id, tenant_id, email, display_name, email_verified, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+            INSERT INTO users (
+                id, tenant_id, email, display_name, first_name, last_name, avatar_url,
+                email_verified, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
             ",
         )
         .bind(user_id)
         .bind(tenant_id)
         .bind(email)
         .bind(display_name)
+        .bind(first_name)
+        .bind(last_name)
+        .bind(avatar_url)
         .bind(email_verified)
         .execute(&self.pool)
         .await
@@ -2186,6 +2196,23 @@ mod tests {
         assert!(
             !production.contains(".ok()\n            .flatten()"),
             "must not mint a JWT after swallowing email lookup errors"
+        );
+    }
+
+    #[test]
+    fn social_create_user_persists_advertised_profile_fields() {
+        let src = include_str!("main.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let body = production
+            .split("async fn create_social_user")
+            .nth(1)
+            .expect("create_social_user")
+            .split("async fn shutdown_signal")
+            .next()
+            .expect("create_social_user body");
+        assert!(
+            body.contains("first_name, last_name, avatar_url"),
+            "social JIT must store advertised profile fields"
         );
     }
 }

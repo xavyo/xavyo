@@ -9,9 +9,26 @@ use tracing::{info, warn};
 
 use crate::error::{ProviderType, SocialError};
 use crate::models::{AppleCallbackForm, AppleUserInfo, OAuthCallbackQuery};
-use crate::providers::{ProviderFactory, SocialProvider};
+use crate::providers::{ProviderFactory, SocialProvider, SocialUserInfo};
 use crate::services::ConnectionResult;
 use crate::SocialState;
+
+/// Advertised user profile fields from a social provider userinfo payload.
+pub fn social_profile_fields(
+    info: &SocialUserInfo,
+) -> (String, Option<String>, Option<String>, Option<String>) {
+    let nonempty = |s: Option<&str>| {
+        s.map(str::trim)
+            .filter(|v| !v.is_empty())
+            .map(str::to_string)
+    };
+    (
+        info.display_name(),
+        nonempty(info.given_name.as_deref()),
+        nonempty(info.family_name.as_deref()),
+        nonempty(info.picture.as_deref()),
+    )
+}
 
 /// Sanitize redirect_after to prevent open redirects.
 /// Only allows relative paths starting with `/` (rejects `//`, `://`, `\`).
@@ -452,6 +469,34 @@ async fn process_callback(
                 )
                 .await?;
 
+            let (display_name, first_name, last_name, avatar_url) =
+                social_profile_fields(&user_info);
+            let display_name = if user_info.name.is_some()
+                || user_info.given_name.is_some()
+                || user_info.family_name.is_some()
+            {
+                Some(display_name)
+            } else {
+                None
+            };
+            if let Err(e) = xavyo_db::models::User::update_profile(
+                &state.pool,
+                tenant_id,
+                user_id,
+                display_name,
+                first_name,
+                last_name,
+                avatar_url,
+            )
+            .await
+            {
+                tracing::warn!(
+                    user_id = %user_id,
+                    error = %e,
+                    "Failed to sync social profile names; continuing login"
+                );
+            }
+
             info!(user_id = %user_id, "Returning user logged in via social");
 
             // Issue xavyo tokens and redirect
@@ -477,14 +522,19 @@ async fn process_callback(
                     "Email collision with unverified email - creating new account without email to prevent takeover"
                 );
 
+                let (display_name, first_name, last_name, avatar_url) =
+                    social_profile_fields(&user_info);
                 // Create new user WITHOUT the unverified email
                 let user_id = state
                     .auth_service
                     .create_social_user(
                         tenant_id,
                         None, // Do not use unverified email
-                        user_info.display_name().as_str(),
+                        display_name.as_str(),
                         false,
+                        first_name.as_deref(),
+                        last_name.as_deref(),
+                        avatar_url.as_deref(),
                     )
                     .await?;
 
@@ -537,14 +587,19 @@ async fn process_callback(
             // Only mark as verified if provider explicitly says so
             let email_verified = user_info.email_verified.unwrap_or(false);
 
+            let (display_name, first_name, last_name, avatar_url) =
+                social_profile_fields(&user_info);
             // Create new user with correct email_verified status
             let user_id = state
                 .auth_service
                 .create_social_user(
                     tenant_id,
                     user_info.email.as_deref(),
-                    user_info.display_name().as_str(),
+                    display_name.as_str(),
                     email_verified,
+                    first_name.as_deref(),
+                    last_name.as_deref(),
+                    avatar_url.as_deref(),
                 )
                 .await?;
 
@@ -749,6 +804,59 @@ mod tests {
         assert!(
             production.contains("social_login_allowed(user.is_active, user.is_locked())"),
             "existing social logins must refuse locked accounts"
+        );
+    }
+
+    fn sample_info() -> SocialUserInfo {
+        SocialUserInfo {
+            provider_user_id: "gid-1".to_string(),
+            email: Some("ada@example.com".to_string()),
+            email_verified: Some(true),
+            name: Some("Ada Lovelace".to_string()),
+            given_name: Some("Ada".to_string()),
+            family_name: Some("Lovelace".to_string()),
+            picture: Some("https://example.com/ada.png".to_string()),
+            is_private_email: false,
+            raw_claims: serde_json::json!({}),
+        }
+    }
+
+    #[test]
+    fn social_profile_fields_fills_advertised_names() {
+        let (display, first, last, avatar) = social_profile_fields(&sample_info());
+        assert_eq!(display, "Ada Lovelace");
+        assert_eq!(first.as_deref(), Some("Ada"));
+        assert_eq!(last.as_deref(), Some("Lovelace"));
+        assert_eq!(avatar.as_deref(), Some("https://example.com/ada.png"));
+    }
+
+    #[test]
+    fn social_profile_fields_joins_given_family_when_name_absent() {
+        let mut info = sample_info();
+        info.name = None;
+        let (display, first, last, _) = social_profile_fields(&info);
+        assert_eq!(display, "Ada Lovelace");
+        assert_eq!(first.as_deref(), Some("Ada"));
+        assert_eq!(last.as_deref(), Some("Lovelace"));
+    }
+
+    #[test]
+    fn social_callback_create_and_sync_persist_profile_fields() {
+        let src = include_str!("callback.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("social_profile_fields(&user_info)"),
+            "social JIT must map given/family/picture onto the user"
+        );
+        assert!(
+            production.contains("User::update_profile("),
+            "existing social login must sync first_name/last_name/avatar"
+        );
+        assert!(
+            production.contains("first_name.as_deref()")
+                && production.contains("last_name.as_deref()")
+                && production.contains("avatar_url.as_deref()"),
+            "create_social_user must receive advertised profile fields"
         );
     }
 }

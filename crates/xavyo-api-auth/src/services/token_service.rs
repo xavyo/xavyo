@@ -202,9 +202,31 @@ impl TokenService {
             .enforce_access(*tenant_id.as_uuid(), ip_str.as_deref(), &roles)
             .await?;
 
+        // Advertised JwtClaims.name: stored display_name, else given+family.
+        // Lookup errors omit `name` (optional) — they must not fail token issue.
+        let name = match xavyo_db::User::get_profile_name_by_id(
+            &self.pool,
+            *tenant_id.as_uuid(),
+            *user_id.as_uuid(),
+        )
+        .await
+        {
+            Ok(name) => name,
+            Err(e) => {
+                tracing::debug!(error = %e, "Optional JWT name lookup failed");
+                None
+            }
+        };
+
         // Generate access token
-        let access_token =
-            self.create_access_token(user_id, tenant_id, roles, email, auth_context.as_ref())?;
+        let access_token = self.create_access_token(
+            user_id,
+            tenant_id,
+            roles,
+            email,
+            name,
+            auth_context.as_ref(),
+        )?;
 
         // Generate refresh token, persisting the auth context so it survives
         // token rotation (carried forward on refresh).
@@ -230,6 +252,7 @@ impl TokenService {
         tenant_id: TenantId,
         roles: Vec<String>,
         email: Option<String>,
+        name: Option<String>,
         auth_context: Option<&AuthContext>,
     ) -> Result<String, ApiAuthError> {
         let mut builder = JwtClaims::builder()
@@ -242,6 +265,9 @@ impl TokenService {
 
         if let Some(email) = email {
             builder = builder.email(email);
+        }
+        if let Some(name) = name.filter(|s| !s.is_empty()) {
+            builder = builder.name(name);
         }
 
         // OIDC authentication context (acr/amr/auth_time). Emitted on
@@ -877,6 +903,20 @@ mod tests {
         assert!(
             production.contains("enforce_access("),
             "token issue must enforce tenant IP restrictions"
+        );
+    }
+
+    #[test]
+    fn create_access_token_sets_advertised_name_claim() {
+        let src = include_str!("token_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("get_profile_name_by_id("),
+            "first-party JWTs must look up advertised name"
+        );
+        assert!(
+            production.contains("builder = builder.name(name)"),
+            "create_access_token must set JwtClaims.name"
         );
     }
 
