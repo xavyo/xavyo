@@ -25,13 +25,22 @@ impl SiemDestinationService {
         &self,
         tenant_id: Uuid,
         enabled_only: Option<bool>,
+        destination_type: Option<&str>,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<SiemDestination>, i64)> {
-        let destinations =
-            SiemDestination::list_by_tenant(&self.pool, tenant_id, enabled_only, limit, offset)
+        let destinations = SiemDestination::list_by_tenant(
+            &self.pool,
+            tenant_id,
+            enabled_only,
+            destination_type,
+            limit,
+            offset,
+        )
+        .await?;
+        let total =
+            SiemDestination::count_by_tenant(&self.pool, tenant_id, enabled_only, destination_type)
                 .await?;
-        let total = SiemDestination::count_by_tenant(&self.pool, tenant_id, enabled_only).await?;
         Ok((destinations, total))
     }
 

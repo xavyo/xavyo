@@ -163,6 +163,7 @@ impl SiemDestination {
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         enabled_only: Option<bool>,
+        destination_type: Option<&str>,
         limit: i64,
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
@@ -178,6 +179,10 @@ impl SiemDestination {
             param_count += 1;
             query.push_str(&format!(" AND enabled = ${param_count}"));
         }
+        if destination_type.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND destination_type = ${param_count}"));
+        }
 
         query.push_str(&format!(
             " ORDER BY name LIMIT ${} OFFSET ${}",
@@ -189,6 +194,9 @@ impl SiemDestination {
 
         if let Some(enabled) = enabled_only {
             q = q.bind(enabled);
+        }
+        if let Some(destination_type) = destination_type {
+            q = q.bind(destination_type);
         }
 
         q.bind(limit).bind(offset).fetch_all(pool).await
@@ -216,6 +224,7 @@ impl SiemDestination {
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         enabled_only: Option<bool>,
+        destination_type: Option<&str>,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
             r"
@@ -229,11 +238,18 @@ impl SiemDestination {
             param_count += 1;
             query.push_str(&format!(" AND enabled = ${param_count}"));
         }
+        if destination_type.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND destination_type = ${param_count}"));
+        }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
 
         if let Some(enabled) = enabled_only {
             q = q.bind(enabled);
+        }
+        if let Some(destination_type) = destination_type {
+            q = q.bind(destination_type);
         }
 
         q.fetch_one(pool).await

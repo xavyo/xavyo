@@ -42,12 +42,21 @@ impl SiemBatchExportService {
         &self,
         tenant_id: Uuid,
         status: Option<&str>,
+        output_format: Option<&str>,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<SiemBatchExport>, i64)> {
-        let exports =
-            SiemBatchExport::list_by_tenant(&self.pool, tenant_id, status, limit, offset).await?;
-        let total = SiemBatchExport::count_by_tenant(&self.pool, tenant_id, status).await?;
+        let exports = SiemBatchExport::list_by_tenant(
+            &self.pool,
+            tenant_id,
+            status,
+            output_format,
+            limit,
+            offset,
+        )
+        .await?;
+        let total =
+            SiemBatchExport::count_by_tenant(&self.pool, tenant_id, status, output_format).await?;
         Ok((exports, total))
     }
 
