@@ -134,9 +134,6 @@ async fn continue_sso_inner(
             .map_err(SamlError::DatabaseError)?
             .ok_or(SamlError::NotAuthenticated)?;
 
-    // Build user attributes
-    let display_name = user.email.split('@').next().map(String::from);
-
     let sp_group_config = sp.get_group_config().map_err(|e| {
         SamlError::AssertionGenerationFailed(format!("Invalid SP group filter JSON: {e}"))
     })?;
@@ -164,13 +161,7 @@ async fn continue_sso_inner(
         GroupService::load_groups_for_assertion(&state.pool, tenant_id, user.id, &group_config)
             .await?;
 
-    let user_attrs = UserAttributes {
-        user_id: user.id.to_string(),
-        email: user.email.clone(),
-        display_name,
-        groups,
-        tenant_id: tenant_id.to_string(),
-    };
+    let user_attrs = UserAttributes::from_db_user(&user, groups, tenant_id);
 
     // Get IdP signing credentials
     let cert = sp_service.get_active_certificate(tenant_id).await?;
@@ -296,6 +287,20 @@ mod tests {
         assert!(
             !production.contains("_ => crate::models::group_config::GroupFilterType::None"),
             "unknown group filter type must not include every group"
+        );
+    }
+
+    #[test]
+    fn continue_sso_assertions_use_db_profile_fields() {
+        let src = include_str!("continue_sso.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("UserAttributes::from_db_user("),
+            "POST /saml/continue must fill advertised display/given/family names from the user row"
+        );
+        assert!(
+            !production.contains("email.split('@')"),
+            "POST /saml/continue must not stub display_name from the email local-part"
         );
     }
 }
