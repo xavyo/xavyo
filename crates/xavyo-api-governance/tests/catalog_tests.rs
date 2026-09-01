@@ -139,6 +139,10 @@ pub async fn cleanup_catalog_data(pool: &sqlx::PgPool, tenant_id: Uuid) {
         .bind(tenant_id)
         .execute(pool)
         .await;
+    let _ = sqlx::query("DELETE FROM catalog_request_links WHERE tenant_id = $1")
+        .bind(tenant_id)
+        .execute(pool)
+        .await;
     let _ = sqlx::query("DELETE FROM catalog_items WHERE tenant_id = $1")
         .bind(tenant_id)
         .execute(pool)

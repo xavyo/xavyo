@@ -832,4 +832,18 @@ mod tests {
             "cart item responses must fill names from the catalog item"
         );
     }
+
+    #[test]
+    fn list_catalog_requests_query_advertises_submission_id() {
+        let query: ListCatalogRequestsQuery = serde_json::from_str(
+            r#"{"status":"pending","submission_id":"00000000-0000-0000-0000-000000000001","limit":10,"offset":0}"#,
+        )
+        .unwrap();
+        assert_eq!(query.status.as_deref(), Some("pending"));
+        assert_eq!(
+            query.submission_id,
+            Some(Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap())
+        );
+        assert_eq!(query.limit, 10);
+    }
 }

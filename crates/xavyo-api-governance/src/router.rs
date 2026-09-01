@@ -736,6 +736,7 @@ pub fn governance_self_service_router(
         )
         .route("/catalog/cart/validate", post(catalog::validate_cart))
         .route("/catalog/cart/submit", post(catalog::submit_cart))
+        .route("/catalog/requests", get(catalog::list_catalog_requests))
         .with_state(state)
 }
 
