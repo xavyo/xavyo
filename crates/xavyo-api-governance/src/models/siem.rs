@@ -99,6 +99,8 @@ const MAX_LIMIT: i64 = 100;
 pub struct ListSiemDestinationsQuery {
     /// Filter by enabled status.
     pub enabled: Option<bool>,
+    /// Filter by destination type (`syslog_tcp_tls`, `syslog_udp`, webhook, `splunk_hec`).
+    pub destination_type: Option<String>,
     /// Maximum number of results (1-100, default 50).
     #[serde(default = "default_limit")]
     pub limit: i64,
@@ -115,6 +117,7 @@ impl ListSiemDestinationsQuery {
     pub fn validated(self) -> Self {
         Self {
             enabled: self.enabled,
+            destination_type: self.destination_type,
             limit: self.limit.clamp(1, MAX_LIMIT),
             offset: self.offset.max(0),
         }
@@ -223,10 +226,27 @@ pub struct CreateBatchExportRequest {
 #[derive(Debug, Clone, Deserialize, IntoParams)]
 pub struct ListBatchExportsQuery {
     pub status: Option<String>,
+    /// Filter by output format (`cef`, `syslog_rfc5424`, json, csv).
+    pub output_format: Option<String>,
     #[serde(default = "default_limit")]
     pub limit: i64,
     #[serde(default)]
     pub offset: i64,
+}
+
+impl ListBatchExportsQuery {
+    /// Validate and clamp pagination values.
+    ///
+    /// SECURITY: Prevents `DoS` via unbounded pagination.
+    #[must_use]
+    pub fn validated(self) -> Self {
+        Self {
+            status: self.status,
+            output_format: self.output_format,
+            limit: self.limit.clamp(1, MAX_LIMIT),
+            offset: self.offset.max(0),
+        }
+    }
 }
 
 /// Batch export response.

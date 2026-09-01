@@ -34,6 +34,36 @@ fn parse_optional_export_status(status: Option<&str>) -> Result<Option<&str>, Ap
     }
 }
 
+/// Invalid destination-type filters must not silently list every destination.
+fn parse_optional_destination_type(
+    destination_type: Option<&str>,
+) -> Result<Option<&str>, ApiGovernanceError> {
+    match destination_type {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "syslog_tcp_tls" | "syslog_udp" | "webhook" | "splunk_hec") => {
+            Ok(Some(s))
+        }
+        Some(s) => Err(ApiGovernanceError::Validation(format!(
+            "Invalid destination_type '{s}'. Must be one of: syslog_tcp_tls, syslog_udp, webhook, splunk_hec"
+        ))),
+    }
+}
+
+/// Invalid output-format filters must not silently list every export.
+fn parse_optional_output_format(
+    output_format: Option<&str>,
+) -> Result<Option<&str>, ApiGovernanceError> {
+    match output_format {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) if matches!(s, "cef" | "syslog_rfc5424" | "json" | "csv") => Ok(Some(s)),
+        Some(s) => Err(ApiGovernanceError::Validation(format!(
+            "Invalid output_format '{s}'. Must be one of: cef, syslog_rfc5424, json, csv"
+        ))),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Destination CRUD
 // ---------------------------------------------------------------------------
@@ -60,9 +90,17 @@ pub async fn list_destinations(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
+    let query = query.validated();
+    let destination_type = parse_optional_destination_type(query.destination_type.as_deref())?;
     let (destinations, total) = state
         .siem_destination_service
-        .list_destinations(tenant_id, query.enabled, query.limit, query.offset)
+        .list_destinations(
+            tenant_id,
+            query.enabled,
+            destination_type,
+            query.limit,
+            query.offset,
+        )
         .await?;
 
     Ok(Json(SiemDestinationListResponse {
@@ -342,10 +380,12 @@ pub async fn list_batch_exports(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
+    let query = query.validated();
     let status = parse_optional_export_status(query.status.as_deref())?;
+    let output_format = parse_optional_output_format(query.output_format.as_deref())?;
     let (exports, total) = state
         .siem_batch_export_service
-        .list_exports(tenant_id, status, query.limit, query.offset)
+        .list_exports(tenant_id, status, output_format, query.limit, query.offset)
         .await?;
 
     Ok(Json(SiemBatchExportListResponse {
@@ -674,6 +714,40 @@ mod tests {
             production.contains("parse_optional_export_status(")
                 && !production.contains("query.status.as_deref(),"),
             "invalid SIEM export status must be 400, not an unfiltered list"
+        );
+    }
+
+    #[test]
+    fn invalid_destination_type_does_not_list_all_destinations() {
+        assert_eq!(parse_optional_destination_type(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_destination_type(Some("splunk_hec")).unwrap(),
+            Some("splunk_hec")
+        );
+        assert!(parse_optional_destination_type(Some("syslog")).is_err());
+        let src = include_str!("siem.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_destination_type(")
+                && production.contains("query.validated()"),
+            "invalid SIEM destination_type must be 400, not an unfiltered list"
+        );
+    }
+
+    #[test]
+    fn invalid_output_format_does_not_list_all_exports() {
+        assert_eq!(parse_optional_output_format(None).unwrap(), None);
+        assert_eq!(
+            parse_optional_output_format(Some("json")).unwrap(),
+            Some("json")
+        );
+        assert!(parse_optional_output_format(Some("xml")).is_err());
+        let src = include_str!("siem.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("parse_optional_output_format(")
+                && production.contains("query.validated()"),
+            "invalid SIEM output_format must be 400, not an unfiltered list"
         );
     }
 

@@ -94,6 +94,7 @@ impl SiemBatchExport {
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         status_filter: Option<&str>,
+        output_format: Option<&str>,
         limit: i64,
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
@@ -109,6 +110,10 @@ impl SiemBatchExport {
             param_count += 1;
             query.push_str(&format!(" AND status = ${param_count}"));
         }
+        if output_format.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND output_format = ${param_count}"));
+        }
 
         query.push_str(&format!(
             " ORDER BY created_at DESC LIMIT ${} OFFSET ${}",
@@ -121,6 +126,9 @@ impl SiemBatchExport {
         if let Some(status) = status_filter {
             q = q.bind(status);
         }
+        if let Some(output_format) = output_format {
+            q = q.bind(output_format);
+        }
 
         q.bind(limit).bind(offset).fetch_all(pool).await
     }
@@ -130,6 +138,7 @@ impl SiemBatchExport {
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         status_filter: Option<&str>,
+        output_format: Option<&str>,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
             r"
@@ -143,11 +152,18 @@ impl SiemBatchExport {
             param_count += 1;
             query.push_str(&format!(" AND status = ${param_count}"));
         }
+        if output_format.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND output_format = ${param_count}"));
+        }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
 
         if let Some(status) = status_filter {
             q = q.bind(status);
+        }
+        if let Some(output_format) = output_format {
+            q = q.bind(output_format);
         }
 
         q.fetch_one(pool).await
