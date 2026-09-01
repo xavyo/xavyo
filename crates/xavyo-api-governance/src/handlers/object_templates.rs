@@ -36,6 +36,39 @@ use crate::models::{
 };
 use crate::router::GovernanceState;
 
+fn rule_input(request: CreateRuleRequest) -> CreateGovTemplateRule {
+    CreateGovTemplateRule {
+        rule_type: request.rule_type,
+        target_attribute: request.target_attribute,
+        expression: request.expression,
+        priority: Some(request.priority),
+        strength: Some(request.strength),
+        condition: request.condition,
+        authoritative: Some(request.authoritative),
+        error_message: request.error_message,
+        exclusive: Some(request.exclusive),
+        time_from: request.time_from,
+        time_to: request.time_to,
+        time_reference: request.time_reference,
+    }
+}
+
+fn scope_input(request: CreateScopeRequest) -> CreateGovTemplateScope {
+    if request.scope_type == TemplateScopeType::Condition {
+        CreateGovTemplateScope {
+            scope_type: request.scope_type,
+            scope_value: None,
+            condition: request.condition,
+        }
+    } else {
+        CreateGovTemplateScope {
+            scope_type: request.scope_type,
+            scope_value: request.scope_value,
+            condition: None,
+        }
+    }
+}
+
 // ============================================================================
 // Object Template CRUD Operations
 // ============================================================================
@@ -134,6 +167,23 @@ pub async fn create_template(
         .object_template_service
         .create(tenant_id, created_by, input)
         .await?;
+
+    if let Some(rules) = request.rules {
+        for rule in rules {
+            state
+                .template_rule_service
+                .add_rule(tenant_id, result.id, created_by, rule_input(rule))
+                .await?;
+        }
+    }
+    if let Some(scopes) = request.scopes {
+        for scope in scopes {
+            state
+                .template_scope_service
+                .add_scope(tenant_id, result.id, created_by, scope_input(scope))
+                .await?;
+        }
+    }
 
     Ok(Json(TemplateResponse::from(result)))
 }
@@ -447,24 +497,9 @@ pub async fn add_rule(
     }
     let actor_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
-    let input = CreateGovTemplateRule {
-        rule_type: request.rule_type,
-        target_attribute: request.target_attribute,
-        expression: request.expression,
-        priority: Some(request.priority),
-        strength: Some(request.strength),
-        condition: request.condition,
-        authoritative: Some(request.authoritative),
-        error_message: request.error_message,
-        exclusive: Some(request.exclusive),
-        time_from: request.time_from,
-        time_to: request.time_to,
-        time_reference: request.time_reference,
-    };
-
     let result = state
         .template_rule_service
-        .add_rule(tenant_id, template_id, actor_id, input)
+        .add_rule(tenant_id, template_id, actor_id, rule_input(request))
         .await?;
 
     Ok(Json(RuleResponse::from(result)))
@@ -794,25 +829,9 @@ pub async fn add_scope(
         .get(tenant_id, template_id)
         .await?;
 
-    // Convert condition scope to proper scope_value
-    let (scope_value, condition) = if request.scope_type == TemplateScopeType::Condition {
-        (None, request.condition.clone())
-    } else {
-        (request.scope_value.clone(), None)
-    };
-
     let scope = state
         .template_scope_service
-        .add_scope(
-            tenant_id,
-            template_id,
-            actor_id,
-            CreateGovTemplateScope {
-                scope_type: request.scope_type,
-                scope_value,
-                condition,
-            },
-        )
+        .add_scope(tenant_id, template_id, actor_id, scope_input(request))
         .await?;
 
     Ok(Json(ScopeResponse::from(scope)))
@@ -1495,6 +1514,24 @@ pub async fn simulate_template(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn create_template_persists_advertised_rules_and_scopes() {
+        let src = include_str!("object_templates.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let create = production
+            .split("pub async fn create_template")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("create_template");
+        assert!(
+            create.contains("request.rules")
+                && create.contains("add_rule(")
+                && create.contains("request.scopes")
+                && create.contains("add_scope("),
+            "POST /governance/object-templates must persist advertised rules and scopes"
+        );
+    }
+
     #[test]
     fn application_event_lists_honor_pagination_and_report_real_totals() {
         let src = include_str!("object_templates.rs");

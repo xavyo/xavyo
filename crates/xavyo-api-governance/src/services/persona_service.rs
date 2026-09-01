@@ -8,7 +8,7 @@
 //! - Archetype conflict detection
 //! - Approval workflow compatibility validation
 
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use handlebars::Handlebars;
 use serde_json::json;
 use sqlx::PgPool;
@@ -85,6 +85,8 @@ impl PersonaService {
         archetype_id: Uuid,
         physical_user_id: Uuid,
         attribute_overrides: Option<serde_json::Map<String, serde_json::Value>>,
+        valid_from: Option<DateTime<Utc>>,
+        valid_until: Option<DateTime<Utc>>,
     ) -> Result<GovPersona> {
         self.create_with_actor(
             tenant_id,
@@ -92,6 +94,8 @@ impl PersonaService {
             physical_user_id,
             physical_user_id,
             attribute_overrides,
+            valid_from,
+            valid_until,
         )
         .await
     }
@@ -100,6 +104,7 @@ impl PersonaService {
     ///
     /// This method allows specifying the actor performing the operation,
     /// enabling proper authorization checks for admin-initiated persona creation.
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_with_actor(
         &self,
         tenant_id: Uuid,
@@ -107,6 +112,8 @@ impl PersonaService {
         physical_user_id: Uuid,
         actor_id: Uuid,
         attribute_overrides: Option<serde_json::Map<String, serde_json::Value>>,
+        valid_from: Option<DateTime<Utc>>,
+        valid_until: Option<DateTime<Utc>>,
     ) -> Result<GovPersona> {
         // 1. Get and validate archetype
         let archetype = self.archetype_service.get(tenant_id, archetype_id).await?;
@@ -207,9 +214,22 @@ impl PersonaService {
             .parse_lifecycle_policy()
             .map_err(|e| GovernanceError::Validation(format!("Invalid lifecycle policy: {e}")))?;
 
-        let valid_from = Utc::now();
-        let valid_until =
-            valid_from + Duration::days(i64::from(lifecycle_policy.default_validity_days));
+        let valid_from = valid_from.unwrap_or_else(Utc::now);
+        let valid_until = valid_until.unwrap_or_else(|| {
+            valid_from + Duration::days(i64::from(lifecycle_policy.default_validity_days))
+        });
+        if valid_until <= valid_from {
+            return Err(GovernanceError::Validation(
+                "valid_until must be after valid_from".to_string(),
+            ));
+        }
+        let max_until = valid_from + Duration::days(i64::from(lifecycle_policy.max_validity_days));
+        if valid_until > max_until {
+            return Err(GovernanceError::Validation(format!(
+                "valid_until exceeds archetype max_validity_days ({})",
+                lifecycle_policy.max_validity_days
+            )));
+        }
 
         // Create persona
         let input = CreatePersona {
@@ -729,7 +749,15 @@ impl PersonaService {
 
         for archetype_id in archetype_ids {
             match self
-                .create_with_actor(tenant_id, *archetype_id, physical_user_id, actor_id, None)
+                .create_with_actor(
+                    tenant_id,
+                    *archetype_id,
+                    physical_user_id,
+                    actor_id,
+                    None,
+                    None,
+                    None,
+                )
                 .await
             {
                 Ok(persona) => {

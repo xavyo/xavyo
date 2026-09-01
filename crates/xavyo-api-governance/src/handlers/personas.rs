@@ -634,11 +634,14 @@ pub async fn create_persona(
 
     let persona = state
         .persona_service
-        .create(
+        .create_with_actor(
             tenant_id,
             request.archetype_id,
             request.physical_user_id,
+            actor_id,
             request.attribute_overrides,
+            request.valid_from,
+            request.valid_until,
         )
         .await?;
 
@@ -1848,6 +1851,23 @@ mod tests {
                 "{handler} must look up advertised personas_count"
             );
         }
+    }
+
+    #[test]
+    fn create_persona_passes_advertised_validity_window() {
+        let src = include_str!("personas.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let create = production
+            .split("pub async fn create_persona")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("create_persona");
+        assert!(
+            create.contains("request.valid_from")
+                && create.contains("request.valid_until")
+                && create.contains("create_with_actor("),
+            "POST /governance/personas must persist advertised valid_from and valid_until"
+        );
     }
 
     #[test]
