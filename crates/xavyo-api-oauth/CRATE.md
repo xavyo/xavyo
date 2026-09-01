@@ -53,7 +53,7 @@ pub fn well_known_router() -> Router<OAuthState>;
 |--------|------|-------------|
 | GET | `/oauth/authorize` | Authorization endpoint |
 | POST | `/oauth/token` | Token endpoint |
-| GET | `/oauth/userinfo` | UserInfo endpoint |
+| GET, POST | `/oauth/userinfo` | UserInfo endpoint |
 | POST | `/oauth/revoke` | Token revocation |
 | POST | `/oauth/introspect` | Token introspection |
 | POST | `/oauth/device/code` | Device authorization (RFC 8628) |
