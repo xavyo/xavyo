@@ -618,6 +618,14 @@ pub struct NhiRequestResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub requested_rotation_days: Option<i32>,
 
+    /// Advertised BFF alias of `requested_rotation_days`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rotation_interval_days: Option<i32>,
+
+    /// Requested NHI type (`service_account`, `agent`, `tool`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nhi_type: Option<String>,
+
     /// Current status.
     pub status: NhiRequestStatus,
 
@@ -625,17 +633,33 @@ pub struct NhiRequestResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub approver_id: Option<Uuid>,
 
+    /// Advertised BFF alias of `approver_id`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reviewer_id: Option<Uuid>,
+
     /// When the decision was made.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decision_at: Option<DateTime<Utc>>,
+
+    /// Advertised BFF alias of `decision_at`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reviewed_at: Option<DateTime<Utc>>,
 
     /// Approver comments.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decision_comments: Option<String>,
 
+    /// Advertised BFF alias of `decision_comments`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_comments: Option<String>,
+
     /// The created NHI ID (if approved).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_nhi_id: Option<Uuid>,
+
+    /// Advertised BFF alias of `created_nhi_id`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nhi_id: Option<Uuid>,
 
     /// When this request expires.
     pub expires_at: DateTime<Utc>,
@@ -654,11 +678,17 @@ impl From<GovNhiRequest> for NhiRequestResponse {
             requested_permissions: req.requested_permissions,
             requested_expiration: req.requested_expiration,
             requested_rotation_days: req.requested_rotation_days,
+            rotation_interval_days: req.requested_rotation_days,
+            nhi_type: req.nhi_type,
             status: req.status,
             approver_id: req.approver_id,
+            reviewer_id: req.approver_id,
             decision_at: req.decision_at,
-            decision_comments: req.decision_comments,
+            reviewed_at: req.decision_at,
+            decision_comments: req.decision_comments.clone(),
+            review_comments: req.decision_comments,
             created_nhi_id: req.created_nhi_id,
+            nhi_id: req.created_nhi_id,
             expires_at: req.expires_at,
             created_at: req.created_at,
         }
@@ -689,6 +719,10 @@ pub struct SubmitNhiRequestRequest {
     #[validate(range(min = 1, max = 365, message = "Rotation interval must be 1-365 days"))]
     #[serde(default, alias = "rotation_interval_days")]
     pub requested_rotation_days: Option<i32>,
+
+    /// Requested NHI type (`service_account`, `agent`, `tool`).
+    #[serde(default)]
+    pub nhi_type: Option<String>,
 }
 
 /// Request to approve an NHI request.
@@ -1490,6 +1524,9 @@ pub struct NhiCertificationCampaignResponse {
 
     /// Campaign deadline.
     pub deadline: DateTime<Utc>,
+
+    /// Advertised BFF alias of `deadline`.
+    pub due_date: DateTime<Utc>,
 
     /// Who created the campaign.
     pub created_by: Uuid,

@@ -93,7 +93,13 @@ pub fn archetypes_router() -> Router<GovState>;  // F-058 Identity Archetypes
 | Identity Correlation | PUT | `/identity-correlation-rules/:id` | Persist advertised `attribute` and `match_type` |
 | Connector Correlation | PUT | `/connectors/:id/correlation/rules/:id` | Persist advertised `match_type` |
 | NHI Certification | POST | `/nhis/certification/campaigns` | Persist advertised `scope` plus owner/type filters |
-| NHI Certification | GET | `/nhis/certification/campaigns` | Return advertised `scope` |
+| NHI Certification | GET | `/nhis/certification/campaigns` | Return advertised `scope` and BFF `due_date` alias of `deadline` |
+| NHI Requests | GET | `/nhis/requests` | Return advertised BFF aliases (`nhi_type`, `rotation_interval_days`, `reviewer_id`, `reviewed_at`, `review_comments`, `nhi_id`) |
+| NHI Requests | POST | `/nhis/requests` | Persist advertised `nhi_type` |
+| Certifications | GET | `/my-certifications` | Return advertised BFF `campaign_name`, `user_email`, `entitlements`, `due_date` |
+| Outliers | POST | `/outliers/reports` | Return `trends` / `peer_group_breakdown` as arrays (empty, not null) |
+| License Reports | POST | `/license-reports/compliance` | Return advertised BFF `pools`, `is_compliant`, `issues`, `summary` |
+| Compliance Reports | GET | `/reports` | Return advertised BFF `limit` / `offset` aliases of `page_size` / query offset |
 | NHI Certification | GET | `/nhis/certification/campaigns/:id/items` | Return advertised `nhi_type` |
 | NHI Certification | POST | `/nhis/certification/campaigns/:id/launch` | Launch using stored create-time filters including `scope` |
 | NHI Usage | POST | `/nhis/:id/usage` | Return created usage event; look up `nhi_identities` |

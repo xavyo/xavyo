@@ -7,9 +7,11 @@ use axum::{
     http::StatusCode,
     Extension, Json,
 };
+use std::str::FromStr;
 use utoipa::IntoParams;
 use uuid::Uuid;
 use validator::Validate;
+use xavyo_nhi::NhiType;
 
 use xavyo_auth::JwtClaims;
 
@@ -1257,6 +1259,16 @@ pub async fn submit_nhi_request(
 
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
+    let nhi_type = match body.nhi_type.as_deref() {
+        None => None,
+        Some(raw) => Some(
+            NhiType::from_str(raw)
+                .map_err(|e| ApiGovernanceError::Validation(e.to_string()))?
+                .as_str()
+                .to_string(),
+        ),
+    };
+
     let result = state
         .nhi_request_service
         .submit_request(
@@ -1267,6 +1279,7 @@ pub async fn submit_nhi_request(
             body.requested_permissions,
             body.requested_expiration,
             body.requested_rotation_days,
+            nhi_type,
         )
         .await?;
 
@@ -1622,6 +1635,23 @@ mod tests {
                 && record.contains("Json(event)")
                 && !record.contains("Ok(StatusCode::CREATED)"),
             "POST /governance/nhis/{{id}}/usage must return the created usage event"
+        );
+    }
+
+    #[test]
+    fn submit_nhi_request_persists_nhi_type() {
+        let src = include_str!("nhis.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let submit = production
+            .split("pub async fn submit_nhi_request")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("submit_nhi_request");
+        assert!(
+            submit.contains("body.nhi_type")
+                && submit.contains("NhiType::from_str")
+                && submit.contains("nhi_type,"),
+            "POST /governance/nhis/requests must persist advertised nhi_type"
         );
     }
 }

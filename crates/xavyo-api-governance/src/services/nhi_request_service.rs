@@ -76,6 +76,7 @@ impl NhiRequestService {
         requested_permissions: Vec<Uuid>,
         requested_expiration: Option<chrono::DateTime<chrono::Utc>>,
         requested_rotation_days: Option<i32>,
+        nhi_type: Option<String>,
     ) -> Result<NhiRequestResponse> {
         // Check for duplicate pending request
         if GovNhiRequest::has_pending_request(&self.pool, tenant_id, requester_id, &name).await? {
@@ -94,6 +95,7 @@ impl NhiRequestService {
             requested_permissions,
             requested_expiration,
             requested_rotation_days,
+            nhi_type,
             expires_at,
         };
 

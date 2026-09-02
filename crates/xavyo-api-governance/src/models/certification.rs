@@ -417,6 +417,21 @@ pub struct ItemWithDetailsResponse {
     /// Decision if made.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decision: Option<DecisionResponse>,
+
+    /// Advertised BFF alias of `campaign.name`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub campaign_name: Option<String>,
+
+    /// Advertised BFF alias of `user.email`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_email: Option<String>,
+
+    /// Advertised BFF alias of entitlement names.
+    pub entitlements: Vec<String>,
+
+    /// Advertised BFF alias of `campaign.deadline`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub due_date: Option<DateTime<Utc>>,
 }
 
 /// Summary of a user for display.
@@ -471,6 +486,9 @@ pub struct CampaignSummary {
 
     /// Campaign deadline.
     pub deadline: DateTime<Utc>,
+
+    /// Advertised BFF alias of `deadline`.
+    pub due_date: DateTime<Utc>,
 
     /// Campaign status.
     pub status: CertCampaignStatus,

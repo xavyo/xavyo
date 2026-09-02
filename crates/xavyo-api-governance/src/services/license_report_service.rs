@@ -65,6 +65,8 @@ pub struct ComplianceReport {
     pub filters_applied: ComplianceReportFilters,
     /// Per-pool compliance summaries.
     pub pool_summaries: Vec<PoolComplianceSummary>,
+    /// Advertised BFF alias of `pool_summaries`.
+    pub pools: Vec<PoolComplianceSummary>,
     /// Total number of pools included in the report.
     pub total_pools: usize,
     /// Sum of `total_capacity` across all pools.
@@ -73,6 +75,19 @@ pub struct ComplianceReport {
     pub total_assigned: i64,
     /// Overall compliance score (0-100 percentage).
     pub overall_compliance_score: f64,
+    /// Advertised BFF summary object.
+    pub summary: ComplianceReportBffSummary,
+}
+
+/// Advertised BFF summary for license compliance reports.
+#[derive(Debug, Clone, Default, Serialize, ToSchema)]
+pub struct ComplianceReportBffSummary {
+    pub total_pools_reviewed: usize,
+    pub compliant_pools: usize,
+    pub non_compliant_pools: usize,
+    pub total_capacity: i64,
+    pub total_allocated: i64,
+    pub overall_utilization: f64,
 }
 
 /// Filters applied when generating the report.
@@ -98,6 +113,10 @@ pub struct PoolComplianceSummary {
     pub expiration_date: Option<DateTime<Utc>>,
     /// Whether `allocated_count` exceeds `total_capacity`.
     pub is_over_allocated: bool,
+    /// Advertised BFF alias of `!is_over_allocated`.
+    pub is_compliant: bool,
+    /// Advertised BFF issues list derived from over-allocation.
+    pub issues: Vec<String>,
     /// Count of active assignments for this pool.
     pub assignment_count: i64,
 }
@@ -202,12 +221,20 @@ impl LicenseReportService {
                 license_type: pool_record.license_type,
                 expiration_date: pool_record.expiration_date,
                 is_over_allocated,
+                is_compliant: !is_over_allocated,
+                issues: if is_over_allocated {
+                    vec!["Over-allocated".to_string()]
+                } else {
+                    Vec::new()
+                },
                 assignment_count,
             });
         }
 
         // 4. Calculate compliance score
         let compliance_score = calculate_compliance_score(over_allocated_count, expired_count);
+        let total_pools = pools.len();
+        let compliant_pools = pool_summaries.iter().filter(|p| p.is_compliant).count();
 
         Ok(ComplianceReport {
             generated_at: Utc::now(),
@@ -218,11 +245,24 @@ impl LicenseReportService {
                 from_date: params.from_date,
                 to_date: params.to_date,
             },
+            pools: pool_summaries.clone(),
             pool_summaries,
-            total_pools: pools.len(),
+            total_pools,
             total_licenses,
             total_assigned,
             overall_compliance_score: compliance_score,
+            summary: ComplianceReportBffSummary {
+                total_pools_reviewed: total_pools,
+                compliant_pools,
+                non_compliant_pools: total_pools.saturating_sub(compliant_pools),
+                total_capacity: total_licenses,
+                total_allocated: total_assigned,
+                overall_utilization: if total_licenses > 0 {
+                    (total_assigned as f64 / total_licenses as f64) * 100.0
+                } else {
+                    0.0
+                },
+            },
         })
     }
 
@@ -386,10 +426,12 @@ mod tests {
                 to_date: None,
             },
             pool_summaries: vec![],
+            pools: vec![],
             total_pools: 0,
             total_licenses: 0,
             total_assigned: 0,
             overall_compliance_score: 100.0,
+            summary: ComplianceReportBffSummary::default(),
         };
 
         assert_eq!(report.tenant_id, tenant_id);
@@ -411,10 +453,12 @@ mod tests {
                 to_date: None,
             },
             pool_summaries: vec![],
+            pools: vec![],
             total_pools: 5,
             total_licenses: 1000,
             total_assigned: 750,
             overall_compliance_score: 85.0,
+            summary: ComplianceReportBffSummary::default(),
         };
 
         let json = serde_json::to_string(&report).unwrap();
@@ -423,6 +467,9 @@ mod tests {
         assert!(json.contains("\"total_assigned\":750"));
         assert!(json.contains("\"overall_compliance_score\":85.0"));
         assert!(json.contains("\"vendor\":\"Microsoft\""));
+        assert!(json.contains("\"pools\""));
+        assert!(json.contains("\"summary\""));
+        assert!(json.contains("\"total_pools_reviewed\""));
     }
 
     // ========================================================================
@@ -478,6 +525,8 @@ mod tests {
             license_type: LicenseType::Named,
             expiration_date: None,
             is_over_allocated: false,
+            is_compliant: true,
+            issues: vec![],
             assignment_count: 350,
         };
 
@@ -499,6 +548,8 @@ mod tests {
             license_type: LicenseType::Concurrent,
             expiration_date: None,
             is_over_allocated: true,
+            is_compliant: true,
+            issues: vec![],
             assignment_count: 120,
         };
 
@@ -519,6 +570,8 @@ mod tests {
             license_type: LicenseType::Named,
             expiration_date: Some(Utc::now() - Duration::days(10)),
             is_over_allocated: false,
+            is_compliant: true,
+            issues: vec![],
             assignment_count: 50,
         };
 
@@ -539,6 +592,8 @@ mod tests {
             license_type: LicenseType::Named,
             expiration_date: None,
             is_over_allocated: false,
+            is_compliant: true,
+            issues: vec![],
             assignment_count: 50,
         };
 
@@ -698,10 +753,12 @@ mod tests {
                 to_date: None,
             },
             pool_summaries: vec![],
+            pools: vec![],
             total_pools: 0,
             total_licenses: 0,
             total_assigned: 0,
             overall_compliance_score: 100.0,
+            summary: ComplianceReportBffSummary::default(),
         };
 
         let csv = LicenseReportService::export_csv(&report).unwrap();
@@ -735,12 +792,16 @@ mod tests {
                 license_type: LicenseType::Named,
                 expiration_date: None,
                 is_over_allocated: false,
+                is_compliant: true,
+                issues: vec![],
                 assignment_count: 350,
             }],
+            pools: vec![],
             total_pools: 1,
             total_licenses: 500,
             total_assigned: 350,
             overall_compliance_score: 100.0,
+            summary: ComplianceReportBffSummary::default(),
         };
 
         let csv = LicenseReportService::export_csv(&report).unwrap();
@@ -771,10 +832,12 @@ mod tests {
                 to_date: None,
             },
             pool_summaries: vec![],
+            pools: vec![],
             total_pools: 0,
             total_licenses: 0,
             total_assigned: 0,
             overall_compliance_score: 100.0,
+            summary: ComplianceReportBffSummary::default(),
         };
 
         let csv = LicenseReportService::export_csv(&report).unwrap();
@@ -804,12 +867,16 @@ mod tests {
                 license_type: LicenseType::Named,
                 expiration_date: None,
                 is_over_allocated: false,
+                is_compliant: true,
+                issues: vec![],
                 assignment_count: 50,
             }],
+            pools: vec![],
             total_pools: 1,
             total_licenses: 100,
             total_assigned: 50,
             overall_compliance_score: 100.0,
+            summary: ComplianceReportBffSummary::default(),
         };
 
         let csv = LicenseReportService::export_csv(&report).unwrap();
@@ -843,12 +910,16 @@ mod tests {
                 license_type: LicenseType::Named,
                 expiration_date: Some(expiration),
                 is_over_allocated: false,
+                is_compliant: true,
+                issues: vec![],
                 assignment_count: 80,
             }],
+            pools: vec![],
             total_pools: 1,
             total_licenses: 100,
             total_assigned: 80,
             overall_compliance_score: 100.0,
+            summary: ComplianceReportBffSummary::default(),
         };
 
         let csv = LicenseReportService::export_csv(&report).unwrap();
@@ -881,6 +952,8 @@ mod tests {
                     license_type: LicenseType::Named,
                     expiration_date: None,
                     is_over_allocated: false,
+                    is_compliant: true,
+                    issues: vec![],
                     assignment_count: 50,
                 },
                 PoolComplianceSummary {
@@ -894,13 +967,17 @@ mod tests {
                     license_type: LicenseType::Concurrent,
                     expiration_date: None,
                     is_over_allocated: false,
+                    is_compliant: true,
+                    issues: vec![],
                     assignment_count: 180,
                 },
             ],
+            pools: vec![],
             total_pools: 2,
             total_licenses: 300,
             total_assigned: 230,
             overall_compliance_score: 100.0,
+            summary: ComplianceReportBffSummary::default(),
         };
 
         let csv = LicenseReportService::export_csv(&report).unwrap();

@@ -50,6 +50,7 @@ pub struct SecretMetadata {
     pub rotation_interval_days: Option<i32>,
     pub max_lease_duration_secs: i32,
     pub max_concurrent_leases: i32,
+    pub created_by: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -69,6 +70,7 @@ impl From<NhiVaultedSecret> for SecretMetadata {
             rotation_interval_days: s.rotation_interval_days,
             max_lease_duration_secs: s.max_lease_duration_secs,
             max_concurrent_leases: s.max_concurrent_leases,
+            created_by: s.created_by,
             created_at: s.created_at,
             updated_at: s.updated_at,
         }

@@ -50,6 +50,9 @@ pub struct GovNhiRequest {
     /// Requested rotation interval in days.
     pub requested_rotation_days: Option<i32>,
 
+    /// Requested NHI type (`service_account`, `agent`, `tool`).
+    pub nhi_type: Option<String>,
+
     /// Current status.
     pub status: NhiRequestStatus,
 
@@ -84,6 +87,7 @@ pub struct CreateGovNhiRequest {
     pub requested_permissions: Vec<Uuid>,
     pub requested_expiration: Option<DateTime<Utc>>,
     pub requested_rotation_days: Option<i32>,
+    pub nhi_type: Option<String>,
     pub expires_at: DateTime<Utc>,
 }
 
@@ -239,9 +243,9 @@ impl GovNhiRequest {
             INSERT INTO gov_nhi_requests (
                 tenant_id, requester_id, requested_name, purpose,
                 requested_permissions, requested_expiration,
-                requested_rotation_days, expires_at
+                requested_rotation_days, nhi_type, expires_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
             ",
         )
@@ -252,6 +256,7 @@ impl GovNhiRequest {
         .bind(&data.requested_permissions)
         .bind(data.requested_expiration)
         .bind(data.requested_rotation_days)
+        .bind(&data.nhi_type)
         .bind(data.expires_at)
         .fetch_one(pool)
         .await

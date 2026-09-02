@@ -57,6 +57,8 @@ pub async fn list_schedules(
         total,
         page,
         page_size: limit,
+        limit,
+        offset,
     }))
 }
 

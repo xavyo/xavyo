@@ -1261,18 +1261,15 @@ impl OutlierScoringService {
         };
 
         let trends = if include_trends {
-            Some(outlier_trend_points(
-                &analyses,
-                &avg_scores_by_analysis(&results),
-            ))
+            outlier_trend_points(&analyses, &avg_scores_by_analysis(&results))
         } else {
-            None
+            Vec::new()
         };
 
         let peer_group_breakdown = if include_peer_breakdown {
-            Some(aggregate_peer_breakdown(&results))
+            aggregate_peer_breakdown(&results)
         } else {
-            None
+            Vec::new()
         };
 
         Ok(OutlierReportResponse {
@@ -2059,7 +2056,7 @@ mod tests {
         assert!(
             !generate.contains("TODO: Implement full report generation")
                 && !generate.contains("total_analyses: 0")
-                && !generate.contains("Some(vec![])"),
+                && generate.contains("Vec::new()"),
             "must not return a fake empty report: {generate}"
         );
     }
