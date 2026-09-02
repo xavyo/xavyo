@@ -8,10 +8,11 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 use validator::Validate;
 use xavyo_db::{
-    GovNhiAuditEvent, GovNhiRequest, GovNhiRiskScore, GovNhiUsageEvent, GovServiceAccount,
-    NhiAuditEventType, NhiRequestStatus, NhiSuspensionReason, NhiUsageOutcome, RiskLevel,
-    ServiceAccountStatus,
+    GovNhiAuditEvent, GovNhiRequest, GovNhiRiskScore, GovNhiUsageEvent, NhiAuditEventType,
+    NhiRequestStatus, NhiServiceAccountWithIdentity, NhiSuspensionReason, NhiUsageOutcome,
+    RiskLevel, ServiceAccountStatus,
 };
+use xavyo_nhi::NhiLifecycleState;
 
 // =============================================================================
 // NHI Core Models
@@ -108,42 +109,103 @@ pub struct NhiResponse {
     pub updated_at: DateTime<Utc>,
 }
 
-impl From<GovServiceAccount> for NhiResponse {
-    fn from(account: GovServiceAccount) -> Self {
-        // Compute derived fields before moving
-        let days_until_expiry = account.days_until_expiry();
-        let needs_rotation = account.needs_rotation();
-        let days_since_last_use = account.days_since_last_use();
-        let is_inactive = account.is_inactive();
-        let is_in_grace_period = account.is_in_grace_period();
-        let needs_certification = account.needs_certification();
+impl From<NhiServiceAccountWithIdentity> for NhiResponse {
+    fn from(account: NhiServiceAccountWithIdentity) -> Self {
+        let days_until_expiry = account.expires_at.map(|exp| (exp - Utc::now()).num_days());
+        let needs_rotation = {
+            let interval = i64::from(account.rotation_interval_days.unwrap_or(90));
+            match account.last_rotation_at {
+                Some(last_rotation) => {
+                    Utc::now().signed_duration_since(last_rotation).num_days() >= interval
+                }
+                None => true,
+            }
+        };
+        let days_since_last_use = account
+            .last_activity_at
+            .map(|used| Utc::now().signed_duration_since(used).num_days());
+        let is_inactive = {
+            let threshold = i64::from(account.inactivity_threshold_days.unwrap_or(90));
+            match days_since_last_use {
+                Some(days) => days >= threshold,
+                None => true,
+            }
+        };
+        let is_in_grace_period = account
+            .grace_period_ends_at
+            .is_some_and(|ends_at| ends_at > Utc::now());
+        let needs_certification = match account.last_certified_at {
+            Some(certified_at) => Utc::now().signed_duration_since(certified_at).num_days() > 365,
+            None => true,
+        };
 
         Self {
             id: account.id,
-            user_id: account.user_id,
+            user_id: linked_user_id(account.owner_id, account.id),
             name: account.name,
             purpose: account.purpose,
-            owner_id: account.owner_id,
+            owner_id: linked_user_id(account.owner_id, account.id),
             backup_owner_id: account.backup_owner_id,
-            status: account.status,
+            status: lifecycle_to_sa_status(account.lifecycle_state),
             expires_at: account.expires_at,
             days_until_expiry,
             rotation_interval_days: account.rotation_interval_days,
             last_rotation_at: account.last_rotation_at,
             needs_rotation,
-            last_used_at: account.last_used_at,
+            last_used_at: account.last_activity_at,
             days_since_last_use,
             inactivity_threshold_days: account.inactivity_threshold_days,
             is_inactive,
             grace_period_ends_at: account.grace_period_ends_at,
             is_in_grace_period,
-            suspension_reason: account.suspension_reason,
+            suspension_reason: parse_suspension_reason(&account.suspension_reason),
             last_certified_at: account.last_certified_at,
-            certified_by: account.certified_by,
+            certified_by: account.last_certified_by,
             needs_certification,
             created_at: account.created_at,
             updated_at: account.updated_at,
         }
+    }
+}
+
+pub(crate) fn linked_user_id(owner_id: Option<Uuid>, id: Uuid) -> Uuid {
+    owner_id.unwrap_or(id)
+}
+
+pub(crate) fn lifecycle_to_sa_status(state: NhiLifecycleState) -> ServiceAccountStatus {
+    match state {
+        NhiLifecycleState::Active => ServiceAccountStatus::Active,
+        NhiLifecycleState::Suspended => ServiceAccountStatus::Suspended,
+        _ => ServiceAccountStatus::Expired,
+    }
+}
+
+pub(crate) fn sa_status_to_lifecycle(status: ServiceAccountStatus) -> NhiLifecycleState {
+    match status {
+        ServiceAccountStatus::Active => NhiLifecycleState::Active,
+        ServiceAccountStatus::Suspended => NhiLifecycleState::Suspended,
+        ServiceAccountStatus::Expired => NhiLifecycleState::Inactive,
+    }
+}
+
+pub(crate) fn parse_suspension_reason(value: &Option<String>) -> Option<NhiSuspensionReason> {
+    value.as_deref().and_then(|raw| match raw {
+        "expired" => Some(NhiSuspensionReason::Expired),
+        "inactive" => Some(NhiSuspensionReason::Inactive),
+        "certification_revoked" => Some(NhiSuspensionReason::CertificationRevoked),
+        "emergency" => Some(NhiSuspensionReason::Emergency),
+        "manual" => Some(NhiSuspensionReason::Manual),
+        _ => None,
+    })
+}
+
+pub(crate) fn suspension_reason_str(reason: NhiSuspensionReason) -> &'static str {
+    match reason {
+        NhiSuspensionReason::Expired => "expired",
+        NhiSuspensionReason::Inactive => "inactive",
+        NhiSuspensionReason::CertificationRevoked => "certification_revoked",
+        NhiSuspensionReason::Emergency => "emergency",
+        NhiSuspensionReason::Manual => "manual",
     }
 }
 

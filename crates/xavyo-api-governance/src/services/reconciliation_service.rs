@@ -8,9 +8,9 @@ use uuid::Uuid;
 
 use xavyo_db::{
     CreateGovOrphanDetection, CreateGovReconciliationRun, DetectionReason, GovDetectionRule,
-    GovLifecycleEvent, GovOrphanDetection, GovReconciliationRun, GovServiceAccount,
-    LifecycleEventFilter, LifecycleEventType, LoginAttempt, OrphanDetectionFilter, OrphanStatus,
-    ReconciliationRunFilter, ReconciliationStatus,
+    GovLifecycleEvent, GovOrphanDetection, GovReconciliationRun, LifecycleEventFilter,
+    LifecycleEventType, LoginAttempt, OrphanDetectionFilter, OrphanStatus, ReconciliationRunFilter,
+    ReconciliationStatus,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 use xavyo_governance::expression::{eval_expression, EvalContext};
@@ -165,10 +165,8 @@ impl ReconciliationService {
             .await
             .map_err(GovernanceError::Database)?;
 
-        // Get service account user IDs for exclusion
-        let service_account_ids = GovServiceAccount::get_all_user_ids(&pool, tenant_id)
-            .await
-            .map_err(GovernanceError::Database)?;
+        // Unified NHIs are not users; there is no linked user_id to exclude.
+        let service_account_ids: Vec<Uuid> = Vec::new();
 
         // Process users in batches
         loop {
@@ -1350,6 +1348,17 @@ mod tests {
         assert!(
             !trigger.contains(".ok()"),
             "must not drop next_run_at persist: {trigger}"
+        );
+    }
+
+    #[test]
+    fn orphan_detection_does_not_query_dropped_service_account_table() {
+        let src = include_str!("reconciliation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("GovServiceAccount")
+                && !production.contains("gov_service_accounts"),
+            "POST /governance/reconciliation-runs must not look up the dropped gov_service_accounts table"
         );
     }
 }

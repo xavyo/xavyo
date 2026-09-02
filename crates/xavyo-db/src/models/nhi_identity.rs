@@ -302,6 +302,43 @@ impl NhiIdentity {
         q.fetch_optional(pool).await
     }
 
+    /// True when a name already exists (case-insensitive) in the tenant.
+    pub async fn name_exists(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        name: &str,
+    ) -> Result<bool, sqlx::Error> {
+        let count: i64 = sqlx::query_scalar(
+            r"
+            SELECT COUNT(*) FROM nhi_identities
+            WHERE tenant_id = $1 AND LOWER(name) = LOWER($2)
+            ",
+        )
+        .bind(tenant_id)
+        .bind(name)
+        .fetch_one(pool)
+        .await?;
+        Ok(count > 0)
+    }
+
+    /// Mark active identities past `expires_at` as inactive.
+    pub async fn mark_expired(pool: &PgPool, tenant_id: Uuid) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            r"
+            UPDATE nhi_identities
+            SET lifecycle_state = 'inactive', updated_at = NOW()
+            WHERE tenant_id = $1
+              AND lifecycle_state = 'active'
+              AND expires_at IS NOT NULL
+              AND expires_at < NOW()
+            ",
+        )
+        .bind(tenant_id)
+        .execute(pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
     /// Delete an NHI identity.
     pub async fn delete(pool: &PgPool, tenant_id: Uuid, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(

@@ -2,17 +2,22 @@
 //!
 //! Provides CRUD operations for the service account registry.
 
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use xavyo_db::{
-    CreateGovServiceAccount, GovServiceAccount, ServiceAccountFilter, UpdateGovServiceAccount,
+    CreateNhiIdentity, CreateNhiServiceAccount, NhiIdentity,
+    NhiServiceAccount as NhiServiceAccountModel, NhiServiceAccountFilter, UpdateNhiIdentity,
+    UpdateNhiServiceAccount,
 };
 use xavyo_governance::error::{GovernanceError, Result};
+use xavyo_nhi::{NhiLifecycleState, NhiType};
 
 use crate::models::{
-    ListServiceAccountsQuery, RegisterServiceAccountRequest, ServiceAccountListResponse,
-    ServiceAccountResponse, ServiceAccountSummary, UpdateServiceAccountRequest,
+    sa_status_to_lifecycle, ListServiceAccountsQuery, RegisterServiceAccountRequest,
+    ServiceAccountListResponse, ServiceAccountResponse, ServiceAccountSummary,
+    UpdateServiceAccountRequest,
 };
 
 /// Service for managing service accounts.
@@ -39,25 +44,22 @@ impl ServiceAccountService {
         tenant_id: Uuid,
         query: &ListServiceAccountsQuery,
     ) -> Result<ServiceAccountListResponse> {
-        let filter = ServiceAccountFilter {
-            status: query.status,
+        let filter = NhiServiceAccountFilter {
+            lifecycle_state: query.status.map(sa_status_to_lifecycle),
             owner_id: query.owner_id,
             expiring_within_days: query.expiring_within_days,
             needs_certification: query.needs_certification,
-            // NHI lifecycle filters (F061)
-            backup_owner_id: None,
-            inactive_days: None,
-            needs_rotation: None,
+            ..Default::default()
         };
 
         let limit = query.limit.unwrap_or(50).min(100);
         let offset = query.offset.unwrap_or(0).max(0);
 
-        let accounts = GovServiceAccount::list(&self.pool, tenant_id, &filter, limit, offset)
+        let accounts = NhiServiceAccountModel::list(&self.pool, tenant_id, &filter, limit, offset)
             .await
             .map_err(GovernanceError::Database)?;
 
-        let total = GovServiceAccount::count(&self.pool, tenant_id, &filter)
+        let total = NhiServiceAccountModel::count(&self.pool, tenant_id, &filter)
             .await
             .map_err(GovernanceError::Database)?;
 
@@ -74,7 +76,7 @@ impl ServiceAccountService {
 
     /// Get a service account by ID.
     pub async fn get(&self, tenant_id: Uuid, id: Uuid) -> Result<ServiceAccountResponse> {
-        let account = GovServiceAccount::find_by_id(&self.pool, tenant_id, id)
+        let account = NhiServiceAccountModel::find_by_nhi_id(&self.pool, tenant_id, id)
             .await
             .map_err(GovernanceError::Database)?
             .ok_or(GovernanceError::ServiceAccountNotFound(id))?;
@@ -82,13 +84,13 @@ impl ServiceAccountService {
         Ok(ServiceAccountResponse::from(account))
     }
 
-    /// Get a service account by user ID.
+    /// Get a service account by identity ID.
     pub async fn get_by_user_id(
         &self,
         tenant_id: Uuid,
         user_id: Uuid,
     ) -> Result<Option<ServiceAccountResponse>> {
-        let account = GovServiceAccount::find_by_user_id(&self.pool, tenant_id, user_id)
+        let account = NhiServiceAccountModel::find_by_nhi_id(&self.pool, tenant_id, user_id)
             .await
             .map_err(GovernanceError::Database)?;
 
@@ -101,36 +103,52 @@ impl ServiceAccountService {
         tenant_id: Uuid,
         request: RegisterServiceAccountRequest,
     ) -> Result<ServiceAccountResponse> {
-        // Check if user is already registered as a service account
-        if GovServiceAccount::is_service_account(&self.pool, tenant_id, request.user_id)
+        if NhiIdentity::name_exists(&self.pool, tenant_id, &request.name)
             .await
             .map_err(GovernanceError::Database)?
         {
             return Err(GovernanceError::Validation(
-                "User is already registered as a service account".to_string(),
+                "A service account with this name already exists".to_string(),
             ));
         }
 
-        let input = CreateGovServiceAccount {
-            user_id: request.user_id,
-            name: request.name,
-            purpose: request.purpose,
-            owner_id: request.owner_id,
-            expires_at: request.expires_at,
-            // NHI lifecycle fields (F061)
-            backup_owner_id: None,
-            rotation_interval_days: None,
-            inactivity_threshold_days: None,
-        };
+        let identity = NhiIdentity::create(
+            &self.pool,
+            tenant_id,
+            CreateNhiIdentity {
+                nhi_type: NhiType::ServiceAccount,
+                name: request.name.clone(),
+                description: Some(request.purpose.clone()),
+                owner_id: Some(request.owner_id),
+                backup_owner_id: None,
+                expires_at: request.expires_at,
+                inactivity_threshold_days: None,
+                rotation_interval_days: None,
+                created_by: None,
+            },
+        )
+        .await
+        .map_err(GovernanceError::Database)?;
 
-        let account = GovServiceAccount::create(&self.pool, tenant_id, input)
+        NhiServiceAccountModel::create(
+            &self.pool,
+            CreateNhiServiceAccount {
+                nhi_id: identity.id,
+                purpose: request.purpose,
+                environment: None,
+            },
+        )
+        .await
+        .map_err(GovernanceError::Database)?;
+
+        let account = NhiServiceAccountModel::find_by_nhi_id(&self.pool, tenant_id, identity.id)
             .await
-            .map_err(GovernanceError::Database)?;
+            .map_err(GovernanceError::Database)?
+            .ok_or(GovernanceError::ServiceAccountNotFound(identity.id))?;
 
         tracing::info!(
             tenant_id = %tenant_id,
             service_account_id = %account.id,
-            user_id = %account.user_id,
             "Service account registered"
         );
 
@@ -144,16 +162,38 @@ impl ServiceAccountService {
         id: Uuid,
         request: UpdateServiceAccountRequest,
     ) -> Result<ServiceAccountResponse> {
-        let update = UpdateGovServiceAccount {
-            name: request.name,
-            purpose: request.purpose,
-            owner_id: request.owner_id,
-            status: None,
-            expires_at: request.expires_at,
-            ..Default::default()
-        };
+        NhiIdentity::update(
+            &self.pool,
+            tenant_id,
+            id,
+            UpdateNhiIdentity {
+                name: request.name.clone(),
+                description: request.purpose.clone(),
+                owner_id: request.owner_id.map(Some),
+                expires_at: request.expires_at.map(Some),
+                ..Default::default()
+            },
+        )
+        .await
+        .map_err(GovernanceError::Database)?
+        .ok_or(GovernanceError::ServiceAccountNotFound(id))?;
 
-        let updated = GovServiceAccount::update(&self.pool, tenant_id, id, update)
+        if request.purpose.is_some() {
+            NhiServiceAccountModel::update(
+                &self.pool,
+                tenant_id,
+                id,
+                UpdateNhiServiceAccount {
+                    purpose: request.purpose.clone(),
+                    environment: None,
+                },
+            )
+            .await
+            .map_err(GovernanceError::Database)?
+            .ok_or(GovernanceError::ServiceAccountNotFound(id))?;
+        }
+
+        let updated = NhiServiceAccountModel::find_by_nhi_id(&self.pool, tenant_id, id)
             .await
             .map_err(GovernanceError::Database)?
             .ok_or(GovernanceError::ServiceAccountNotFound(id))?;
@@ -174,7 +214,20 @@ impl ServiceAccountService {
         id: Uuid,
         certified_by: Uuid,
     ) -> Result<ServiceAccountResponse> {
-        let certified = GovServiceAccount::certify(&self.pool, tenant_id, id, certified_by)
+        let certified_ok = NhiIdentity::update_certification(
+            &self.pool,
+            tenant_id,
+            id,
+            certified_by,
+            Some(Utc::now() + chrono::Duration::days(365)),
+        )
+        .await
+        .map_err(GovernanceError::Database)?;
+        if !certified_ok {
+            return Err(GovernanceError::ServiceAccountNotFound(id));
+        }
+
+        let certified = NhiServiceAccountModel::find_by_nhi_id(&self.pool, tenant_id, id)
             .await
             .map_err(GovernanceError::Database)?
             .ok_or(GovernanceError::ServiceAccountNotFound(id))?;
@@ -191,7 +244,18 @@ impl ServiceAccountService {
 
     /// Suspend a service account.
     pub async fn suspend(&self, tenant_id: Uuid, id: Uuid) -> Result<ServiceAccountResponse> {
-        let suspended = GovServiceAccount::suspend(&self.pool, tenant_id, id)
+        NhiIdentity::update_lifecycle_state(
+            &self.pool,
+            tenant_id,
+            id,
+            NhiLifecycleState::Suspended,
+            Some("manual".to_string()),
+        )
+        .await
+        .map_err(GovernanceError::Database)?
+        .ok_or(GovernanceError::ServiceAccountNotFound(id))?;
+
+        let suspended = NhiServiceAccountModel::find_by_nhi_id(&self.pool, tenant_id, id)
             .await
             .map_err(GovernanceError::Database)?
             .ok_or(GovernanceError::ServiceAccountNotFound(id))?;
@@ -207,14 +271,32 @@ impl ServiceAccountService {
 
     /// Reactivate a suspended service account.
     pub async fn reactivate(&self, tenant_id: Uuid, id: Uuid) -> Result<ServiceAccountResponse> {
-        let reactivated = GovServiceAccount::reactivate(&self.pool, tenant_id, id)
+        let existing = NhiServiceAccountModel::find_by_nhi_id(&self.pool, tenant_id, id)
             .await
             .map_err(GovernanceError::Database)?
-            .ok_or_else(|| {
-                GovernanceError::Validation(
-                    "Service account not found or not in suspended status".to_string(),
-                )
-            })?;
+            .ok_or(GovernanceError::ServiceAccountNotFound(id))?;
+
+        if existing.lifecycle_state != NhiLifecycleState::Suspended {
+            return Err(GovernanceError::Validation(
+                "Service account not found or not in suspended status".to_string(),
+            ));
+        }
+
+        NhiIdentity::update_lifecycle_state(
+            &self.pool,
+            tenant_id,
+            id,
+            NhiLifecycleState::Active,
+            None,
+        )
+        .await
+        .map_err(GovernanceError::Database)?
+        .ok_or(GovernanceError::ServiceAccountNotFound(id))?;
+
+        let reactivated = NhiServiceAccountModel::find_by_nhi_id(&self.pool, tenant_id, id)
+            .await
+            .map_err(GovernanceError::Database)?
+            .ok_or(GovernanceError::ServiceAccountNotFound(id))?;
 
         tracing::info!(
             tenant_id = %tenant_id,
@@ -227,7 +309,7 @@ impl ServiceAccountService {
 
     /// Unregister (delete) a service account.
     pub async fn unregister(&self, tenant_id: Uuid, id: Uuid) -> Result<()> {
-        let deleted = GovServiceAccount::delete(&self.pool, tenant_id, id)
+        let deleted = NhiIdentity::delete(&self.pool, tenant_id, id)
             .await
             .map_err(GovernanceError::Database)?;
 
@@ -246,36 +328,33 @@ impl ServiceAccountService {
 
     /// Get summary statistics for service accounts.
     pub async fn get_summary(&self, tenant_id: Uuid) -> Result<ServiceAccountSummary> {
-        use xavyo_db::ServiceAccountStatus;
-
-        // Get counts by status
-        let active = GovServiceAccount::count(
+        let active = NhiServiceAccountModel::count(
             &self.pool,
             tenant_id,
-            &ServiceAccountFilter {
-                status: Some(ServiceAccountStatus::Active),
+            &NhiServiceAccountFilter {
+                lifecycle_state: Some(NhiLifecycleState::Active),
                 ..Default::default()
             },
         )
         .await
         .map_err(GovernanceError::Database)?;
 
-        let expired = GovServiceAccount::count(
+        let expired = NhiServiceAccountModel::count(
             &self.pool,
             tenant_id,
-            &ServiceAccountFilter {
-                status: Some(ServiceAccountStatus::Expired),
+            &NhiServiceAccountFilter {
+                lifecycle_state: Some(NhiLifecycleState::Inactive),
                 ..Default::default()
             },
         )
         .await
         .map_err(GovernanceError::Database)?;
 
-        let suspended = GovServiceAccount::count(
+        let suspended = NhiServiceAccountModel::count(
             &self.pool,
             tenant_id,
-            &ServiceAccountFilter {
-                status: Some(ServiceAccountStatus::Suspended),
+            &NhiServiceAccountFilter {
+                lifecycle_state: Some(NhiLifecycleState::Suspended),
                 ..Default::default()
             },
         )
@@ -284,11 +363,10 @@ impl ServiceAccountService {
 
         let total = active + expired + suspended;
 
-        // Needs certification count
-        let needs_certification = GovServiceAccount::count(
+        let needs_certification = NhiServiceAccountModel::count(
             &self.pool,
             tenant_id,
-            &ServiceAccountFilter {
+            &NhiServiceAccountFilter {
                 needs_certification: Some(true),
                 ..Default::default()
             },
@@ -296,11 +374,10 @@ impl ServiceAccountService {
         .await
         .map_err(GovernanceError::Database)?;
 
-        // Expiring within 30 days
-        let expiring_soon = GovServiceAccount::count(
+        let expiring_soon = NhiServiceAccountModel::count(
             &self.pool,
             tenant_id,
-            &ServiceAccountFilter {
+            &NhiServiceAccountFilter {
                 expiring_within_days: Some(30),
                 ..Default::default()
             },
@@ -320,7 +397,7 @@ impl ServiceAccountService {
 
     /// Mark expired service accounts.
     pub async fn mark_expired(&self, tenant_id: Uuid) -> Result<u64> {
-        let count = GovServiceAccount::mark_expired(&self.pool, tenant_id)
+        let count = NhiIdentity::mark_expired(&self.pool, tenant_id)
             .await
             .map_err(GovernanceError::Database)?;
 
@@ -335,22 +412,17 @@ impl ServiceAccountService {
         Ok(count)
     }
 
-    /// Get all service account user IDs (for orphan detection exclusion).
-    pub async fn get_all_user_ids(&self, tenant_id: Uuid) -> Result<Vec<Uuid>> {
-        let ids = GovServiceAccount::get_all_user_ids(&self.pool, tenant_id)
-            .await
-            .map_err(GovernanceError::Database)?;
-
-        Ok(ids)
+    /// Unified NHIs are not users; there is no linked user_id to exclude.
+    pub async fn get_all_user_ids(&self, _tenant_id: Uuid) -> Result<Vec<Uuid>> {
+        Ok(Vec::new())
     }
 
-    /// Check if a user is registered as a service account.
+    /// Check if an identity is a service account.
     pub async fn is_service_account(&self, tenant_id: Uuid, user_id: Uuid) -> Result<bool> {
-        let is_sa = GovServiceAccount::is_service_account(&self.pool, tenant_id, user_id)
+        let account = NhiServiceAccountModel::find_by_nhi_id(&self.pool, tenant_id, user_id)
             .await
             .map_err(GovernanceError::Database)?;
-
-        Ok(is_sa)
+        Ok(account.is_some())
     }
 }
 
@@ -407,5 +479,21 @@ mod tests {
         };
 
         assert_eq!(summary.total, 0);
+    }
+
+    #[test]
+    fn service_account_crud_queries_unified_nhi_identities() {
+        let src = include_str!("service_account_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("NhiServiceAccountModel::list")
+                && production.contains("NhiServiceAccountModel::find_by_nhi_id")
+                && production.contains("NhiIdentity::create")
+                && production.contains("NhiIdentity::update")
+                && production.contains("NhiIdentity::delete")
+                && !production.contains("GovServiceAccount")
+                && !production.contains("gov_service_accounts"),
+            "GET/POST/PUT/DELETE /governance/service-accounts must use nhi_identities, not the dropped gov_service_accounts table"
+        );
     }
 }

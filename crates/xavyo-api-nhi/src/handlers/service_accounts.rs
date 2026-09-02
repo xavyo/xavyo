@@ -220,6 +220,7 @@ pub async fn list_service_accounts(
         lifecycle_state: query.lifecycle_state,
         owner_id: query.owner_id,
         ids: None,
+        ..Default::default()
     };
 
     // Admin/super_admin see all service accounts; non-admin users only see permitted ones
