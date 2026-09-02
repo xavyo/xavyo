@@ -54,8 +54,8 @@ pub fn discovery_router(state: NhiState) -> Router; // Agent discovery (/.well-k
 | POST | `/mcp/tools/:name/call` | Invoke an MCP tool (501 — remote execution is not implemented) |
 | POST | `/nhi/tool-permissions/check` | Allow/deny/requires_approval; unregistered tools are `deny` |
 | POST | `/a2a/tasks` | Create A2A task (with NHI-to-NHI permission check) |
-| GET | `/a2a/tasks` | List A2A tasks |
-| GET | `/a2a/tasks/:id` | Get A2A task |
+| GET | `/a2a/tasks` | List A2A tasks (includes persisted `callback_url`) |
+| GET | `/a2a/tasks/:id` | Get A2A task (includes persisted `callback_url`) |
 | POST | `/a2a/tasks/:id/cancel` | Cancel A2A task |
 | GET | `/.well-known/agents/:id` | Get agent discovery card |
 

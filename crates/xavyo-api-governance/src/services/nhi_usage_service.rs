@@ -5,8 +5,9 @@
 //! - Usage summary and analytics
 //! - Staleness detection
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
+use std::collections::HashMap;
 #[cfg(feature = "kafka")]
 use std::sync::Arc;
 use uuid::Uuid;
@@ -214,6 +215,45 @@ impl NhiUsageService {
             0.0
         };
 
+        let first_activity_at: Option<DateTime<Utc>> = sqlx::query_scalar(
+            r"
+            SELECT MIN(timestamp)
+            FROM gov_nhi_usage_events
+            WHERE tenant_id = $1
+              AND nhi_id = $2
+              AND timestamp >= NOW() - ($3 || ' days')::interval
+            ",
+        )
+        .bind(tenant_id)
+        .bind(nhi_id)
+        .bind(period)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(GovernanceError::Database)?;
+
+        let activity_rows: Vec<(String, i64)> = sqlx::query_as(
+            r"
+            SELECT action, COUNT(*)
+            FROM gov_nhi_usage_events
+            WHERE tenant_id = $1
+              AND nhi_id = $2
+              AND timestamp >= NOW() - ($3 || ' days')::interval
+            GROUP BY action
+            ",
+        )
+        .bind(tenant_id)
+        .bind(nhi_id)
+        .bind(period)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(GovernanceError::Database)?;
+        let activity_types: HashMap<String, i64> = activity_rows.into_iter().collect();
+        let daily_average = if period > 0 {
+            summary.total_events as f64 / f64::from(period)
+        } else {
+            0.0
+        };
+
         Ok(NhiUsageSummaryExtendedResponse {
             nhi_id,
             nhi_name: nhi.name,
@@ -233,6 +273,10 @@ impl NhiUsageService {
                 })
                 .collect(),
             last_used_at: summary.last_used_at,
+            last_activity_at: summary.last_used_at,
+            first_activity_at,
+            activity_types,
+            daily_average,
         })
     }
 
@@ -248,8 +292,12 @@ impl NhiUsageService {
         &self,
         tenant_id: Uuid,
         min_inactive_days: Option<i32>,
+        limit: Option<i64>,
+        offset: Option<i64>,
     ) -> Result<StalenessReportResponse> {
         let threshold = min_inactive_days.unwrap_or(30);
+        let limit = limit.unwrap_or(50).clamp(1, 100);
+        let offset = offset.unwrap_or(0).max(0);
 
         let nhis = sqlx::query_as::<_, NhiIdentity>(
             r"
@@ -294,6 +342,10 @@ impl NhiUsageService {
                     inactivity_threshold_days: individual_threshold,
                     in_grace_period: nhi.grace_period_ends_at.is_some_and(|ends| ends > now),
                     grace_period_ends_at: nhi.grace_period_ends_at,
+                    id: nhi.id,
+                    nhi_type: nhi.nhi_type.as_str().to_string(),
+                    state: nhi.lifecycle_state.as_str().to_string(),
+                    last_activity_at: nhi.last_activity_at,
                 });
             }
         }
@@ -308,13 +360,21 @@ impl NhiUsageService {
             .filter(|n| n.days_inactive > 90 && n.days_inactive <= 180)
             .count() as i64;
 
+        let start = offset.min(total_stale) as usize;
+        let end = (offset + limit).min(total_stale) as usize;
+        let page = stale_nhis[start..end].to_vec();
+
         Ok(StalenessReportResponse {
             generated_at: now,
             min_inactive_days: threshold,
             total_stale,
             critical_count,
             warning_count,
-            stale_nhis,
+            stale_nhis: page.clone(),
+            items: page,
+            total: total_stale,
+            limit,
+            offset,
         })
     }
 
@@ -412,6 +472,43 @@ mod tests {
                 && production.contains("FROM nhi_identities")
                 && !production.contains("GovServiceAccount::"),
             "NHI usage GET/POST must look up nhi_identities, not the dropped gov_service_accounts table"
+        );
+    }
+
+    #[test]
+    fn usage_summary_returns_advertised_activity_fields() {
+        let src = include_str!("nhi_usage_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let summary = production
+            .split("pub async fn get_summary")
+            .nth(1)
+            .and_then(|s| s.split("    // =========================================================================")
+                .next())
+            .expect("get_summary");
+        assert!(
+            summary.contains("activity_types")
+                && summary.contains("first_activity_at")
+                && summary.contains("last_activity_at")
+                && summary.contains("daily_average"),
+            "GET usage summary must return advertised activity_types / first_activity_at / last_activity_at / daily_average"
+        );
+    }
+
+    #[test]
+    fn staleness_report_returns_advertised_type_and_items() {
+        let src = include_str!("nhi_usage_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let report = production
+            .split("pub async fn get_staleness_report")
+            .nth(1)
+            .and_then(|s| s.split("    // =========================================================================").next())
+            .expect("get_staleness_report");
+        assert!(
+            report.contains("nhi_type:")
+                && report.contains("state:")
+                && report.contains("items:")
+                && report.contains("last_activity_at"),
+            "GET staleness-report must return advertised nhi_type, state, items, and last_activity_at"
         );
     }
 }

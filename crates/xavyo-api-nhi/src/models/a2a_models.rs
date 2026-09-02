@@ -92,6 +92,10 @@ pub struct A2aTaskResponse {
     /// When the task reached a terminal state.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub completed_at: Option<DateTime<Utc>>,
+
+    /// Callback URL persisted at create time.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub callback_url: Option<String>,
 }
 
 /// Response for POST /a2a/tasks/{id}/cancel.
@@ -279,12 +283,36 @@ mod tests {
             created_at: Utc::now(),
             started_at: None,
             completed_at: None,
+            callback_url: None,
         };
 
         let json = serde_json::to_string(&resp).unwrap();
         assert!(!json.contains("result"));
         assert!(!json.contains("error_code"));
         assert!(!json.contains("started_at"));
+        assert!(!json.contains("callback_url"));
+    }
+
+    #[test]
+    fn test_task_response_echoes_callback_url() {
+        let resp = A2aTaskResponse {
+            id: Uuid::new_v4(),
+            source_agent_id: Some(Uuid::new_v4()),
+            target_agent_id: Some(Uuid::new_v4()),
+            task_type: "test".to_string(),
+            state: "pending".to_string(),
+            result: None,
+            error_code: None,
+            error_message: None,
+            created_at: Utc::now(),
+            started_at: None,
+            completed_at: None,
+            callback_url: Some("https://example.com/webhook".to_string()),
+        };
+
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("callback_url"));
+        assert!(json.contains("https://example.com/webhook"));
     }
 
     #[test]

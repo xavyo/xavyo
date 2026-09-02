@@ -92,9 +92,14 @@ pub fn archetypes_router() -> Router<GovState>;  // F-058 Identity Archetypes
 | Service Accounts | GET | `/service-accounts` | Do not advertise `user_id` as a distinct linked user; `owner_id` is null when unassigned |
 | Identity Correlation | PUT | `/identity-correlation-rules/:id` | Persist advertised `attribute` and `match_type` |
 | Connector Correlation | PUT | `/connectors/:id/correlation/rules/:id` | Persist advertised `match_type` |
-| NHI Certification | POST | `/nhis/certification/campaigns` | Persist advertised owner/type filters |
-| NHI Certification | POST | `/nhis/certification/campaigns/:id/launch` | Launch using stored create-time filters |
+| NHI Certification | POST | `/nhis/certification/campaigns` | Persist advertised `scope` plus owner/type filters |
+| NHI Certification | GET | `/nhis/certification/campaigns` | Return advertised `scope` |
+| NHI Certification | GET | `/nhis/certification/campaigns/:id/items` | Return advertised `nhi_type` |
+| NHI Certification | POST | `/nhis/certification/campaigns/:id/launch` | Launch using stored create-time filters including `scope` |
 | NHI Usage | POST | `/nhis/:id/usage` | Return created usage event; look up `nhi_identities` |
+| NHI Usage | GET | `/nhis/:id/usage` | Return advertised `activity_type`, `details`, `performed_at` |
+| NHI Usage | GET | `/nhis/:id/usage/summary` | Return advertised `activity_types`, `first_activity_at`, `last_activity_at`, `daily_average` |
+| NHI Usage | GET | `/nhis/staleness-report` | Return advertised `nhi_type`/`state`/`items`/`total` |
 | Personas | POST | `/personas` | Persist advertised `valid_from` / `valid_until` |
 | Meta-roles | POST | `/meta-roles` | Persist advertised entitlements and constraints |
 | Object Templates | POST | `/object-templates` | Persist advertised initial rules and scopes |

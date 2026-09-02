@@ -23,9 +23,10 @@ use xavyo_nhi::NhiType;
 use xavyo_events::EventProducer;
 
 use crate::models::{
-    BulkCertificationError, BulkNhiCertificationResult, NhiCertCampaignStatus, NhiCertReviewerType,
-    NhiCertificationCampaignResponse, NhiCertificationDecision, NhiCertificationItemResponse,
-    NhiCertificationStatus, NhiCertificationSummary,
+    BulkCertificationError, BulkNhiCertificationResult, NhiCertCampaignScope,
+    NhiCertCampaignStatus, NhiCertReviewerType, NhiCertificationCampaignResponse,
+    NhiCertificationDecision, NhiCertificationItemResponse, NhiCertificationStatus,
+    NhiCertificationSummary,
 };
 
 // ============================================================================
@@ -41,6 +42,7 @@ pub struct NhiCertificationCampaign {
     pub name: String,
     pub description: Option<String>,
     pub status: NhiCertCampaignStatus,
+    pub scope: NhiCertCampaignScope,
     pub reviewer_type: NhiCertReviewerType,
     pub specific_reviewers: Option<Vec<Uuid>>,
     pub deadline: DateTime<Utc>,
@@ -126,6 +128,7 @@ impl NhiCertificationService {
         needs_certification_only: bool,
         reviewer_type: NhiCertReviewerType,
         specific_reviewers: Option<Vec<Uuid>>,
+        scope: Option<NhiCertCampaignScope>,
         nhi_type_filter: Option<String>,
         specific_nhi_ids: Option<Vec<Uuid>>,
         deadline: DateTime<Utc>,
@@ -148,6 +151,8 @@ impl NhiCertificationService {
         let nhi_type_filter =
             parse_optional_nhi_type_filter(nhi_type_filter.as_deref())?.map(|t| t.to_string());
 
+        let scope = resolve_campaign_scope(scope, nhi_type_filter.as_deref(), &specific_nhi_ids)?;
+
         // Create campaign in database, including launch filters.
         let campaign = self
             .create_campaign_record(
@@ -158,6 +163,7 @@ impl NhiCertificationService {
                 specific_reviewers,
                 owner_filter,
                 needs_certification_only,
+                scope,
                 nhi_type_filter,
                 specific_nhi_ids,
                 deadline,
@@ -632,17 +638,25 @@ impl NhiCertificationService {
             );
         }
 
-        let nhi_type = parse_optional_nhi_type_filter(campaign.nhi_type_filter.as_deref())?;
+        let nhi_type = if campaign.scope == NhiCertCampaignScope::ByType {
+            parse_optional_nhi_type_filter(campaign.nhi_type_filter.as_deref())?
+        } else {
+            None
+        };
         if nhi_type.is_some() {
             query.push_str(&format!(" AND nhi_type = ${param_idx}"));
             param_idx += 1;
         }
 
-        if campaign
-            .specific_nhi_ids
-            .as_ref()
-            .is_some_and(|ids| !ids.is_empty())
-        {
+        let specific_ids = if campaign.scope == NhiCertCampaignScope::Specific {
+            campaign
+                .specific_nhi_ids
+                .as_ref()
+                .filter(|ids| !ids.is_empty())
+        } else {
+            None
+        };
+        if specific_ids.is_some() {
             query.push_str(&format!(" AND id = ANY(${param_idx})"));
         }
 
@@ -656,10 +670,8 @@ impl NhiCertificationService {
         if let Some(nhi_type) = nhi_type {
             q = q.bind(nhi_type.to_string());
         }
-        if let Some(ref ids) = campaign.specific_nhi_ids {
-            if !ids.is_empty() {
-                q = q.bind(ids);
-            }
+        if let Some(ids) = specific_ids {
+            q = q.bind(ids);
         }
 
         q.fetch_all(&self.pool)
@@ -807,6 +819,7 @@ impl NhiCertificationService {
         specific_reviewers: Option<Vec<Uuid>>,
         owner_filter: Option<Uuid>,
         needs_certification_only: bool,
+        scope: NhiCertCampaignScope,
         nhi_type_filter: Option<String>,
         specific_nhi_ids: Option<Vec<Uuid>>,
         deadline: DateTime<Utc>,
@@ -832,9 +845,9 @@ impl NhiCertificationService {
             INSERT INTO gov_nhi_certification_campaigns (
                 id, tenant_id, name, description, status, reviewer_type,
                 specific_reviewers, deadline, owner_filter, needs_certification_only,
-                nhi_type_filter, specific_nhi_ids, created_by, created_at
+                nhi_type_filter, specific_nhi_ids, created_by, created_at, scope
             )
-            VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             ",
         )
         .bind(id)
@@ -850,6 +863,7 @@ impl NhiCertificationService {
         .bind(&specific_nhi_ids)
         .bind(created_by)
         .bind(now)
+        .bind(scope_as_str(scope))
         .execute(&self.pool)
         .await
         .map_err(GovernanceError::Database)?;
@@ -860,6 +874,7 @@ impl NhiCertificationService {
             name,
             description,
             status: NhiCertCampaignStatus::Draft,
+            scope,
             reviewer_type,
             specific_reviewers,
             deadline,
@@ -884,7 +899,7 @@ impl NhiCertificationService {
             SELECT id, tenant_id, name, description, status, reviewer_type,
                    specific_reviewers, deadline, created_by, created_at,
                    launched_at, completed_at, owner_filter, needs_certification_only,
-                   nhi_type_filter, specific_nhi_ids
+                   nhi_type_filter, specific_nhi_ids, scope
             FROM gov_nhi_certification_campaigns
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -912,7 +927,7 @@ impl NhiCertificationService {
             SELECT id, tenant_id, name, description, status, reviewer_type,
                    specific_reviewers, deadline, created_by, created_at,
                    launched_at, completed_at, owner_filter, needs_certification_only,
-                   nhi_type_filter, specific_nhi_ids
+                   nhi_type_filter, specific_nhi_ids, scope
             FROM gov_nhi_certification_campaigns
             WHERE tenant_id = $1
             ",
@@ -1374,6 +1389,7 @@ impl NhiCertificationService {
             name: campaign.name,
             description: campaign.description,
             status: campaign.status,
+            scope: campaign.scope,
             reviewer_type: campaign.reviewer_type,
             specific_reviewers: campaign.specific_reviewers,
             owner_filter: campaign.owner_filter,
@@ -1427,6 +1443,7 @@ impl NhiCertificationService {
             nhi_id: item.nhi_id,
             nhi_name: nhi.name,
             nhi_purpose: nhi.description.unwrap_or_default(),
+            nhi_type: nhi.nhi_type.as_str().to_string(),
             owner_id,
             owner_name,
             reviewer_id: item.reviewer_id,
@@ -1511,44 +1528,97 @@ impl NhiCertificationService {
     }
 }
 
-type CampaignRow = (
-    Uuid,
-    Uuid,
-    String,
-    Option<String>,
-    String,
-    String,
-    Option<serde_json::Value>,
-    DateTime<Utc>,
-    Uuid,
-    DateTime<Utc>,
-    Option<DateTime<Utc>>,
-    Option<DateTime<Utc>>,
-    Option<Uuid>,
-    bool,
-    Option<String>,
-    Option<Vec<Uuid>>,
-);
+#[derive(sqlx::FromRow)]
+struct CampaignRow {
+    id: Uuid,
+    tenant_id: Uuid,
+    name: String,
+    description: Option<String>,
+    status: String,
+    reviewer_type: String,
+    specific_reviewers: Option<serde_json::Value>,
+    deadline: DateTime<Utc>,
+    created_by: Uuid,
+    created_at: DateTime<Utc>,
+    launched_at: Option<DateTime<Utc>>,
+    completed_at: Option<DateTime<Utc>>,
+    owner_filter: Option<Uuid>,
+    needs_certification_only: bool,
+    nhi_type_filter: Option<String>,
+    specific_nhi_ids: Option<Vec<Uuid>>,
+    scope: String,
+}
 
 fn campaign_from_row(row: CampaignRow) -> Result<NhiCertificationCampaign> {
     Ok(NhiCertificationCampaign {
-        id: row.0,
-        tenant_id: row.1,
-        name: row.2,
-        description: row.3,
-        status: parse_campaign_status(&row.4)?,
-        reviewer_type: parse_reviewer_type(&row.5)?,
-        specific_reviewers: parse_reviewers(row.6)?,
-        deadline: row.7,
-        created_by: row.8,
-        created_at: row.9,
-        launched_at: row.10,
-        completed_at: row.11,
-        owner_filter: row.12,
-        needs_certification_only: row.13,
-        nhi_type_filter: row.14,
-        specific_nhi_ids: row.15.filter(|ids| !ids.is_empty()),
+        id: row.id,
+        tenant_id: row.tenant_id,
+        name: row.name,
+        description: row.description,
+        status: parse_campaign_status(&row.status)?,
+        reviewer_type: parse_reviewer_type(&row.reviewer_type)?,
+        specific_reviewers: parse_reviewers(row.specific_reviewers)?,
+        deadline: row.deadline,
+        created_by: row.created_by,
+        created_at: row.created_at,
+        launched_at: row.launched_at,
+        completed_at: row.completed_at,
+        owner_filter: row.owner_filter,
+        needs_certification_only: row.needs_certification_only,
+        nhi_type_filter: row.nhi_type_filter,
+        specific_nhi_ids: row.specific_nhi_ids.filter(|ids| !ids.is_empty()),
+        scope: parse_campaign_scope(&row.scope)?,
     })
+}
+
+fn resolve_campaign_scope(
+    scope: Option<NhiCertCampaignScope>,
+    nhi_type_filter: Option<&str>,
+    specific_nhi_ids: &Option<Vec<Uuid>>,
+) -> Result<NhiCertCampaignScope> {
+    let resolved = scope.unwrap_or_else(|| {
+        if specific_nhi_ids.as_ref().is_some_and(|ids| !ids.is_empty()) {
+            NhiCertCampaignScope::Specific
+        } else if nhi_type_filter.is_some() {
+            NhiCertCampaignScope::ByType
+        } else {
+            NhiCertCampaignScope::All
+        }
+    });
+    match resolved {
+        NhiCertCampaignScope::ByType if nhi_type_filter.is_none() => Err(
+            GovernanceError::Validation("nhi_type_filter is required when scope is by_type".into()),
+        ),
+        NhiCertCampaignScope::Specific
+            if specific_nhi_ids
+                .as_ref()
+                .is_none_or(std::vec::Vec::is_empty) =>
+        {
+            Err(GovernanceError::Validation(
+                "specific_nhi_ids is required when scope is specific".into(),
+            ))
+        }
+        other => Ok(other),
+    }
+}
+
+fn scope_as_str(scope: NhiCertCampaignScope) -> &'static str {
+    match scope {
+        NhiCertCampaignScope::All => "all",
+        NhiCertCampaignScope::ByType => "by_type",
+        NhiCertCampaignScope::Specific => "specific",
+    }
+}
+
+fn parse_campaign_scope(s: &str) -> Result<NhiCertCampaignScope> {
+    match s {
+        "all" => Ok(NhiCertCampaignScope::All),
+        "by_type" => Ok(NhiCertCampaignScope::ByType),
+        "specific" => Ok(NhiCertCampaignScope::Specific),
+        other => Err(GovernanceError::Validation(format!(
+            "Invalid campaign scope '{other}'. Must be 'all', 'by_type', or 'specific'"
+        ))),
+    }
 }
 
 fn parse_optional_nhi_type_filter(value: Option<&str>) -> Result<Option<NhiType>> {
@@ -1843,7 +1913,8 @@ mod tests {
             create.contains("owner_filter")
                 && create.contains("needs_certification_only")
                 && create.contains("nhi_type_filter")
-                && create.contains("specific_nhi_ids"),
+                && create.contains("specific_nhi_ids")
+                && create.contains("scope"),
             "POST create must persist advertised campaign filters"
         );
         let select = production
@@ -1873,8 +1944,60 @@ mod tests {
             to_response.contains("owner_filter: campaign.owner_filter")
                 && to_response
                     .contains("needs_certification_only: campaign.needs_certification_only")
-                && to_response.contains("reviewer_type: campaign.reviewer_type"),
+                && to_response.contains("reviewer_type: campaign.reviewer_type")
+                && to_response.contains("scope: campaign.scope"),
             "GET/create campaign responses must echo persisted filters"
+        );
+    }
+
+    #[test]
+    fn campaign_scope_fails_closed_when_filters_missing() {
+        assert_eq!(
+            resolve_campaign_scope(None, None, &None).unwrap(),
+            NhiCertCampaignScope::All
+        );
+        assert_eq!(
+            resolve_campaign_scope(Some(NhiCertCampaignScope::ByType), Some("agent"), &None)
+                .unwrap(),
+            NhiCertCampaignScope::ByType
+        );
+        assert!(resolve_campaign_scope(Some(NhiCertCampaignScope::ByType), None, &None).is_err());
+        assert!(resolve_campaign_scope(Some(NhiCertCampaignScope::Specific), None, &None).is_err());
+        let ids = Some(vec![Uuid::new_v4()]);
+        assert_eq!(
+            resolve_campaign_scope(Some(NhiCertCampaignScope::Specific), None, &ids).unwrap(),
+            NhiCertCampaignScope::Specific
+        );
+    }
+
+    #[test]
+    fn launch_applies_type_and_id_filters_only_for_matching_scope() {
+        let src = include_str!("nhi_certification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let select = production
+            .split("async fn get_nhis_for_campaign")
+            .nth(1)
+            .and_then(|s| s.split("    async fn generate_certification_items").next())
+            .expect("get_nhis_for_campaign");
+        assert!(
+            select.contains("NhiCertCampaignScope::ByType")
+                && select.contains("NhiCertCampaignScope::Specific"),
+            "launch must honor persisted campaign scope when applying type/id filters"
+        );
+    }
+
+    #[test]
+    fn certification_item_response_includes_nhi_type() {
+        let src = include_str!("nhi_certification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let item = production
+            .split("async fn item_to_response(")
+            .nth(1)
+            .and_then(|s| s.split("    async fn ").next())
+            .expect("item_to_response");
+        assert!(
+            item.contains("nhi_type: nhi.nhi_type.as_str()"),
+            "GET certification items must return advertised nhi_type"
         );
     }
 
