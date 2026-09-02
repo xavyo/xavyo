@@ -17,8 +17,9 @@ use uuid::Uuid;
 
 use xavyo_db::{
     CreateGovNhiAuditEvent, CreateNhiIdentity, CreateNhiServiceAccount, GovNhiAuditEvent,
-    GovServiceAccount, NhiAuditEventType, NhiIdentity, NhiServiceAccount as NhiServiceAccountModel,
-    NhiSuspensionReason, ServiceAccountFilter, ServiceAccountStatus, UpdateGovServiceAccount, User,
+    NhiAuditEventType, NhiIdentity, NhiServiceAccount as NhiServiceAccountModel,
+    NhiServiceAccountFilter, NhiServiceAccountWithIdentity, NhiSuspensionReason, UpdateNhiIdentity,
+    UpdateNhiServiceAccount, User,
 };
 #[cfg(feature = "kafka")]
 use xavyo_events::{
@@ -28,10 +29,11 @@ use xavyo_events::{
     EventProducer,
 };
 use xavyo_governance::error::{GovernanceError, Result};
-use xavyo_nhi::NhiType;
+use xavyo_nhi::{NhiLifecycleState, NhiType};
 
 use crate::models::{
-    CreateNhiRequest, ListNhisQuery, NhiListResponse, NhiResponse, NhiSummary, UpdateNhiRequest,
+    sa_status_to_lifecycle, suspension_reason_str, CreateNhiRequest, ListNhisQuery,
+    NhiListResponse, NhiResponse, NhiSummary, UpdateNhiRequest,
 };
 
 /// Service for managing Non-Human Identities (NHIs).
@@ -70,29 +72,16 @@ impl NhiService {
 
     /// List NHIs with filtering and pagination.
     pub async fn list(&self, tenant_id: Uuid, query: &ListNhisQuery) -> Result<NhiListResponse> {
-        let filter = ServiceAccountFilter {
-            status: query.status,
-            owner_id: query.owner_id,
-            expiring_within_days: query.expiring_within_days,
-            needs_certification: query.needs_certification,
-            backup_owner_id: None, // Not exposed in query params
-            // Convert inactive_only bool to inactive_days (90 day default threshold)
-            inactive_days: if query.inactive_only == Some(true) {
-                Some(90)
-            } else {
-                None
-            },
-            needs_rotation: query.needs_rotation,
-        };
+        let filter = list_filter(query);
 
         let limit = query.limit.unwrap_or(50).min(100);
         let offset = query.offset.unwrap_or(0).max(0);
 
-        let accounts = GovServiceAccount::list(&self.pool, tenant_id, &filter, limit, offset)
+        let accounts = NhiServiceAccountModel::list(&self.pool, tenant_id, &filter, limit, offset)
             .await
             .map_err(GovernanceError::Database)?;
 
-        let total = GovServiceAccount::count(&self.pool, tenant_id, &filter)
+        let total = NhiServiceAccountModel::count(&self.pool, tenant_id, &filter)
             .await
             .map_err(GovernanceError::Database)?;
 
@@ -106,25 +95,27 @@ impl NhiService {
 
     /// Get an NHI by ID.
     pub async fn get(&self, tenant_id: Uuid, id: Uuid) -> Result<NhiResponse> {
-        let account = GovServiceAccount::find_by_id(&self.pool, tenant_id, id)
-            .await
-            .map_err(GovernanceError::Database)?
-            .ok_or(GovernanceError::NhiNotFound(id))?;
-
-        Ok(NhiResponse::from(account))
+        Ok(NhiResponse::from(self.load_sa(tenant_id, id).await?))
     }
 
-    /// Get an NHI by user ID.
+    /// Get an NHI by identity ID (unified NHIs are not linked users).
     pub async fn get_by_user_id(
         &self,
         tenant_id: Uuid,
         user_id: Uuid,
     ) -> Result<Option<NhiResponse>> {
-        let account = GovServiceAccount::find_by_user_id(&self.pool, tenant_id, user_id)
+        let account = NhiServiceAccountModel::find_by_nhi_id(&self.pool, tenant_id, user_id)
             .await
             .map_err(GovernanceError::Database)?;
 
         Ok(account.map(NhiResponse::from))
+    }
+
+    async fn load_sa(&self, tenant_id: Uuid, id: Uuid) -> Result<NhiServiceAccountWithIdentity> {
+        NhiServiceAccountModel::find_by_nhi_id(&self.pool, tenant_id, id)
+            .await
+            .map_err(GovernanceError::Database)?
+            .ok_or(GovernanceError::NhiNotFound(id))
     }
 
     /// Create a new NHI.
@@ -177,17 +168,10 @@ impl NhiService {
             }
         }
 
-        // Check if name already exists in nhi_identities
-        let name_count: i64 = sqlx::query_scalar(
-            r"SELECT COUNT(*) FROM nhi_identities WHERE tenant_id = $1 AND LOWER(name) = LOWER($2)",
-        )
-        .bind(tenant_id)
-        .bind(&request.name)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(GovernanceError::Database)?;
-
-        if name_count > 0 {
+        if NhiIdentity::name_exists(&self.pool, tenant_id, &request.name)
+            .await
+            .map_err(GovernanceError::Database)?
+        {
             return Err(GovernanceError::NhiNameExists(request.name));
         }
 
@@ -245,35 +229,9 @@ impl NhiService {
             "NHI created"
         );
 
-        // Build NhiResponse from the new NhiIdentity
-        let nhi_response = NhiResponse {
-            id: identity.id,
-            user_id: request.user_id,
-            name: identity.name,
-            purpose: request.purpose,
-            owner_id: identity.owner_id.unwrap_or(request.owner_id),
-            backup_owner_id: identity.backup_owner_id,
-            status: ServiceAccountStatus::Active,
-            expires_at: identity.expires_at,
-            days_until_expiry: identity.expires_at.map(|e| (e - Utc::now()).num_days()),
-            rotation_interval_days: identity.rotation_interval_days,
-            last_rotation_at: identity.last_rotation_at,
-            needs_rotation: false,
-            last_used_at: identity.last_activity_at,
-            days_since_last_use: None,
-            inactivity_threshold_days: identity.inactivity_threshold_days,
-            is_inactive: false,
-            grace_period_ends_at: identity.grace_period_ends_at,
-            is_in_grace_period: false,
-            suspension_reason: None,
-            last_certified_at: identity.last_certified_at,
-            certified_by: identity.last_certified_by,
-            needs_certification: false,
-            created_at: identity.created_at,
-            updated_at: identity.updated_at,
-        };
-
-        Ok(nhi_response)
+        Ok(NhiResponse::from(
+            self.load_sa(tenant_id, identity.id).await?,
+        ))
     }
 
     /// Update an NHI.
@@ -284,11 +242,7 @@ impl NhiService {
         actor_id: Uuid,
         request: UpdateNhiRequest,
     ) -> Result<NhiResponse> {
-        // Get existing NHI to validate changes
-        let existing = GovServiceAccount::find_by_id(&self.pool, tenant_id, id)
-            .await
-            .map_err(GovernanceError::Database)?
-            .ok_or(GovernanceError::NhiNotFound(id))?;
+        let existing = self.load_sa(tenant_id, id).await?;
 
         // Validate rotation interval if provided
         if let Some(interval) = request.rotation_interval_days {
@@ -304,8 +258,10 @@ impl NhiService {
             }
         }
 
-        // Validate new owner exists (if changing owner)
-        let new_owner = request.owner_id.unwrap_or(existing.owner_id);
+        let new_owner = request
+            .owner_id
+            .or(existing.owner_id)
+            .unwrap_or(existing.id);
         if let Some(owner_id) = request.owner_id {
             if !User::exists_in_tenant(&self.pool, tenant_id, owner_id)
                 .await
@@ -332,7 +288,7 @@ impl NhiService {
         // Check if new name already exists (if changing name)
         if let Some(ref new_name) = request.name {
             if *new_name != existing.name
-                && GovServiceAccount::name_exists(&self.pool, tenant_id, new_name)
+                && NhiIdentity::name_exists(&self.pool, tenant_id, new_name)
                     .await
                     .map_err(GovernanceError::Database)?
             {
@@ -340,22 +296,37 @@ impl NhiService {
             }
         }
 
-        let update = UpdateGovServiceAccount {
+        let identity_update = UpdateNhiIdentity {
             name: request.name.clone(),
-            purpose: request.purpose.clone(),
-            owner_id: request.owner_id,
-            status: None, // Status changes go through dedicated methods
-            expires_at: request.expires_at,
-            backup_owner_id: request.backup_owner_id,
-            rotation_interval_days: request.rotation_interval_days,
-            inactivity_threshold_days: request.inactivity_threshold_days,
-            ..Default::default()
+            description: request.purpose.clone(),
+            owner_id: request.owner_id.map(Some),
+            backup_owner_id: request.backup_owner_id.map(Some),
+            expires_at: request.expires_at.map(Some),
+            inactivity_threshold_days: request.inactivity_threshold_days.map(Some),
+            rotation_interval_days: request.rotation_interval_days.map(Some),
         };
 
-        let updated = GovServiceAccount::update(&self.pool, tenant_id, id, update)
+        NhiIdentity::update(&self.pool, tenant_id, id, identity_update)
             .await
             .map_err(GovernanceError::Database)?
             .ok_or(GovernanceError::NhiNotFound(id))?;
+
+        if request.purpose.is_some() {
+            NhiServiceAccountModel::update(
+                &self.pool,
+                tenant_id,
+                id,
+                UpdateNhiServiceAccount {
+                    purpose: request.purpose.clone(),
+                    environment: None,
+                },
+            )
+            .await
+            .map_err(GovernanceError::Database)?
+            .ok_or(GovernanceError::NhiNotFound(id))?;
+        }
+
+        let updated = self.load_sa(tenant_id, id).await?;
 
         // Record audit event
         let audit_event = CreateGovNhiAuditEvent {
@@ -395,11 +366,7 @@ impl NhiService {
 
     /// Delete an NHI.
     pub async fn delete(&self, tenant_id: Uuid, id: Uuid, actor_id: Uuid) -> Result<()> {
-        // Get existing NHI
-        let existing = GovServiceAccount::find_by_id(&self.pool, tenant_id, id)
-            .await
-            .map_err(GovernanceError::Database)?
-            .ok_or(GovernanceError::NhiNotFound(id))?;
+        let existing = self.load_sa(tenant_id, id).await?;
 
         // Record audit event before deletion
         let audit_event = CreateGovNhiAuditEvent {
@@ -418,7 +385,7 @@ impl NhiService {
             .await
             .map_err(GovernanceError::Database)?;
 
-        let deleted = GovServiceAccount::delete(&self.pool, tenant_id, id)
+        let deleted = NhiIdentity::delete(&self.pool, tenant_id, id)
             .await
             .map_err(GovernanceError::Database)?;
 
@@ -453,25 +420,24 @@ impl NhiService {
         reason: NhiSuspensionReason,
         notes: Option<String>,
     ) -> Result<NhiResponse> {
-        let existing = GovServiceAccount::find_by_id(&self.pool, tenant_id, id)
-            .await
-            .map_err(GovernanceError::Database)?
-            .ok_or(GovernanceError::NhiNotFound(id))?;
+        let existing = self.load_sa(tenant_id, id).await?;
 
-        if existing.status == ServiceAccountStatus::Suspended {
+        if existing.lifecycle_state == NhiLifecycleState::Suspended {
             return Err(GovernanceError::NhiAlreadySuspended(id));
         }
 
-        let update = UpdateGovServiceAccount {
-            status: Some(ServiceAccountStatus::Suspended),
-            suspension_reason: Some(reason),
-            ..Default::default()
-        };
+        NhiIdentity::update_lifecycle_state(
+            &self.pool,
+            tenant_id,
+            id,
+            NhiLifecycleState::Suspended,
+            Some(suspension_reason_str(reason).to_string()),
+        )
+        .await
+        .map_err(GovernanceError::Database)?
+        .ok_or(GovernanceError::NhiNotFound(id))?;
 
-        let updated = GovServiceAccount::update(&self.pool, tenant_id, id, update)
-            .await
-            .map_err(GovernanceError::Database)?
-            .ok_or(GovernanceError::NhiNotFound(id))?;
+        let updated = self.load_sa(tenant_id, id).await?;
 
         // Record audit event
         let audit_event = CreateGovNhiAuditEvent {
@@ -479,7 +445,7 @@ impl NhiService {
             event_type: NhiAuditEventType::Suspended,
             actor_id: Some(actor_id),
             changes: Some(serde_json::json!({
-                "previous_status": existing.status,
+                "previous_status": existing.lifecycle_state.as_str(),
             })),
             metadata: Some(serde_json::json!({
                 "reason": reason,
@@ -515,33 +481,31 @@ impl NhiService {
         actor_id: Uuid,
         notes: Option<String>,
     ) -> Result<NhiResponse> {
-        let existing = GovServiceAccount::find_by_id(&self.pool, tenant_id, id)
-            .await
-            .map_err(GovernanceError::Database)?
-            .ok_or(GovernanceError::NhiNotFound(id))?;
+        let existing = self.load_sa(tenant_id, id).await?;
 
-        if existing.status != ServiceAccountStatus::Suspended {
+        if existing.lifecycle_state != NhiLifecycleState::Suspended {
             return Err(GovernanceError::NhiNotSuspended(id));
         }
 
-        // Check if NHI can be reactivated (not expired)
-        if existing.is_expired() {
+        if existing.expires_at.is_some_and(|exp| exp <= Utc::now()) {
             return Err(GovernanceError::NhiCannotReactivate {
                 nhi_id: id,
                 reason: "NHI has expired".to_string(),
             });
         }
 
-        let update = UpdateGovServiceAccount {
-            status: Some(ServiceAccountStatus::Active),
-            suspension_reason: None,
-            ..Default::default()
-        };
+        NhiIdentity::update_lifecycle_state(
+            &self.pool,
+            tenant_id,
+            id,
+            NhiLifecycleState::Active,
+            None,
+        )
+        .await
+        .map_err(GovernanceError::Database)?
+        .ok_or(GovernanceError::NhiNotFound(id))?;
 
-        let updated = GovServiceAccount::update(&self.pool, tenant_id, id, update)
-            .await
-            .map_err(GovernanceError::Database)?
-            .ok_or(GovernanceError::NhiNotFound(id))?;
+        let updated = self.load_sa(tenant_id, id).await?;
 
         // Record audit event
         let audit_event = CreateGovNhiAuditEvent {
@@ -588,12 +552,9 @@ impl NhiService {
         new_owner_id: Uuid,
         notes: Option<String>,
     ) -> Result<NhiResponse> {
-        let existing = GovServiceAccount::find_by_id(&self.pool, tenant_id, id)
-            .await
-            .map_err(GovernanceError::Database)?
-            .ok_or(GovernanceError::NhiNotFound(id))?;
+        let existing = self.load_sa(tenant_id, id).await?;
 
-        if existing.owner_id == new_owner_id {
+        if existing.owner_id == Some(new_owner_id) {
             return Err(GovernanceError::NhiOwnershipTransferToSelf);
         }
 
@@ -605,15 +566,20 @@ impl NhiService {
             return Err(GovernanceError::NhiOwnerNotFound(new_owner_id));
         }
 
-        let update = UpdateGovServiceAccount {
-            owner_id: Some(new_owner_id),
-            ..Default::default()
-        };
+        NhiIdentity::update(
+            &self.pool,
+            tenant_id,
+            id,
+            UpdateNhiIdentity {
+                owner_id: Some(Some(new_owner_id)),
+                ..Default::default()
+            },
+        )
+        .await
+        .map_err(GovernanceError::Database)?
+        .ok_or(GovernanceError::NhiNotFound(id))?;
 
-        let updated = GovServiceAccount::update(&self.pool, tenant_id, id, update)
-            .await
-            .map_err(GovernanceError::Database)?
-            .ok_or(GovernanceError::NhiNotFound(id))?;
+        let updated = self.load_sa(tenant_id, id).await?;
 
         // Record audit event
         let audit_event = CreateGovNhiAuditEvent {
@@ -637,7 +603,7 @@ impl NhiService {
         tracing::info!(
             tenant_id = %tenant_id,
             nhi_id = %id,
-            previous_owner = %existing.owner_id,
+            previous_owner = ?existing.owner_id,
             new_owner = %new_owner_id,
             "NHI ownership transferred"
         );
@@ -647,7 +613,7 @@ impl NhiService {
         self.emit_ownership_transferred_event(
             tenant_id,
             &updated,
-            existing.owner_id,
+            existing.owner_id.unwrap_or(existing.id),
             new_owner_id,
             notes,
             actor_id,
@@ -669,10 +635,19 @@ impl NhiService {
         certified_by: Uuid,
         notes: Option<String>,
     ) -> Result<NhiResponse> {
-        let certified = GovServiceAccount::certify(&self.pool, tenant_id, id, certified_by)
-            .await
-            .map_err(GovernanceError::Database)?
-            .ok_or(GovernanceError::NhiNotFound(id))?;
+        let certified_ok = NhiIdentity::update_certification(
+            &self.pool,
+            tenant_id,
+            id,
+            certified_by,
+            Some(Utc::now() + chrono::Duration::days(365)),
+        )
+        .await
+        .map_err(GovernanceError::Database)?;
+        if !certified_ok {
+            return Err(GovernanceError::NhiNotFound(id));
+        }
+        let certified = self.load_sa(tenant_id, id).await?;
 
         // Record audit event
         let audit_event = CreateGovNhiAuditEvent {
@@ -706,34 +681,33 @@ impl NhiService {
 
     /// Get summary statistics for NHIs.
     pub async fn get_summary(&self, tenant_id: Uuid) -> Result<NhiSummary> {
-        // Get counts by status
-        let active = GovServiceAccount::count(
+        let active = NhiServiceAccountModel::count(
             &self.pool,
             tenant_id,
-            &ServiceAccountFilter {
-                status: Some(ServiceAccountStatus::Active),
+            &NhiServiceAccountFilter {
+                lifecycle_state: Some(NhiLifecycleState::Active),
                 ..Default::default()
             },
         )
         .await
         .map_err(GovernanceError::Database)?;
 
-        let expired = GovServiceAccount::count(
+        let expired = NhiServiceAccountModel::count(
             &self.pool,
             tenant_id,
-            &ServiceAccountFilter {
-                status: Some(ServiceAccountStatus::Expired),
+            &NhiServiceAccountFilter {
+                lifecycle_state: Some(NhiLifecycleState::Inactive),
                 ..Default::default()
             },
         )
         .await
         .map_err(GovernanceError::Database)?;
 
-        let suspended = GovServiceAccount::count(
+        let suspended = NhiServiceAccountModel::count(
             &self.pool,
             tenant_id,
-            &ServiceAccountFilter {
-                status: Some(ServiceAccountStatus::Suspended),
+            &NhiServiceAccountFilter {
+                lifecycle_state: Some(NhiLifecycleState::Suspended),
                 ..Default::default()
             },
         )
@@ -742,11 +716,10 @@ impl NhiService {
 
         let total = active + expired + suspended;
 
-        // Needs certification count
-        let needs_certification = GovServiceAccount::count(
+        let needs_certification = NhiServiceAccountModel::count(
             &self.pool,
             tenant_id,
-            &ServiceAccountFilter {
+            &NhiServiceAccountFilter {
                 needs_certification: Some(true),
                 ..Default::default()
             },
@@ -754,11 +727,10 @@ impl NhiService {
         .await
         .map_err(GovernanceError::Database)?;
 
-        // Needs rotation count
-        let needs_rotation = GovServiceAccount::count(
+        let needs_rotation = NhiServiceAccountModel::count(
             &self.pool,
             tenant_id,
-            &ServiceAccountFilter {
+            &NhiServiceAccountFilter {
                 needs_rotation: Some(true),
                 ..Default::default()
             },
@@ -766,11 +738,10 @@ impl NhiService {
         .await
         .map_err(GovernanceError::Database)?;
 
-        // Inactive count (using default 90 days threshold)
-        let inactive = GovServiceAccount::count(
+        let inactive = NhiServiceAccountModel::count(
             &self.pool,
             tenant_id,
-            &ServiceAccountFilter {
+            &NhiServiceAccountFilter {
                 inactive_days: Some(90),
                 ..Default::default()
             },
@@ -778,11 +749,10 @@ impl NhiService {
         .await
         .map_err(GovernanceError::Database)?;
 
-        // Expiring within 30 days
-        let expiring_soon = GovServiceAccount::count(
+        let expiring_soon = NhiServiceAccountModel::count(
             &self.pool,
             tenant_id,
-            &ServiceAccountFilter {
+            &NhiServiceAccountFilter {
                 expiring_within_days: Some(30),
                 ..Default::default()
             },
@@ -809,7 +779,7 @@ impl NhiService {
 
     /// Mark expired NHIs.
     pub async fn mark_expired(&self, tenant_id: Uuid) -> Result<u64> {
-        let count = GovServiceAccount::mark_expired(&self.pool, tenant_id)
+        let count = NhiIdentity::mark_expired(&self.pool, tenant_id)
             .await
             .map_err(GovernanceError::Database)?;
 
@@ -830,13 +800,13 @@ impl NhiService {
         tenant_id: Uuid,
         within_days: i32,
     ) -> Result<Vec<NhiResponse>> {
-        let filter = ServiceAccountFilter {
+        let filter = NhiServiceAccountFilter {
             expiring_within_days: Some(within_days),
-            status: Some(ServiceAccountStatus::Active),
+            lifecycle_state: Some(NhiLifecycleState::Active),
             ..Default::default()
         };
 
-        let accounts = GovServiceAccount::list(&self.pool, tenant_id, &filter, 1000, 0)
+        let accounts = NhiServiceAccountModel::list(&self.pool, tenant_id, &filter, 1000, 0)
             .await
             .map_err(GovernanceError::Database)?;
 
@@ -849,13 +819,13 @@ impl NhiService {
         tenant_id: Uuid,
         inactive_days: i32,
     ) -> Result<Vec<NhiResponse>> {
-        let filter = ServiceAccountFilter {
+        let filter = NhiServiceAccountFilter {
             inactive_days: Some(inactive_days),
-            status: Some(ServiceAccountStatus::Active),
+            lifecycle_state: Some(NhiLifecycleState::Active),
             ..Default::default()
         };
 
-        let accounts = GovServiceAccount::list(&self.pool, tenant_id, &filter, 1000, 0)
+        let accounts = NhiServiceAccountModel::list(&self.pool, tenant_id, &filter, 1000, 0)
             .await
             .map_err(GovernanceError::Database)?;
 
@@ -864,15 +834,12 @@ impl NhiService {
 
     /// Record usage activity for an NHI.
     pub async fn record_usage(&self, tenant_id: Uuid, id: Uuid) -> Result<()> {
-        let update = UpdateGovServiceAccount {
-            last_used_at: Some(Utc::now()),
-            ..Default::default()
-        };
-
-        GovServiceAccount::update(&self.pool, tenant_id, id, update)
+        let touched = NhiIdentity::update_last_activity(&self.pool, tenant_id, id)
             .await
-            .map_err(GovernanceError::Database)?
-            .ok_or(GovernanceError::NhiNotFound(id))?;
+            .map_err(GovernanceError::Database)?;
+        if !touched {
+            return Err(GovernanceError::NhiNotFound(id));
+        }
 
         Ok(())
     }
@@ -884,34 +851,36 @@ impl NhiService {
         id: Uuid,
         grace_period_ends_at: DateTime<Utc>,
     ) -> Result<NhiResponse> {
-        let existing = GovServiceAccount::find_by_id(&self.pool, tenant_id, id)
-            .await
-            .map_err(GovernanceError::Database)?
-            .ok_or(GovernanceError::NhiNotFound(id))?;
+        let existing = self.load_sa(tenant_id, id).await?;
 
-        // Don't start grace period if already in one
-        if existing.is_in_grace_period() {
+        if existing
+            .grace_period_ends_at
+            .is_some_and(|ends_at| ends_at > Utc::now())
+        {
             return Err(GovernanceError::NhiInGracePeriod(
-                existing.grace_period_ends_at.unwrap().to_rfc3339(),
+                existing
+                    .grace_period_ends_at
+                    .map(|t| t.to_rfc3339())
+                    .unwrap_or_else(|| "active".to_string()),
             ));
         }
 
-        // Update using raw SQL since we don't have a direct method for grace_period_ends_at
-        let updated = sqlx::query_as::<_, GovServiceAccount>(
+        let result = sqlx::query(
             r"
-            UPDATE gov_service_accounts
+            UPDATE nhi_identities
             SET grace_period_ends_at = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            RETURNING *
             ",
         )
         .bind(id)
         .bind(tenant_id)
         .bind(grace_period_ends_at)
-        .fetch_optional(&self.pool)
+        .execute(&self.pool)
         .await
-        .map_err(GovernanceError::Database)?
-        .ok_or(GovernanceError::NhiNotFound(id))?;
+        .map_err(GovernanceError::Database)?;
+        if result.rows_affected() == 0 {
+            return Err(GovernanceError::NhiNotFound(id));
+        }
 
         tracing::info!(
             tenant_id = %tenant_id,
@@ -920,146 +889,7 @@ impl NhiService {
             "NHI grace period started"
         );
 
-        Ok(NhiResponse::from(updated))
-    }
-
-    // =========================================================================
-    // F108: US7 - Service Account Anomaly Detection
-    // =========================================================================
-
-    /// Set anomaly detection baseline for an NHI (F108 US7).
-    ///
-    /// The baseline contains statistical metrics about normal behavior patterns
-    /// that will be used for anomaly detection (e.g., usage frequency, access times).
-    pub async fn set_anomaly_baseline(
-        &self,
-        tenant_id: Uuid,
-        id: Uuid,
-        baseline: serde_json::Value,
-    ) -> Result<NhiResponse> {
-        let _ = GovServiceAccount::find_by_id(&self.pool, tenant_id, id)
-            .await
-            .map_err(GovernanceError::Database)?
-            .ok_or(GovernanceError::NhiNotFound(id))?;
-
-        // Update baseline using raw SQL since UpdateGovServiceAccount doesn't have this field yet
-        let updated = sqlx::query_as::<_, GovServiceAccount>(
-            r"
-            UPDATE gov_service_accounts
-            SET anomaly_baseline = $3, updated_at = NOW()
-            WHERE id = $1 AND tenant_id = $2
-            RETURNING *
-            ",
-        )
-        .bind(id)
-        .bind(tenant_id)
-        .bind(&baseline)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(GovernanceError::Database)?
-        .ok_or(GovernanceError::NhiNotFound(id))?;
-
-        tracing::info!(
-            tenant_id = %tenant_id,
-            nhi_id = %id,
-            "NHI anomaly baseline updated"
-        );
-
-        Ok(NhiResponse::from(updated))
-    }
-
-    /// Set anomaly threshold for an NHI (F108 US7).
-    ///
-    /// The threshold is the z-score value above which behavior is considered anomalous.
-    /// Default is 2.5 (approximately 99% confidence).
-    pub async fn set_anomaly_threshold(
-        &self,
-        tenant_id: Uuid,
-        id: Uuid,
-        threshold: rust_decimal::Decimal,
-    ) -> Result<NhiResponse> {
-        let _ = GovServiceAccount::find_by_id(&self.pool, tenant_id, id)
-            .await
-            .map_err(GovernanceError::Database)?
-            .ok_or(GovernanceError::NhiNotFound(id))?;
-
-        let updated = sqlx::query_as::<_, GovServiceAccount>(
-            r"
-            UPDATE gov_service_accounts
-            SET anomaly_threshold = $3, updated_at = NOW()
-            WHERE id = $1 AND tenant_id = $2
-            RETURNING *
-            ",
-        )
-        .bind(id)
-        .bind(tenant_id)
-        .bind(threshold)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(GovernanceError::Database)?
-        .ok_or(GovernanceError::NhiNotFound(id))?;
-
-        tracing::info!(
-            tenant_id = %tenant_id,
-            nhi_id = %id,
-            threshold = %threshold,
-            "NHI anomaly threshold updated"
-        );
-
-        Ok(NhiResponse::from(updated))
-    }
-
-    /// Record anomaly check timestamp for an NHI (F108 US7).
-    ///
-    /// Called after running anomaly detection to track when the check was performed.
-    pub async fn record_anomaly_check(&self, tenant_id: Uuid, id: Uuid) -> Result<()> {
-        sqlx::query(
-            r"
-            UPDATE gov_service_accounts
-            SET last_anomaly_check_at = NOW(), updated_at = NOW()
-            WHERE id = $1 AND tenant_id = $2
-            ",
-        )
-        .bind(id)
-        .bind(tenant_id)
-        .execute(&self.pool)
-        .await
-        .map_err(GovernanceError::Database)?;
-
-        Ok(())
-    }
-
-    /// Get NHIs that need anomaly detection check (F108 US7).
-    ///
-    /// Returns NHIs where:
-    /// - `anomaly_threshold` is configured
-    /// - `last_anomaly_check_at` is NULL or older than the specified interval
-    pub async fn get_needing_anomaly_check(
-        &self,
-        tenant_id: Uuid,
-        check_interval_hours: i64,
-    ) -> Result<Vec<NhiResponse>> {
-        let cutoff = Utc::now() - chrono::Duration::hours(check_interval_hours);
-
-        let accounts = sqlx::query_as::<_, GovServiceAccount>(
-            r"
-            SELECT * FROM gov_service_accounts
-            WHERE tenant_id = $1
-              AND deleted_at IS NULL
-              AND status = 'active'
-              AND anomaly_threshold IS NOT NULL
-              AND (last_anomaly_check_at IS NULL OR last_anomaly_check_at < $2)
-            ORDER BY last_anomaly_check_at ASC NULLS FIRST
-            LIMIT 100
-            ",
-        )
-        .bind(tenant_id)
-        .bind(cutoff)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(GovernanceError::Database)?;
-
-        Ok(accounts.into_iter().map(NhiResponse::from).collect())
+        Ok(NhiResponse::from(self.load_sa(tenant_id, id).await?))
     }
 
     // =========================================================================
@@ -1070,7 +900,7 @@ impl NhiService {
     async fn emit_created_event(
         &self,
         tenant_id: Uuid,
-        account: &GovServiceAccount,
+        account: &NhiServiceAccountWithIdentity,
         created_by: Uuid,
     ) {
         if let Some(ref producer) = self.event_producer {
@@ -1079,7 +909,7 @@ impl NhiService {
                 tenant_id,
                 name: account.name.clone(),
                 purpose: Some(account.purpose.clone()),
-                owner_id: account.owner_id,
+                owner_id: account.owner_id.unwrap_or(account.id),
                 backup_owner_id: account.backup_owner_id,
                 expires_at: account.expires_at,
                 created_by,
@@ -1099,7 +929,7 @@ impl NhiService {
     async fn emit_updated_event(
         &self,
         tenant_id: Uuid,
-        account: &GovServiceAccount,
+        account: &NhiServiceAccountWithIdentity,
         updated_by: Uuid,
         request: &UpdateNhiRequest,
     ) {
@@ -1178,7 +1008,7 @@ impl NhiService {
     async fn emit_suspended_event(
         &self,
         tenant_id: Uuid,
-        account: &GovServiceAccount,
+        account: &NhiServiceAccountWithIdentity,
         reason: NhiSuspensionReason,
         details: Option<String>,
         suspended_by: Option<Uuid>,
@@ -1220,7 +1050,7 @@ impl NhiService {
     async fn emit_reactivated_event(
         &self,
         tenant_id: Uuid,
-        account: &GovServiceAccount,
+        account: &NhiServiceAccountWithIdentity,
         reason: Option<String>,
         reactivated_by: Uuid,
     ) {
@@ -1247,7 +1077,7 @@ impl NhiService {
     async fn emit_ownership_transferred_event(
         &self,
         tenant_id: Uuid,
-        account: &GovServiceAccount,
+        account: &NhiServiceAccountWithIdentity,
         from_owner_id: Uuid,
         to_owner_id: Uuid,
         reason: Option<String>,
@@ -1314,13 +1144,14 @@ impl NhiService {
     /// owner reassignment or suspension.
     pub async fn detect_orphaned(&self, tenant_id: Uuid) -> Result<Vec<OrphanedNhiInfo>> {
         // Find all active NHIs where owner is inactive
-        let orphaned = sqlx::query_as::<_, (Uuid, String, Uuid, Option<Uuid>)>(
+        let orphaned = sqlx::query_as::<_, (Uuid, String, Option<Uuid>, Option<Uuid>)>(
             r"
-            SELECT sa.id, sa.name, sa.owner_id, sa.backup_owner_id
-            FROM gov_service_accounts sa
-            LEFT JOIN users u ON sa.owner_id = u.id AND u.tenant_id = sa.tenant_id
-            WHERE sa.tenant_id = $1
-              AND sa.status = 'active'
+            SELECT i.id, i.name, i.owner_id, i.backup_owner_id
+            FROM nhi_identities i
+            LEFT JOIN users u ON i.owner_id = u.id AND u.tenant_id = i.tenant_id
+            WHERE i.tenant_id = $1
+              AND i.lifecycle_state = 'active'
+              AND i.nhi_type = 'service_account'
               AND (u.id IS NULL OR u.is_active = false)
             ",
         )
@@ -1331,6 +1162,9 @@ impl NhiService {
 
         let mut results = Vec::new();
         for (nhi_id, name, owner_id, backup_owner_id) in orphaned {
+            let Some(owner_id) = owner_id else {
+                continue;
+            };
             let has_backup = backup_owner_id.is_some();
 
             // If backup owner exists, check if they're still active
@@ -1414,6 +1248,23 @@ impl NhiService {
     }
 }
 
+fn list_filter(query: &ListNhisQuery) -> NhiServiceAccountFilter {
+    NhiServiceAccountFilter {
+        environment: None,
+        lifecycle_state: query.status.map(sa_status_to_lifecycle),
+        owner_id: query.owner_id,
+        ids: None,
+        expiring_within_days: query.expiring_within_days,
+        needs_certification: query.needs_certification,
+        needs_rotation: query.needs_rotation,
+        inactive_days: if query.inactive_only == Some(true) {
+            Some(90)
+        } else {
+            None
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1483,15 +1334,26 @@ mod tests {
     fn list_nhis_passes_rotation_and_inactivity_filters() {
         let src = include_str!("nhi_service.rs");
         let production = src.split("mod tests").next().expect("production source");
-        let list = production
-            .split("pub async fn list(")
-            .nth(1)
-            .and_then(|s| s.split("    pub async fn ").next())
-            .expect("list");
         assert!(
-            list.contains("needs_rotation: query.needs_rotation")
-                && list.contains("inactive_days: if query.inactive_only == Some(true)"),
+            production.contains("needs_rotation: query.needs_rotation")
+                && production.contains("inactive_days: if query.inactive_only == Some(true)"),
             "GET /governance/nhis must pass advertised needs_rotation and inactive_only filters"
+        );
+    }
+
+    #[test]
+    fn nhi_crud_queries_unified_nhi_identities() {
+        let src = include_str!("nhi_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("NhiServiceAccountModel::list")
+                && production.contains("NhiServiceAccountModel::find_by_nhi_id")
+                && production.contains("NhiIdentity::update")
+                && production.contains("NhiIdentity::delete")
+                && production.contains("FROM nhi_identities")
+                && !production.contains("GovServiceAccount")
+                && !production.contains("gov_service_accounts"),
+            "GET/PUT/DELETE /governance/nhis must use nhi_identities, not the dropped gov_service_accounts table"
         );
     }
 

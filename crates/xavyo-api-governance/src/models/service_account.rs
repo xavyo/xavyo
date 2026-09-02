@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 use validator::Validate;
-use xavyo_db::{GovServiceAccount, ServiceAccountStatus};
+use xavyo_db::{NhiServiceAccountWithIdentity, ServiceAccountStatus};
+
+use super::nhi::{lifecycle_to_sa_status, linked_user_id};
 
 /// Service account response.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -54,22 +56,25 @@ pub struct ServiceAccountResponse {
     pub updated_at: DateTime<Utc>,
 }
 
-impl From<GovServiceAccount> for ServiceAccountResponse {
-    fn from(account: GovServiceAccount) -> Self {
-        let days_until_expiry = account.days_until_expiry();
-        let needs_certification = account.needs_certification();
+impl From<NhiServiceAccountWithIdentity> for ServiceAccountResponse {
+    fn from(account: NhiServiceAccountWithIdentity) -> Self {
+        let days_until_expiry = account.expires_at.map(|exp| (exp - Utc::now()).num_days());
+        let needs_certification = match account.last_certified_at {
+            Some(certified_at) => Utc::now().signed_duration_since(certified_at).num_days() > 365,
+            None => true,
+        };
 
         Self {
             id: account.id,
-            user_id: account.user_id,
+            user_id: linked_user_id(account.owner_id, account.id),
             name: account.name,
             purpose: account.purpose,
-            owner_id: account.owner_id,
-            status: account.status,
+            owner_id: linked_user_id(account.owner_id, account.id),
+            status: lifecycle_to_sa_status(account.lifecycle_state),
             expires_at: account.expires_at,
             days_until_expiry,
             last_certified_at: account.last_certified_at,
-            certified_by: account.certified_by,
+            certified_by: account.last_certified_by,
             needs_certification,
             created_at: account.created_at,
             updated_at: account.updated_at,

@@ -71,6 +71,64 @@ pub struct NhiServiceAccountFilter {
     pub owner_id: Option<Uuid>,
     /// When set, restrict to these identity IDs (permission-scoped lists).
     pub ids: Option<Vec<Uuid>>,
+    /// Filter NHIs expiring within this many days (still active, not yet expired).
+    pub expiring_within_days: Option<i32>,
+    /// Filter NHIs whose certification is missing or older than 365 days.
+    pub needs_certification: Option<bool>,
+    /// Filter NHIs whose rotation interval has elapsed.
+    pub needs_rotation: Option<bool>,
+    /// Filter NHIs inactive for at least this many days (fallback threshold).
+    pub inactive_days: Option<i32>,
+}
+
+fn append_sa_filter_sql(
+    query: &mut String,
+    filter: &NhiServiceAccountFilter,
+    mut param_idx: usize,
+) -> usize {
+    if filter.environment.is_some() {
+        query.push_str(&format!(" AND s.environment = ${param_idx}"));
+        param_idx += 1;
+    }
+    if filter.lifecycle_state.is_some() {
+        query.push_str(&format!(" AND i.lifecycle_state = ${param_idx}"));
+        param_idx += 1;
+    }
+    if filter.owner_id.is_some() {
+        query.push_str(&format!(" AND i.owner_id = ${param_idx}"));
+        param_idx += 1;
+    }
+    if filter.ids.is_some() {
+        query.push_str(&format!(" AND i.id = ANY(${param_idx})"));
+        param_idx += 1;
+    }
+    if filter.expiring_within_days.is_some() {
+        query.push_str(&format!(
+            " AND i.expires_at IS NOT NULL AND i.expires_at <= NOW() + (${param_idx} || ' days')::interval AND i.expires_at > NOW()"
+        ));
+        param_idx += 1;
+    }
+    if filter.needs_certification == Some(true) {
+        query.push_str(
+            " AND (i.last_certified_at IS NULL OR i.last_certified_at < NOW() - INTERVAL '365 days')",
+        );
+    }
+    if filter.needs_rotation == Some(true) {
+        query.push_str(
+            " AND (i.last_rotation_at IS NULL OR i.last_rotation_at <= NOW() - (COALESCE(i.rotation_interval_days, 90) || ' days')::interval)",
+        );
+    } else if filter.needs_rotation == Some(false) {
+        query.push_str(
+            " AND i.last_rotation_at IS NOT NULL AND i.last_rotation_at > NOW() - (COALESCE(i.rotation_interval_days, 90) || ' days')::interval",
+        );
+    }
+    if filter.inactive_days.is_some() {
+        query.push_str(&format!(
+            " AND (i.last_activity_at IS NULL OR i.last_activity_at <= NOW() - (COALESCE(i.inactivity_threshold_days, ${param_idx}) || ' days')::interval)"
+        ));
+        param_idx += 1;
+    }
+    param_idx
 }
 
 const SA_JOIN_SELECT: &str = r"
@@ -163,28 +221,11 @@ impl NhiServiceAccount {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<NhiServiceAccountWithIdentity>, sqlx::Error> {
-        let limit = limit.min(100);
+        let limit = limit.min(1000);
         let offset = offset.max(0);
 
         let mut query = format!("{SA_JOIN_SELECT} WHERE i.tenant_id = $1");
-        let mut param_idx = 2;
-
-        if filter.environment.is_some() {
-            query.push_str(&format!(" AND s.environment = ${param_idx}"));
-            param_idx += 1;
-        }
-        if filter.lifecycle_state.is_some() {
-            query.push_str(&format!(" AND i.lifecycle_state = ${param_idx}"));
-            param_idx += 1;
-        }
-        if filter.owner_id.is_some() {
-            query.push_str(&format!(" AND i.owner_id = ${param_idx}"));
-            param_idx += 1;
-        }
-        if filter.ids.is_some() {
-            query.push_str(&format!(" AND i.id = ANY(${param_idx})"));
-            param_idx += 1;
-        }
+        let param_idx = append_sa_filter_sql(&mut query, filter, 2);
 
         query.push_str(&format!(
             " ORDER BY i.name ASC LIMIT ${} OFFSET ${}",
@@ -193,7 +234,6 @@ impl NhiServiceAccount {
         ));
 
         let mut q = sqlx::query_as::<_, NhiServiceAccountWithIdentity>(&query).bind(tenant_id);
-
         if let Some(ref environment) = filter.environment {
             q = q.bind(environment);
         }
@@ -206,8 +246,50 @@ impl NhiServiceAccount {
         if let Some(ref ids) = filter.ids {
             q = q.bind(ids);
         }
-
+        if let Some(days) = filter.expiring_within_days {
+            q = q.bind(days);
+        }
+        if let Some(inactive_days) = filter.inactive_days {
+            q = q.bind(inactive_days);
+        }
         q.bind(limit).bind(offset).fetch_all(pool).await
+    }
+
+    /// Count service accounts for a tenant with optional filtering.
+    pub async fn count(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        filter: &NhiServiceAccountFilter,
+    ) -> Result<i64, sqlx::Error> {
+        let mut query = String::from(
+            r"
+            SELECT COUNT(*) FROM nhi_identities i
+            INNER JOIN nhi_service_accounts s ON s.nhi_id = i.id
+            WHERE i.tenant_id = $1
+            ",
+        );
+        let _ = append_sa_filter_sql(&mut query, filter, 2);
+
+        let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
+        if let Some(ref environment) = filter.environment {
+            q = q.bind(environment);
+        }
+        if let Some(lifecycle_state) = filter.lifecycle_state {
+            q = q.bind(lifecycle_state);
+        }
+        if let Some(owner_id) = filter.owner_id {
+            q = q.bind(owner_id);
+        }
+        if let Some(ref ids) = filter.ids {
+            q = q.bind(ids);
+        }
+        if let Some(days) = filter.expiring_within_days {
+            q = q.bind(days);
+        }
+        if let Some(inactive_days) = filter.inactive_days {
+            q = q.bind(inactive_days);
+        }
+        q.fetch_one(pool).await
     }
 }
 

@@ -19,7 +19,7 @@ use crate::models::{NhiRiskScoreListResponse, NhiRiskScoreResponse, RiskLevelSum
 use xavyo_events::{events::nhi::NhiRiskScoreChanged, EventProducer};
 
 use xavyo_db::{
-    GovNhiRiskScore, GovServiceAccount, NhiRiskScoreFilter, RiskLevel, UpsertGovNhiRiskScore,
+    GovNhiRiskScore, NhiIdentity, NhiRiskScoreFilter, RiskLevel, UpsertGovNhiRiskScore,
 };
 
 type Result<T> = std::result::Result<T, GovernanceError>;
@@ -102,8 +102,7 @@ impl NhiRiskService {
         tenant_id: Uuid,
         nhi_id: Uuid,
     ) -> Result<NhiRiskScoreResponse> {
-        // Validate NHI exists
-        let nhi = GovServiceAccount::find_by_id(&self.pool, tenant_id, nhi_id)
+        let nhi = NhiIdentity::find_by_id(&self.pool, tenant_id, nhi_id)
             .await
             .map_err(GovernanceError::Database)?
             .ok_or(GovernanceError::NhiNotFound(nhi_id))?;
@@ -173,12 +172,11 @@ impl NhiRiskService {
     }
 
     /// Calculate staleness factor (0-50 points).
-    fn calculate_staleness_factor(&self, nhi: &GovServiceAccount) -> (i32, serde_json::Value) {
+    fn calculate_staleness_factor(&self, nhi: &NhiIdentity) -> (i32, serde_json::Value) {
         let now = Utc::now();
 
-        // Calculate days since last use (or since creation if never used)
         let days_inactive = nhi
-            .last_used_at
+            .last_activity_at
             .map_or((now - nhi.created_at).num_days(), |last| {
                 (now - last).num_days()
             }) as i32;
@@ -192,7 +190,7 @@ impl NhiRiskService {
 
         let breakdown = json!({
             "days_inactive": days_inactive,
-            "last_used_at": nhi.last_used_at,
+            "last_used_at": nhi.last_activity_at,
             "created_at": nhi.created_at.to_rfc3339(),
             "points": factor,
             "max_points": self.config.staleness_max_points,
@@ -460,5 +458,17 @@ mod tests {
         assert_eq!(GovNhiRiskScore::level_from_score(75), RiskLevel::High);
         assert_eq!(GovNhiRiskScore::level_from_score(76), RiskLevel::Critical);
         assert_eq!(GovNhiRiskScore::level_from_score(100), RiskLevel::Critical);
+    }
+
+    #[test]
+    fn risk_lookup_uses_unified_nhi_identities() {
+        let src = include_str!("nhi_risk_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("NhiIdentity::find_by_id")
+                && production.contains("last_activity_at")
+                && !production.contains("GovServiceAccount"),
+            "POST /governance/nhis/{{id}}/risk/calculate must look up nhi_identities, not the dropped gov_service_accounts table"
+        );
     }
 }
