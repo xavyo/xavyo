@@ -69,6 +69,8 @@ pub async fn list_mining_jobs(
         total,
         page,
         page_size: limit,
+        limit,
+        offset,
     }))
 }
 
@@ -258,6 +260,8 @@ pub async fn list_candidates(
         total,
         page,
         page_size: limit,
+        limit,
+        offset,
     }))
 }
 
@@ -422,6 +426,8 @@ pub async fn list_access_patterns(
         total,
         page,
         page_size: limit,
+        limit,
+        offset,
     }))
 }
 
@@ -513,6 +519,8 @@ pub async fn list_excessive_privileges(
         total,
         page,
         page_size: limit,
+        limit,
+        offset,
     }))
 }
 
@@ -646,6 +654,8 @@ pub async fn list_consolidation_suggestions(
         total,
         page,
         page_size: limit,
+        limit,
+        offset,
     }))
 }
 
@@ -773,6 +783,8 @@ pub async fn list_simulations(
         total,
         page,
         page_size: limit,
+        limit,
+        offset,
     }))
 }
 
@@ -1010,6 +1022,8 @@ pub async fn list_metrics(
         total,
         page,
         page_size: limit,
+        limit,
+        offset,
     }))
 }
 
@@ -1103,6 +1117,8 @@ fn role_metrics_list(items: Vec<RoleMetricsResponse>) -> RoleMetricsListResponse
         total,
         page: 0,
         page_size: total,
+        limit: total,
+        offset: 0,
     }
 }
 
@@ -1123,12 +1139,31 @@ mod tests {
         let response = role_metrics_list(vec![]);
         assert_eq!(response.total, 0);
         assert_eq!(response.page_size, 0);
+        assert_eq!(response.limit, 0);
+        assert_eq!(response.offset, 0);
         let src = include_str!("role_mining.rs");
         let production = src.split("mod tests").next().expect("production source");
         assert!(
             production.contains("items.len() as i64")
                 && !production.contains("role_ids.len() as i64"),
             "metrics list total must be the returned item count, not the requested role_ids length"
+        );
+    }
+
+    #[test]
+    fn role_mining_lists_return_limit_offset_aliases() {
+        let src = include_str!("role_mining.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("page_size: limit,\n        limit,\n        offset,"),
+            "role-mining list DTOs must return advertised BFF limit/offset"
+        );
+        let lists = production
+            .matches("page_size: limit,\n        limit,\n        offset,")
+            .count();
+        assert!(
+            lists >= 7,
+            "expected all paginated role-mining lists to echo limit/offset, found {lists}"
         );
     }
 }

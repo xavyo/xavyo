@@ -286,6 +286,12 @@ pub struct BirthrightPolicyListResponse {
 
     /// Page size.
     pub page_size: i64,
+
+    /// Advertised BFF alias of `page_size`.
+    pub limit: i64,
+
+    /// Advertised BFF query offset echoed on the list.
+    pub offset: i64,
 }
 
 /// Result of policy simulation.
@@ -541,5 +547,20 @@ mod tests {
         };
         let err = super::PolicyConditionResponse::try_from(condition).expect_err("fail closed");
         assert!(err.to_string().contains("gte"));
+    }
+
+    #[test]
+    fn birthright_policy_list_serializes_limit_offset_aliases() {
+        let json = serde_json::to_string(&super::BirthrightPolicyListResponse {
+            items: vec![],
+            total: 0,
+            page: 1,
+            page_size: 50,
+            limit: 50,
+            offset: 0,
+        })
+        .expect("serialize");
+        assert!(json.contains("\"limit\":50"));
+        assert!(json.contains("\"offset\":0"));
     }
 }

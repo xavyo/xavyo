@@ -60,6 +60,8 @@ pub async fn list_policies(
         total,
         page,
         page_size: limit,
+        limit,
+        offset,
     }))
 }
 
@@ -413,4 +415,17 @@ pub async fn analyze_policy_impact(
         .await?;
 
     Ok(Json(result))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn birthright_policy_list_returns_limit_offset_aliases() {
+        let src = include_str!("birthright_policies.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("page_size: limit,\n        limit,\n        offset,"),
+            "GET /governance/birthright-policies must return advertised BFF limit/offset"
+        );
+    }
 }

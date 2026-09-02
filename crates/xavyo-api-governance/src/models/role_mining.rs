@@ -99,6 +99,10 @@ pub struct MiningJobListResponse {
     pub total: i64,
     pub page: i64,
     pub page_size: i64,
+    /// Advertised BFF alias of `page_size`.
+    pub limit: i64,
+    /// Advertised BFF query offset echoed on the list.
+    pub offset: i64,
 }
 
 // ============================================================================
@@ -154,6 +158,10 @@ pub struct RoleCandidateListResponse {
     pub total: i64,
     pub page: i64,
     pub page_size: i64,
+    /// Advertised BFF alias of `page_size`.
+    pub limit: i64,
+    /// Advertised BFF query offset echoed on the list.
+    pub offset: i64,
 }
 
 // ============================================================================
@@ -189,6 +197,10 @@ pub struct AccessPatternListResponse {
     pub total: i64,
     pub page: i64,
     pub page_size: i64,
+    /// Advertised BFF alias of `page_size`.
+    pub limit: i64,
+    /// Advertised BFF query offset echoed on the list.
+    pub offset: i64,
 }
 
 // ============================================================================
@@ -247,6 +259,10 @@ pub struct ExcessivePrivilegeListResponse {
     pub total: i64,
     pub page: i64,
     pub page_size: i64,
+    /// Advertised BFF alias of `page_size`.
+    pub limit: i64,
+    /// Advertised BFF query offset echoed on the list.
+    pub offset: i64,
 }
 
 // ============================================================================
@@ -294,6 +310,10 @@ pub struct ConsolidationSuggestionListResponse {
     pub total: i64,
     pub page: i64,
     pub page_size: i64,
+    /// Advertised BFF alias of `page_size`.
+    pub limit: i64,
+    /// Advertised BFF query offset echoed on the list.
+    pub offset: i64,
 }
 
 // ============================================================================
@@ -348,6 +368,10 @@ pub struct SimulationListResponse {
     pub total: i64,
     pub page: i64,
     pub page_size: i64,
+    /// Advertised BFF alias of `page_size`.
+    pub limit: i64,
+    /// Advertised BFF query offset echoed on the list.
+    pub offset: i64,
 }
 
 // ============================================================================
@@ -396,6 +420,10 @@ pub struct RoleMetricsListResponse {
     pub total: i64,
     pub page: i64,
     pub page_size: i64,
+    /// Advertised BFF alias of `page_size`.
+    pub limit: i64,
+    /// Advertised BFF query offset echoed on the list.
+    pub offset: i64,
 }
 
 // ============================================================================
@@ -588,5 +616,21 @@ mod tests {
                 && !production.contains("let changes = s.parse_changes();"),
             "role simulation and metrics GET must fail closed on JSON parse"
         );
+    }
+
+    #[test]
+    fn role_mining_lists_serialize_limit_offset_aliases() {
+        let json = serde_json::to_string(&super::MiningJobListResponse {
+            items: vec![],
+            total: 0,
+            page: 1,
+            page_size: 20,
+            limit: 20,
+            offset: 40,
+        })
+        .expect("serialize");
+        assert!(json.contains("\"limit\":20"));
+        assert!(json.contains("\"offset\":40"));
+        assert!(json.contains("\"page_size\":20"));
     }
 }
