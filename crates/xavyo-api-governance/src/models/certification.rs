@@ -206,8 +206,41 @@ pub struct CampaignWithProgressResponse {
     #[serde(flatten)]
     pub campaign: CampaignResponse,
 
-    /// Progress summary.
+    /// Nested progress summary (legacy).
     pub progress: CampaignProgressResponse,
+
+    /// Advertised BFF flat alias of `progress.total_items`.
+    pub total_items: i64,
+
+    /// Advertised BFF flat alias of `progress.pending_items`.
+    pub pending_items: i64,
+
+    /// Advertised BFF flat alias of `progress.approved_items`.
+    pub approved_items: i64,
+
+    /// Advertised BFF flat alias of `progress.revoked_items`.
+    pub revoked_items: i64,
+
+    /// Advertised BFF flat alias of `progress.completion_percentage`.
+    pub completion_percentage: f64,
+}
+
+impl CampaignWithProgressResponse {
+    /// Flatten progress fields onto the campaign GET/launch payload.
+    pub fn from_campaign_and_progress(
+        campaign: CampaignResponse,
+        progress: CampaignProgressResponse,
+    ) -> Self {
+        Self {
+            total_items: progress.total_items,
+            pending_items: progress.pending_items,
+            approved_items: progress.approved_items,
+            revoked_items: progress.revoked_items,
+            completion_percentage: progress.completion_percentage,
+            campaign,
+            progress,
+        }
+    }
 }
 
 /// Campaign progress summary.
@@ -741,5 +774,49 @@ mod tests {
         let item_json = serde_json::to_string(&items).expect("items");
         assert!(item_json.contains("\"limit\":25"));
         assert!(item_json.contains("\"offset\":25"));
+    }
+
+    #[test]
+    fn get_campaign_flattens_progress_fields() {
+        let progress = CampaignProgressResponse {
+            total_items: 10,
+            completed_items: 6,
+            pending_items: 4,
+            approved_count: 5,
+            approved_items: 5,
+            revoked_count: 1,
+            revoked_items: 1,
+            skipped_count: 0,
+            completion_percentage: 60.0,
+            by_reviewer: None,
+        };
+        let campaign = CampaignResponse {
+            id: Uuid::nil(),
+            tenant_id: Uuid::nil(),
+            name: "Q1 recert".into(),
+            description: None,
+            scope_type: CertScopeType::AllUsers,
+            scope_config: None,
+            reviewer_type: CertReviewerType::UserManager,
+            specific_reviewers: vec![],
+            status: CertCampaignStatus::Active,
+            deadline: Utc::now(),
+            launched_at: None,
+            completed_at: None,
+            created_by: Uuid::nil(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let json = serde_json::to_string(
+            &CampaignWithProgressResponse::from_campaign_and_progress(campaign, progress),
+        )
+        .expect("serialize");
+        assert!(json.contains("\"total_items\":10"));
+        assert!(json.contains("\"pending_items\":4"));
+        assert!(json.contains("\"approved_items\":5"));
+        assert!(json.contains("\"revoked_items\":1"));
+        assert!(json.contains("\"completion_percentage\":60"));
+        assert!(json.contains("\"progress\""));
+        assert!(json.contains("\"name\":\"Q1 recert\""));
     }
 }

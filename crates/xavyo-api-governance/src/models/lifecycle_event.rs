@@ -235,6 +235,12 @@ pub struct LifecycleEventListResponse {
 
     /// Page size.
     pub page_size: i64,
+
+    /// Advertised BFF alias of `page_size`.
+    pub limit: i64,
+
+    /// Advertised BFF query offset echoed on the list.
+    pub offset: i64,
 }
 
 // ============================================================================
@@ -578,5 +584,20 @@ mod tests {
                 && !production.contains("let content = snapshot.parse_assignments();"),
             "access snapshot GET must fail closed on JSON parse"
         );
+    }
+
+    #[test]
+    fn lifecycle_event_list_serializes_limit_offset_aliases() {
+        let json = serde_json::to_string(&super::LifecycleEventListResponse {
+            items: vec![],
+            total: 3,
+            page: 2,
+            page_size: 10,
+            limit: 10,
+            offset: 10,
+        })
+        .expect("serialize");
+        assert!(json.contains("\"limit\":10"));
+        assert!(json.contains("\"offset\":10"));
     }
 }

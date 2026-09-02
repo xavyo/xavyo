@@ -160,10 +160,12 @@ pub async fn get_campaign(
         .get_progress(tenant_id, id)
         .await?;
 
-    Ok(Json(CampaignWithProgressResponse {
-        campaign: campaign.try_into()?,
-        progress: progress.into(),
-    }))
+    Ok(Json(
+        CampaignWithProgressResponse::from_campaign_and_progress(
+            campaign.try_into()?,
+            progress.into(),
+        ),
+    ))
 }
 
 /// Update a certification campaign (only allowed in draft status).
@@ -292,10 +294,12 @@ pub async fn launch_campaign(
         .get_progress(tenant_id, id)
         .await?;
 
-    Ok(Json(CampaignWithProgressResponse {
-        campaign: campaign.try_into()?,
-        progress: progress.into(),
-    }))
+    Ok(Json(
+        CampaignWithProgressResponse::from_campaign_and_progress(
+            campaign.try_into()?,
+            progress.into(),
+        ),
+    ))
 }
 
 /// Cancel a certification campaign.
@@ -402,6 +406,20 @@ mod tests {
         assert!(
             production.contains("page_size: limit,\n        limit,\n        offset,"),
             "GET /governance/certification-campaigns must return advertised BFF limit/offset"
+        );
+    }
+
+    #[test]
+    fn get_and_launch_campaign_flatten_progress() {
+        let src = include_str!("certification_campaigns.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("CampaignWithProgressResponse::from_campaign_and_progress"),
+            "GET/launch campaign must flatten advertised BFF progress fields"
+        );
+        assert!(
+            !production.contains("progress: progress.into(),"),
+            "must not return nested-only progress on GET/launch campaign"
         );
     }
 }

@@ -64,6 +64,8 @@ pub async fn list_events(
         total,
         page,
         page_size: limit,
+        limit,
+        offset,
     }))
 }
 
@@ -273,6 +275,16 @@ mod tests {
         assert!(
             !get_event.contains("get_event_actions(id)"),
             "must not list event actions by id alone"
+        );
+    }
+
+    #[test]
+    fn lifecycle_event_list_returns_limit_offset_aliases() {
+        let src = include_str!("lifecycle_events.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("page_size: limit,\n        limit,\n        offset,"),
+            "GET /governance/lifecycle-events must return advertised BFF limit/offset"
         );
     }
 }
