@@ -125,6 +125,8 @@ pub struct CreateGovCorrelationRule {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateGovCorrelationRule {
     pub name: Option<String>,
+    pub attribute: Option<String>,
+    pub match_type: Option<GovMatchType>,
     pub algorithm: Option<GovFuzzyAlgorithm>,
     pub threshold: Option<rust_decimal::Decimal>,
     pub weight: Option<rust_decimal::Decimal>,
@@ -470,6 +472,14 @@ impl GovCorrelationRule {
             updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
+        if input.attribute.is_some() {
+            updates.push(format!("attribute = ${param_idx}"));
+            param_idx += 1;
+        }
+        if input.match_type.is_some() {
+            updates.push(format!("match_type = ${param_idx}"));
+            param_idx += 1;
+        }
         if input.algorithm.is_some() {
             updates.push(format!("algorithm = ${param_idx}"));
             param_idx += 1;
@@ -526,6 +536,12 @@ impl GovCorrelationRule {
 
         if let Some(ref name) = input.name {
             q = q.bind(name);
+        }
+        if let Some(ref attribute) = input.attribute {
+            q = q.bind(attribute);
+        }
+        if let Some(match_type) = input.match_type {
+            q = q.bind(match_type);
         }
         if let Some(algorithm) = input.algorithm {
             q = q.bind(algorithm);

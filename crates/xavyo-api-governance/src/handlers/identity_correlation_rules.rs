@@ -264,6 +264,8 @@ pub async fn update_identity_correlation_rule(
 
     let input = UpdateGovCorrelationRule {
         name: request.name,
+        attribute: request.attribute,
+        match_type: request.match_type,
         algorithm: request.algorithm,
         threshold: request
             .threshold
@@ -362,6 +364,11 @@ mod tests {
         assert!(
             update.contains("priority: request.priority") && !update.contains("priority: None"),
             "PUT identity correlation rule must apply advertised priority"
+        );
+        assert!(
+            update.contains("attribute: request.attribute")
+                && update.contains("match_type: request.match_type"),
+            "PUT identity correlation rule must persist advertised attribute and match_type"
         );
     }
 }

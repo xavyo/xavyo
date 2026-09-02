@@ -15,9 +15,6 @@ pub struct ServiceAccountResponse {
     /// Service account ID.
     pub id: Uuid,
 
-    /// The user ID this service account is linked to.
-    pub user_id: Uuid,
-
     /// Display name for the service account.
     pub name: String,
 
@@ -66,7 +63,6 @@ impl From<NhiServiceAccountWithIdentity> for ServiceAccountResponse {
 
         Self {
             id: account.id,
-            user_id: linked_user_id(account.owner_id, account.id),
             name: account.name,
             purpose: account.purpose,
             owner_id: linked_user_id(account.owner_id, account.id),

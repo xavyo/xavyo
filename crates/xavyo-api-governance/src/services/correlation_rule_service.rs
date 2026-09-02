@@ -228,8 +228,15 @@ impl CorrelationRuleService {
             })
             .transpose()?;
 
+        let match_type = request
+            .match_type
+            .as_deref()
+            .map(parse_match_type)
+            .transpose()?;
         let input = UpdateGovCorrelationRule {
             name: request.name,
+            attribute: None,
+            match_type,
             algorithm: match &request.match_type {
                 Some(mt) => {
                     let mt_parsed = parse_match_type(mt)?;
@@ -746,6 +753,21 @@ mod tests {
         assert!(
             production.contains("decimal_to_f64(") && !production.contains("unwrap_or(0.0)"),
             "connector correlation threshold/weight must not serialize as 0.0 on parse failure"
+        );
+    }
+
+    #[test]
+    fn update_persists_advertised_match_type() {
+        let src = include_str!("correlation_rule_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let update = production
+            .split("pub async fn update(")
+            .nth(1)
+            .and_then(|s| s.split("    /// Delete a correlation rule.").next())
+            .expect("update");
+        assert!(
+            update.contains("match_type,") && update.contains("let match_type = request"),
+            "PUT connector correlation rule must persist advertised match_type"
         );
     }
 
