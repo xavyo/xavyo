@@ -543,5 +543,11 @@ mod tests {
             !from_impl.contains("user_id:"),
             "ServiceAccountResponse must not alias owner_id as a distinct linked user_id"
         );
+        assert!(
+            from_impl.contains("owner_id: account.owner_id")
+                && !from_impl.contains("unwrap_or(account.id)")
+                && !from_impl.contains("linked_user_id"),
+            "GET /governance/service-accounts owner_id must stay null when no owner is assigned"
+        );
     }
 }

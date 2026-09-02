@@ -37,7 +37,7 @@ fn create_mock_nhi_response(name: &str, status: ServiceAccountStatus) -> NhiResp
         id: Uuid::new_v4(),
         name: name.to_string(),
         purpose: "Test purpose".to_string(),
-        owner_id: Uuid::new_v4(),
+        owner_id: Some(Uuid::new_v4()),
         backup_owner_id: None,
         status,
         expires_at: Some(Utc::now() + Duration::days(365)),

@@ -18,10 +18,10 @@ use xavyo_db::models::{
 };
 
 use crate::handlers::reconciliation::{
-    ActionSummary, AttributeMismatchCount, BulkRemediateItem, BulkRemediationResponse,
-    BulkRemediationSummary, DiscrepancySummary, PerformanceMetrics, PreviewItem, PreviewResponse,
-    PreviewSummary, ReconciliationStatistics, RemediationResponse, ReportResponse, RunInfo,
-    TrendDataPoint, TrendResponse,
+    schedule_response, ActionSummary, AttributeMismatchCount, BulkRemediateItem,
+    BulkRemediationResponse, BulkRemediationSummary, DiscrepancySummary, PerformanceMetrics,
+    PreviewItem, PreviewResponse, PreviewSummary, ReconciliationStatistics, RemediationResponse,
+    ReportResponse, RunInfo, ScheduleResponse, TrendDataPoint, TrendResponse,
 };
 
 /// Error type for reconciliation service operations.
@@ -420,6 +420,25 @@ impl ReconciliationService {
         let schedule =
             ReconciliationSchedule::find_by_connector(&self.pool, tenant_id, connector_id).await?;
         Ok(schedule)
+    }
+
+    /// Map a stored schedule onto the advertised GET payload.
+    pub async fn to_schedule_response(
+        &self,
+        tenant_id: Uuid,
+        schedule: ReconciliationSchedule,
+    ) -> ReconciliationServiceResult<ScheduleResponse> {
+        let connector_name =
+            ConnectorConfiguration::find_by_id(&self.pool, tenant_id, schedule.connector_id)
+                .await?
+                .map(|c| c.name);
+        let last_run_at = match schedule.last_run_id {
+            Some(run_id) => ConnectorReconciliationRun::find_by_id(&self.pool, tenant_id, run_id)
+                .await?
+                .and_then(|run| run.completed_at.or(run.started_at)),
+            None => None,
+        };
+        Ok(schedule_response(schedule, connector_name, last_run_at))
     }
 
     /// Upsert schedule for a connector.

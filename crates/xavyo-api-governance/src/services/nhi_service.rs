@@ -1397,11 +1397,17 @@ mod tests {
         let from_impl = dto
             .split("impl From<NhiServiceAccountWithIdentity> for NhiResponse")
             .nth(1)
-            .and_then(|s| s.split("pub(crate) fn linked_user_id").next())
+            .and_then(|s| s.split("pub(crate) fn lifecycle_to_sa_status").next())
             .expect("NhiResponse From");
         assert!(
             !from_impl.contains("user_id:"),
             "NhiResponse must not alias owner_id as a distinct linked user_id"
+        );
+        assert!(
+            from_impl.contains("owner_id: account.owner_id")
+                && !from_impl.contains("unwrap_or(account.id)")
+                && !from_impl.contains("linked_user_id"),
+            "GET /governance/nhis owner_id must stay null when no owner is assigned"
         );
     }
 
