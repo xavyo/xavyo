@@ -72,6 +72,7 @@ pub fn reconciliation_router() -> Router<ConnectorsState>;
 | POST | `/connectors/:id/reconciliation/discrepancies/bulk-remediate` | 501 until connector-side remediation exists |
 | POST | `/admin/scim-targets/:id/sync` | 501 until outbound full sync is wired |
 | POST | `/admin/scim-targets/:id/reconcile` | 501 until outbound reconciliation is wired |
+| GET | `/operations/conflicts` | Return advertised BFF `total` alias of `pending_count` |
 | GET | `/provisioning/queue` | Queue stats |
 | GET | `/provisioning/dlq` | Dead letter queue |
 | GET | `/jobs` | List background jobs (F-044) |

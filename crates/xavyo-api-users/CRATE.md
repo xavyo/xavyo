@@ -60,9 +60,9 @@ pub fn bulk_operations_router() -> Router<UsersState>;
 | POST | `/users/:id/disable` | Disable user |
 | POST | `/users/:id/enable` | Enable user |
 | GET | `/groups` | List groups |
-| POST | `/groups` | Create group |
+| POST | `/groups` | Create group (`name` aliases `display_name`) |
 | GET | `/groups/:id` | Get group by ID |
-| PATCH | `/groups/:id` | Update group |
+| PATCH | `/groups/:id` | Update group (`name` aliases `display_name`) |
 | DELETE | `/groups/:id` | Delete group |
 | GET | `/groups/:id/members` | List group members |
 | POST | `/groups/:id/members` | Add group members |

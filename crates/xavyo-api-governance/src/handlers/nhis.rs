@@ -1033,6 +1033,7 @@ async fn list_nhi_certification_items_with(
             query.status,
             reviewer_id,
             query.owner_id,
+            query.decision,
             limit,
             offset,
         )
@@ -1583,8 +1584,10 @@ mod tests {
             .nth(1)
             .expect("list_nhi_certification_items_with");
         assert!(
-            helper.contains("campaign_id,") && helper.contains("query.status,"),
-            "nested campaign item list must pass the path campaign_id into list_items"
+            helper.contains("campaign_id,")
+                && helper.contains("query.status,")
+                && helper.contains("query.decision,"),
+            "nested campaign item list must pass the path campaign_id and advertised decision filter into list_items"
         );
         assert!(
             !helper.contains("query.campaign_id,"),

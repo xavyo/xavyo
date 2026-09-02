@@ -16,6 +16,9 @@ pub enum CertItemStatus {
     /// Awaiting reviewer decision.
     Pending,
     /// Reviewer approved the access.
+    ///
+    /// `certified` is the advertised BFF/UI alias.
+    #[serde(alias = "certified")]
     Approved,
     /// Reviewer revoked the access.
     Revoked,
@@ -583,6 +586,13 @@ mod tests {
         assert!(!CertItemStatus::Approved.is_pending());
         assert!(!CertItemStatus::Revoked.is_pending());
         assert!(!CertItemStatus::Skipped.is_pending());
+    }
+
+    #[test]
+    fn item_status_accepts_certified_alias() {
+        let status: CertItemStatus =
+            serde_json::from_str("\"certified\"").expect("certified alias");
+        assert_eq!(status, CertItemStatus::Approved);
     }
 
     #[test]

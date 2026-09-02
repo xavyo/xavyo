@@ -112,8 +112,6 @@ impl SodRuleService {
     }
 
     /// Update an `SoD` rule.
-    ///
-    /// Note: Entitlement IDs cannot be changed after creation.
     pub async fn update_rule(
         &self,
         tenant_id: Uuid,
@@ -121,7 +119,7 @@ impl SodRuleService {
         input: UpdateGovSodRule,
     ) -> Result<GovSodRule> {
         // Verify rule exists
-        let _existing = self.get_rule(tenant_id, rule_id).await?;
+        let existing = self.get_rule(tenant_id, rule_id).await?;
 
         // Validate name if being updated
         if let Some(ref new_name) = input.name {
@@ -138,11 +136,31 @@ impl SodRuleService {
             }
 
             // Check for duplicate name
-            if let Some(existing) =
-                GovSodRule::find_by_name(&self.pool, tenant_id, new_name).await?
-            {
-                if existing.id != rule_id {
+            if let Some(other) = GovSodRule::find_by_name(&self.pool, tenant_id, new_name).await? {
+                if other.id != rule_id {
                     return Err(GovernanceError::SodRuleNameExists(new_name.clone()));
+                }
+            }
+        }
+
+        if input.first_entitlement_id.is_some() || input.second_entitlement_id.is_some() {
+            let first = input
+                .first_entitlement_id
+                .unwrap_or(existing.first_entitlement_id);
+            let second = input
+                .second_entitlement_id
+                .unwrap_or(existing.second_entitlement_id);
+            if first == second {
+                return Err(GovernanceError::SodSameEntitlement);
+            }
+            if let Some(other) =
+                GovSodRule::find_by_entitlement_pair(&self.pool, tenant_id, first, second).await?
+            {
+                if other.id != rule_id {
+                    return Err(GovernanceError::SodRulePairExists {
+                        rule_id: other.id,
+                        rule_name: other.name,
+                    });
                 }
             }
         }

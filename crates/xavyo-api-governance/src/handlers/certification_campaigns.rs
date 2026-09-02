@@ -212,6 +212,10 @@ pub async fn update_campaign(
             request.name,
             request.description,
             request.deadline,
+            request.scope_type,
+            request.scope_config,
+            request.reviewer_type,
+            request.specific_reviewers,
         )
         .await?;
 
@@ -420,6 +424,24 @@ mod tests {
         assert!(
             !production.contains("progress: progress.into(),"),
             "must not return nested-only progress on GET/launch campaign"
+        );
+    }
+
+    #[test]
+    fn update_campaign_persists_advertised_scope_and_reviewer() {
+        let src = include_str!("certification_campaigns.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let handler = production
+            .split("pub async fn update_campaign")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("update_campaign");
+        assert!(
+            handler.contains("request.scope_type")
+                && handler.contains("request.scope_config")
+                && handler.contains("request.reviewer_type")
+                && handler.contains("request.specific_reviewers"),
+            "PUT /governance/certification-campaigns/{{id}} must persist advertised scope/reviewer fields"
         );
     }
 }

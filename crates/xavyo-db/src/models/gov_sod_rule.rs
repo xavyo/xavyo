@@ -92,6 +92,8 @@ pub struct CreateGovSodRule {
 pub struct UpdateGovSodRule {
     pub name: Option<String>,
     pub description: Option<String>,
+    pub first_entitlement_id: Option<Uuid>,
+    pub second_entitlement_id: Option<Uuid>,
     pub severity: Option<GovSodSeverity>,
     pub business_rationale: Option<String>,
 }
@@ -305,6 +307,14 @@ impl GovSodRule {
             updates.push(format!("description = ${param_idx}"));
             param_idx += 1;
         }
+        if input.first_entitlement_id.is_some() {
+            updates.push(format!("first_entitlement_id = ${param_idx}"));
+            param_idx += 1;
+        }
+        if input.second_entitlement_id.is_some() {
+            updates.push(format!("second_entitlement_id = ${param_idx}"));
+            param_idx += 1;
+        }
         if input.severity.is_some() {
             updates.push(format!("severity = ${param_idx}"));
             param_idx += 1;
@@ -328,6 +338,12 @@ impl GovSodRule {
         }
         if let Some(ref description) = input.description {
             q = q.bind(description);
+        }
+        if let Some(first_entitlement_id) = input.first_entitlement_id {
+            q = q.bind(first_entitlement_id);
+        }
+        if let Some(second_entitlement_id) = input.second_entitlement_id {
+            q = q.bind(second_entitlement_id);
         }
         if let Some(severity) = input.severity {
             q = q.bind(severity);

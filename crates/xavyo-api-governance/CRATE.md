@@ -96,7 +96,10 @@ pub fn archetypes_router() -> Router<GovState>;  // F-058 Identity Archetypes
 | NHI Certification | GET | `/nhis/certification/campaigns` | Return advertised `scope` and BFF `due_date` alias of `deadline` |
 | NHI Requests | GET | `/nhis/requests` | Return advertised BFF aliases (`nhi_type`, `rotation_interval_days`, `reviewer_id`, `reviewed_at`, `review_comments`, `nhi_id`) |
 | NHI Requests | POST | `/nhis/requests` | Persist advertised `nhi_type` |
-| Certifications | GET | `/my-certifications` | Return advertised BFF `campaign_name`, `user_email`, `entitlements`, `due_date`, plus `limit` / `offset` |
+| Certifications | GET | `/my-certifications` | Honor advertised `status` (`certified` aliases `approved`); return BFF `campaign_name`, `user_email`, `entitlements`, `due_date`, plus `limit` / `offset` |
+| Certifications | PUT | `/certification-campaigns/:id` | Persist advertised `scope_type`, `scope_config`, `reviewer_type`, `specific_reviewers` |
+| Catalog | POST/GET | `/catalog/cart` | Return advertised BFF `catalog_item_name` / `catalog_item_type` aliases |
+| SoD Rules | PUT | `/sod-rules/:id` | Persist advertised `first_entitlement_id` / `second_entitlement_id` |
 | Certifications | GET | `/certification-campaigns` | Return advertised BFF `limit` / `offset` aliases of `page_size` / query offset |
 | Certifications | GET | `/certification-campaigns/:id/items` | Return advertised BFF `limit` / `offset` |
 | Certifications | GET | `/certification-campaigns/:id/progress` | Return advertised BFF `approved_items` / `revoked_items` aliases of `approved_count` / `revoked_count` |
@@ -107,7 +110,7 @@ pub fn archetypes_router() -> Router<GovState>;  // F-058 Identity Archetypes
 | Outliers | POST | `/outliers/reports` | Return `trends` / `peer_group_breakdown` as arrays (empty, not null) |
 | License Reports | POST | `/license-reports/compliance` | Return advertised BFF `pools`, `is_compliant`, `issues`, `summary` |
 | Compliance Reports | GET | `/reports` | Return advertised BFF `limit` / `offset` aliases of `page_size` / query offset |
-| NHI Certification | GET | `/nhis/certification/campaigns/:id/items` | Return advertised `nhi_type` |
+| NHI Certification | GET | `/nhis/certification/campaigns/:id/items` | Honor advertised `decision` (`certified` aliases `certify`); return advertised `nhi_type` |
 | NHI Certification | POST | `/nhis/certification/campaigns/:id/launch` | Launch using stored create-time filters including `scope` |
 | NHI Usage | POST | `/nhis/:id/usage` | Return created usage event; look up `nhi_identities` |
 | NHI Usage | GET | `/nhis/:id/usage` | Return advertised `activity_type`, `details`, `performed_at` |

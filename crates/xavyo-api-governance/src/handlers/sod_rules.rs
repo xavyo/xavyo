@@ -181,6 +181,8 @@ pub async fn update_sod_rule(
     let input = UpdateGovSodRule {
         name: request.name,
         description: request.description,
+        first_entitlement_id: request.first_entitlement_id,
+        second_entitlement_id: request.second_entitlement_id,
         severity: request.severity,
         business_rationale: request.business_rationale,
     };
@@ -330,4 +332,23 @@ pub async fn sod_check(
         .await?;
 
     Ok(Json(SodEnforcementService::to_api_response(&result)))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn update_sod_rule_persists_advertised_entitlement_ids() {
+        let src = include_str!("sod_rules.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let handler = production
+            .split("pub async fn update_sod_rule")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("update_sod_rule");
+        assert!(
+            handler.contains("first_entitlement_id: request.first_entitlement_id")
+                && handler.contains("second_entitlement_id: request.second_entitlement_id"),
+            "PUT /governance/sod-rules/{{id}} must persist advertised entitlement IDs"
+        );
+    }
 }

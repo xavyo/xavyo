@@ -268,6 +268,9 @@ impl PaginationWithTotal {
 #[derive(Debug, Clone, Deserialize, ToSchema)]
 pub struct CreateGroupRequest {
     /// Group display name (required).
+    ///
+    /// `name` is the advertised form/BFF alias.
+    #[serde(alias = "name")]
     pub display_name: String,
 
     /// Group description (optional).
@@ -287,7 +290,9 @@ pub struct CreateGroupRequest {
 #[derive(Debug, Clone, Deserialize, ToSchema)]
 pub struct UpdateGroupRequest {
     /// New display name (optional).
-    #[serde(default)]
+    ///
+    /// `name` is the advertised form/BFF alias.
+    #[serde(default, alias = "name")]
     pub display_name: Option<String>,
 
     /// New description (optional).
@@ -367,5 +372,15 @@ mod tests {
 
         let p = PaginationWithTotal::new(30, 0, 50);
         assert!(!p.has_more);
+    }
+
+    #[test]
+    fn create_and_update_group_accept_name_alias() {
+        let create: CreateGroupRequest =
+            serde_json::from_str(r#"{"name":"Engineering"}"#).expect("name alias");
+        assert_eq!(create.display_name, "Engineering");
+        let update: UpdateGroupRequest =
+            serde_json::from_str(r#"{"name":"Ops"}"#).expect("name alias");
+        assert_eq!(update.display_name.as_deref(), Some("Ops"));
     }
 }

@@ -151,6 +151,10 @@ pub struct UpdateCertificationCampaign {
     pub name: Option<String>,
     pub description: Option<String>,
     pub deadline: Option<DateTime<Utc>>,
+    pub scope_type: Option<CertScopeType>,
+    pub scope_config: Option<serde_json::Value>,
+    pub reviewer_type: Option<CertReviewerType>,
+    pub specific_reviewers: Option<Vec<Uuid>>,
 }
 
 /// Filter options for listing certification campaigns.
@@ -327,6 +331,22 @@ impl GovCertificationCampaign {
         }
         if input.deadline.is_some() {
             updates.push(format!("deadline = ${param_idx}"));
+            param_idx += 1;
+        }
+        if input.scope_type.is_some() {
+            updates.push(format!("scope_type = ${param_idx}"));
+            param_idx += 1;
+        }
+        if input.scope_config.is_some() {
+            updates.push(format!("scope_config = ${param_idx}"));
+            param_idx += 1;
+        }
+        if input.reviewer_type.is_some() {
+            updates.push(format!("reviewer_type = ${param_idx}"));
+            param_idx += 1;
+        }
+        if input.specific_reviewers.is_some() {
+            updates.push(format!("specific_reviewers = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -347,6 +367,18 @@ impl GovCertificationCampaign {
         }
         if let Some(deadline) = input.deadline {
             q = q.bind(deadline);
+        }
+        if let Some(scope_type) = input.scope_type {
+            q = q.bind(scope_type);
+        }
+        if let Some(ref scope_config) = input.scope_config {
+            q = q.bind(scope_config);
+        }
+        if let Some(reviewer_type) = input.reviewer_type {
+            q = q.bind(reviewer_type);
+        }
+        if let Some(ref specific_reviewers) = input.specific_reviewers {
+            q = q.bind(specific_reviewers);
         }
 
         q.fetch_optional(pool).await

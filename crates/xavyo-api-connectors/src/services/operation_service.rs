@@ -926,6 +926,9 @@ pub struct ConflictListResponse {
     /// Total pending conflicts count.
     pub pending_count: i64,
 
+    /// Advertised BFF alias of `pending_count`.
+    pub total: i64,
+
     /// Current offset.
     pub offset: i64,
 
@@ -1337,11 +1340,16 @@ mod tests {
         let response = ConflictListResponse {
             conflicts: vec![],
             pending_count: 0,
+            total: 0,
             offset: 0,
             limit: 50,
         };
         assert_eq!(response.pending_count, 0);
+        assert_eq!(response.total, 0);
         assert!(response.conflicts.is_empty());
+        let json = serde_json::to_string(&response).expect("serialize");
+        assert!(json.contains("\"total\":0"));
+        assert!(json.contains("\"pending_count\":0"));
     }
 
     #[test]
