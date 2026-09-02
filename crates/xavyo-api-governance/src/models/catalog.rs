@@ -422,11 +422,17 @@ pub struct CartItemResponse {
     /// Catalog item name.
     pub item_name: String,
 
+    /// Advertised BFF alias of `item_name`.
+    pub catalog_item_name: String,
+
     /// Catalog item description.
     pub item_description: Option<String>,
 
     /// Catalog item type.
     pub item_type: String,
+
+    /// Advertised BFF alias of `item_type`.
+    pub catalog_item_type: String,
 
     /// Whether the catalog item is still enabled.
     pub item_enabled: bool,
@@ -446,8 +452,10 @@ impl From<CartItemWithDetails> for CartItemResponse {
         Self {
             id: item.id,
             catalog_item_id: item.catalog_item_id,
+            catalog_item_name: item.item_name.clone(),
             item_name: item.item_name,
             item_description: item.item_description,
+            catalog_item_type: item.item_type.clone(),
             item_type: item.item_type,
             item_enabled: item.item_enabled,
             parameters: item.parameters,
@@ -460,12 +468,16 @@ impl From<CartItemWithDetails> for CartItemResponse {
 impl CartItemResponse {
     /// Fill advertised catalog fields from the item definition.
     pub fn from_request_item(item: RequestCartItem, catalog: &CatalogItem) -> Self {
+        let item_name = catalog.name.clone();
+        let item_type = catalog_item_type_label(catalog.item_type);
         Self {
             id: item.id,
             catalog_item_id: item.catalog_item_id,
-            item_name: catalog.name.clone(),
+            catalog_item_name: item_name.clone(),
+            item_name,
             item_description: catalog.description.clone(),
-            item_type: catalog_item_type_label(catalog.item_type),
+            catalog_item_type: item_type.clone(),
+            item_type,
             item_enabled: catalog.is_enabled(),
             parameters: item.parameters,
             form_values: item.form_values,
@@ -831,6 +843,27 @@ mod tests {
                 && !production.contains("item_name: String::new()"),
             "cart item responses must fill names from the catalog item"
         );
+    }
+
+    #[test]
+    fn cart_item_serializes_advertised_catalog_aliases() {
+        let item = CartItemResponse {
+            id: Uuid::nil(),
+            catalog_item_id: Uuid::nil(),
+            item_name: "Developer Access".into(),
+            catalog_item_name: "Developer Access".into(),
+            item_description: None,
+            item_type: "role".into(),
+            catalog_item_type: "role".into(),
+            item_enabled: true,
+            parameters: serde_json::json!({}),
+            form_values: serde_json::json!({}),
+            added_at: Utc::now(),
+        };
+        let json = serde_json::to_string(&item).expect("serialize");
+        assert!(json.contains("\"catalog_item_name\":\"Developer Access\""));
+        assert!(json.contains("\"catalog_item_type\":\"role\""));
+        assert!(json.contains("\"item_name\":\"Developer Access\""));
     }
 
     #[test]

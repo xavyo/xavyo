@@ -122,6 +122,7 @@ impl CertificationCampaignService {
     }
 
     /// Update a campaign (only allowed in draft status).
+    #[allow(clippy::too_many_arguments)]
     pub async fn update(
         &self,
         tenant_id: Uuid,
@@ -129,6 +130,10 @@ impl CertificationCampaignService {
         name: Option<String>,
         description: Option<String>,
         deadline: Option<chrono::DateTime<Utc>>,
+        scope_type: Option<CertScopeType>,
+        scope_config: Option<ScopeConfig>,
+        reviewer_type: Option<CertReviewerType>,
+        specific_reviewers: Option<Vec<Uuid>>,
     ) -> Result<GovCertificationCampaign> {
         // Get existing campaign
         let campaign = self.get(tenant_id, campaign_id).await?;
@@ -156,10 +161,27 @@ impl CertificationCampaignService {
             }
         }
 
+        let next_reviewer_type = reviewer_type.unwrap_or(campaign.reviewer_type);
+        let next_reviewers = specific_reviewers
+            .clone()
+            .unwrap_or_else(|| campaign.specific_reviewers.clone());
+        if next_reviewer_type == CertReviewerType::SpecificUsers && next_reviewers.is_empty() {
+            return Err(GovernanceError::SpecificReviewersRequired);
+        }
+
+        let scope_config_json = scope_config
+            .as_ref()
+            .map(serde_json::to_value)
+            .transpose()?;
+
         let input = UpdateCertificationCampaign {
             name,
             description,
             deadline,
+            scope_type,
+            scope_config: scope_config_json,
+            reviewer_type,
+            specific_reviewers,
         };
 
         GovCertificationCampaign::update(&self.pool, tenant_id, campaign_id, input)

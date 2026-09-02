@@ -1183,6 +1183,9 @@ impl NhiCertificationStatus {
 #[serde(rename_all = "snake_case")]
 pub enum NhiCertificationDecision {
     /// Certify the NHI (approve continued use).
+    ///
+    /// `certified` is the advertised BFF list-filter alias.
+    #[serde(alias = "certified")]
     Certify,
     /// Revoke the NHI (suspend and invalidate credentials).
     Revoke,
@@ -1455,6 +1458,9 @@ pub struct ListNhiCertificationItemsQuery {
     /// Filter by status.
     pub status: Option<NhiCertificationStatus>,
 
+    /// Filter by decision (`certify`/`certified`, `revoke`, `delegate`).
+    pub decision: Option<NhiCertificationDecision>,
+
     /// Filter by reviewer.
     pub reviewer_id: Option<Uuid>,
 
@@ -1478,6 +1484,7 @@ impl Default for ListNhiCertificationItemsQuery {
         Self {
             campaign_id: None,
             status: None,
+            decision: None,
             reviewer_id: None,
             owner_id: None,
             my_pending: None,

@@ -82,6 +82,22 @@ pub struct UpdateCampaignRequest {
     /// Campaign deadline (must be in the future).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deadline: Option<DateTime<Utc>>,
+
+    /// Scope type for the campaign.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope_type: Option<CertScopeType>,
+
+    /// Scope configuration (depends on `scope_type`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope_config: Option<ScopeConfig>,
+
+    /// How to assign reviewers.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reviewer_type: Option<CertReviewerType>,
+
+    /// Specific reviewer user IDs (required when `reviewer_type` is `specific_users`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub specific_reviewers: Option<Vec<Uuid>>,
 }
 
 /// Query parameters for listing campaigns.
@@ -648,6 +664,10 @@ pub struct MyCertificationsQuery {
     /// Filter by campaign.
     pub campaign_id: Option<Uuid>,
 
+    /// Filter by item status (`pending`, `approved`/`certified`, `revoked`, `skipped`).
+    /// Omitted returns all items for the current reviewer.
+    pub status: Option<CertItemStatus>,
+
     /// Maximum number of results (default: 50, max: 100).
     #[param(minimum = 1, maximum = 100)]
     pub limit: Option<i64>,
@@ -661,6 +681,7 @@ impl Default for MyCertificationsQuery {
     fn default() -> Self {
         Self {
             campaign_id: None,
+            status: None,
             limit: Some(50),
             offset: Some(0),
         }
@@ -750,6 +771,18 @@ mod tests {
     }
 
     #[test]
+    fn my_certifications_status_accepts_certified_alias() {
+        let query: MyCertificationsQuery =
+            serde_json::from_value(serde_json::json!({"status": "certified"}))
+                .expect("certified alias");
+        assert_eq!(query.status, Some(CertItemStatus::Approved));
+        let approved: MyCertificationsQuery =
+            serde_json::from_value(serde_json::json!({"status": "approved"}))
+                .expect("approved status");
+        assert_eq!(approved.status, Some(CertItemStatus::Approved));
+    }
+
+    #[test]
     fn campaign_and_item_lists_serialize_limit_offset_aliases() {
         let campaigns = CampaignListResponse {
             items: vec![],
@@ -818,5 +851,26 @@ mod tests {
         assert!(json.contains("\"completion_percentage\":60"));
         assert!(json.contains("\"progress\""));
         assert!(json.contains("\"name\":\"Q1 recert\""));
+    }
+
+    #[test]
+    fn update_campaign_request_accepts_advertised_scope_and_reviewer() {
+        let req: UpdateCampaignRequest = serde_json::from_value(serde_json::json!({
+            "name": "Q2 recert",
+            "scope_type": "department",
+            "scope_config": {"department": "Engineering"},
+            "reviewer_type": "specific_users",
+            "specific_reviewers": ["00000000-0000-0000-0000-000000000001"]
+        }))
+        .expect("update campaign advertised fields");
+        assert_eq!(req.scope_type, Some(CertScopeType::Department));
+        assert_eq!(
+            req.scope_config
+                .as_ref()
+                .and_then(|c| c.department.as_deref()),
+            Some("Engineering")
+        );
+        assert_eq!(req.reviewer_type, Some(CertReviewerType::SpecificUsers));
+        assert_eq!(req.specific_reviewers.as_ref().map(Vec::len), Some(1));
     }
 }

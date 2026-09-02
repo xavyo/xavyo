@@ -64,19 +64,22 @@ impl CertificationItemService {
         Ok((items, total))
     }
 
-    /// List pending items for a reviewer (my-certifications).
+    /// List items for a reviewer (my-certifications).
+    ///
+    /// `status` is optional; omitted returns every item assigned to the reviewer.
     pub async fn list_for_reviewer(
         &self,
         tenant_id: Uuid,
         reviewer_id: Uuid,
         campaign_id: Option<Uuid>,
+        status: Option<CertItemStatus>,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<GovCertificationItem>, i64)> {
         let filter = CertItemFilter {
             reviewer_id: Some(reviewer_id),
             campaign_id,
-            status: Some(CertItemStatus::Pending),
+            status,
             ..Default::default()
         };
 
@@ -231,6 +234,21 @@ mod tests {
         assert!(
             production.contains("list_reviewer_pending_by_campaign("),
             "reviewer summary must group pending items by campaign"
+        );
+    }
+
+    #[test]
+    fn list_for_reviewer_does_not_hardcode_pending() {
+        let src = include_str!("certification_item_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("pub async fn list_for_reviewer")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("list_for_reviewer");
+        assert!(
+            list.contains("status,") && !list.contains("Some(CertItemStatus::Pending)"),
+            "my-certifications list must use advertised status instead of hardcoding pending"
         );
     }
 

@@ -336,6 +336,7 @@ impl NhiCertificationService {
         status: Option<NhiCertificationStatus>,
         reviewer_id: Option<Uuid>,
         owner_id: Option<Uuid>,
+        decision: Option<NhiCertificationDecision>,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<NhiCertificationItemResponse>, i64)> {
@@ -346,6 +347,7 @@ impl NhiCertificationService {
                 status,
                 reviewer_id,
                 owner_id,
+                decision,
                 limit,
                 offset,
             )
@@ -372,6 +374,7 @@ impl NhiCertificationService {
             None,
             Some(NhiCertificationStatus::Pending),
             Some(reviewer_id),
+            None,
             None,
             limit,
             offset,
@@ -1152,6 +1155,7 @@ impl NhiCertificationService {
         status: Option<NhiCertificationStatus>,
         reviewer_id: Option<Uuid>,
         owner_id: Option<Uuid>,
+        decision: Option<NhiCertificationDecision>,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<NhiCertificationItem>, i64)> {
@@ -1201,6 +1205,12 @@ impl NhiCertificationService {
             param_idx += 1;
         }
 
+        if decision.is_some() {
+            query.push_str(&format!(" AND i.decision = ${param_idx}"));
+            count_query.push_str(&format!(" AND i.decision = ${param_idx}"));
+            param_idx += 1;
+        }
+
         query.push_str(&format!(
             " ORDER BY i.created_at DESC LIMIT ${} OFFSET ${}",
             param_idx,
@@ -1212,6 +1222,12 @@ impl NhiCertificationService {
             NhiCertificationStatus::Certified => "certified",
             NhiCertificationStatus::Revoked => "revoked",
             NhiCertificationStatus::Expired => "expired",
+        });
+
+        let decision_str = decision.map(|d| match d {
+            NhiCertificationDecision::Certify => "certify",
+            NhiCertificationDecision::Revoke => "revoke",
+            NhiCertificationDecision::Delegate => "delegate",
         });
 
         type ItemRow = (
@@ -1251,6 +1267,11 @@ impl NhiCertificationService {
         if let Some(oid) = owner_id {
             q = q.bind(oid);
             cq = cq.bind(oid);
+        }
+
+        if let Some(d) = &decision_str {
+            q = q.bind(*d);
+            cq = cq.bind(*d);
         }
 
         q = q.bind(limit).bind(offset);
@@ -1798,6 +1819,24 @@ mod tests {
             production.contains("parse_reviewers(") && !production.contains("from_value(v).ok()"),
             "NHI campaign load must fail closed on reviewer JSON parse"
         );
+    }
+
+    #[test]
+    fn list_items_honor_advertised_decision_filter() {
+        let src = include_str!("nhi_certification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let list = production
+            .split("async fn list_item_records")
+            .nth(1)
+            .and_then(|s| s.split("    async fn ").next())
+            .expect("list_item_records");
+        assert!(
+            list.contains("AND i.decision =") && list.contains("decision_str"),
+            "GET NHI certification items must filter by advertised decision"
+        );
+        let certify: NhiCertificationDecision =
+            serde_json::from_str("\"certified\"").expect("certified alias");
+        assert_eq!(certify, NhiCertificationDecision::Certify);
     }
 
     #[test]

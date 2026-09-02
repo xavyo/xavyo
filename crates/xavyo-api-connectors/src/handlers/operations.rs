@@ -500,6 +500,7 @@ pub async fn list_conflicts(
             .map(ConflictResponse::try_from)
             .collect::<Result<Vec<_>>>()?,
         pending_count,
+        total: pending_count,
         offset,
         limit,
     };

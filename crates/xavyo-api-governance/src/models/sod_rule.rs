@@ -46,6 +46,12 @@ pub struct UpdateSodRuleRequest {
     #[validate(length(max = 1000, message = "Description must not exceed 1000 characters"))]
     pub description: Option<String>,
 
+    /// Updated first conflicting entitlement ID.
+    pub first_entitlement_id: Option<Uuid>,
+
+    /// Updated second conflicting entitlement ID.
+    pub second_entitlement_id: Option<Uuid>,
+
     /// Updated severity level.
     pub severity: Option<GovSodSeverity>,
 
@@ -202,6 +208,28 @@ pub struct SodCheckViolation {
     /// Source of the conflicting entitlement (F088: includes inheritance info).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<EntitlementSourceInfo>,
+}
+
+#[cfg(test)]
+mod update_request_tests {
+    use super::*;
+
+    #[test]
+    fn update_sod_rule_request_accepts_advertised_entitlement_ids() {
+        let req: UpdateSodRuleRequest = serde_json::from_value(serde_json::json!({
+            "first_entitlement_id": "00000000-0000-0000-0000-000000000001",
+            "second_entitlement_id": "00000000-0000-0000-0000-000000000002"
+        }))
+        .expect("entitlement ids");
+        assert_eq!(
+            req.first_entitlement_id,
+            Some(Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap())
+        );
+        assert_eq!(
+            req.second_entitlement_id,
+            Some(Uuid::parse_str("00000000-0000-0000-0000-000000000002").unwrap())
+        );
+    }
 }
 
 /// Information about how an entitlement was obtained (F088).

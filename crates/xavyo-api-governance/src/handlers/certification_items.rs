@@ -403,14 +403,14 @@ pub async fn reassign_item(
     ))
 }
 
-/// Get pending certification items for the current user.
+/// Get certification items for the current reviewer.
 #[utoipa::path(
     get,
     path = "/governance/my-certifications",
     tag = "Governance - Certification Items",
     params(MyCertificationsQuery),
     responses(
-        (status = 200, description = "List of pending items", body = ItemListResponse),
+        (status = 200, description = "List of items for the current reviewer", body = ItemListResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
@@ -434,7 +434,14 @@ pub async fn get_my_certifications(
 
     let (items, total) = state
         .certification_item_service
-        .list_for_reviewer(tenant_id, user_id, query.campaign_id, limit, offset)
+        .list_for_reviewer(
+            tenant_id,
+            user_id,
+            query.campaign_id,
+            query.status,
+            limit,
+            offset,
+        )
         .await?;
 
     let mut cache = ItemDetailCache::new();
@@ -629,6 +636,22 @@ mod tests {
             production.contains("page_size: limit,\n        limit,\n        offset,")
                 || production.contains("limit,\n        offset,"),
             "GET certification item lists must return advertised BFF limit/offset"
+        );
+    }
+
+    #[test]
+    fn my_certifications_honor_advertised_status_filter() {
+        let src = include_str!("certification_items.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let handler = production
+            .split("pub async fn get_my_certifications")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("get_my_certifications");
+        assert!(
+            handler.contains("query.status")
+                && !handler.contains("CertItemStatus::Pending"),
+            "GET /governance/my-certifications must honor advertised status instead of hardcoding pending"
         );
     }
 }
