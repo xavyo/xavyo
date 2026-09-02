@@ -24,9 +24,6 @@ pub struct NhiResponse {
     /// NHI ID (same as service account ID).
     pub id: Uuid,
 
-    /// The linked user ID.
-    pub user_id: Uuid,
-
     /// Display name for the NHI.
     pub name: String,
 
@@ -141,7 +138,6 @@ impl From<NhiServiceAccountWithIdentity> for NhiResponse {
 
         Self {
             id: account.id,
-            user_id: linked_user_id(account.owner_id, account.id),
             name: account.name,
             purpose: account.purpose,
             owner_id: linked_user_id(account.owner_id, account.id),

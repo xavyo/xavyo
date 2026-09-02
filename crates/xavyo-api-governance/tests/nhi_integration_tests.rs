@@ -35,7 +35,6 @@ fn create_test_request(name: &str, owner_id: Uuid) -> CreateNhiRequest {
 fn create_mock_nhi_response(name: &str, status: ServiceAccountStatus) -> NhiResponse {
     NhiResponse {
         id: Uuid::new_v4(),
-        user_id: Uuid::new_v4(),
         name: name.to_string(),
         purpose: "Test purpose".to_string(),
         owner_id: Uuid::new_v4(),

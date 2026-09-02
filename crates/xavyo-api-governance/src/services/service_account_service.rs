@@ -521,4 +521,27 @@ mod tests {
             "RegisterServiceAccountRequest must not advertise user_id; unified NHIs are not linked users"
         );
     }
+
+    #[test]
+    fn get_service_account_does_not_advertise_linked_user_id() {
+        let dto = include_str!("../models/service_account.rs");
+        let response_dto = dto
+            .split("pub struct ServiceAccountResponse")
+            .nth(1)
+            .and_then(|s| s.split("impl From<NhiServiceAccountWithIdentity>").next())
+            .expect("ServiceAccountResponse");
+        assert!(
+            !response_dto.contains("user_id"),
+            "GET /governance/service-accounts must not advertise user_id as a distinct linked user"
+        );
+        let from_impl = dto
+            .split("impl From<NhiServiceAccountWithIdentity> for ServiceAccountResponse")
+            .nth(1)
+            .and_then(|s| s.split("pub struct RegisterServiceAccountRequest").next())
+            .expect("ServiceAccountResponse From");
+        assert!(
+            !from_impl.contains("user_id:"),
+            "ServiceAccountResponse must not alias owner_id as a distinct linked user_id"
+        );
+    }
 }

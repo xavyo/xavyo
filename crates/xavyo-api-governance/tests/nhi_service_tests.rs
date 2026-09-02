@@ -23,7 +23,6 @@ fn create_test_nhi_response(
 ) -> NhiResponse {
     NhiResponse {
         id,
-        user_id: Uuid::new_v4(),
         name: name.to_string(),
         purpose: "Test purpose".to_string(),
         owner_id,

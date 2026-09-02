@@ -1383,6 +1383,29 @@ mod tests {
     }
 
     #[test]
+    fn get_nhi_does_not_advertise_linked_user_id() {
+        let dto = include_str!("../models/nhi.rs");
+        let response_dto = dto
+            .split("pub struct NhiResponse")
+            .nth(1)
+            .and_then(|s| s.split("impl From<NhiServiceAccountWithIdentity>").next())
+            .expect("NhiResponse");
+        assert!(
+            !response_dto.contains("user_id"),
+            "GET /governance/nhis must not advertise user_id as a distinct linked user; unified NHIs echo owner_id"
+        );
+        let from_impl = dto
+            .split("impl From<NhiServiceAccountWithIdentity> for NhiResponse")
+            .nth(1)
+            .and_then(|s| s.split("pub(crate) fn linked_user_id").next())
+            .expect("NhiResponse From");
+        assert!(
+            !from_impl.contains("user_id:"),
+            "NhiResponse must not alias owner_id as a distinct linked user_id"
+        );
+    }
+
+    #[test]
     fn test_nhi_summary_default() {
         let summary = NhiSummary {
             total: 0,

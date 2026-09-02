@@ -114,11 +114,12 @@ impl IdentityCorrelationRuleService {
 
         // Validate the update
         let name = input.name.as_ref().unwrap_or(&existing.name);
+        let match_type = input.match_type.unwrap_or(existing.match_type);
         let algorithm = input.algorithm.or(existing.algorithm);
         let threshold = input.threshold.or(existing.threshold);
         let weight = input.weight.or(Some(existing.weight));
 
-        self.validate_rule(name, existing.match_type, algorithm, threshold, weight)?;
+        self.validate_rule(name, match_type, algorithm, threshold, weight)?;
 
         GovCorrelationRule::update(&self.pool, tenant_id, id, input)
             .await
