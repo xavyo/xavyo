@@ -61,6 +61,17 @@ fn detect_device_type(ua: &str) -> String {
         return "mobile".to_string();
     }
 
+    // Desktop OS signals — only then classify as desktop.
+    if ua.contains("windows")
+        || ua.contains("macintosh")
+        || ua.contains("mac os x")
+        || ua.contains("linux")
+        || ua.contains("cros")
+        || ua.contains("x11")
+    {
+        return "desktop".to_string();
+    }
+
     // Unrecognized UA is not a desktop — device-type policies must not skip.
     "unknown".to_string()
 }
