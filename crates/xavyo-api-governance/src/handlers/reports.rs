@@ -61,6 +61,8 @@ pub async fn list_reports(
         total,
         page,
         page_size: limit,
+        limit,
+        offset,
     }))
 }
 

@@ -120,6 +120,7 @@ async fn campaign_summary(
         id: campaign.id,
         name: campaign.name,
         deadline: campaign.deadline,
+        due_date: campaign.deadline,
         status: campaign.status,
     };
     cache.campaigns.insert(campaign_id, summary.clone());
@@ -153,6 +154,13 @@ async fn item_with_details(
         None
     };
     Ok(ItemWithDetailsResponse {
+        campaign_name: campaign.as_ref().map(|c| c.name.clone()),
+        user_email: user.as_ref().map(|u| u.email.clone()),
+        entitlements: entitlement
+            .as_ref()
+            .map(|e| vec![e.name.clone()])
+            .unwrap_or_default(),
+        due_date: campaign.as_ref().map(|c| c.due_date),
         item: item.into(),
         user,
         entitlement,
@@ -586,6 +594,24 @@ mod tests {
         assert!(
             decide.contains(".await?;"),
             "certification decide must fail when campaign completion cannot be written"
+        );
+    }
+
+    #[test]
+    fn my_certifications_return_advertised_bff_aliases() {
+        let src = include_str!("certification_items.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let details = production
+            .split("async fn item_with_details")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("item_with_details");
+        assert!(
+            details.contains("campaign_name:")
+                && details.contains("user_email:")
+                && details.contains("entitlements:")
+                && details.contains("due_date:"),
+            "GET /governance/my-certifications must return advertised BFF aliases"
         );
     }
 }

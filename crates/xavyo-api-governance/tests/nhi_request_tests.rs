@@ -52,6 +52,7 @@ fn test_submit_request_validation_valid() {
         requested_permissions: vec![Uuid::new_v4()],
         requested_expiration: Some(Utc::now() + Duration::days(365)),
         requested_rotation_days: Some(30),
+        nhi_type: None,
     };
 
     // Validate using the Validate trait
@@ -67,6 +68,7 @@ fn test_submit_request_validation_name_too_long() {
         requested_permissions: vec![],
         requested_expiration: None,
         requested_rotation_days: None,
+        nhi_type: None,
     };
 
     use validator::Validate;
@@ -81,6 +83,7 @@ fn test_submit_request_validation_purpose_too_short() {
         requested_permissions: vec![],
         requested_expiration: None,
         requested_rotation_days: None,
+        nhi_type: None,
     };
 
     use validator::Validate;
@@ -95,6 +98,7 @@ fn test_submit_request_validation_rotation_days_too_low() {
         requested_permissions: vec![],
         requested_expiration: None,
         requested_rotation_days: Some(0), // Too low (min 1)
+        nhi_type: None,
     };
 
     use validator::Validate;
@@ -109,6 +113,7 @@ fn test_submit_request_validation_rotation_days_too_high() {
         requested_permissions: vec![],
         requested_expiration: None,
         requested_rotation_days: Some(400), // Too high (max 365)
+        nhi_type: None,
     };
 
     use validator::Validate;
@@ -123,6 +128,7 @@ fn test_submit_request_minimal_fields() {
         requested_permissions: vec![],
         requested_expiration: None,
         requested_rotation_days: None,
+        nhi_type: None,
     };
 
     use validator::Validate;
@@ -139,6 +145,7 @@ fn test_submit_request_with_permissions() {
         requested_permissions: entitlement_ids.clone(),
         requested_expiration: None,
         requested_rotation_days: None,
+        nhi_type: None,
     };
 
     assert_eq!(request.requested_permissions.len(), 3);
@@ -204,11 +211,17 @@ fn test_request_response_pending() {
         requested_permissions: vec![Uuid::new_v4()],
         requested_expiration: Some(Utc::now() + Duration::days(365)),
         requested_rotation_days: Some(30),
+        rotation_interval_days: None,
+        nhi_type: None,
         status: NhiRequestStatus::Pending,
         approver_id: None,
+        reviewer_id: None,
         decision_at: None,
+        reviewed_at: None,
         decision_comments: None,
+        review_comments: None,
         created_nhi_id: None,
+        nhi_id: None,
         expires_at: Utc::now() + Duration::days(14),
         created_at: Utc::now(),
     };
@@ -231,11 +244,17 @@ fn test_request_response_approved_with_nhi() {
         requested_permissions: vec![],
         requested_expiration: Some(Utc::now() + Duration::days(365)),
         requested_rotation_days: Some(90),
+        rotation_interval_days: None,
+        nhi_type: None,
         status: NhiRequestStatus::Approved,
         approver_id: Some(approver_id),
+        reviewer_id: None,
         decision_at: Some(Utc::now()),
+        reviewed_at: None,
         decision_comments: Some("Approved for production use".to_string()),
+        review_comments: None,
         created_nhi_id: Some(created_nhi_id),
+        nhi_id: None,
         expires_at: Utc::now() + Duration::days(14),
         created_at: Utc::now() - Duration::days(1),
     };
@@ -256,11 +275,17 @@ fn test_request_response_rejected() {
         requested_permissions: vec![],
         requested_expiration: None,
         requested_rotation_days: None,
+        rotation_interval_days: None,
+        nhi_type: None,
         status: NhiRequestStatus::Rejected,
         approver_id: Some(Uuid::new_v4()),
+        reviewer_id: None,
         decision_at: Some(Utc::now()),
+        reviewed_at: None,
         decision_comments: Some("Insufficient justification provided".to_string()),
+        review_comments: None,
         created_nhi_id: None,
+        nhi_id: None,
         expires_at: Utc::now() + Duration::days(14),
         created_at: Utc::now() - Duration::days(1),
     };
@@ -280,11 +305,17 @@ fn test_request_response_cancelled() {
         requested_permissions: vec![],
         requested_expiration: None,
         requested_rotation_days: None,
+        rotation_interval_days: None,
+        nhi_type: None,
         status: NhiRequestStatus::Cancelled,
         approver_id: None,
+        reviewer_id: None,
         decision_at: None,
+        reviewed_at: None,
         decision_comments: None,
+        review_comments: None,
         created_nhi_id: None,
+        nhi_id: None,
         expires_at: Utc::now() + Duration::days(14),
         created_at: Utc::now() - Duration::days(1),
     };
@@ -354,11 +385,17 @@ fn test_request_list_with_items() {
             requested_permissions: vec![],
             requested_expiration: None,
             requested_rotation_days: None,
+            rotation_interval_days: None,
+            nhi_type: None,
             status: NhiRequestStatus::Pending,
             approver_id: None,
+            reviewer_id: None,
             decision_at: None,
+            reviewed_at: None,
             decision_comments: None,
+            review_comments: None,
             created_nhi_id: None,
+            nhi_id: None,
             expires_at: Utc::now() + Duration::days(14),
             created_at: Utc::now(),
         },
@@ -370,11 +407,17 @@ fn test_request_list_with_items() {
             requested_permissions: vec![],
             requested_expiration: None,
             requested_rotation_days: None,
+            rotation_interval_days: None,
+            nhi_type: None,
             status: NhiRequestStatus::Approved,
             approver_id: Some(Uuid::new_v4()),
+            reviewer_id: None,
             decision_at: Some(Utc::now()),
+            reviewed_at: None,
             decision_comments: None,
+            review_comments: None,
             created_nhi_id: Some(Uuid::new_v4()),
+            nhi_id: None,
             expires_at: Utc::now() + Duration::days(14),
             created_at: Utc::now() - Duration::days(1),
         },
@@ -423,6 +466,7 @@ fn test_approval_creates_nhi_with_requested_params() {
         requested_permissions: vec![Uuid::new_v4(), Uuid::new_v4()],
         requested_expiration: Some(Utc::now() + Duration::days(365)),
         requested_rotation_days: Some(30),
+        nhi_type: None,
     };
 
     // Verify all params are captured
@@ -468,11 +512,17 @@ fn test_request_response_serialization() {
         requested_permissions: vec![],
         requested_expiration: None,
         requested_rotation_days: None,
+        rotation_interval_days: None,
+        nhi_type: None,
         status: NhiRequestStatus::Pending,
         approver_id: None,
+        reviewer_id: None,
         decision_at: None,
+        reviewed_at: None,
         decision_comments: None,
+        review_comments: None,
         created_nhi_id: None,
+        nhi_id: None,
         expires_at: Utc::now() + Duration::days(14),
         created_at: Utc::now(),
     };
@@ -483,6 +533,44 @@ fn test_request_response_serialization() {
 }
 
 #[test]
+fn test_request_response_serializes_bff_aliases() {
+    let id = Uuid::new_v4();
+    let reviewer = Uuid::new_v4();
+    let nhi = Uuid::new_v4();
+    let now = Utc::now();
+    let response = NhiRequestResponse {
+        id,
+        requester_id: Uuid::new_v4(),
+        requested_name: "alias-nhi".to_string(),
+        purpose: "Alias coverage".to_string(),
+        requested_permissions: vec![],
+        requested_expiration: None,
+        requested_rotation_days: Some(30),
+        rotation_interval_days: Some(30),
+        nhi_type: Some("agent".to_string()),
+        status: NhiRequestStatus::Approved,
+        approver_id: Some(reviewer),
+        reviewer_id: Some(reviewer),
+        decision_at: Some(now),
+        reviewed_at: Some(now),
+        decision_comments: Some("ok".to_string()),
+        review_comments: Some("ok".to_string()),
+        created_nhi_id: Some(nhi),
+        nhi_id: Some(nhi),
+        expires_at: now + Duration::days(14),
+        created_at: now,
+    };
+
+    let json = serde_json::to_string(&response).unwrap();
+    assert!(json.contains("\"rotation_interval_days\":30"));
+    assert!(json.contains("\"nhi_type\":\"agent\""));
+    assert!(json.contains("\"reviewer_id\""));
+    assert!(json.contains("\"reviewed_at\""));
+    assert!(json.contains("\"review_comments\":\"ok\""));
+    assert!(json.contains("\"nhi_id\""));
+}
+
+#[test]
 fn test_submit_request_serialization() {
     let request = SubmitNhiRequestRequest {
         name: "my-service".to_string(),
@@ -490,6 +578,7 @@ fn test_submit_request_serialization() {
         requested_permissions: vec![],
         requested_expiration: None,
         requested_rotation_days: Some(30),
+        nhi_type: None,
     };
 
     let json = serde_json::to_string(&request).unwrap();

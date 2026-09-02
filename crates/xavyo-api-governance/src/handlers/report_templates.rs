@@ -64,6 +64,8 @@ pub async fn list_templates(
         total,
         page,
         page_size: limit,
+        limit,
+        offset,
     }))
 }
 

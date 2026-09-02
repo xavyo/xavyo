@@ -341,8 +341,10 @@ pub struct OutlierReportResponse {
     pub total_users_analyzed: i64,
     pub total_outliers_detected: i64,
     pub average_outlier_rate: f64,
-    pub trends: Option<Vec<OutlierTrendPoint>>,
-    pub peer_group_breakdown: Option<Vec<PeerGroupBreakdown>>,
+    /// Empty when `include_trends` is false (BFF advertises an array, not null).
+    pub trends: Vec<OutlierTrendPoint>,
+    /// Empty when `include_peer_breakdown` is false (BFF advertises an array, not null).
+    pub peer_group_breakdown: Vec<PeerGroupBreakdown>,
     pub generated_at: DateTime<Utc>,
 }
 

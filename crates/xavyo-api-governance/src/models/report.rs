@@ -86,6 +86,10 @@ pub struct ReportTemplateListResponse {
     pub total: i64,
     pub page: i64,
     pub page_size: i64,
+    /// Advertised BFF alias of `page_size`.
+    pub limit: i64,
+    /// Advertised BFF alias of the query offset (`page * page_size`).
+    pub offset: i64,
 }
 
 // ============================================================================
@@ -145,6 +149,10 @@ pub struct GeneratedReportListResponse {
     pub total: i64,
     pub page: i64,
     pub page_size: i64,
+    /// Advertised BFF alias of `page_size`.
+    pub limit: i64,
+    /// Advertised BFF alias of the query offset (`page * page_size`).
+    pub offset: i64,
 }
 
 // ============================================================================
@@ -231,6 +239,10 @@ pub struct ReportScheduleListResponse {
     pub total: i64,
     pub page: i64,
     pub page_size: i64,
+    /// Advertised BFF alias of `page_size`.
+    pub limit: i64,
+    /// Advertised BFF alias of the query offset (`page * page_size`).
+    pub offset: i64,
 }
 
 // ============================================================================
@@ -354,6 +366,16 @@ mod tests {
                 && production.contains("TryFrom")
                 && !production.contains("let recipients = s.parse_recipients();"),
             "report schedule GET must fail closed on JSON parse"
+        );
+    }
+
+    #[test]
+    fn report_list_responses_include_limit_offset_aliases() {
+        let src = include_str!("report.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("pub limit: i64") && production.contains("pub offset: i64"),
+            "GET report list DTOs must serialize advertised BFF limit/offset aliases"
         );
     }
 }

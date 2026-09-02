@@ -1403,6 +1403,7 @@ impl NhiCertificationService {
             expired_items: expired,
             completion_rate,
             deadline: campaign.deadline,
+            due_date: campaign.deadline,
             created_by: campaign.created_by,
             created_at: campaign.created_at,
             launched_at: campaign.launched_at,
@@ -1886,6 +1887,16 @@ mod tests {
                 && !item.contains("owner_name: None")
                 && item.contains("NhiIdentity::find_by_id"),
             "NHI certification items must look up the owner display name from nhi_identities"
+        );
+    }
+
+    #[test]
+    fn campaign_response_includes_due_date_alias() {
+        let src = include_str!("nhi_certification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("due_date: campaign.deadline"),
+            "GET NHI certification campaigns must serialize advertised BFF due_date alias"
         );
     }
 
