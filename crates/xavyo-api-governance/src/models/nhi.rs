@@ -1235,6 +1235,9 @@ pub struct NhiCertificationItemResponse {
     /// Deadline for decision.
     pub deadline: DateTime<Utc>,
 
+    /// Advertised BFF alias of `deadline`.
+    pub due_date: DateTime<Utc>,
+
     /// Decision made (if any).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decision: Option<NhiCertificationDecision>,
@@ -1251,6 +1254,10 @@ pub struct NhiCertificationItemResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
 
+    /// Advertised BFF alias of `comment`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+
     /// When the item was created.
     pub created_at: DateTime<Utc>,
 }
@@ -1260,6 +1267,9 @@ pub struct NhiCertificationItemResponse {
 pub struct NhiCertificationSummary {
     /// Total items in campaign.
     pub total: i64,
+
+    /// Advertised BFF alias of `total`.
+    pub total_items: i64,
 
     /// Pending items awaiting decision.
     pub pending: i64,
@@ -1272,9 +1282,32 @@ pub struct NhiCertificationSummary {
 
     /// Expired items (deadline passed).
     pub expired: i64,
+
+    /// Advertised BFF alias of decided items (`certified` + `revoked` + `expired`).
+    pub decided: i64,
 }
 
 impl NhiCertificationSummary {
+    /// Build a summary, filling advertised BFF aliases.
+    #[must_use]
+    pub fn from_counts(
+        total: i64,
+        pending: i64,
+        certified: i64,
+        revoked: i64,
+        expired: i64,
+    ) -> Self {
+        Self {
+            total,
+            total_items: total,
+            pending,
+            certified,
+            revoked,
+            expired,
+            decided: certified + revoked + expired,
+        }
+    }
+
     /// Calculate completion rate as percentage.
     #[must_use]
     pub fn completion_rate(&self) -> f64 {
@@ -1369,7 +1402,7 @@ pub struct NhiCertificationDecisionRequest {
 
     /// Comment explaining the decision.
     #[validate(length(max = 1000, message = "Comment must be at most 1000 characters"))]
-    #[serde(default)]
+    #[serde(default, alias = "notes")]
     pub comment: Option<String>,
 
     /// Delegate to this user (required if decision is Delegate).
@@ -1389,7 +1422,7 @@ pub struct BulkNhiCertificationDecisionRequest {
 
     /// Comment for all items.
     #[validate(length(max = 500, message = "Comment must be at most 500 characters"))]
-    #[serde(default)]
+    #[serde(default, alias = "notes")]
     pub comment: Option<String>,
 }
 

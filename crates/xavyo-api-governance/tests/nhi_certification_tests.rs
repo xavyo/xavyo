@@ -10,8 +10,8 @@ use chrono::{Duration, Utc};
 use uuid::Uuid;
 
 use xavyo_api_governance::models::{
-    NhiCertificationDecision, NhiCertificationItemResponse, NhiCertificationStatus,
-    NhiCertificationSummary,
+    NhiCertificationDecision, NhiCertificationDecisionRequest, NhiCertificationItemResponse,
+    NhiCertificationStatus, NhiCertificationSummary,
 };
 
 // ============================================================================
@@ -114,10 +114,12 @@ fn test_certification_item_response_structure() {
         reviewer_id,
         status: NhiCertificationStatus::Pending,
         deadline,
+        due_date: deadline,
         decision: None,
         decided_by: None,
         decided_at: None,
         comment: None,
+        notes: None,
         created_at: now,
     };
 
@@ -145,10 +147,12 @@ fn test_certification_item_response_with_decision() {
         reviewer_id: Uuid::new_v4(),
         status: NhiCertificationStatus::Certified,
         deadline: now + Duration::days(7),
+        due_date: now + Duration::days(7),
         decision: Some(NhiCertificationDecision::Certify),
         decided_by: Some(decided_by),
         decided_at: Some(now),
         comment: Some("Confirmed active use".to_string()),
+        notes: Some("Confirmed active use".to_string()),
         created_at: now - Duration::days(1),
     };
 
@@ -172,10 +176,12 @@ fn test_certification_item_serialization() {
         reviewer_id: Uuid::new_v4(),
         status: NhiCertificationStatus::Pending,
         deadline: Utc::now() + Duration::days(14),
+        due_date: Utc::now() + Duration::days(14),
         decision: None,
         decided_by: None,
         decided_at: None,
         comment: None,
+        notes: None,
         created_at: Utc::now(),
     };
 
@@ -184,6 +190,7 @@ fn test_certification_item_serialization() {
     assert!(json.contains("pending"));
     assert!(json.contains("nhi_id"));
     assert!(json.contains("campaign_id"));
+    assert!(json.contains("due_date"));
 }
 
 // ============================================================================
@@ -192,76 +199,44 @@ fn test_certification_item_serialization() {
 
 #[test]
 fn test_certification_summary_empty() {
-    let summary = NhiCertificationSummary {
-        total: 0,
-        pending: 0,
-        certified: 0,
-        revoked: 0,
-        expired: 0,
-    };
+    let summary = NhiCertificationSummary::from_counts(0, 0, 0, 0, 0);
 
     assert_eq!(summary.total, 0);
+    assert_eq!(summary.total_items, 0);
+    assert_eq!(summary.decided, 0);
     assert_eq!(summary.completion_rate(), 0.0);
 }
 
 #[test]
 fn test_certification_summary_with_data() {
-    let summary = NhiCertificationSummary {
-        total: 100,
-        pending: 20,
-        certified: 60,
-        revoked: 15,
-        expired: 5,
-    };
+    let summary = NhiCertificationSummary::from_counts(100, 20, 60, 15, 5);
 
     assert_eq!(summary.total, 100);
+    assert_eq!(summary.total_items, 100);
     assert_eq!(
         summary.pending + summary.certified + summary.revoked + summary.expired,
         100
     );
+    assert_eq!(summary.decided, 80);
     assert_eq!(summary.completion_rate(), 80.0); // (60 + 15 + 5) / 100 * 100
 }
 
 #[test]
 fn test_certification_summary_completion_rate() {
     // Test various completion scenarios
-    let full_complete = NhiCertificationSummary {
-        total: 50,
-        pending: 0,
-        certified: 45,
-        revoked: 5,
-        expired: 0,
-    };
+    let full_complete = NhiCertificationSummary::from_counts(50, 0, 45, 5, 0);
     assert_eq!(full_complete.completion_rate(), 100.0);
 
-    let half_complete = NhiCertificationSummary {
-        total: 100,
-        pending: 50,
-        certified: 30,
-        revoked: 10,
-        expired: 10,
-    };
+    let half_complete = NhiCertificationSummary::from_counts(100, 50, 30, 10, 10);
     assert_eq!(half_complete.completion_rate(), 50.0);
 
-    let all_pending = NhiCertificationSummary {
-        total: 25,
-        pending: 25,
-        certified: 0,
-        revoked: 0,
-        expired: 0,
-    };
+    let all_pending = NhiCertificationSummary::from_counts(25, 25, 0, 0, 0);
     assert_eq!(all_pending.completion_rate(), 0.0);
 }
 
 #[test]
 fn test_certification_summary_serialization() {
-    let summary = NhiCertificationSummary {
-        total: 50,
-        pending: 10,
-        certified: 35,
-        revoked: 3,
-        expired: 2,
-    };
+    let summary = NhiCertificationSummary::from_counts(50, 10, 35, 3, 2);
 
     let json = serde_json::to_string(&summary).expect("Serialization failed");
     assert!(json.contains("total"));
@@ -270,6 +245,15 @@ fn test_certification_summary_serialization() {
     assert!(json.contains("certified"));
     assert!(json.contains("revoked"));
     assert!(json.contains("expired"));
+    assert!(json.contains("\"total_items\":50"));
+    assert!(json.contains("\"decided\":40"));
+}
+
+#[test]
+fn test_nhi_cert_decide_accepts_notes_alias() {
+    let json = r#"{"decision":"certify","notes":"Looks good"}"#;
+    let request: NhiCertificationDecisionRequest = serde_json::from_str(json).expect("notes alias");
+    assert_eq!(request.comment.as_deref(), Some("Looks good"));
 }
 
 // ============================================================================

@@ -225,8 +225,14 @@ pub struct CampaignProgressResponse {
     /// Number of approved items.
     pub approved_count: i64,
 
+    /// Advertised BFF alias of `approved_count`.
+    pub approved_items: i64,
+
     /// Number of revoked items.
     pub revoked_count: i64,
+
+    /// Advertised BFF alias of `revoked_count`.
+    pub revoked_items: i64,
 
     /// Number of skipped items.
     pub skipped_count: i64,
@@ -253,7 +259,9 @@ impl From<CertItemSummary> for CampaignProgressResponse {
             completed_items: completed,
             pending_items: summary.pending,
             approved_count: summary.approved,
+            approved_items: summary.approved,
             revoked_count: summary.revoked,
+            revoked_items: summary.revoked,
             skipped_count: summary.skipped,
             completion_percentage: percentage,
             by_reviewer: None,
@@ -299,6 +307,12 @@ pub struct CampaignListResponse {
 
     /// Page size.
     pub page_size: i64,
+
+    /// Advertised BFF alias of `page_size`.
+    pub limit: i64,
+
+    /// Advertised BFF query offset echoed on the list.
+    pub offset: i64,
 }
 
 // ============================================================================
@@ -519,6 +533,12 @@ pub struct ItemListResponse {
 
     /// Page size.
     pub page_size: i64,
+
+    /// Advertised BFF alias of `page_size`.
+    pub limit: i64,
+
+    /// Advertised BFF query offset echoed on the list.
+    pub offset: i64,
 }
 
 // ============================================================================
@@ -529,11 +549,12 @@ pub struct ItemListResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct DecisionRequest {
     /// Decision type (approved or revoked).
+    #[serde(alias = "decision")]
     pub decision_type: CertDecisionType,
 
     /// Justification (required when `decision_type` is revoked, minimum 20 characters).
     #[validate(length(min = 20, message = "Justification must be at least 20 characters"))]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, alias = "notes", skip_serializing_if = "Option::is_none")]
     pub justification: Option<String>,
 }
 
@@ -661,5 +682,64 @@ mod tests {
             !production.contains("from_value::<ScopeConfig>(v.clone()).ok()"),
             "GET campaign must not hide corrupt scope_config as null"
         );
+    }
+
+    #[test]
+    fn campaign_progress_serializes_bff_item_aliases() {
+        let progress = CampaignProgressResponse {
+            total_items: 10,
+            completed_items: 6,
+            pending_items: 4,
+            approved_count: 5,
+            approved_items: 5,
+            revoked_count: 1,
+            revoked_items: 1,
+            skipped_count: 0,
+            completion_percentage: 60.0,
+            by_reviewer: None,
+        };
+        let json = serde_json::to_string(&progress).expect("serialize");
+        assert!(json.contains("\"approved_items\":5"));
+        assert!(json.contains("\"revoked_items\":1"));
+        assert!(json.contains("\"approved_count\":5"));
+    }
+
+    #[test]
+    fn decide_request_accepts_bff_decision_and_notes_aliases() {
+        let req: DecisionRequest =
+            serde_json::from_str(r#"{"decision":"approved","notes":"Looks good to keep access"}"#)
+                .expect("decision/notes aliases");
+        assert_eq!(req.decision_type, CertDecisionType::Approved);
+        assert_eq!(
+            req.justification.as_deref(),
+            Some("Looks good to keep access")
+        );
+    }
+
+    #[test]
+    fn campaign_and_item_lists_serialize_limit_offset_aliases() {
+        let campaigns = CampaignListResponse {
+            items: vec![],
+            total: 0,
+            page: 1,
+            page_size: 50,
+            limit: 50,
+            offset: 0,
+        };
+        let campaign_json = serde_json::to_string(&campaigns).expect("campaigns");
+        assert!(campaign_json.contains("\"limit\":50"));
+        assert!(campaign_json.contains("\"offset\":0"));
+
+        let items = ItemListResponse {
+            items: vec![],
+            total: 0,
+            page: 2,
+            page_size: 25,
+            limit: 25,
+            offset: 25,
+        };
+        let item_json = serde_json::to_string(&items).expect("items");
+        assert!(item_json.contains("\"limit\":25"));
+        assert!(item_json.contains("\"offset\":25"));
     }
 }

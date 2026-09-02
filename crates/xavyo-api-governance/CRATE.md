@@ -96,7 +96,14 @@ pub fn archetypes_router() -> Router<GovState>;  // F-058 Identity Archetypes
 | NHI Certification | GET | `/nhis/certification/campaigns` | Return advertised `scope` and BFF `due_date` alias of `deadline` |
 | NHI Requests | GET | `/nhis/requests` | Return advertised BFF aliases (`nhi_type`, `rotation_interval_days`, `reviewer_id`, `reviewed_at`, `review_comments`, `nhi_id`) |
 | NHI Requests | POST | `/nhis/requests` | Persist advertised `nhi_type` |
-| Certifications | GET | `/my-certifications` | Return advertised BFF `campaign_name`, `user_email`, `entitlements`, `due_date` |
+| Certifications | GET | `/my-certifications` | Return advertised BFF `campaign_name`, `user_email`, `entitlements`, `due_date`, plus `limit` / `offset` |
+| Certifications | GET | `/certification-campaigns` | Return advertised BFF `limit` / `offset` aliases of `page_size` / query offset |
+| Certifications | GET | `/certification-campaigns/:id/items` | Return advertised BFF `limit` / `offset` |
+| Certifications | GET | `/certification-campaigns/:id/progress` | Return advertised BFF `approved_items` / `revoked_items` aliases of `approved_count` / `revoked_count` |
+| Certifications | POST | `/certification-items/:id/decide` | Accept advertised BFF `decision` / `notes` aliases of `decision_type` / `justification` |
+| NHI Certification | GET | `/nhis/certification/campaigns/:id/summary` | Return advertised BFF `total_items` / `decided` |
+| NHI Certification | GET | `/nhis/certification/items/:id` | Return advertised BFF `due_date` / `notes` aliases of `deadline` / `comment` |
+| NHI Certification | POST | `/nhis/certification/items/:id/decide` | Accept advertised BFF `notes` alias of `comment` |
 | Outliers | POST | `/outliers/reports` | Return `trends` / `peer_group_breakdown` as arrays (empty, not null) |
 | License Reports | POST | `/license-reports/compliance` | Return advertised BFF `pools`, `is_compliant`, `issues`, `summary` |
 | Compliance Reports | GET | `/reports` | Return advertised BFF `limit` / `offset` aliases of `page_size` / query offset |

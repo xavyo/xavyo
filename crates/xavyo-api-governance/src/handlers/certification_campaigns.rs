@@ -68,6 +68,8 @@ pub async fn list_campaigns(
         total,
         page,
         page_size: limit,
+        limit,
+        offset,
     }))
 }
 
@@ -391,5 +393,15 @@ mod tests {
             .expires_in_secs(3600)
             .build();
         assert!(require_campaign_admin(&admin).is_ok());
+    }
+
+    #[test]
+    fn campaign_lists_return_limit_offset_aliases() {
+        let src = include_str!("certification_campaigns.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("page_size: limit,\n        limit,\n        offset,"),
+            "GET /governance/certification-campaigns must return advertised BFF limit/offset"
+        );
     }
 }
