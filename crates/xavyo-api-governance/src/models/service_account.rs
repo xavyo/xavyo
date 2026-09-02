@@ -85,9 +85,6 @@ impl From<NhiServiceAccountWithIdentity> for ServiceAccountResponse {
 /// Request to register a new service account.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct RegisterServiceAccountRequest {
-    /// The user ID to register as a service account.
-    pub user_id: Uuid,
-
     /// Display name for the service account.
     #[validate(length(min = 1, max = 200, message = "Name must be 1-200 characters"))]
     pub name: String,

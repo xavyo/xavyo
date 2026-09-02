@@ -58,7 +58,6 @@ fn test_create_nhi_request_validation_name_too_short() {
     use validator::Validate;
 
     let request = CreateNhiRequest {
-        user_id: Uuid::new_v4(),
         name: String::new(), // Empty name
         purpose: "This is a test purpose for the NHI".to_string(),
         owner_id: Uuid::new_v4(),
@@ -79,7 +78,6 @@ fn test_create_nhi_request_validation_purpose_too_short() {
     use validator::Validate;
 
     let request = CreateNhiRequest {
-        user_id: Uuid::new_v4(),
         name: "test-service-account".to_string(),
         purpose: "Short".to_string(), // Less than 10 chars
         owner_id: Uuid::new_v4(),
@@ -100,7 +98,6 @@ fn test_create_nhi_request_validation_rotation_interval_out_of_range() {
     use validator::Validate;
 
     let request = CreateNhiRequest {
-        user_id: Uuid::new_v4(),
         name: "test-service-account".to_string(),
         purpose: "This is a valid purpose for the NHI account".to_string(),
         owner_id: Uuid::new_v4(),
@@ -121,7 +118,6 @@ fn test_create_nhi_request_validation_valid() {
     use validator::Validate;
 
     let request = CreateNhiRequest {
-        user_id: Uuid::new_v4(),
         name: "test-service-account".to_string(),
         purpose: "This is a valid purpose for the NHI account".to_string(),
         owner_id: Uuid::new_v4(),
@@ -403,7 +399,6 @@ fn test_expired_cannot_be_directly_reactivated() {
 #[test]
 fn test_create_nhi_request_serialization() {
     let request = CreateNhiRequest {
-        user_id: Uuid::new_v4(),
         name: "test-service".to_string(),
         purpose: "Test purpose for serialization".to_string(),
         owner_id: Uuid::new_v4(),
@@ -543,7 +538,6 @@ fn test_owner_must_be_different_user_not_service_account() {
     // Edge case: Owner should be a human user, not another NHI
     // This prevents circular ownership chains
     let request = CreateNhiRequest {
-        user_id: Uuid::new_v4(),
         name: "test-nhi".to_string(),
         purpose: "Test service account".to_string(),
         owner_id: Uuid::new_v4(), // This should be validated as a human user

@@ -496,4 +496,29 @@ mod tests {
             "GET/POST/PUT/DELETE /governance/service-accounts must use nhi_identities, not the dropped gov_service_accounts table"
         );
     }
+
+    #[test]
+    fn register_service_account_does_not_advertise_unused_user_id() {
+        let src = include_str!("service_account_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let register = production
+            .split("pub async fn register(")
+            .nth(1)
+            .and_then(|s| s.split("    /// Update a service account.").next())
+            .expect("register");
+        assert!(
+            !register.contains("request.user_id") && !register.contains("user_id:"),
+            "POST /governance/service-accounts must not require or store a linked user_id after NHI unification"
+        );
+        let dto = include_str!("../models/service_account.rs");
+        let create_dto = dto
+            .split("pub struct RegisterServiceAccountRequest")
+            .nth(1)
+            .and_then(|s| s.split("pub struct UpdateServiceAccountRequest").next())
+            .expect("RegisterServiceAccountRequest");
+        assert!(
+            !create_dto.contains("user_id"),
+            "RegisterServiceAccountRequest must not advertise user_id; unified NHIs are not linked users"
+        );
+    }
 }

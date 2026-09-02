@@ -1358,6 +1358,31 @@ mod tests {
     }
 
     #[test]
+    fn create_nhi_does_not_advertise_unused_user_id() {
+        let src = include_str!("nhi_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let create = production
+            .split("pub async fn create(")
+            .nth(1)
+            .and_then(|s| s.split("    /// Update an NHI.").next())
+            .expect("create");
+        assert!(
+            !create.contains("request.user_id") && !create.contains("user_id:"),
+            "POST /governance/nhis must not require or store a linked user_id after NHI unification"
+        );
+        let dto = include_str!("../models/nhi.rs");
+        let create_dto = dto
+            .split("pub struct CreateNhiRequest")
+            .nth(1)
+            .and_then(|s| s.split("pub struct UpdateNhiRequest").next())
+            .expect("CreateNhiRequest");
+        assert!(
+            !create_dto.contains("user_id"),
+            "CreateNhiRequest must not advertise user_id; unified NHIs are not linked users"
+        );
+    }
+
+    #[test]
     fn test_nhi_summary_default() {
         let summary = NhiSummary {
             total: 0,

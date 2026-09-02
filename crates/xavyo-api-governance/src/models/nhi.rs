@@ -212,9 +212,6 @@ pub(crate) fn suspension_reason_str(reason: NhiSuspensionReason) -> &'static str
 /// Request to create a new NHI.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct CreateNhiRequest {
-    /// The user ID to register as an NHI.
-    pub user_id: Uuid,
-
     /// Display name for the NHI.
     #[validate(length(min = 1, max = 200, message = "Name must be 1-200 characters"))]
     pub name: String,
