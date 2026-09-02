@@ -88,8 +88,8 @@ pub fn archetypes_router() -> Router<GovState>;  // F-058 Identity Archetypes
 | Lifecycle | PUT | `/lifecycle/configs/:id/states/:sid/actions` | Update state actions (F-193) |
 | Lifecycle | GET | `/users/:id/lifecycle/status` | Get user lifecycle status (F-193) |
 | Manual Tasks | GET | `/manual-tasks/audit` | List manual task audit events |
-| NHI | GET | `/nhis` | Do not advertise `user_id` as a distinct linked user |
-| Service Accounts | GET | `/service-accounts` | Do not advertise `user_id` as a distinct linked user |
+| NHI | GET | `/nhis` | Do not advertise `user_id` as a distinct linked user; `owner_id` is null when unassigned |
+| Service Accounts | GET | `/service-accounts` | Do not advertise `user_id` as a distinct linked user; `owner_id` is null when unassigned |
 | Identity Correlation | PUT | `/identity-correlation-rules/:id` | Persist advertised `attribute` and `match_type` |
 | Connector Correlation | PUT | `/connectors/:id/correlation/rules/:id` | Persist advertised `match_type` |
 | NHI Certification | POST | `/nhis/certification/campaigns` | Persist advertised owner/type filters |

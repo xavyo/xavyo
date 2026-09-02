@@ -30,8 +30,8 @@ pub struct NhiResponse {
     /// Purpose/justification for the NHI.
     pub purpose: String,
 
-    /// Primary owner responsible for this NHI.
-    pub owner_id: Uuid,
+    /// Primary owner responsible for this NHI. Null when no owner is assigned.
+    pub owner_id: Option<Uuid>,
 
     /// Backup owner (secondary contact).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -140,7 +140,7 @@ impl From<NhiServiceAccountWithIdentity> for NhiResponse {
             id: account.id,
             name: account.name,
             purpose: account.purpose,
-            owner_id: linked_user_id(account.owner_id, account.id),
+            owner_id: account.owner_id,
             backup_owner_id: account.backup_owner_id,
             status: lifecycle_to_sa_status(account.lifecycle_state),
             expires_at: account.expires_at,
@@ -162,10 +162,6 @@ impl From<NhiServiceAccountWithIdentity> for NhiResponse {
             updated_at: account.updated_at,
         }
     }
-}
-
-pub(crate) fn linked_user_id(owner_id: Option<Uuid>, id: Uuid) -> Uuid {
-    owner_id.unwrap_or(id)
 }
 
 pub(crate) fn lifecycle_to_sa_status(state: NhiLifecycleState) -> ServiceAccountStatus {

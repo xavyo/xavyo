@@ -51,6 +51,9 @@ pub fn reconciliation_router() -> Router<ConnectorsState>;
 | GET | `/connectors/:id/schema` | Get schema (optional `version` query) |
 | GET | `/connectors/sync/status` | Sync status for all connectors |
 | POST | `/connectors/:id/reconciliation/trigger` | Trigger a reconciliation run |
+| GET | `/connectors/:id/reconciliation/schedule` | Return advertised `cron_expression`, `last_run_at`, `connector_name` |
+| PUT | `/connectors/:id/reconciliation/schedule` | Persist `frequency=cron` via advertised `cron_expression` |
+| GET | `/reconciliation/schedules` | List schedules with advertised cron/last-run/name fields |
 | GET | `/connectors/:id/schema/status` | Schema discovery status |
 | GET | `/connectors/:id/schema/versions` | List schema versions |
 | GET | `/connectors/:id/schema/diff` | Diff two schema versions |

@@ -243,7 +243,7 @@ fn create_test_nhi_response(
         id: Uuid::new_v4(),
         name: "test-service".to_string(),
         purpose: "Test service account".to_string(),
-        owner_id: Uuid::new_v4(),
+        owner_id: Some(Uuid::new_v4()),
         backup_owner_id: None,
         status,
         expires_at,

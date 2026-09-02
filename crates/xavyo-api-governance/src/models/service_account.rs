@@ -7,7 +7,7 @@ use uuid::Uuid;
 use validator::Validate;
 use xavyo_db::{NhiServiceAccountWithIdentity, ServiceAccountStatus};
 
-use super::nhi::{lifecycle_to_sa_status, linked_user_id};
+use super::nhi::lifecycle_to_sa_status;
 
 /// Service account response.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -21,8 +21,8 @@ pub struct ServiceAccountResponse {
     /// Purpose/justification for the service account.
     pub purpose: String,
 
-    /// Owner responsible for this service account.
-    pub owner_id: Uuid,
+    /// Owner responsible for this service account. Null when no owner is assigned.
+    pub owner_id: Option<Uuid>,
 
     /// Current status.
     pub status: ServiceAccountStatus,
@@ -65,7 +65,7 @@ impl From<NhiServiceAccountWithIdentity> for ServiceAccountResponse {
             id: account.id,
             name: account.name,
             purpose: account.purpose,
-            owner_id: linked_user_id(account.owner_id, account.id),
+            owner_id: account.owner_id,
             status: lifecycle_to_sa_status(account.lifecycle_state),
             expires_at: account.expires_at,
             days_until_expiry,

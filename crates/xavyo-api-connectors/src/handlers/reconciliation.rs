@@ -233,8 +233,11 @@ pub struct ScheduleRequest {
     /// Mode: full or delta.
     #[serde(default = "default_mode")]
     pub mode: String,
-    /// Frequency: hourly, daily, weekly, monthly, or cron expression.
+    /// Frequency: hourly, daily, weekly, monthly, `cron`, or a cron expression.
     pub frequency: String,
+    /// Cron expression. Required when `frequency` is `cron`; stored in `frequency`.
+    #[serde(default)]
+    pub cron_expression: Option<String>,
     /// Day of week (0-6) for weekly schedule.
     pub day_of_week: Option<i32>,
     /// Day of month (1-28) for monthly schedule.
@@ -251,20 +254,73 @@ fn default_hour() -> i32 {
     2
 }
 
+/// Resolve the stored frequency. `frequency=cron` requires `cron_expression`.
+pub fn resolve_schedule_frequency(
+    frequency: &str,
+    cron_expression: Option<&str>,
+) -> Result<String, String> {
+    if frequency.eq_ignore_ascii_case("cron") {
+        let expr = cron_expression
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| "cron_expression is required when frequency is cron".to_string())?;
+        if !expr.contains(' ') {
+            return Err("cron_expression must be a cron expression".to_string());
+        }
+        return Ok(expr.to_string());
+    }
+    Ok(frequency.to_string())
+}
+
+/// Cron expressions are stored in `frequency`; echo them as `cron_expression`.
+pub fn advertised_cron_expression(frequency: &str) -> Option<String> {
+    frequency.contains(' ').then(|| frequency.to_string())
+}
+
 /// Response for a schedule.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ScheduleResponse {
     pub id: Uuid,
     pub connector_id: Uuid,
+    pub connector_name: Option<String>,
     pub mode: String,
     pub frequency: String,
+    pub cron_expression: Option<String>,
     pub day_of_week: Option<i32>,
     pub day_of_month: Option<i32>,
     pub hour_of_day: i32,
     pub enabled: bool,
     pub last_run_id: Option<Uuid>,
+    pub last_run_at: Option<DateTime<Utc>>,
     pub next_run_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Build the advertised schedule payload.
+pub fn schedule_response(
+    schedule: xavyo_db::models::ReconciliationSchedule,
+    connector_name: Option<String>,
+    last_run_at: Option<DateTime<Utc>>,
+) -> ScheduleResponse {
+    let cron_expression = advertised_cron_expression(&schedule.frequency);
+    ScheduleResponse {
+        id: schedule.id,
+        connector_id: schedule.connector_id,
+        connector_name,
+        mode: schedule.mode,
+        frequency: schedule.frequency,
+        cron_expression,
+        day_of_week: schedule.day_of_week,
+        day_of_month: schedule.day_of_month,
+        hour_of_day: schedule.hour_of_day,
+        enabled: schedule.enabled,
+        last_run_id: schedule.last_run_id,
+        last_run_at,
+        next_run_at: schedule.next_run_at,
+        created_at: schedule.created_at,
+        updated_at: schedule.updated_at,
+    }
 }
 
 /// Response for listing schedules.
@@ -976,19 +1032,13 @@ pub async fn get_schedule(
         .map_err(map_reconciliation_error)?
         .ok_or_else(|| ApiError::not_found("Schedule not found"))?;
 
-    Ok(Json(ScheduleResponse {
-        id: schedule.id,
-        connector_id: schedule.connector_id,
-        mode: schedule.mode,
-        frequency: schedule.frequency,
-        day_of_week: schedule.day_of_week,
-        day_of_month: schedule.day_of_month,
-        hour_of_day: schedule.hour_of_day,
-        enabled: schedule.enabled,
-        last_run_id: schedule.last_run_id,
-        next_run_at: schedule.next_run_at,
-        created_at: schedule.created_at,
-    }))
+    Ok(Json(
+        state
+            .reconciliation_service
+            .to_schedule_response(tenant_id, schedule)
+            .await
+            .map_err(map_reconciliation_error)?,
+    ))
 }
 
 /// Update schedule for a connector.
@@ -1016,6 +1066,9 @@ pub async fn update_schedule(
         return Err(ConnectorApiError::Forbidden);
     }
     let tenant_id = extract_tenant_id(&claims)?;
+    let frequency =
+        resolve_schedule_frequency(&request.frequency, request.cron_expression.as_deref())
+            .map_err(ApiError::bad_request)?;
 
     let schedule = state
         .reconciliation_service
@@ -1023,7 +1076,7 @@ pub async fn update_schedule(
             tenant_id,
             connector_id,
             &request.mode,
-            &request.frequency,
+            &frequency,
             request.day_of_week,
             request.day_of_month,
             request.hour_of_day,
@@ -1032,19 +1085,13 @@ pub async fn update_schedule(
         .await
         .map_err(map_reconciliation_error)?;
 
-    Ok(Json(ScheduleResponse {
-        id: schedule.id,
-        connector_id: schedule.connector_id,
-        mode: schedule.mode,
-        frequency: schedule.frequency,
-        day_of_week: schedule.day_of_week,
-        day_of_month: schedule.day_of_month,
-        hour_of_day: schedule.hour_of_day,
-        enabled: schedule.enabled,
-        last_run_id: schedule.last_run_id,
-        next_run_at: schedule.next_run_at,
-        created_at: schedule.created_at,
-    }))
+    Ok(Json(
+        state
+            .reconciliation_service
+            .to_schedule_response(tenant_id, schedule)
+            .await
+            .map_err(map_reconciliation_error)?,
+    ))
 }
 
 /// Delete schedule for a connector.
@@ -1166,24 +1213,20 @@ pub async fn list_schedules(
         .await
         .map_err(map_reconciliation_error)?;
 
-    let schedules: Vec<ScheduleResponse> = schedules
-        .into_iter()
-        .map(|s| ScheduleResponse {
-            id: s.id,
-            connector_id: s.connector_id,
-            mode: s.mode,
-            frequency: s.frequency,
-            day_of_week: s.day_of_week,
-            day_of_month: s.day_of_month,
-            hour_of_day: s.hour_of_day,
-            enabled: s.enabled,
-            last_run_id: s.last_run_id,
-            next_run_at: s.next_run_at,
-            created_at: s.created_at,
-        })
-        .collect();
+    let mut responses = Vec::with_capacity(schedules.len());
+    for schedule in schedules {
+        responses.push(
+            state
+                .reconciliation_service
+                .to_schedule_response(tenant_id, schedule)
+                .await
+                .map_err(map_reconciliation_error)?,
+        );
+    }
 
-    Ok(Json(ListSchedulesResponse { schedules }))
+    Ok(Json(ListSchedulesResponse {
+        schedules: responses,
+    }))
 }
 
 // ============================================================================
@@ -1488,6 +1531,32 @@ mod tests {
         assert_eq!(request.enabled, None);
         assert_eq!(request.hour_of_day, 2);
         assert_eq!(request.mode, "full");
+        assert!(request.cron_expression.is_none());
+    }
+
+    #[test]
+    fn frequency_cron_requires_cron_expression() {
+        assert!(resolve_schedule_frequency("cron", None).is_err());
+        assert!(resolve_schedule_frequency("cron", Some("   ")).is_err());
+        assert!(resolve_schedule_frequency("cron", Some("nightly")).is_err());
+        assert_eq!(
+            resolve_schedule_frequency("cron", Some("0 2 * * *")).unwrap(),
+            "0 2 * * *"
+        );
+        assert_eq!(
+            resolve_schedule_frequency("daily", Some("0 2 * * *")).unwrap(),
+            "daily"
+        );
+    }
+
+    #[test]
+    fn advertised_cron_expression_comes_from_stored_frequency() {
+        assert_eq!(
+            advertised_cron_expression("0 2 * * *").as_deref(),
+            Some("0 2 * * *")
+        );
+        assert!(advertised_cron_expression("daily").is_none());
+        assert!(advertised_cron_expression("cron").is_none());
     }
 
     #[test]

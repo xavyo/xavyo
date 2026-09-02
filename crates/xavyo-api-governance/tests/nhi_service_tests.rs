@@ -25,7 +25,7 @@ fn create_test_nhi_response(
         id,
         name: name.to_string(),
         purpose: "Test purpose".to_string(),
-        owner_id,
+        owner_id: Some(owner_id),
         backup_owner_id: None,
         status,
         expires_at: Some(Utc::now() + Duration::days(365)),
@@ -227,7 +227,7 @@ fn test_nhi_response_active_status() {
 
     assert_eq!(response.id, id);
     assert_eq!(response.name, "test-nhi");
-    assert_eq!(response.owner_id, owner_id);
+    assert_eq!(response.owner_id, Some(owner_id));
     assert_eq!(response.status, ServiceAccountStatus::Active);
     assert!(!response.is_inactive);
     assert!(!response.needs_rotation);
