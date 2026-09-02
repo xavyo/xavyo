@@ -201,7 +201,6 @@ impl NhiRequestService {
 
         // Create the NHI request - requester becomes the owner
         let create_nhi_request = CreateNhiRequest {
-            user_id: request.requester_id, // user_id is required
             name: request.requested_name.clone(),
             purpose: request.purpose.clone(),
             owner_id: request.requester_id, // owner is the requester

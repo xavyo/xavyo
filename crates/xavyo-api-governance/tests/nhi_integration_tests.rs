@@ -21,7 +21,6 @@ use xavyo_api_governance::models::{
 /// Create a test `CreateNhiRequest` with default values.
 fn create_test_request(name: &str, owner_id: Uuid) -> CreateNhiRequest {
     CreateNhiRequest {
-        user_id: Uuid::new_v4(),
         name: name.to_string(),
         purpose: "Integration test service account".to_string(),
         owner_id,
@@ -73,7 +72,6 @@ fn test_create_nhi_request_with_all_fields() {
     let expires_at = Utc::now() + Duration::days(365);
 
     let request = CreateNhiRequest {
-        user_id: Uuid::new_v4(),
         name: "data-pipeline-processor".to_string(),
         purpose: "ETL service for data warehouse processing".to_string(),
         owner_id,
@@ -95,7 +93,6 @@ fn test_create_nhi_request_minimal_fields() {
     let owner_id = Uuid::new_v4();
 
     let request = CreateNhiRequest {
-        user_id: Uuid::new_v4(),
         name: "minimal-service".to_string(),
         purpose: "Minimal service account for testing".to_string(),
         owner_id,
@@ -531,7 +528,6 @@ fn test_nhi_with_long_name() {
 #[test]
 fn test_nhi_with_unicode_purpose() {
     let request = CreateNhiRequest {
-        user_id: Uuid::new_v4(),
         name: "unicode-test".to_string(),
         purpose: "テスト目的 - Test purpose 🚀".to_string(),
         owner_id: Uuid::new_v4(),
@@ -654,7 +650,6 @@ fn test_list_response_serialization() {
 fn test_create_request_with_expired_date() {
     // This should be caught by service validation before DB insert
     let request = CreateNhiRequest {
-        user_id: Uuid::new_v4(),
         name: "expired-test".to_string(),
         purpose: "Test with expiration in the past".to_string(),
         owner_id: Uuid::new_v4(),
@@ -673,7 +668,6 @@ fn test_create_request_with_same_backup_and_primary_owner() {
     let owner_id = Uuid::new_v4();
 
     let request = CreateNhiRequest {
-        user_id: Uuid::new_v4(),
         name: "same-owner-test".to_string(),
         purpose: "Test with same backup and primary owner".to_string(),
         owner_id,
@@ -787,7 +781,6 @@ fn test_suspend_request_all_reasons() {
 fn test_nhi_with_rotation_interval_boundaries() {
     // Test minimum valid rotation interval (1 day)
     let request_min = CreateNhiRequest {
-        user_id: Uuid::new_v4(),
         name: "min-rotation".to_string(),
         purpose: "Test minimum rotation interval".to_string(),
         owner_id: Uuid::new_v4(),
@@ -800,7 +793,6 @@ fn test_nhi_with_rotation_interval_boundaries() {
 
     // Test maximum valid rotation interval (365 days)
     let request_max = CreateNhiRequest {
-        user_id: Uuid::new_v4(),
         name: "max-rotation".to_string(),
         purpose: "Test maximum rotation interval".to_string(),
         owner_id: Uuid::new_v4(),
@@ -816,7 +808,6 @@ fn test_nhi_with_rotation_interval_boundaries() {
 fn test_nhi_with_inactivity_threshold_boundaries() {
     // Test minimum valid inactivity threshold (1 day)
     let request_min = CreateNhiRequest {
-        user_id: Uuid::new_v4(),
         name: "min-inactivity".to_string(),
         purpose: "Test minimum inactivity threshold".to_string(),
         owner_id: Uuid::new_v4(),
@@ -829,7 +820,6 @@ fn test_nhi_with_inactivity_threshold_boundaries() {
 
     // Test maximum valid inactivity threshold (365 days)
     let request_max = CreateNhiRequest {
-        user_id: Uuid::new_v4(),
         name: "max-inactivity".to_string(),
         purpose: "Test maximum inactivity threshold".to_string(),
         owner_id: Uuid::new_v4(),

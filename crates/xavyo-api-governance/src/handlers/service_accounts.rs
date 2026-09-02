@@ -116,7 +116,7 @@ pub async fn get_service_account(
         (status = 201, description = "Service account registered", body = ServiceAccountResponse),
         (status = 400, description = "Invalid request"),
         (status = 401, description = "Unauthorized"),
-        (status = 409, description = "User already registered as service account"),
+        (status = 409, description = "Service account name already exists"),
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = []))

@@ -118,7 +118,7 @@ pub async fn get_nhi(
         (status = 201, description = "NHI created", body = NhiResponse),
         (status = 400, description = "Invalid request"),
         (status = 401, description = "Unauthorized"),
-        (status = 409, description = "NHI name already exists or user already registered"),
+        (status = 409, description = "NHI name already exists"),
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = []))
