@@ -232,6 +232,8 @@ pub async fn list_campaign_items(
         total,
         page,
         page_size: limit,
+        limit,
+        offset,
     }))
 }
 
@@ -448,6 +450,8 @@ pub async fn get_my_certifications(
         total,
         page,
         page_size: limit,
+        limit,
+        offset,
     }))
 }
 
@@ -612,6 +616,19 @@ mod tests {
                 && details.contains("entitlements:")
                 && details.contains("due_date:"),
             "GET /governance/my-certifications must return advertised BFF aliases"
+        );
+    }
+
+    #[test]
+    fn certification_item_lists_return_limit_offset_aliases() {
+        let src = include_str!("certification_items.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let lists = production.matches("ItemListResponse {").count();
+        assert_eq!(lists, 2, "campaign items and my-certifications lists");
+        assert!(
+            production.contains("page_size: limit,\n        limit,\n        offset,")
+                || production.contains("limit,\n        offset,"),
+            "GET certification item lists must return advertised BFF limit/offset"
         );
     }
 }

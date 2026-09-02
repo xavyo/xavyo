@@ -796,13 +796,9 @@ impl NhiCertificationService {
         .await
         .map_err(GovernanceError::Database)?;
 
-        Ok(NhiCertificationSummary {
-            total: row.0,
-            pending: row.1,
-            certified: row.2,
-            revoked: row.3,
-            expired: row.4,
-        })
+        Ok(NhiCertificationSummary::from_counts(
+            row.0, row.1, row.2, row.3, row.4,
+        ))
     }
 
     // =========================================================================
@@ -1450,10 +1446,12 @@ impl NhiCertificationService {
             reviewer_id: item.reviewer_id,
             status: item.status,
             deadline: campaign.deadline,
+            due_date: campaign.deadline,
             decision: item.decision,
             decided_by: item.decided_by,
             decided_at: item.decided_at,
-            comment: item.comment,
+            comment: item.comment.clone(),
+            notes: item.comment,
             created_at: item.created_at,
         })
     }
@@ -1723,22 +1721,12 @@ mod tests {
 
     #[test]
     fn test_certification_summary_completion_rate() {
-        let summary = NhiCertificationSummary {
-            total: 100,
-            pending: 20,
-            certified: 60,
-            revoked: 15,
-            expired: 5,
-        };
+        let summary = NhiCertificationSummary::from_counts(100, 20, 60, 15, 5);
         assert_eq!(summary.completion_rate(), 80.0);
+        assert_eq!(summary.total_items, 100);
+        assert_eq!(summary.decided, 80);
 
-        let empty = NhiCertificationSummary {
-            total: 0,
-            pending: 0,
-            certified: 0,
-            revoked: 0,
-            expired: 0,
-        };
+        let empty = NhiCertificationSummary::from_counts(0, 0, 0, 0, 0);
         assert_eq!(empty.completion_rate(), 0.0);
     }
 
@@ -2007,8 +1995,10 @@ mod tests {
             .and_then(|s| s.split("    async fn ").next())
             .expect("item_to_response");
         assert!(
-            item.contains("nhi_type: nhi.nhi_type.as_str()"),
-            "GET certification items must return advertised nhi_type"
+            item.contains("nhi_type: nhi.nhi_type.as_str()")
+                && item.contains("due_date: campaign.deadline")
+                && item.contains("notes: item.comment"),
+            "GET certification items must return advertised nhi_type, due_date, and notes"
         );
     }
 

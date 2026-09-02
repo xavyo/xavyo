@@ -47,6 +47,10 @@ pub fn discovery_router(state: NhiState) -> Router; // Agent discovery (/.well-k
 | GET | `/nhi/:id` | Get NHI by ID |
 | GET | `/nhi/:id/risk` | Get risk score |
 | POST | `/nhi/:id/certify` | Certify NHI |
+| POST | `/nhi/:id/vault/secrets` | Store secret; accept advertised `secret_value` alias of `value` |
+| POST | `/nhi/:id/vault/secrets/:sid/rotate` | Rotate secret; accept advertised `new_value` alias of `value` |
+| POST | `/nhi/:id/vault/leases` | Create lease; accept advertised `consumer_nhi_id` / `ttl_seconds` |
+| GET | `/nhi/:id/vault/leases` | List leases; return advertised `consumer_nhi_id` alias of `lessee_nhi_id` |
 | GET | `/nhi/agents` | List agents |
 | GET | `/nhi/tools` | List tools |
 | GET | `/nhi/service-accounts` | List service accounts |
