@@ -2,6 +2,8 @@
 //!
 //! F061 - NHI Lifecycle Management
 
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
@@ -417,6 +419,16 @@ pub struct NhiUsageEventResponse {
     /// Request duration in milliseconds.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duration_ms: Option<i32>,
+
+    /// Advertised BFF alias of `action`.
+    pub activity_type: String,
+
+    /// Advertised BFF details (the target resource).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<String>,
+
+    /// Advertised BFF alias of `timestamp`.
+    pub performed_at: DateTime<Utc>,
 }
 
 impl From<GovNhiUsageEvent> for NhiUsageEventResponse {
@@ -425,12 +437,15 @@ impl From<GovNhiUsageEvent> for NhiUsageEventResponse {
             id: event.id,
             nhi_id: event.nhi_id,
             timestamp: event.timestamp,
-            target_resource: event.target_resource,
-            action: event.action,
+            target_resource: event.target_resource.clone(),
+            action: event.action.clone(),
             outcome: event.outcome,
             source_ip: event.source_ip,
             user_agent: event.user_agent,
             duration_ms: event.duration_ms,
+            activity_type: event.action,
+            details: Some(event.target_resource),
+            performed_at: event.timestamp,
         }
     }
 }
@@ -972,6 +987,20 @@ pub struct NhiUsageSummaryExtendedResponse {
     /// When the NHI was last used.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_used_at: Option<DateTime<Utc>>,
+
+    /// Advertised BFF alias of `last_used_at`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_activity_at: Option<DateTime<Utc>>,
+
+    /// First usage event in the period.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub first_activity_at: Option<DateTime<Utc>>,
+
+    /// Event counts keyed by action.
+    pub activity_types: HashMap<String, i64>,
+
+    /// Average events per day over `period_days`.
+    pub daily_average: f64,
 }
 
 /// Information about a stale NHI.
@@ -1002,6 +1031,19 @@ pub struct StaleNhiInfo {
     /// When grace period ends.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub grace_period_ends_at: Option<DateTime<Utc>>,
+
+    /// Advertised BFF alias of `nhi_id`.
+    pub id: Uuid,
+
+    /// NHI type (`service_account`, `agent`, `tool`).
+    pub nhi_type: String,
+
+    /// Current lifecycle state.
+    pub state: String,
+
+    /// Advertised BFF alias of `last_used_at`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_activity_at: Option<DateTime<Utc>>,
 }
 
 /// Staleness report response.
@@ -1024,6 +1066,18 @@ pub struct StalenessReportResponse {
 
     /// List of stale NHIs (sorted by `days_inactive` desc).
     pub stale_nhis: Vec<StaleNhiInfo>,
+
+    /// Advertised BFF alias of `stale_nhis`.
+    pub items: Vec<StaleNhiInfo>,
+
+    /// Advertised BFF alias of `total_stale`.
+    pub total: i64,
+
+    /// Page size used for `items`.
+    pub limit: i64,
+
+    /// Offset used for `items`.
+    pub offset: i64,
 }
 
 // =============================================================================
@@ -1128,6 +1182,9 @@ pub struct NhiCertificationItemResponse {
     /// NHI purpose.
     pub nhi_purpose: String,
 
+    /// NHI type (`service_account`, `agent`, `tool`).
+    pub nhi_type: String,
+
     /// NHI owner responsible.
     pub owner_id: Uuid,
 
@@ -1222,6 +1279,10 @@ pub struct CreateNhiCertificationCampaignRequest {
     #[serde(default)]
     pub specific_reviewers: Option<Vec<Uuid>>,
 
+    /// Campaign scope (`all`, `by_type`, `specific`).
+    #[serde(default)]
+    pub scope: Option<NhiCertCampaignScope>,
+
     /// Filter by NHI type (`service_account`, `agent`, `tool`).
     #[serde(default)]
     pub nhi_type_filter: Option<String>,
@@ -1236,6 +1297,19 @@ pub struct CreateNhiCertificationCampaignRequest {
 
 fn default_true() -> bool {
     true
+}
+
+/// Campaign NHI selection scope.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NhiCertCampaignScope {
+    /// Include all matching NHIs (owner / certification-needed filters still apply).
+    #[default]
+    All,
+    /// Restrict to `nhi_type_filter`.
+    ByType,
+    /// Restrict to `specific_nhi_ids`.
+    Specific,
 }
 
 /// Reviewer assignment strategy for NHI certification.
@@ -1370,6 +1444,9 @@ pub struct NhiCertificationCampaignResponse {
 
     /// Current status.
     pub status: NhiCertCampaignStatus,
+
+    /// Campaign scope (`all`, `by_type`, `specific`).
+    pub scope: NhiCertCampaignScope,
 
     /// Reviewer assignment strategy.
     pub reviewer_type: NhiCertReviewerType,

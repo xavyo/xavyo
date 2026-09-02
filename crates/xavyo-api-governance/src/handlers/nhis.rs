@@ -409,6 +409,14 @@ pub struct StalenessReportParams {
     /// Minimum days inactive to include in report.
     #[param(minimum = 1)]
     pub min_inactive_days: Option<i32>,
+
+    /// Maximum number of stale NHIs to return (default: 50, max: 100).
+    #[param(minimum = 1, maximum = 100)]
+    pub limit: Option<i64>,
+
+    /// Number of stale NHIs to skip.
+    #[param(minimum = 0)]
+    pub offset: Option<i64>,
 }
 
 /// Record a usage event for an NHI.
@@ -553,7 +561,12 @@ pub async fn get_nhi_staleness_report(
 
     let report = state
         .nhi_usage_service
-        .get_staleness_report(tenant_id, params.min_inactive_days)
+        .get_staleness_report(
+            tenant_id,
+            params.min_inactive_days,
+            params.limit,
+            params.offset,
+        )
         .await?;
 
     Ok(Json(report))
@@ -753,6 +766,7 @@ pub async fn create_nhi_certification_campaign(
             request.needs_certification_only,
             request.reviewer_type,
             request.specific_reviewers,
+            request.scope,
             request.nhi_type_filter,
             request.specific_nhi_ids,
             request.deadline,
@@ -1587,6 +1601,7 @@ mod tests {
         assert!(
             create.contains("request.owner_filter")
                 && create.contains("request.needs_certification_only")
+                && create.contains("request.scope")
                 && create.contains("request.nhi_type_filter")
                 && create.contains("request.specific_nhi_ids"),
             "POST /governance/nhis/certification/campaigns must pass advertised filters through"

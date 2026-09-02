@@ -2104,6 +2104,7 @@ impl Modify for SecurityAddon {
         xavyo_api_governance::models::NhiCertificationSummary,
         xavyo_api_governance::models::CreateNhiCertificationCampaignRequest,
         xavyo_api_governance::models::NhiCertReviewerType,
+        xavyo_api_governance::models::NhiCertCampaignScope,
         xavyo_api_governance::models::NhiCertificationDecisionRequest,
         xavyo_api_governance::models::BulkNhiCertificationDecisionRequest,
         xavyo_api_governance::models::BulkNhiCertificationResult,

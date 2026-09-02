@@ -156,6 +156,9 @@ fn test_usage_event_response_structure() {
         source_ip: Some("10.0.0.1".to_string()),
         user_agent: Some("Mozilla/5.0".to_string()),
         duration_ms: Some(100),
+        activity_type: "read".to_string(),
+        details: Some("api/users".to_string()),
+        performed_at: now,
     };
 
     assert_eq!(response.id, id);
@@ -168,22 +171,28 @@ fn test_usage_event_response_structure() {
 
 #[test]
 fn test_usage_event_response_serialization() {
+    let now = Utc::now();
     let response = NhiUsageEventResponse {
         id: Uuid::new_v4(),
         nhi_id: Uuid::new_v4(),
-        timestamp: Utc::now(),
+        timestamp: now,
         target_resource: "api/orders".to_string(),
         action: "create".to_string(),
         outcome: NhiUsageOutcome::Success,
         source_ip: None,
         user_agent: None,
         duration_ms: None,
+        activity_type: "create".to_string(),
+        details: Some("api/orders".to_string()),
+        performed_at: now,
     };
 
     let json = serde_json::to_string(&response).expect("Serialization failed");
     assert!(json.contains("api/orders"));
     assert!(json.contains("create"));
     assert!(json.contains("success"));
+    assert!(json.contains("activity_type"));
+    assert!(json.contains("performed_at"));
 }
 
 // ============================================================================
@@ -205,6 +214,10 @@ fn test_usage_summary_empty() {
         unique_resources: 0,
         top_resources: vec![],
         last_used_at: None,
+        last_activity_at: None,
+        first_activity_at: None,
+        activity_types: Default::default(),
+        daily_average: 0.0,
     };
 
     assert_eq!(summary.total_events, 0);
@@ -241,6 +254,10 @@ fn test_usage_summary_with_data() {
             },
         ],
         last_used_at: Some(now),
+        last_activity_at: Some(now),
+        first_activity_at: Some(now - Duration::days(30)),
+        activity_types: Default::default(),
+        daily_average: 1000.0 / 30.0,
     };
 
     assert_eq!(summary.total_events, 1000);
@@ -327,6 +344,10 @@ fn test_stale_nhi_info() {
         inactivity_threshold_days: 90,
         in_grace_period: false,
         grace_period_ends_at: None,
+        id: Uuid::new_v4(),
+        nhi_type: "service_account".to_string(),
+        state: "active".to_string(),
+        last_activity_at: None,
     };
 
     assert_eq!(stale.nhi_id, nhi_id);
@@ -349,6 +370,10 @@ fn test_stale_nhi_in_grace_period() {
         inactivity_threshold_days: 90,
         in_grace_period: true,
         grace_period_ends_at: Some(now + Duration::days(7)),
+        id: Uuid::new_v4(),
+        nhi_type: "service_account".to_string(),
+        state: "active".to_string(),
+        last_activity_at: Some(now - Duration::days(100)),
     };
 
     assert!(stale.in_grace_period);
@@ -366,6 +391,10 @@ fn test_stale_nhi_never_used() {
         inactivity_threshold_days: 90,
         in_grace_period: false,
         grace_period_ends_at: None,
+        id: Uuid::new_v4(),
+        nhi_type: "service_account".to_string(),
+        state: "active".to_string(),
+        last_activity_at: None,
     };
 
     assert!(stale.last_used_at.is_none());
@@ -386,6 +415,10 @@ fn test_staleness_report_empty() {
         critical_count: 0,
         warning_count: 0,
         stale_nhis: vec![],
+        items: vec![],
+        total: 0,
+        limit: 50,
+        offset: 0,
     };
 
     assert_eq!(report.total_stale, 0);
@@ -408,6 +441,10 @@ fn test_staleness_report_with_data() {
             inactivity_threshold_days: 90,
             in_grace_period: false,
             grace_period_ends_at: None,
+            id: Uuid::new_v4(),
+            nhi_type: "service_account".to_string(),
+            state: "active".to_string(),
+            last_activity_at: Some(now - Duration::days(200)),
         },
         StaleNhiInfo {
             nhi_id: Uuid::new_v4(),
@@ -418,6 +455,10 @@ fn test_staleness_report_with_data() {
             inactivity_threshold_days: 90,
             in_grace_period: false,
             grace_period_ends_at: None,
+            id: Uuid::new_v4(),
+            nhi_type: "service_account".to_string(),
+            state: "active".to_string(),
+            last_activity_at: Some(now - Duration::days(100)),
         },
     ];
 
@@ -427,7 +468,11 @@ fn test_staleness_report_with_data() {
         total_stale: 2,
         critical_count: 1, // >180 days
         warning_count: 1,  // 90-180 days
-        stale_nhis,
+        stale_nhis: stale_nhis.clone(),
+        items: stale_nhis,
+        total: 2,
+        limit: 50,
+        offset: 0,
     };
 
     assert_eq!(report.total_stale, 2);
@@ -600,6 +645,9 @@ fn test_usage_event_response_with_all_outcomes() {
             source_ip: None,
             user_agent: None,
             duration_ms: None,
+            activity_type: "test".to_string(),
+            details: Some("api/test".to_string()),
+            performed_at: Utc::now(),
         };
 
         let json = serde_json::to_string(&response).expect("Serialization failed");
@@ -625,6 +673,10 @@ fn test_summary_with_high_failure_rate() {
         unique_resources: 3,
         top_resources: vec![],
         last_used_at: Some(Utc::now()),
+        last_activity_at: Some(Utc::now()),
+        first_activity_at: None,
+        activity_types: Default::default(),
+        daily_average: 100.0 / 7.0,
     };
 
     assert!(summary.success_rate < 50.0, "High failure rate expected");
@@ -649,7 +701,15 @@ fn test_staleness_report_serialization() {
             inactivity_threshold_days: 90,
             in_grace_period: false,
             grace_period_ends_at: None,
+            id: Uuid::new_v4(),
+            nhi_type: "service_account".to_string(),
+            state: "active".to_string(),
+            last_activity_at: Some(now - Duration::days(100)),
         }],
+        items: vec![],
+        total: 1,
+        limit: 50,
+        offset: 0,
     };
 
     let json = serde_json::to_string(&report).expect("Serialization failed");

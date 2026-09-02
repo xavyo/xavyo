@@ -248,6 +248,7 @@ fn task_to_response(task: &A2aTask) -> A2aTaskResponse {
         created_at: task.created_at,
         started_at: task.started_at,
         completed_at: task.completed_at,
+        callback_url: task.callback_url.clone(),
     }
 }
 
@@ -387,6 +388,7 @@ mod tests {
         assert_eq!(response.target_agent_id, Some(target_id));
         assert_eq!(response.state, "pending");
         assert!(response.result.is_none());
+        assert!(response.callback_url.is_none());
     }
 
     #[test]
@@ -419,6 +421,10 @@ mod tests {
         assert!(response.result.is_some());
         assert!(response.started_at.is_some());
         assert!(response.completed_at.is_some());
+        assert_eq!(
+            response.callback_url.as_deref(),
+            Some("https://example.com/webhook")
+        );
     }
 
     #[test]
