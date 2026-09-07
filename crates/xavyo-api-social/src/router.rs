@@ -144,8 +144,8 @@ pub fn admin_social_router() -> Router<SocialState> {
 
 /// Create the complete social router with all routes.
 ///
-/// Typically, you would mount this at `/api/v1/auth/social` for public/auth routes
-/// and `/api/v1/admin/social-providers` for admin routes.
+/// Mount this at `/auth/social` for public/auth routes
+/// and `/admin/social-providers` for admin routes.
 pub fn social_router() -> Router<SocialState> {
     Router::new()
         .merge(public_social_router())

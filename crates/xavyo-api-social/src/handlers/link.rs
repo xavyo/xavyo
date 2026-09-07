@@ -91,11 +91,8 @@ pub async fn link_account(
             provider: provider_type,
         })?;
 
-    // Build redirect URI
-    let redirect_uri = format!(
-        "{}/api/v1/auth/social/{}/callback",
-        state.base_url, provider_type
-    );
+    // Build redirect URI (must match the mounted callback route, `/auth/social/{provider}/callback`)
+    let redirect_uri = format!("{}/auth/social/{}/callback", state.base_url, provider_type);
 
     // Exchange code for tokens (similar to callback)
     let (tokens, user_info) = match provider_type {
@@ -282,11 +279,8 @@ pub async fn initiate_link(
         oidc_nonce.clone(),
     )?;
 
-    // Build redirect URI
-    let redirect_uri = format!(
-        "{}/api/v1/auth/social/{}/callback",
-        state.base_url, provider_type
-    );
+    // Build redirect URI (must match the mounted callback route, `/auth/social/{provider}/callback`)
+    let redirect_uri = format!("{}/auth/social/{}/callback", state.base_url, provider_type);
 
     // Get authorization URL
     let nonce_ref = oidc_nonce.as_deref();

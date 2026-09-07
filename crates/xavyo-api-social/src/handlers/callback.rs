@@ -204,11 +204,8 @@ async fn process_callback(
         .and_then(|v| v.as_str())
         .map(String::from);
 
-    // Build redirect URI
-    let redirect_uri = format!(
-        "{}/api/v1/auth/social/{}/callback",
-        state.base_url, provider_type
-    );
+    // Build redirect URI (must match the mounted callback route, `/auth/social/{provider}/callback`)
+    let redirect_uri = format!("{}/auth/social/{}/callback", state.base_url, provider_type);
 
     // Exchange code for tokens and get user info
     let (tokens, mut user_info) = match provider_type {
@@ -804,6 +801,23 @@ mod tests {
         assert!(
             production.contains("social_login_allowed(user.is_active, user.is_locked())"),
             "existing social logins must refuse locked accounts"
+        );
+    }
+
+    #[test]
+    fn social_callback_redirect_uri_matches_mounted_route() {
+        // The redirect_uri sent to the provider must match the callback route
+        // mounted at `/auth/social/{provider}/callback` (see idp-api main.rs).
+        // A stale `/api/v1` prefix breaks token exchange and yields a 404 on return.
+        let src = include_str!("callback.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("/api/v1/auth/social/"),
+            "social callback redirect_uri must not use the unmounted /api/v1 prefix"
+        );
+        assert!(
+            production.contains("{}/auth/social/{}/callback"),
+            "social callback redirect_uri must target the mounted /auth/social route"
         );
     }
 

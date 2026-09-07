@@ -70,11 +70,8 @@ pub async fn authorize(
         oidc_nonce.clone(),
     )?;
 
-    // Build redirect URI
-    let redirect_uri = format!(
-        "{}/api/v1/auth/social/{}/callback",
-        state.base_url, provider_type
-    );
+    // Build redirect URI (must match the mounted callback route, `/auth/social/{provider}/callback`)
+    let redirect_uri = format!("{}/auth/social/{}/callback", state.base_url, provider_type);
 
     // Create provider instance and get authorization URL
     let nonce_ref = oidc_nonce.as_deref();
@@ -159,4 +156,23 @@ pub async fn available_providers(
         .collect();
 
     Ok(Json(AvailableProvidersResponse { providers }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn authorize_redirect_uri_matches_mounted_route() {
+        // The redirect_uri sent to the provider must match the callback route
+        // mounted at `/auth/social/{provider}/callback` (see idp-api main.rs).
+        let src = include_str!("authorize.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("/api/v1/auth/social/"),
+            "authorize redirect_uri must not use the unmounted /api/v1 prefix"
+        );
+        assert!(
+            production.contains("{}/auth/social/{}/callback"),
+            "authorize redirect_uri must target the mounted /auth/social route"
+        );
+    }
 }
