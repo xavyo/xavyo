@@ -11,8 +11,16 @@ use crate::services::{
 use axum::{extract::ConnectInfo, Extension, Json};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use uuid::Uuid;
 use validator::Validate;
+use xavyo_auth::JwtClaims;
 use xavyo_core::{TenantId, UserId};
+
+/// The current session id is the access token's `jti` (login pins jti == session id).
+/// Used to preserve the caller's own session when revoking on password change.
+pub(crate) fn current_session_id(claims: &JwtClaims) -> Option<Uuid> {
+    Uuid::parse_str(&claims.jti).ok()
+}
 
 /// Shared password change logic for both `/auth/password` and `/me/password`.
 pub(crate) async fn do_password_change(
@@ -24,6 +32,7 @@ pub(crate) async fn do_password_change(
     addr: SocketAddr,
     request: PasswordChangeRequest,
     revoke_sessions: bool,
+    current_session_id: Option<Uuid>,
 ) -> Result<Json<PasswordChangeResponse>, ApiAuthError> {
     request.validate().map_err(extract_validation_errors)?;
 
@@ -34,6 +43,7 @@ pub(crate) async fn do_password_change(
             &request.current_password,
             &request.new_password,
             revoke_sessions,
+            current_session_id,
             session_service,
         )
         .await?;
@@ -87,12 +97,17 @@ pub(crate) fn password_change_alert_recorded<T, E>(result: Result<T, E>) -> Resu
 pub async fn password_change_handler(
     Extension(tenant_id): Extension<TenantId>,
     Extension(user_id): Extension<UserId>,
+    Extension(claims): Extension<JwtClaims>,
     Extension(password_policy_service): Extension<Arc<PasswordPolicyService>>,
     Extension(alert_service): Extension<Arc<AlertService>>,
     Extension(session_service): Extension<Arc<SessionService>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(request): Json<PasswordChangeRequest>,
 ) -> Result<Json<PasswordChangeResponse>, ApiAuthError> {
+    // Honor the caller's revoke_other_sessions preference; preserve the current
+    // session so the user is not signed out by their own password change.
+    let revoke = request.revoke_other_sessions;
+    let current = current_session_id(&claims);
     do_password_change(
         &tenant_id,
         &user_id,
@@ -101,7 +116,8 @@ pub async fn password_change_handler(
         &session_service,
         addr,
         request,
-        true, // always revoke
+        revoke,
+        current,
     )
     .await
 }
@@ -134,6 +150,27 @@ mod tests {
         assert!(
             !production.contains("let _ = alert_service"),
             "must not report password change success when the alert was not recorded"
+        );
+    }
+
+    #[test]
+    fn password_change_honors_flag_and_preserves_current_session() {
+        let src = include_str!("password_change.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        // /auth/password must honor the caller's revoke_other_sessions preference
+        // rather than hardcoding a full revoke...
+        assert!(
+            !production.contains("true, // always revoke"),
+            "/auth/password must not hardcode revoke=true (ignores the checkbox)"
+        );
+        assert!(
+            production.contains("let revoke = request.revoke_other_sessions;"),
+            "/auth/password must use the request's revoke_other_sessions flag"
+        );
+        // ...and pass the current session id so the caller's own session survives.
+        assert!(
+            production.contains("current_session_id(&claims)"),
+            "password change must derive the current session id to preserve it"
         );
     }
 }

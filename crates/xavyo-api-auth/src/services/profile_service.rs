@@ -11,7 +11,7 @@ use crate::services::{AlertService, DeviceService, MfaService, SessionService, W
 use sqlx::PgPool;
 use tracing::info;
 use uuid::Uuid;
-use xavyo_db::{set_tenant_context, User};
+use xavyo_db::{set_tenant_context, User, UserWebAuthnCredential};
 
 /// Profile management service.
 #[derive(Clone)]
@@ -133,8 +133,14 @@ impl ProfileService {
             .map_err(ApiAuthError::Database)?
             .ok_or(ApiAuthError::UserNotFound)?;
 
-        // Get MFA status
+        // Get MFA status (TOTP) and WebAuthn passkey count. The overview must
+        // reflect passkeys too — a passkey-only user still has MFA enabled.
         let mfa_status = mfa_service.get_status(user_id, tenant_id).await?;
+        let webauthn_enabled =
+            UserWebAuthnCredential::count_by_user_id_and_tenant(&self.pool, tenant_id, user_id)
+                .await
+                .map_err(ApiAuthError::Database)?
+                > 0;
 
         // Get active sessions count
         let sessions = session_service
@@ -154,14 +160,16 @@ impl ProfileService {
             .await?;
 
         // Build MFA methods list
-        let mfa_methods = if mfa_status.totp_enabled {
-            vec!["totp".to_string()]
-        } else {
-            vec![]
-        };
+        let mut mfa_methods = Vec::new();
+        if mfa_status.totp_enabled {
+            mfa_methods.push("totp".to_string());
+        }
+        if webauthn_enabled {
+            mfa_methods.push("webauthn".to_string());
+        }
 
         Ok(SecurityOverviewResponse {
-            mfa_enabled: mfa_status.totp_enabled,
+            mfa_enabled: mfa_status.totp_enabled || webauthn_enabled,
             mfa_methods,
             trusted_devices_count,
             active_sessions_count,
