@@ -210,13 +210,35 @@ pub fn default_attributes(user: &UserAttributes) -> Vec<ResolvedAttribute> {
 pub const NAMEID_FORMAT_EMAIL: &str = "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress";
 pub const NAMEID_FORMAT_PERSISTENT: &str = "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent";
 pub const NAMEID_FORMAT_TRANSIENT: &str = "urn:oasis:names:tc:SAML:2.0:nameid-format:transient";
+pub const NAMEID_FORMAT_UNSPECIFIED: &str = "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified";
+
+/// Normalize a configured `NameID` format to its canonical URN.
+///
+/// The admin UI offers short labels (`emailAddress`, `persistent`, `transient`,
+/// `unspecified`); the assertion builder matches on the full URNs. Without this,
+/// an SP configured with a short label produced a null NameID and a 500 at SSO
+/// time. Returns `None` for genuinely unsupported formats so callers can reject
+/// them at config time rather than fail during assertion generation.
+#[must_use]
+pub fn normalize_nameid_format(format: &str) -> Option<String> {
+    match format.trim() {
+        "" | "emailAddress" | NAMEID_FORMAT_EMAIL => Some(NAMEID_FORMAT_EMAIL.to_string()),
+        "persistent" | NAMEID_FORMAT_PERSISTENT => Some(NAMEID_FORMAT_PERSISTENT.to_string()),
+        "transient" | NAMEID_FORMAT_TRANSIENT => Some(NAMEID_FORMAT_TRANSIENT.to_string()),
+        "unspecified" | NAMEID_FORMAT_UNSPECIFIED => Some(NAMEID_FORMAT_UNSPECIFIED.to_string()),
+        _ => None,
+    }
+}
 
 /// Check if a `NameID` format is supported
 #[must_use]
 pub fn is_supported_nameid_format(format: &str) -> bool {
     matches!(
         format,
-        NAMEID_FORMAT_EMAIL | NAMEID_FORMAT_PERSISTENT | NAMEID_FORMAT_TRANSIENT
+        NAMEID_FORMAT_EMAIL
+            | NAMEID_FORMAT_PERSISTENT
+            | NAMEID_FORMAT_TRANSIENT
+            | NAMEID_FORMAT_UNSPECIFIED
     )
 }
 
@@ -237,6 +259,10 @@ pub fn get_nameid_for_format(
                 .map(String::from)
                 .unwrap_or_else(|| format!("_transient_{}", uuid::Uuid::new_v4())),
         ),
+        // `unspecified` lets the IdP choose the identifier; email is the
+        // conventional default (Auth0/Okta do the same). This is an explicit,
+        // supported format — not a silent fallback for unknown ones.
+        NAMEID_FORMAT_UNSPECIFIED => Some(user.email.clone()),
         _ => None,
     }
 }
@@ -244,6 +270,46 @@ pub fn get_nameid_for_format(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn normalize_maps_short_labels_to_canonical_urns() {
+        // The admin UI offers these short labels; each must map to a URN the
+        // assertion builder recognizes (else SSO 500s with a null NameID).
+        assert_eq!(
+            normalize_nameid_format("emailAddress").as_deref(),
+            Some(NAMEID_FORMAT_EMAIL)
+        );
+        assert_eq!(
+            normalize_nameid_format("persistent").as_deref(),
+            Some(NAMEID_FORMAT_PERSISTENT)
+        );
+        assert_eq!(
+            normalize_nameid_format("transient").as_deref(),
+            Some(NAMEID_FORMAT_TRANSIENT)
+        );
+        assert_eq!(
+            normalize_nameid_format("unspecified").as_deref(),
+            Some(NAMEID_FORMAT_UNSPECIFIED)
+        );
+        // Full URNs pass through; unknown formats are rejected.
+        assert_eq!(
+            normalize_nameid_format(NAMEID_FORMAT_EMAIL).as_deref(),
+            Some(NAMEID_FORMAT_EMAIL)
+        );
+        assert_eq!(normalize_nameid_format("bogus"), None);
+    }
+
+    #[test]
+    fn every_ui_offered_format_yields_a_nameid() {
+        let user = test_user();
+        for label in ["emailAddress", "persistent", "transient", "unspecified"] {
+            let fmt = normalize_nameid_format(label).expect("normalizable");
+            assert!(
+                get_nameid_for_format(&user, &fmt, Some("sess")).is_some(),
+                "format {label} must produce a NameID"
+            );
+        }
+    }
 
     fn test_user() -> UserAttributes {
         UserAttributes {
@@ -374,14 +440,20 @@ mod tests {
             get_nameid_for_format(&user, NAMEID_FORMAT_PERSISTENT, None),
             Some("user-123".to_string())
         );
+        // A genuinely unknown/custom format must NOT silently become email.
         assert!(
             get_nameid_for_format(
                 &user,
-                "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified",
+                "urn:oasis:names:tc:SAML:2.0:nameid-format:kerberos",
                 None
             )
             .is_none(),
             "unsupported NameID format must not become email"
+        );
+        // `unspecified` is an explicitly supported format → email (IdP's choice).
+        assert_eq!(
+            get_nameid_for_format(&user, NAMEID_FORMAT_UNSPECIFIED, None),
+            Some("test@example.com".to_string())
         );
         let src = include_str!("attributes.rs");
         let production = src.split("mod tests").next().expect("production source");
