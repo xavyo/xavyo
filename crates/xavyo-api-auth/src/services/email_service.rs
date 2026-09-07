@@ -137,9 +137,18 @@ impl EmailConfig {
     }
 
     /// Build the password reset email body.
+    ///
+    /// The tenant is included in the link so that, after resetting, the "log in"
+    /// handoff preserves tenant context — otherwise a user resetting from a device
+    /// without the tenant cookie (e.g. a new device) would land on the system-tenant
+    /// login and fail to authenticate.
     #[must_use]
-    pub fn password_reset_body(&self, token: &str) -> String {
-        let url = self.password_reset_url(token);
+    pub fn password_reset_body(&self, token: &str, tenant_id: TenantId) -> String {
+        let url = format!(
+            "{}&tenant={}",
+            self.password_reset_url(token),
+            tenant_id.as_uuid()
+        );
         format!(
             r"Hi,
 
@@ -354,7 +363,7 @@ impl EmailSender for SmtpEmailSender {
             .parse()
             .map_err(|e| EmailError::InvalidAddress(format!("Invalid recipient: {e}")))?;
 
-        let body = self.config.password_reset_body(token);
+        let body = self.config.password_reset_body(token, tenant_id);
 
         let email = Message::builder()
             .from(from)
@@ -792,6 +801,34 @@ mod tests {
         assert_eq!(
             magic_url,
             "https://app.xavyo.com/passwordless/magic-link/verify?token=ml_token"
+        );
+    }
+
+    #[test]
+    fn password_reset_body_includes_tenant_for_login_handoff() {
+        let config = EmailConfig {
+            smtp_host: "smtp.example.com".to_string(),
+            smtp_port: 587,
+            smtp_username: "u".to_string(),
+            smtp_password: "p".to_string(),
+            smtp_tls: true,
+            from_address: "noreply@example.com".to_string(),
+            from_name: "Test".to_string(),
+            frontend_base_url: "https://app.xavyo.com".to_string(),
+            password_reset_path: "/reset-password".to_string(),
+            email_verify_path: "/verify-email".to_string(),
+            magic_link_path: "/passwordless/magic-link/verify".to_string(),
+        };
+        let tenant_id = TenantId::new();
+        let body = config.password_reset_body("abc123", tenant_id);
+        // The reset link must carry the tenant so the post-reset login preserves
+        // tenant context (otherwise a new-device reset lands on the system tenant).
+        assert!(
+            body.contains(&format!(
+                "https://app.xavyo.com/reset-password?token=abc123&tenant={}",
+                tenant_id.as_uuid()
+            )),
+            "reset email link must include the tenant; body was:\n{body}"
         );
     }
 
