@@ -174,7 +174,13 @@ impl AdminInviteService {
         .map_err(|e| ApiAuthError::Internal(e.to_string()))?;
 
         // Send invitation email
-        let invitation_url = format!("{}/invite/{}", self.frontend_base_url, raw_token);
+        // Include the tenant so the post-accept login preserves tenant context
+        // (a user accepting from a new device has no tenant cookie; without this
+        // they would land on the system-tenant login and fail to authenticate).
+        let invitation_url = format!(
+            "{}/invite/{}?tenant={}",
+            self.frontend_base_url, raw_token, tenant_id
+        );
         let role_label = if role == "admin" {
             "an administrator"
         } else {
@@ -510,7 +516,13 @@ If you didn't expect this invitation, you can safely ignore this email.
         .ok_or_else(|| ApiAuthError::Internal("Failed to refresh invitation".to_string()))?;
 
         // Send new email
-        let invitation_url = format!("{}/invite/{}", self.frontend_base_url, raw_token);
+        // Include the tenant so the post-accept login preserves tenant context
+        // (a user accepting from a new device has no tenant cookie; without this
+        // they would land on the system-tenant login and fail to authenticate).
+        let invitation_url = format!(
+            "{}/invite/{}?tenant={}",
+            self.frontend_base_url, raw_token, tenant_id
+        );
         let role_label = if invitation.role == "admin" {
             "an administrator"
         } else {
