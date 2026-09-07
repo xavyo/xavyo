@@ -232,6 +232,27 @@ pub fn decode_token_with_algorithm(
     algorithm: Algorithm,
     config: &ValidationConfig,
 ) -> Result<JwtClaims, AuthError> {
+    decode_token_into::<JwtClaims>(token, public_key_pem, algorithm, config)
+}
+
+/// Verify a token's signature/expiry/issuer and deserialize its claims into `T`.
+///
+/// Use this for tokens whose claim shape is not [`JwtClaims`] — most importantly
+/// ID tokens minted by *external* OIDC providers, which follow the OIDC spec (no
+/// `jti`, `aud` may be a string) rather than xavyo's internal token contract.
+/// Deserializing a foreign ID token into [`JwtClaims`] would reject spec-compliant
+/// tokens (e.g. Google's, which omit `jti`).
+///
+/// # Errors
+///
+/// Returns an [`AuthError`] if the key is invalid, the signature/claims fail
+/// validation, or the claims cannot be deserialized into `T`.
+pub fn decode_token_into<T: serde::de::DeserializeOwned>(
+    token: &str,
+    public_key_pem: &[u8],
+    algorithm: Algorithm,
+    config: &ValidationConfig,
+) -> Result<T, AuthError> {
     let key = match algorithm {
         Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512 => {
             DecodingKey::from_rsa_pem(public_key_pem)
@@ -256,8 +277,7 @@ pub fn decode_token_with_algorithm(
         validation.validate_aud = false;
     }
 
-    let token_data: TokenData<JwtClaims> =
-        decode(token, &key, &validation).map_err(map_jwt_error)?;
+    let token_data: TokenData<T> = decode(token, &key, &validation).map_err(map_jwt_error)?;
 
     Ok(token_data.claims)
 }
@@ -366,6 +386,57 @@ pwIDAQAB
 
         // Token should have 3 parts separated by dots
         assert_eq!(token.split('.').count(), 3);
+    }
+
+    #[test]
+    fn decode_token_into_accepts_spec_id_token_without_jti() {
+        // An external OIDC provider's ID token follows the spec: it has no `jti`
+        // and may encode `aud` as a plain string. The generic decoder must accept
+        // it, while the strict internal `JwtClaims` (requires `jti`, `Vec<String>`
+        // aud) must reject it — that gap is exactly why federation needs the
+        // permissive path.
+        #[derive(serde::Deserialize)]
+        struct IdTok {
+            sub: String,
+            iss: String,
+        }
+
+        let now = Utc::now().timestamp();
+        let claims = serde_json::json!({
+            "sub": "google-user-1",
+            "iss": "https://accounts.google.com",
+            "aud": "client-abc", // string audience (spec-legal), not an array
+            "exp": now + 3600,
+            "iat": now,
+            "email": "user@example.com",
+            // deliberately no `jti` and no xavyo-internal claims
+        });
+        let header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::RS256);
+        let key = jsonwebtoken::EncodingKey::from_rsa_pem(TEST_PRIVATE_KEY).unwrap();
+        let token = jsonwebtoken::encode(&header, &claims, &key).unwrap();
+
+        let cfg = ValidationConfig::default().issuer("https://accounts.google.com");
+
+        let decoded: IdTok = decode_token_into(
+            &token,
+            TEST_PUBLIC_KEY,
+            jsonwebtoken::Algorithm::RS256,
+            &cfg,
+        )
+        .expect("permissive decode must accept a spec-compliant ID token");
+        assert_eq!(decoded.sub, "google-user-1");
+        assert_eq!(decoded.iss, "https://accounts.google.com");
+
+        let strict = decode_token_with_algorithm(
+            &token,
+            TEST_PUBLIC_KEY,
+            jsonwebtoken::Algorithm::RS256,
+            &cfg,
+        );
+        assert!(
+            strict.is_err(),
+            "strict internal JwtClaims must reject a jti-less external ID token"
+        );
     }
 
     #[test]

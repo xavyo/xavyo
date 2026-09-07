@@ -69,8 +69,8 @@ pub use error::AuthError;
 pub use jsonwebtoken::Algorithm;
 pub use jwks::{JwkSet, JwksClient};
 pub use jwt::{
-    decode_token, decode_token_with_algorithm, decode_token_with_config, encode_token,
-    encode_token_with_kid, extract_kid, ValidationConfig,
+    decode_token, decode_token_into, decode_token_with_algorithm, decode_token_with_config,
+    encode_token, encode_token_with_kid, extract_kid, ValidationConfig,
 };
 pub use mtls::{
     cert_binding_satisfied, compute_x5t_s256, forwarded_cert_thumbprint, x5t_s256_from_pem,

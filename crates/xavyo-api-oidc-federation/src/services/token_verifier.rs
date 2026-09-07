@@ -5,8 +5,38 @@
 
 use crate::error::{FederationError, FederationResult};
 use crate::services::jwks_cache::JwksCache;
+use serde::Deserialize;
 use tracing::{debug, info, instrument, warn};
-use xavyo_auth::{decode_token_with_algorithm, JwtClaims, ValidationConfig};
+use xavyo_auth::{decode_token_into, ValidationConfig};
+
+/// Claims parsed from an *external* IdP ID token during verification.
+///
+/// Intentionally permissive: an upstream ID token follows the OIDC spec, not
+/// xavyo's internal token contract, so it may omit `jti` and may encode `aud`
+/// as a string. Deserializing into xavyo's internal `JwtClaims` (which requires
+/// `jti` and a `Vec<String>` audience) would reject spec-compliant tokens.
+#[derive(Debug, Clone, Deserialize)]
+pub struct VerifiedIdTokenClaims {
+    /// Subject identifier at the IdP.
+    pub sub: String,
+    /// Issuer.
+    pub iss: String,
+    /// Audience (string or array per the OIDC spec).
+    #[serde(default)]
+    pub aud: serde_json::Value,
+    /// Expiration (Unix seconds).
+    #[serde(default)]
+    pub exp: Option<i64>,
+    /// Issued-at (Unix seconds).
+    #[serde(default)]
+    pub iat: Option<i64>,
+    /// Nonce echoed from the authorization request.
+    #[serde(default)]
+    pub nonce: Option<String>,
+    /// Email, when present.
+    #[serde(default)]
+    pub email: Option<String>,
+}
 
 /// Configuration for token verification.
 #[derive(Clone)]
@@ -66,7 +96,7 @@ impl VerificationConfig {
 #[derive(Debug, Clone)]
 pub struct VerifiedToken {
     /// Validated claims from the token.
-    pub claims: JwtClaims,
+    pub claims: VerifiedIdTokenClaims,
     /// Key ID used for verification (if present in token header).
     pub kid: Option<String>,
     /// Issuer from the token.
@@ -178,17 +208,22 @@ impl TokenVerifierService {
         }
 
         // Verify the token
-        let claims = decode_token_with_algorithm(token, &info.pem, info.algorithm, &validation)
-            .map_err(|e| match e {
-                xavyo_auth::AuthError::TokenExpired => FederationError::TokenExpired,
-                xavyo_auth::AuthError::InvalidSignature => {
-                    FederationError::TokenVerificationFailed("Invalid signature".to_string())
-                }
-                xavyo_auth::AuthError::InvalidAlgorithm => {
-                    FederationError::TokenVerificationFailed("Unsupported algorithm".to_string())
-                }
-                _ => FederationError::TokenVerificationFailed(e.to_string()),
-            })?;
+        let claims = decode_token_into::<VerifiedIdTokenClaims>(
+            token,
+            &info.pem,
+            info.algorithm,
+            &validation,
+        )
+        .map_err(|e| match e {
+            xavyo_auth::AuthError::TokenExpired => FederationError::TokenExpired,
+            xavyo_auth::AuthError::InvalidSignature => {
+                FederationError::TokenVerificationFailed("Invalid signature".to_string())
+            }
+            xavyo_auth::AuthError::InvalidAlgorithm => {
+                FederationError::TokenVerificationFailed("Unsupported algorithm".to_string())
+            }
+            _ => FederationError::TokenVerificationFailed(e.to_string()),
+        })?;
 
         // Validate issuer if expected
         if let Some(ref expected) = self.config.expected_issuer {
@@ -268,14 +303,19 @@ impl TokenVerifierService {
             ValidationConfig::with_leeway(self.config.clock_skew_tolerance).issuer(expected_issuer);
 
         // Verify the token
-        let claims = decode_token_with_algorithm(token, &info.pem, info.algorithm, &validation)
-            .map_err(|e| match e {
-                xavyo_auth::AuthError::TokenExpired => FederationError::TokenExpired,
-                xavyo_auth::AuthError::InvalidSignature => {
-                    FederationError::TokenVerificationFailed("Invalid signature".to_string())
-                }
-                _ => FederationError::TokenVerificationFailed(e.to_string()),
-            })?;
+        let claims = decode_token_into::<VerifiedIdTokenClaims>(
+            token,
+            &info.pem,
+            info.algorithm,
+            &validation,
+        )
+        .map_err(|e| match e {
+            xavyo_auth::AuthError::TokenExpired => FederationError::TokenExpired,
+            xavyo_auth::AuthError::InvalidSignature => {
+                FederationError::TokenVerificationFailed("Invalid signature".to_string())
+            }
+            _ => FederationError::TokenVerificationFailed(e.to_string()),
+        })?;
 
         Ok(VerifiedToken {
             issuer: claims.iss.clone(),
