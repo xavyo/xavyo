@@ -9,10 +9,10 @@ use tracing::info;
 use utoipa::ToSchema;
 use uuid::Uuid;
 use webauthn_rs::prelude::{PublicKeyCredential, RequestChallengeResponse};
-use xavyo_core::UserId;
+use xavyo_auth::JwtClaims;
 use xavyo_webhooks::{EventPublisher, WebhookEvent};
 
-use crate::{error::ApiAuthError, router::AuthState};
+use crate::{error::ApiAuthError, models::TokenResponse, router::AuthState, services::AuthContext};
 
 /// Response containing `WebAuthn` authentication options.
 #[derive(Debug, Serialize, ToSchema)]
@@ -35,15 +35,6 @@ pub struct FinishAuthenticationRequest {
     pub credential: PublicKeyCredential,
 }
 
-/// Response after successful `WebAuthn` authentication.
-#[derive(Debug, Serialize, ToSchema)]
-pub struct AuthenticationSuccessResponse {
-    /// Success message.
-    pub message: String,
-    /// The credential ID that was used.
-    pub credential_id: String,
-}
-
 /// POST /auth/mfa/webauthn/authenticate/start
 ///
 /// Start `WebAuthn` authentication for MFA.
@@ -62,26 +53,26 @@ pub struct AuthenticationSuccessResponse {
 )]
 pub async fn start_webauthn_authentication(
     State(state): State<AuthState>,
-    Extension(user_id): Extension<UserId>,
-    Extension(tenant_id): Extension<xavyo_core::TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Extension(ip_address): Extension<Option<IpAddr>>,
     Extension(user_agent): Extension<Option<String>>,
 ) -> Result<(StatusCode, Json<AuthenticationOptionsResponse>), ApiAuthError> {
+    // Identity comes from the partial (mfa_verification) token. The UserId/TenantId
+    // request extensions are not populated for partial tokens, so read the claims
+    // directly — mirroring verify_totp.
+    if claims.purpose.as_deref() != Some("mfa_verification") {
+        return Err(ApiAuthError::PartialTokenInvalid);
+    }
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiAuthError::PartialTokenInvalid)?;
+    let tenant_id = claims.tid.ok_or(ApiAuthError::PartialTokenInvalid)?;
+
     // Start authentication ceremony
     let options = state
         .webauthn_service
-        .start_authentication(
-            *user_id.as_uuid(),
-            *tenant_id.as_uuid(),
-            ip_address,
-            user_agent,
-        )
+        .start_authentication(user_id, tenant_id, ip_address, user_agent)
         .await?;
 
-    info!(
-        user_id = %user_id.as_uuid(),
-        "WebAuthn authentication started"
-    );
+    info!(user_id = %user_id, "WebAuthn authentication started");
 
     Ok((
         StatusCode::OK,
@@ -98,7 +89,7 @@ pub async fn start_webauthn_authentication(
     path = "/auth/mfa/webauthn/authenticate/finish",
     request_body = FinishAuthenticationRequest,
     responses(
-        (status = 200, description = "Authentication successful", body = AuthenticationSuccessResponse),
+        (status = 200, description = "Authentication successful, tokens issued", body = TokenResponse),
         (status = 400, description = "Invalid authenticator response or verification failed"),
         (status = 401, description = "Invalid or expired partial token"),
         (status = 404, description = "Credential not found or challenge expired"),
@@ -108,29 +99,65 @@ pub async fn start_webauthn_authentication(
 )]
 pub async fn finish_webauthn_authentication(
     State(state): State<AuthState>,
-    Extension(user_id): Extension<UserId>,
-    Extension(tenant_id): Extension<xavyo_core::TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Extension(ip_address): Extension<Option<IpAddr>>,
     Extension(user_agent): Extension<Option<String>>,
     publisher: Option<Extension<EventPublisher>>,
     Json(request): Json<FinishAuthenticationRequest>,
-) -> Result<(StatusCode, Json<AuthenticationSuccessResponse>), ApiAuthError> {
-    // Finish authentication ceremony
+) -> Result<(StatusCode, Json<TokenResponse>), ApiAuthError> {
+    // This endpoint completes the login MFA challenge, so it must run against a
+    // partial (mfa_verification) token — mirroring the TOTP/recovery verify paths.
+    // Identity comes from the token claims (UserId/TenantId extensions are not
+    // populated for partial tokens).
+    if claims.purpose.as_deref() != Some("mfa_verification") {
+        return Err(ApiAuthError::PartialTokenInvalid);
+    }
+
+    let uid = Uuid::parse_str(&claims.sub).map_err(|_| ApiAuthError::PartialTokenInvalid)?;
+    let tid = claims.tid.ok_or(ApiAuthError::PartialTokenInvalid)?;
+
+    // Finish the authenticator assertion ceremony.
     let credential_id = state
         .webauthn_service
         .finish_authentication(
-            *user_id.as_uuid(),
-            *tenant_id.as_uuid(),
+            uid,
+            tid,
             &request.credential,
             ip_address,
+            user_agent.clone(),
+        )
+        .await?;
+
+    // Issue a full session (mirrors verify_totp): password + WebAuthn = MFA.
+    // SECURITY: fail closed if the role fetch fails rather than issuing a
+    // downgraded token.
+    let user = xavyo_db::User::find_by_id_in_tenant(&state.pool, tid, uid)
+        .await
+        .map_err(ApiAuthError::Database)?
+        .ok_or(ApiAuthError::InvalidCredentials)?;
+    let roles = xavyo_db::UserRole::get_user_roles(&state.pool, uid, tid)
+        .await
+        .map_err(|e| {
+            tracing::error!(user_id = %uid, error = %e, "Failed to fetch user roles during WebAuthn MFA verification");
+            ApiAuthError::Internal("Failed to fetch user roles".to_string())
+        })?;
+    let tokens = state
+        .token_service
+        .create_tokens(
+            user.user_id(),
+            user.tenant_id(),
+            roles,
+            Some(user.email.clone()),
+            Some(AuthContext::webauthn()),
             user_agent,
+            ip_address,
         )
         .await?;
 
     info!(
-        user_id = %user_id.as_uuid(),
+        user_id = %uid,
         credential_id = %credential_id,
-        "WebAuthn authentication successful"
+        "WebAuthn MFA verification successful, tokens issued"
     );
 
     // F085: Publish auth.mfa.verified webhook event
@@ -138,11 +165,11 @@ pub async fn finish_webauthn_authentication(
         publisher.publish(WebhookEvent {
             event_id: Uuid::new_v4(),
             event_type: "auth.mfa.verified".to_string(),
-            tenant_id: *tenant_id.as_uuid(),
-            actor_id: Some(*user_id.as_uuid()),
+            tenant_id: tid,
+            actor_id: Some(uid),
             timestamp: chrono::Utc::now(),
             data: serde_json::json!({
-                "user_id": user_id.as_uuid(),
+                "user_id": uid,
                 "factor_type": "webauthn",
             }),
         });
@@ -150,9 +177,6 @@ pub async fn finish_webauthn_authentication(
 
     Ok((
         StatusCode::OK,
-        Json(AuthenticationSuccessResponse {
-            message: "Authentication successful".to_string(),
-            credential_id: credential_id.to_string(),
-        }),
+        Json(TokenResponse::new(tokens.0, tokens.1, tokens.2)),
     ))
 }

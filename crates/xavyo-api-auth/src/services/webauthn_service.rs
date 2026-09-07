@@ -402,14 +402,13 @@ impl WebAuthnService {
             return Err(ApiAuthError::WebAuthnNoCredentials);
         }
 
-        // Convert to passkeys for webauthn-rs
+        // Convert to passkeys for webauthn-rs. Registration stores the full
+        // `Passkey` (serde_json::to_vec(&passkey)), so it must be deserialized
+        // back as a `Passkey` — deserializing as a bare `Credential` fails for
+        // every row and makes the user look like they have no credentials.
         let passkeys: Vec<Passkey> = credentials
             .iter()
-            .filter_map(|c| {
-                let cred: webauthn_rs::prelude::Credential =
-                    serde_json::from_slice(&c.public_key).ok()?;
-                Some(Passkey::from(cred))
-            })
+            .filter_map(|c| serde_json::from_slice::<Passkey>(&c.public_key).ok())
             .collect();
 
         if passkeys.is_empty() {
