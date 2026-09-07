@@ -14,7 +14,8 @@ pub struct CreateInvitationRequest {
     /// Optional role template to assign on acceptance.
     pub role_template_id: Option<Uuid>,
 
-    /// Role to assign: "member" or "admin". Defaults to "admin" if omitted.
+    /// Role to assign: "member" or "admin". Defaults to "member" (least
+    /// privilege) if omitted.
     pub role: Option<String>,
 }
 
@@ -32,9 +33,11 @@ impl CreateInvitationRequest {
         Ok(())
     }
 
-    /// Get the resolved role, defaulting to "admin" if not specified.
+    /// Get the resolved role, defaulting to "member" (least privilege) when a
+    /// role is not specified. Defaulting to "admin" would silently grant
+    /// administrator access to every invitee created without an explicit role.
     pub fn resolved_role(&self) -> &str {
-        self.role.as_deref().unwrap_or("admin")
+        self.role.as_deref().unwrap_or("member")
     }
 }
 
@@ -248,20 +251,22 @@ mod tests {
     }
 
     #[test]
-    fn test_resolved_role_defaults_to_admin() {
+    fn test_resolved_role_defaults_to_member() {
+        // Least privilege: an invite created without an explicit role must NOT
+        // grant administrator access.
         let req = CreateInvitationRequest {
             email: "test@example.com".to_string(),
             role_template_id: None,
             role: None,
         };
-        assert_eq!(req.resolved_role(), "admin");
+        assert_eq!(req.resolved_role(), "member");
 
         let req = CreateInvitationRequest {
             email: "test@example.com".to_string(),
             role_template_id: None,
-            role: Some("member".to_string()),
+            role: Some("admin".to_string()),
         };
-        assert_eq!(req.resolved_role(), "member");
+        assert_eq!(req.resolved_role(), "admin");
     }
 
     #[test]
