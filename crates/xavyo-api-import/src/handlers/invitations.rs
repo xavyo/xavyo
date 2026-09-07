@@ -260,41 +260,117 @@ pub async fn accept_invitation(
     let password_hash = xavyo_auth::hash_password(&body.password)
         .map_err(|e| ImportError::Internal(format!("Failed to hash password: {e}")))?;
 
-    // Atomically mark invitation as accepted (prevents concurrent double-acceptance)
-    let accepted = UserInvitation::mark_accepted(
-        &pool,
-        invitation.tenant_id,
-        invitation.id,
-        None, // IP address — can be extracted from ConnectInfo if needed
-        None, // User-Agent — can be extracted from headers if needed
-    )
-    .await?;
+    // Two invitation shapes share this endpoint:
+    //  - Bulk-import invitations pre-create the user (user_id set): activate + set password.
+    //  - Admin invitations have no user yet (user_id NULL): create the account and
+    //    assign the invited role. Previously the UPDATE below matched zero rows for
+    //    admin invitations, so acceptance reported success but never created the
+    //    account — the invited user could never log in.
+    if let Some(existing_user_id) = invitation.user_id {
+        // Atomically mark invitation as accepted (prevents concurrent double-acceptance)
+        let accepted =
+            UserInvitation::mark_accepted(&pool, invitation.tenant_id, invitation.id, None, None)
+                .await?;
+        if accepted.is_none() {
+            return Err(ImportError::TokenAlreadyUsed);
+        }
 
-    // If mark_accepted returned None, the invitation was already accepted concurrently
-    if accepted.is_none() {
-        return Err(ImportError::TokenAlreadyUsed);
+        sqlx::query(
+            r"
+            UPDATE users
+            SET password_hash = $3, is_active = true, email_verified = true,
+                email_verified_at = NOW(), updated_at = NOW()
+            WHERE id = $1 AND tenant_id = $2
+            ",
+        )
+        .bind(existing_user_id)
+        .bind(invitation.tenant_id)
+        .bind(&password_hash)
+        .execute(&pool)
+        .await?;
+
+        tracing::info!(
+            user_id = %existing_user_id,
+            invitation_id = %invitation.id,
+            "Invitation accepted, existing account activated"
+        );
+    } else {
+        // Admin invitation: create the user and assign the invited role atomically.
+        let email = invitation
+            .email
+            .as_ref()
+            .ok_or_else(|| ImportError::Internal("Invitation missing email".to_string()))?;
+
+        let mut tx = pool
+            .begin()
+            .await
+            .map_err(|e| ImportError::Internal(format!("Failed to begin transaction: {e}")))?;
+
+        // RLS tenant context for the transaction.
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(invitation.tenant_id.to_string())
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| ImportError::Internal(format!("Failed to set tenant context: {e}")))?;
+
+        // Atomic single-use guard.
+        let status: Option<(String,)> = sqlx::query_as(
+            "SELECT status FROM user_invitations WHERE id = $1 AND tenant_id = $2 FOR UPDATE",
+        )
+        .bind(invitation.id)
+        .bind(invitation.tenant_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        match status {
+            Some((s,)) if s == "pending" || s == "sent" => {}
+            Some(_) => return Err(ImportError::TokenAlreadyUsed),
+            None => return Err(ImportError::InvalidToken),
+        }
+
+        let new_user_id = uuid::Uuid::new_v4();
+        sqlx::query(
+            r"
+            INSERT INTO users (id, tenant_id, email, password_hash, is_active, email_verified, email_verified_at, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, true, true, NOW(), NOW(), NOW())
+            ",
+        )
+        .bind(new_user_id)
+        .bind(invitation.tenant_id)
+        .bind(email)
+        .bind(&password_hash)
+        .execute(&mut *tx)
+        .await?;
+
+        sqlx::query("INSERT INTO user_roles (user_id, role_name) VALUES ($1, $2)")
+            .bind(new_user_id)
+            .bind(&invitation.role)
+            .execute(&mut *tx)
+            .await?;
+
+        sqlx::query(
+            r"
+            UPDATE user_invitations
+            SET status = 'accepted', accepted_at = NOW(), user_id = $3, updated_at = NOW()
+            WHERE id = $1 AND tenant_id = $2
+            ",
+        )
+        .bind(invitation.id)
+        .bind(invitation.tenant_id)
+        .bind(new_user_id)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit()
+            .await
+            .map_err(|e| ImportError::Internal(format!("Failed to commit: {e}")))?;
+
+        tracing::info!(
+            user_id = %new_user_id,
+            invitation_id = %invitation.id,
+            role = %invitation.role,
+            "Admin invitation accepted, account created and role assigned"
+        );
     }
-
-    // Update user: set password and activate
-    sqlx::query(
-        r"
-        UPDATE users
-        SET password_hash = $3, is_active = true, email_verified = true,
-            email_verified_at = NOW(), updated_at = NOW()
-        WHERE id = $1 AND tenant_id = $2
-        ",
-    )
-    .bind(invitation.user_id)
-    .bind(invitation.tenant_id)
-    .bind(&password_hash)
-    .execute(&pool)
-    .await?;
-
-    tracing::info!(
-        user_id = ?invitation.user_id,
-        invitation_id = %invitation.id,
-        "Invitation accepted, account activated"
-    );
 
     Ok(Json(AcceptInvitationResponse {
         success: true,
@@ -321,4 +397,34 @@ fn hash_token(token: &str) -> String {
 /// Get frontend base URL from environment.
 fn get_frontend_base_url() -> String {
     std::env::var("FRONTEND_BASE_URL").unwrap_or_else(|_| "https://app.xavyo.com".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn accept_creates_user_and_role_for_admin_invitation() {
+        // Admin invitations have user_id = NULL (no pre-created user). The accept
+        // handler must CREATE the user and assign the invited role for that case —
+        // otherwise acceptance silently no-ops (the old UPDATE ... WHERE id = NULL
+        // matched zero rows) and the invited user can never log in.
+        let src = include_str!("invitations.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let accept = production
+            .split("pub async fn accept_invitation")
+            .nth(1)
+            .expect("accept_invitation handler");
+        assert!(
+            accept.contains("if let Some(existing_user_id) = invitation.user_id"),
+            "accept must branch on whether the invitation has a pre-created user"
+        );
+        assert!(
+            accept.contains("INSERT INTO users"),
+            "accept must create the user for admin invitations (user_id NULL)"
+        );
+        assert!(
+            accept.contains("INSERT INTO user_roles (user_id, role_name)")
+                && accept.contains("&invitation.role"),
+            "accept must assign the invited role for admin invitations"
+        );
+    }
 }
