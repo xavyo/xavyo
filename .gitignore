@@ -134,7 +134,10 @@ temp/
 # --------------------------------------------
 # Claude Code / AI tools
 # --------------------------------------------
-.claude/
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/development-lifecycle
 .cursor/
 .aider*
 .codeium/
@@ -142,6 +145,7 @@ temp/
 .ralph/
 .specify/
 # Note: CLAUDE.md is tracked - it contains project guidelines for AI-assisted development
+# GraphPact Claude skill adapter (.claude/skills/development-lifecycle) is tracked
 
 # --------------------------------------------
 # Docker (local data)
@@ -185,6 +189,9 @@ specs/
 *.seed
 *.pid.lock
 .lock-wscript
+__pycache__/
+*.pyc
+.DS_Store
 
 # Package manager locks (keep Cargo.lock for Rust)
 package-lock.json
