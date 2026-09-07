@@ -16,7 +16,7 @@ use common::{
     generate_duplicate_email_csv, generate_empty_csv, generate_empty_email_csv,
     generate_invalid_email_csv, generate_large_csv, generate_long_field_csv,
     generate_missing_email_column_csv, generate_mixed_csv, generate_semicolon_csv,
-    generate_valid_csv, unique_test_prefix, ImportTestContext,
+    generate_valid_csv, unique_test_prefix, unique_token_hash, ImportTestContext,
 };
 use uuid::Uuid;
 use xavyo_api_import::models::{CsvDelimiter, CsvParseConfig, DuplicateCheckFields};
@@ -154,6 +154,17 @@ mod job_lifecycle {
                 "Job should have {} rows",
                 row_count
             );
+
+            UserImportJob::mark_completed(
+                ctx.admin_pool.inner(),
+                *tenant_id.as_uuid(),
+                job.id,
+                row_count as i32,
+                0,
+                0,
+            )
+            .await
+            .expect("Failed to complete job");
         }
     }
 
@@ -292,13 +303,13 @@ mod job_lifecycle {
         let prefix = unique_test_prefix("list-jobs");
         let tenant_id = ctx.create_unique_tenant(&prefix).await;
 
-        // Create multiple jobs
+        // Create multiple jobs (only one active job allowed per tenant)
         let _job1 = ctx
             .create_import_job(tenant_id, "first.csv", 10, "completed")
             .await;
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         let _job2 = ctx
-            .create_import_job(tenant_id, "second.csv", 20, "processing")
+            .create_import_job(tenant_id, "second.csv", 20, "completed")
             .await;
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         let job3 = ctx
@@ -391,10 +402,11 @@ mod tenant_isolation {
             .create_import_job(tenant_a, "tenant_a.csv", 10, "completed")
             .await;
         ctx.create_import_error(
+            tenant_a,
             job_id,
             5,
             Some("bad@email"),
-            "invalid_email",
+            "validation",
             "Invalid format",
         )
         .await;
@@ -641,14 +653,18 @@ mod error_scenarios {
         let csv_data = generate_empty_csv();
         let config = CsvParseConfig::new();
 
-        let result = parse_csv_with_config(csv_data.as_bytes(), &config).unwrap();
+        let result = parse_csv_with_config(csv_data.as_bytes(), &config);
 
-        assert_eq!(
-            result.rows.len(),
-            0,
-            "Header-only CSV should have 0 data rows"
+        assert!(
+            result.is_err(),
+            "Header-only CSV should be rejected with no data rows"
         );
-        assert_eq!(result.errors.len(), 0, "No errors for empty CSV");
+        assert!(
+            result
+                .unwrap_err()
+                .contains("no data rows"),
+            "Error should mention missing data rows"
+        );
     }
 
     #[tokio::test]
@@ -679,18 +695,20 @@ mod error_scenarios {
 
         // Create errors with specific line numbers
         ctx.create_import_error(
+            tenant_id,
             job_id,
             3,
             Some("bad@email"),
-            "invalid_email",
+            "validation",
             "Invalid format",
         )
         .await;
         ctx.create_import_error(
+            tenant_id,
             job_id,
             7,
             Some("dup@email"),
-            "duplicate_email",
+            "duplicate_in_file",
             "Already exists",
         )
         .await;
@@ -857,22 +875,25 @@ mod concurrency {
     async fn test_five_concurrent_jobs_complete_correctly() {
         let ctx = ImportTestContext::new().await;
         let prefix = unique_test_prefix("concurrent");
-        let tenant_id = ctx.create_unique_tenant(&prefix).await;
 
-        // Create 5 jobs
+        // One active job per tenant — use separate tenants for concurrent processing.
         let mut job_ids = Vec::new();
+        let mut tenant_ids = Vec::new();
         for i in 0..5 {
+            let tenant_id = ctx.create_unique_tenant(&format!("{}-{}", prefix, i)).await;
             let job_id = ctx
                 .create_import_job(tenant_id, &format!("concurrent_{}.csv", i), 100, "pending")
                 .await;
             job_ids.push(job_id);
+            tenant_ids.push(tenant_id);
         }
 
         // Process all concurrently using tokio::spawn
         let mut handles = Vec::new();
-        for &job_id in &job_ids {
+        for (i, job_id) in job_ids.iter().enumerate() {
             let pool = ctx.admin_pool.inner().clone();
-            let tid = *tenant_id.as_uuid();
+            let tid = *tenant_ids[i].as_uuid();
+            let job_id = *job_id;
             let handle = tokio::spawn(async move {
                 UserImportJob::mark_started(&pool, tid, job_id).await?;
                 UserImportJob::mark_completed(&pool, tid, job_id, 95, 3, 2).await
@@ -892,7 +913,8 @@ mod concurrency {
         }
 
         // Verify all have correct counts
-        for job_id in &job_ids {
+        for (i, job_id) in job_ids.iter().enumerate() {
+            let tenant_id = tenant_ids[i];
             let job =
                 UserImportJob::find_by_id(ctx.admin_pool.inner(), *tenant_id.as_uuid(), *job_id)
                     .await
@@ -974,10 +996,21 @@ mod concurrency {
         let prefix = unique_test_prefix("under-load");
         let tenant_id = ctx.create_unique_tenant(&prefix).await;
 
-        // Create some active jobs
+        // Completed jobs do not block new pending jobs for the same tenant
         for i in 0..3 {
-            ctx.create_import_job(tenant_id, &format!("active_{}.csv", i), 100, "processing")
+            let completed_job_id = ctx
+                .create_import_job(tenant_id, &format!("active_{}.csv", i), 100, "pending")
                 .await;
+            UserImportJob::mark_completed(
+                ctx.admin_pool.inner(),
+                *tenant_id.as_uuid(),
+                completed_job_id,
+                100,
+                0,
+                0,
+            )
+            .await
+            .expect("Failed to complete prior job");
         }
 
         // Should still be able to create new job
@@ -1044,7 +1077,7 @@ mod invitations {
                 tenant_id,
                 user_id,
                 &email,
-                "token_hash_123",
+                &unique_token_hash(&format!("{}-create", prefix)),
                 "pending",
                 expires_at,
             )
@@ -1079,7 +1112,7 @@ mod invitations {
                 tenant_id,
                 user_id,
                 &email,
-                "valid_token_hash",
+                &unique_token_hash(&format!("{}-valid", prefix)),
                 "pending",
                 expires_at,
             )
@@ -1115,7 +1148,7 @@ mod invitations {
                 tenant_id,
                 user_id,
                 &email,
-                "accept_token_hash",
+                &unique_token_hash(&format!("{}-accept", prefix)),
                 "pending",
                 expires_at,
             )
@@ -1156,7 +1189,7 @@ mod invitations {
                 tenant_id,
                 user_id,
                 &email,
-                "expired_token_hash",
+                &unique_token_hash(&format!("{}-expired", prefix)),
                 "pending",
                 expires_at,
             )
@@ -1189,7 +1222,7 @@ mod invitations {
                 tenant_id,
                 user_id,
                 &email,
-                "already_used_hash",
+                &unique_token_hash(&format!("{}-already", prefix)),
                 "accepted", // Already accepted
                 expires_at,
             )
@@ -1220,12 +1253,13 @@ mod invitations {
 
         // Create invitation expiring soon
         let old_expires = Utc::now() + Duration::hours(1);
+        let old_token_hash = unique_token_hash(&format!("{}-old", prefix));
         let inv_id = ctx
             .create_invitation(
                 tenant_id,
                 user_id,
                 &email,
-                "old_token_hash",
+                &old_token_hash,
                 "pending",
                 old_expires,
             )
@@ -1233,8 +1267,9 @@ mod invitations {
 
         // Simulate resend by updating expiry and token
         let new_expires = Utc::now() + Duration::hours(24);
+        let new_token_hash = unique_token_hash(&format!("{}-new", prefix));
         sqlx::query("UPDATE user_invitations SET token_hash = $1, expires_at = $2 WHERE id = $3")
-            .bind("new_token_hash")
+            .bind(&new_token_hash)
             .bind(new_expires)
             .bind(inv_id)
             .execute(ctx.admin_pool.inner())
@@ -1272,7 +1307,7 @@ mod invitations {
                 tenant_a,
                 user_id,
                 &email,
-                "iso_token_hash",
+                &unique_token_hash(&format!("{}-iso", prefix)),
                 "pending",
                 expires_at,
             )

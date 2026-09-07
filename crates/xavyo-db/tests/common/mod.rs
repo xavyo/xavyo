@@ -70,7 +70,7 @@ impl TestContext {
     pub async fn new() -> Self {
         init_test_logging();
 
-        let pool = DbPool::connect(&get_app_database_url()).await.expect(
+        let pool = DbPool::connect_app(&get_app_database_url()).await.expect(
             "Failed to connect as app user. Is PostgreSQL running? Try: ./scripts/dev-env.sh start",
         );
 
@@ -119,45 +119,27 @@ impl TestContext {
         id
     }
 
-    /// Get the well-known test tenant ID (from seed data).
-    ///
-    /// This matches the tenant created by docker/postgres/seed.sql.
-    #[allow(dead_code)]
+    /// Well-known system tenant ID (bootstrap / migrations).
     pub fn seed_tenant_id() -> TenantId {
         TenantId::from_uuid(
             uuid::Uuid::parse_str("00000000-0000-0000-0000-000000000001")
-                .expect("Invalid seed tenant UUID"),
+                .expect("Invalid system tenant UUID"),
         )
-    }
-
-    /// Get the well-known admin user email (from seed data).
-    pub fn seed_admin_email() -> &'static str {
-        "admin@test.xavyo.com"
-    }
-
-    /// Get the well-known regular user email (from seed data).
-    #[allow(dead_code)]
-    pub fn seed_user_email() -> &'static str {
-        "user@test.xavyo.com"
     }
 
     /// Clean up test data created during tests.
     ///
     /// Uses admin pool to bypass RLS.
-    /// Note: This does NOT remove seed data to avoid breaking other tests.
-    /// Note: Currently unused as tests use unique IDs for parallel safety.
+    /// Note: Preserves the system tenant. Currently unused — tests use unique IDs.
     #[allow(dead_code)]
     pub async fn cleanup(&self) {
-        // Only clean up dynamically created test data, not seed data
-        // Delete users that are not the seed users
         sqlx::query(
-            "DELETE FROM users WHERE email NOT IN ('admin@test.xavyo.com', 'user@test.xavyo.com', 'inactive@test.xavyo.com')"
+            "DELETE FROM users WHERE tenant_id != '00000000-0000-0000-0000-000000000001'::uuid",
         )
         .execute(self.admin_pool.inner())
         .await
         .ok();
 
-        // Delete tenants that are not the seed tenant
         sqlx::query("DELETE FROM tenants WHERE id != '00000000-0000-0000-0000-000000000001'::uuid")
             .execute(self.admin_pool.inner())
             .await

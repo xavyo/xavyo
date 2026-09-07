@@ -35,6 +35,7 @@ mod lifecycle_config_tests {
                 name: "User Lifecycle".to_string(),
                 description: Some("Lifecycle configuration for user objects".to_string()),
                 object_type: LifecycleObjectType::User,
+                auto_assign_initial_state: true,
             };
 
             let config = service
@@ -63,6 +64,7 @@ mod lifecycle_config_tests {
                 name: "User Lifecycle".to_string(),
                 description: None,
                 object_type: LifecycleObjectType::User,
+                auto_assign_initial_state: true,
             };
 
             // First creation should succeed
@@ -96,6 +98,7 @@ mod lifecycle_config_tests {
                     name: format!("{:?} Lifecycle", obj_type),
                     description: None,
                     object_type: obj_type,
+                    auto_assign_initial_state: true,
                 };
                 let _ = service.create_config(tenant_id, request).await.unwrap();
             }
@@ -131,6 +134,7 @@ mod lifecycle_config_tests {
                 name: "User Lifecycle".to_string(),
                 description: None,
                 object_type: LifecycleObjectType::User,
+                auto_assign_initial_state: true,
             };
             let _ = service
                 .create_config(tenant_id, user_request)
@@ -142,6 +146,7 @@ mod lifecycle_config_tests {
                 name: "Role Lifecycle".to_string(),
                 description: None,
                 object_type: LifecycleObjectType::Role,
+                auto_assign_initial_state: true,
             };
             let _ = service
                 .create_config(tenant_id, role_request)
@@ -179,6 +184,7 @@ mod lifecycle_config_tests {
                 name: "User Lifecycle".to_string(),
                 description: Some("Test description".to_string()),
                 object_type: LifecycleObjectType::User,
+                auto_assign_initial_state: true,
             };
 
             let created = service
@@ -211,6 +217,7 @@ mod lifecycle_config_tests {
                 name: "User Lifecycle".to_string(),
                 description: None,
                 object_type: LifecycleObjectType::User,
+                auto_assign_initial_state: true,
             };
 
             let created = service
@@ -222,6 +229,7 @@ mod lifecycle_config_tests {
                 name: Some("Updated User Lifecycle".to_string()),
                 description: Some("New description".to_string()),
                 is_active: Some(false),
+                auto_assign_initial_state: None,
             };
 
             let updated = service
@@ -248,6 +256,7 @@ mod lifecycle_config_tests {
                 name: "User Lifecycle".to_string(),
                 description: None,
                 object_type: LifecycleObjectType::User,
+                auto_assign_initial_state: true,
             };
 
             let created = service
@@ -288,6 +297,7 @@ mod lifecycle_config_tests {
                 name: "User Lifecycle".to_string(),
                 description: None,
                 object_type: LifecycleObjectType::User,
+                auto_assign_initial_state: true,
             };
             let config = service
                 .create_config(tenant_id, config_request)
@@ -329,6 +339,7 @@ mod lifecycle_config_tests {
                 name: "User Lifecycle".to_string(),
                 description: None,
                 object_type: LifecycleObjectType::User,
+                auto_assign_initial_state: true,
             };
             let config = service
                 .create_config(tenant_id, config_request)
@@ -451,6 +462,7 @@ mod lifecycle_config_tests {
                 name: "User Lifecycle".to_string(),
                 description: None,
                 object_type: LifecycleObjectType::User,
+                auto_assign_initial_state: true,
             };
             let config = service
                 .create_config(tenant_id, config_request)
@@ -507,6 +519,7 @@ mod lifecycle_config_tests {
                 name: "User Lifecycle".to_string(),
                 description: None,
                 object_type: LifecycleObjectType::User,
+                auto_assign_initial_state: true,
             };
             let config = service
                 .create_config(tenant_id, config_request)
@@ -591,6 +604,7 @@ mod lifecycle_config_tests {
                 name: "User Lifecycle".to_string(),
                 description: None,
                 object_type: LifecycleObjectType::User,
+                auto_assign_initial_state: true,
             };
             let config = service
                 .create_config(tenant_id, config_request)
@@ -646,6 +660,7 @@ mod lifecycle_config_tests {
                 name: "User Lifecycle".to_string(),
                 description: None,
                 object_type: LifecycleObjectType::User,
+                auto_assign_initial_state: true,
             };
             let config = service
                 .create_config(tenant_id, config_request)
@@ -722,6 +737,7 @@ mod lifecycle_config_tests {
                 name: "User Lifecycle".to_string(),
                 description: None,
                 object_type: LifecycleObjectType::User,
+                auto_assign_initial_state: true,
             };
             let config = service
                 .create_config(tenant_id, config_request)
@@ -793,6 +809,7 @@ mod lifecycle_config_tests {
                 name: "User Lifecycle".to_string(),
                 description: None,
                 object_type: LifecycleObjectType::User,
+                auto_assign_initial_state: true,
             };
             let config = service
                 .create_config(tenant_id, config_request)
@@ -972,6 +989,7 @@ mod lifecycle_config_tests {
                 name: "User Lifecycle".to_string(),
                 description: None,
                 object_type: LifecycleObjectType::User,
+                auto_assign_initial_state: true,
             };
             let config = service
                 .create_config(tenant_id, config_request)
@@ -1052,6 +1070,7 @@ mod lifecycle_config_tests {
                 name: "User Lifecycle".to_string(),
                 description: None,
                 object_type: LifecycleObjectType::User,
+                auto_assign_initial_state: true,
             };
             let config = service
                 .create_config(tenant_id, config_request)
@@ -1122,6 +1141,7 @@ mod lifecycle_config_tests {
                         name: "User Lifecycle".to_string(),
                         description: Some("Complete user lifecycle management".to_string()),
                         object_type: LifecycleObjectType::User,
+                        auto_assign_initial_state: true,
                     },
                 )
                 .await

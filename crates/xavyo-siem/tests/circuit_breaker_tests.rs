@@ -3,6 +3,8 @@
 //! Tests User Story 7 (Circuit Breaker and Health Monitoring).
 
 #![cfg(feature = "integration")]
+#![allow(dead_code)]
+#![allow(unused_imports)]
 
 mod helpers;
 

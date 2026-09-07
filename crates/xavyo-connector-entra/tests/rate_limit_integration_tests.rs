@@ -1,6 +1,8 @@
 //! Integration tests for rate limiting behavior with Graph API.
 
 #![cfg(feature = "integration")]
+#![allow(dead_code)]
+#![allow(unused_imports)]
 
 mod common;
 

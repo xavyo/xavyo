@@ -3,6 +3,8 @@
 //! Tests User Story 5 (Webhook Delivery).
 
 #![cfg(feature = "integration")]
+#![allow(dead_code)]
+#![allow(unused_imports)]
 
 mod helpers;
 

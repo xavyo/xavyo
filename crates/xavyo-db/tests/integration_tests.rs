@@ -49,33 +49,35 @@ async fn test_migrations() {
 }
 
 #[tokio::test]
-async fn test_seed_data_accessible() {
+async fn test_system_tenant_accessible() {
     let ctx = TestContext::new().await;
 
-    // Verify seed tenant exists (tenants table allows reads without context)
+    // System tenant is created by bootstrap/migrations (not SQL seed users).
     let row: (i64,) = sqlx::query_as(
         "SELECT COUNT(*) FROM tenants WHERE id = '00000000-0000-0000-0000-000000000001'::uuid",
     )
     .fetch_one(ctx.pool.inner())
     .await
     .expect("Failed to query tenants");
-    assert_eq!(row.0, 1, "Seed tenant should exist");
+    assert_eq!(row.0, 1, "System tenant should exist");
 
-    // To query users, we need to set tenant context (RLS is enforced)
-    let seed_tenant_id =
-        TenantId::from_uuid(uuid::Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap());
+    let system_tenant_id = TestContext::seed_tenant_id();
+    let unique = &uuid::Uuid::new_v4().to_string()[..8];
+    let email = format!("bootstrap-check-{}@test.xavyo.com", unique);
+    ctx.create_user(system_tenant_id, &email, "hash").await;
+
+    // App pool reads require tenant context (RLS).
     let mut tx = ctx.pool.begin().await.expect("Failed to begin transaction");
-    set_tenant_context(&mut *tx, seed_tenant_id)
+    set_tenant_context(&mut *tx, system_tenant_id)
         .await
         .expect("Failed to set tenant context");
 
-    // Verify seed admin user exists
     let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users WHERE email = $1")
-        .bind(TestContext::seed_admin_email())
+        .bind(&email)
         .fetch_one(&mut *tx)
         .await
         .expect("Failed to query users");
-    assert_eq!(row.0, 1, "Seed admin user should exist");
+    assert_eq!(row.0, 1, "User should be readable under system tenant context");
 
     tx.rollback().await.expect("Failed to rollback");
 }

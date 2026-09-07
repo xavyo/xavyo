@@ -4,6 +4,8 @@
 //! without race conditions or blocking.
 
 #![cfg(feature = "integration")]
+#![allow(dead_code)]
+#![allow(unused_variables)]
 
 mod common;
 

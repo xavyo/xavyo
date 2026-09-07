@@ -3,6 +3,8 @@
 //! Tests User Story 2 (Syslog Delivery).
 
 #![cfg(feature = "integration")]
+#![allow(dead_code)]
+#![allow(unused_imports)]
 
 mod helpers;
 
@@ -281,7 +283,7 @@ async fn test_tcp_exponential_backoff() {
     let formatted = formatter.format(&event).unwrap();
 
     // First two attempts should fail
-    for i in 0..2 {
+    for _i in 0..2 {
         let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
         use tokio::io::AsyncWriteExt;
         let write_result = stream

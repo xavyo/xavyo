@@ -10,7 +10,7 @@ use helpers::test_events::{
     generate_audit_event, generate_audit_event_with_severity, generate_batch,
     generate_event_with_special_chars, generate_minimal_event,
 };
-use helpers::validators::{calculate_syslog_priority, validate_cef, validate_rfc5424};
+use helpers::validators::{validate_cef, validate_rfc5424};
 use uuid::Uuid;
 use xavyo_siem::format::{CefFormatter, EventFormatter, SyslogFormatter};
 

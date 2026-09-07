@@ -21,15 +21,21 @@ mod delegation_grants {
     use xavyo_db::models::nhi_delegation_grant::{CreateNhiDelegationGrant, NhiDelegationGrant};
 
     /// Helper: create a test NHI identity for the actor agent.
-    async fn create_test_nhi(ctx: &OAuthTestContext, tenant_id: Uuid, name: &str) -> Uuid {
+    async fn create_test_nhi(
+        ctx: &OAuthTestContext,
+        tenant_id: Uuid,
+        owner_id: Uuid,
+        name: &str,
+    ) -> Uuid {
         let id = Uuid::new_v4();
         sqlx::query(
             "INSERT INTO nhi_identities (id, tenant_id, name, nhi_type, lifecycle_state, owner_id)
-             VALUES ($1, $2, $3, 'agent', 'active', $1)",
+             VALUES ($1, $2, $3, 'agent', 'active', $4)",
         )
         .bind(id)
         .bind(tenant_id)
         .bind(name)
+        .bind(owner_id)
         .execute(&ctx.admin_pool)
         .await
         .expect("Failed to create test NHI");
@@ -84,7 +90,7 @@ mod delegation_grants {
                 "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
             )
             .await;
-        let agent_id = create_test_nhi(&ctx, tenant_id, "scope-agent-1").await;
+        let agent_id = create_test_nhi(&ctx, tenant_id, user_id, "scope-agent-1").await;
 
         let grant = create_grant(
             &ctx,
@@ -121,7 +127,7 @@ mod delegation_grants {
                 "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
             )
             .await;
-        let agent_id = create_test_nhi(&ctx, tenant_id, "wc-agent-1").await;
+        let agent_id = create_test_nhi(&ctx, tenant_id, user_id, "wc-agent-1").await;
 
         // Empty scopes = wildcard (all allowed)
         let grant = create_grant(&ctx, tenant_id, user_id, agent_id, vec![], None, None).await;
@@ -147,7 +153,7 @@ mod delegation_grants {
                 "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
             )
             .await;
-        let agent_id = create_test_nhi(&ctx, tenant_id, "rev-agent-1").await;
+        let agent_id = create_test_nhi(&ctx, tenant_id, user_id, "rev-agent-1").await;
 
         sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
             .bind(tenant_id.to_string())
@@ -205,7 +211,7 @@ mod delegation_grants {
                 "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
             )
             .await;
-        let agent_id = create_test_nhi(&ctx, tenant_id, "exp-agent-1").await;
+        let agent_id = create_test_nhi(&ctx, tenant_id, user_id, "exp-agent-1").await;
 
         let grant = create_grant(
             &ctx,
@@ -238,7 +244,7 @@ mod delegation_grants {
                 "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
             )
             .await;
-        let agent_id = create_test_nhi(&ctx, tenant_id, "depth-agent-1").await;
+        let agent_id = create_test_nhi(&ctx, tenant_id, user_id, "depth-agent-1").await;
 
         let grant = create_grant(&ctx, tenant_id, user_id, agent_id, vec![], Some(3), None).await;
 
@@ -262,7 +268,7 @@ mod delegation_grants {
                 "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
             )
             .await;
-        let agent_id = create_test_nhi(&ctx, tenant_id, "upsert-agent-1").await;
+        let agent_id = create_test_nhi(&ctx, tenant_id, user_id, "upsert-agent-1").await;
 
         let grant1 = create_grant(
             &ctx,
@@ -317,7 +323,7 @@ mod delegation_grants {
                 "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
             )
             .await;
-        let agent_id = create_test_nhi(&ctx, tenant_id, "fbi-agent-1").await;
+        let agent_id = create_test_nhi(&ctx, tenant_id, user_id, "fbi-agent-1").await;
 
         let grant = create_grant(
             &ctx,
@@ -372,9 +378,9 @@ mod delegation_grants {
             .await;
 
         // Create 3 grants for the same principal but different actors
-        let agent_a = create_test_nhi(&ctx, tenant_id, "lbp-agent-a").await;
-        let agent_b = create_test_nhi(&ctx, tenant_id, "lbp-agent-b").await;
-        let agent_c = create_test_nhi(&ctx, tenant_id, "lbp-agent-c").await;
+        let agent_a = create_test_nhi(&ctx, tenant_id, user_id, "lbp-agent-a").await;
+        let agent_b = create_test_nhi(&ctx, tenant_id, user_id, "lbp-agent-b").await;
+        let agent_c = create_test_nhi(&ctx, tenant_id, user_id, "lbp-agent-c").await;
 
         create_grant(
             &ctx,
@@ -436,7 +442,6 @@ mod delegation_grants {
             )
             .await;
         let tenant_id = *tid.as_uuid();
-        let agent_id = create_test_nhi(&ctx, tenant_id, "lba-agent-1").await;
 
         // Create 2 grants for the same actor but different principals
         let user_a = ctx
@@ -453,6 +458,7 @@ mod delegation_grants {
                 "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
             )
             .await;
+        let agent_id = create_test_nhi(&ctx, tenant_id, user_a, "lba-agent-1").await;
 
         create_grant(
             &ctx,
@@ -500,7 +506,7 @@ mod delegation_grants {
             .await;
 
         // Active grant (no expiration)
-        let agent_active = create_test_nhi(&ctx, tenant_id, "clean-agent-active").await;
+        let agent_active = create_test_nhi(&ctx, tenant_id, user_id, "clean-agent-active").await;
         let active_grant = create_grant(
             &ctx,
             tenant_id,
@@ -513,7 +519,7 @@ mod delegation_grants {
         .await;
 
         // Another grant that we'll force-expire via admin_pool
-        let agent_expired = create_test_nhi(&ctx, tenant_id, "clean-agent-expired").await;
+        let agent_expired = create_test_nhi(&ctx, tenant_id, user_id, "clean-agent-expired").await;
         let expired_grant = create_grant(
             &ctx,
             tenant_id,
@@ -581,7 +587,7 @@ mod delegation_grants {
                 "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
             )
             .await;
-        let agent_a = create_test_nhi(&ctx, tenant_a, "iso-agent-a").await;
+        let agent_a = create_test_nhi(&ctx, tenant_a, user_a, "iso-agent-a").await;
 
         let grant = create_grant(
             &ctx,
@@ -646,7 +652,7 @@ mod delegation_grants {
                 "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
             )
             .await;
-        let agent_id = create_test_nhi(&ctx, tenant_id, "rt-agent-1").await;
+        let agent_id = create_test_nhi(&ctx, tenant_id, user_id, "rt-agent-1").await;
 
         // Create grant with specific resource types (bypass helper to set allowed_resource_types)
         sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
@@ -983,15 +989,16 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
     ];
 
     /// Helper: create a test NHI identity.
-    async fn create_test_nhi(pool: &PgPool, tenant_id: Uuid, name: &str) -> Uuid {
+    async fn create_test_nhi(pool: &PgPool, tenant_id: Uuid, owner_id: Uuid, name: &str) -> Uuid {
         let id = Uuid::new_v4();
         sqlx::query(
             "INSERT INTO nhi_identities (id, tenant_id, name, nhi_type, lifecycle_state, owner_id)
-             VALUES ($1, $2, $3, 'agent', 'active', $1)",
+             VALUES ($1, $2, $3, 'agent', 'active', $4)",
         )
         .bind(id)
         .bind(tenant_id)
         .bind(name)
+        .bind(owner_id)
         .execute(pool)
         .await
         .expect("Failed to create test NHI");
@@ -1129,7 +1136,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
             )
             .await;
         let agent_id =
-            create_test_nhi(&ctx.admin_pool, tenant_id, &format!("hp-agent-{uid}")).await;
+            create_test_nhi(&ctx.admin_pool, tenant_id, user_id, &format!("hp-agent-{uid}")).await;
 
         let (client_id_str, client_secret) =
             create_exchange_client(&ctx, tenant_id, &uid, Some(agent_id)).await;
@@ -1160,6 +1167,10 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
                 "urn:ietf:params:oauth:token-type:access_token",
             ),
             ("actor_token", &agent_jwt),
+            (
+                "actor_token_type",
+                "urn:ietf:params:oauth:token-type:access_token",
+            ),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),
             ("scope", "read:tools"),
@@ -1221,7 +1232,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
             )
             .await;
         let agent_id =
-            create_test_nhi(&ctx.admin_pool, tenant_id, &format!("mfa-agent-{uid}")).await;
+            create_test_nhi(&ctx.admin_pool, tenant_id, user_id, &format!("mfa-agent-{uid}")).await;
 
         let (client_id_str, client_secret) =
             create_exchange_client(&ctx, tenant_id, &uid, Some(agent_id)).await;
@@ -1266,6 +1277,10 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
                 "urn:ietf:params:oauth:token-type:access_token",
             ),
             ("actor_token", &agent_jwt),
+            (
+                "actor_token_type",
+                "urn:ietf:params:oauth:token-type:access_token",
+            ),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),
             ("scope", "read:tools"),
@@ -1300,9 +1315,16 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
             .create_tenant("te-http-mst", &format!("te-http-mst-{uid}"))
             .await;
         let tenant_id = *tid.as_uuid();
+        let user_id = ctx
+            .create_user(
+                tid,
+                &format!("mst-{uid}@test.com"),
+                "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
+            )
+            .await;
 
         let agent_id =
-            create_test_nhi(&ctx.admin_pool, tenant_id, &format!("mst-agent-{uid}")).await;
+            create_test_nhi(&ctx.admin_pool, tenant_id, user_id, &format!("mst-agent-{uid}")).await;
         let (client_id_str, client_secret) =
             create_exchange_client(&ctx, tenant_id, &uid, Some(agent_id)).await;
         let agent_jwt = sign_jwt(agent_id, tenant_id);
@@ -1320,6 +1342,10 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
                 "urn:ietf:params:oauth:token-type:access_token",
             ),
             ("actor_token", &agent_jwt),
+            (
+                "actor_token_type",
+                "urn:ietf:params:oauth:token-type:access_token",
+            ),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),
         ])
@@ -1415,7 +1441,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
                 "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
             )
             .await;
-        let agent_id = create_test_nhi(&ctx.admin_pool, tenant_a, &format!("ct-agent-{uid}")).await;
+        let agent_id = create_test_nhi(&ctx.admin_pool, tenant_a, user_id, &format!("ct-agent-{uid}")).await;
 
         // Client lives on tenant B (no NHI binding needed; fails before H8 check)
         let (client_id_str, client_secret) =
@@ -1439,6 +1465,10 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
                 "urn:ietf:params:oauth:token-type:access_token",
             ),
             ("actor_token", &agent_jwt),
+            (
+                "actor_token_type",
+                "urn:ietf:params:oauth:token-type:access_token",
+            ),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),
             ("scope", "read:tools"),
@@ -1481,7 +1511,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
             )
             .await;
         let agent_id =
-            create_test_nhi(&ctx.admin_pool, tenant_id, &format!("nag-agent-{uid}")).await;
+            create_test_nhi(&ctx.admin_pool, tenant_id, user_id, &format!("nag-agent-{uid}")).await;
         let (client_id_str, client_secret) =
             create_exchange_client(&ctx, tenant_id, &uid, Some(agent_id)).await;
 
@@ -1503,6 +1533,10 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
                 "urn:ietf:params:oauth:token-type:access_token",
             ),
             ("actor_token", &agent_jwt),
+            (
+                "actor_token_type",
+                "urn:ietf:params:oauth:token-type:access_token",
+            ),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),
             ("scope", "read:tools"),
@@ -1544,7 +1578,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
             )
             .await;
         let agent_id =
-            create_test_nhi(&ctx.admin_pool, tenant_id, &format!("se-agent-{uid}")).await;
+            create_test_nhi(&ctx.admin_pool, tenant_id, user_id, &format!("se-agent-{uid}")).await;
         let (client_id_str, client_secret) =
             create_exchange_client(&ctx, tenant_id, &uid, Some(agent_id)).await;
 
@@ -1576,6 +1610,10 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
                 "urn:ietf:params:oauth:token-type:access_token",
             ),
             ("actor_token", &agent_jwt),
+            (
+                "actor_token_type",
+                "urn:ietf:params:oauth:token-type:access_token",
+            ),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),
             ("scope", "admin:everything"),
@@ -1617,7 +1655,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
             )
             .await;
         let agent_id =
-            create_test_nhi(&ctx.admin_pool, tenant_id, &format!("de-agent-{uid}")).await;
+            create_test_nhi(&ctx.admin_pool, tenant_id, user_id, &format!("de-agent-{uid}")).await;
         let (client_id_str, client_secret) =
             create_exchange_client(&ctx, tenant_id, &uid, Some(agent_id)).await;
 
@@ -1650,6 +1688,10 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
                 "urn:ietf:params:oauth:token-type:access_token",
             ),
             ("actor_token", &agent_jwt),
+            (
+                "actor_token_type",
+                "urn:ietf:params:oauth:token-type:access_token",
+            ),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),
             ("scope", "read:tools"),
@@ -1691,7 +1733,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
             )
             .await;
         let agent_id =
-            create_test_nhi(&ctx.admin_pool, tenant_id, &format!("mcs-agent-{uid}")).await;
+            create_test_nhi(&ctx.admin_pool, tenant_id, user_id, &format!("mcs-agent-{uid}")).await;
         let (client_id_str, _client_secret) =
             create_exchange_client(&ctx, tenant_id, &uid, Some(agent_id)).await;
 
@@ -1712,6 +1754,10 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
                 "urn:ietf:params:oauth:token-type:access_token",
             ),
             ("actor_token", &agent_jwt),
+            (
+                "actor_token_type",
+                "urn:ietf:params:oauth:token-type:access_token",
+            ),
             ("client_id", &client_id_str),
         ])
         .unwrap();
@@ -1788,15 +1834,16 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
     ];
 
     /// Helper: create a test NHI identity.
-    async fn create_test_nhi(pool: &PgPool, tenant_id: Uuid, name: &str) -> Uuid {
+    async fn create_test_nhi(pool: &PgPool, tenant_id: Uuid, owner_id: Uuid, name: &str) -> Uuid {
         let id = Uuid::new_v4();
         sqlx::query(
             "INSERT INTO nhi_identities (id, tenant_id, name, nhi_type, lifecycle_state, owner_id)
-             VALUES ($1, $2, $3, 'agent', 'active', $1)",
+             VALUES ($1, $2, $3, 'agent', 'active', $4)",
         )
         .bind(id)
         .bind(tenant_id)
         .bind(name)
+        .bind(owner_id)
         .execute(pool)
         .await
         .expect("Failed to create test NHI");
@@ -1862,8 +1909,15 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
             .create_tenant("nhi-bind-1", &format!("nhi-bind-1-{uid}"))
             .await;
         let tenant_id = *tid.as_uuid();
+        let user_id = ctx
+            .create_user(
+                tid,
+                &format!("bind-{uid}@test.com"),
+                "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
+            )
+            .await;
 
-        let nhi_id = create_test_nhi(&ctx.admin_pool, tenant_id, &format!("bind-nhi-{uid}")).await;
+        let nhi_id = create_test_nhi(&ctx.admin_pool, tenant_id, user_id, &format!("bind-nhi-{uid}")).await;
 
         let (client_id_str, _secret) = create_client(&ctx, tenant_id, &uid, Some(nhi_id)).await;
 
@@ -1893,8 +1947,15 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
             .create_tenant("nhi-cc-1", &format!("nhi-cc-1-{uid}"))
             .await;
         let tenant_id = *tid.as_uuid();
+        let user_id = ctx
+            .create_user(
+                tid,
+                &format!("cc-{uid}@test.com"),
+                "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
+            )
+            .await;
 
-        let nhi_id = create_test_nhi(&ctx.admin_pool, tenant_id, &format!("cc-nhi-{uid}")).await;
+        let nhi_id = create_test_nhi(&ctx.admin_pool, tenant_id, user_id, &format!("cc-nhi-{uid}")).await;
         let (client_id_str, client_secret) =
             create_client(&ctx, tenant_id, &uid, Some(nhi_id)).await;
 

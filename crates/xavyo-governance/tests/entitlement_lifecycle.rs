@@ -3,6 +3,9 @@
 //! These tests validate the full CRUD lifecycle for entitlements and assignments.
 
 #![cfg(feature = "integration")]
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 
 mod common;
 

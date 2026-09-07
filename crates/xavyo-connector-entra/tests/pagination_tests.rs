@@ -6,6 +6,8 @@
 //! - Pagination with various page sizes
 
 #![cfg(feature = "integration")]
+#![allow(dead_code)]
+#![allow(unused_imports)]
 
 mod common;
 

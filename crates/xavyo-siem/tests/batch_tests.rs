@@ -3,6 +3,8 @@
 //! Tests User Story 6 (Large Batch Export).
 
 #![cfg(feature = "integration")]
+#![allow(dead_code)]
+#![allow(unused_imports)]
 
 mod helpers;
 

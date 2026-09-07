@@ -1890,17 +1890,24 @@ mod tests {
             .nth(1)
             .and_then(|s| s.split("pub async fn ").next())
             .expect("load_peer_group_stats");
+        // Scope to this function body only (stop at the next top-level fn).
+        let load_fn = load
+            .split("\n    /// ")
+            .next()
+            .and_then(|s| s.split("\n    pub async fn ").next())
+            .and_then(|s| s.split("\n    fn ").next())
+            .expect("load_peer_group_stats body");
         assert!(
-            load.contains("peer_entitlement_stats(")
-                && load.contains("independent_peer_role_stats("),
+            load_fn.contains("peer_entitlement_stats(")
+                && load_fn.contains("independent_peer_role_stats("),
             "peer stats must fail closed on missing averages"
         );
         assert!(
-            !load.contains("unwrap_or(0.0)"),
-            "missing peer averages must not become 0.0: {load}"
+            !load_fn.contains("unwrap_or(0.0)"),
+            "missing peer averages must not become 0.0"
         );
         assert!(
-            !load.contains("mean_roles: g.avg_entitlements"),
+            !load_fn.contains("mean_roles: g.avg_entitlements"),
             "role stats must not copy entitlement averages"
         );
     }

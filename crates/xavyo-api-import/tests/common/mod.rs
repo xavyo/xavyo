@@ -52,7 +52,7 @@ impl ImportTestContext {
     pub async fn new() -> Self {
         init_test_logging();
 
-        let pool = DbPool::connect(&get_app_database_url()).await.expect(
+        let pool = DbPool::connect_app(&get_app_database_url()).await.expect(
             "Failed to connect as app user. Is PostgreSQL running? Try: ./scripts/dev-env.sh start",
         );
 
@@ -135,6 +135,7 @@ impl ImportTestContext {
     /// Create an import error record for testing.
     pub async fn create_import_error(
         &self,
+        tenant_id: TenantId,
         job_id: Uuid,
         line_number: i32,
         email: Option<&str>,
@@ -146,11 +147,12 @@ impl ImportTestContext {
         sqlx::query(
             r#"
             INSERT INTO user_import_errors
-                (id, job_id, line_number, email, error_type, error_message)
-            VALUES ($1, $2, $3, $4, $5, $6)
+                (id, tenant_id, job_id, line_number, email, error_type, error_message)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             "#,
         )
         .bind(id)
+        .bind(tenant_id.as_uuid())
         .bind(job_id)
         .bind(line_number)
         .bind(email)
@@ -346,4 +348,9 @@ invalid-email,Invalid,User
 pub fn unique_test_prefix(test_name: &str) -> String {
     let unique_id = &Uuid::new_v4().to_string()[..8];
     format!("{}-{}", test_name, unique_id)
+}
+
+/// Generate a unique invitation token hash for test isolation (fits VARCHAR(64)).
+pub fn unique_token_hash(_prefix: &str) -> String {
+    format!("{:x}", Uuid::new_v4().as_u128())
 }

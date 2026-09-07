@@ -384,10 +384,10 @@ mod rls_isolation {
             .expect("Failed to create client");
 
         // Query directly without setting tenant context
-        let mut conn = ctx.pool.acquire().await.expect("Failed to acquire conn");
+        let mut conn = ctx.rls_pool.acquire().await.expect("Failed to acquire conn");
 
         // Clear any existing context
-        sqlx::query("SELECT set_config('app.current_tenant', '', true)")
+        sqlx::query("SELECT set_config('app.current_tenant', '', false)")
             .execute(&mut *conn)
             .await
             .expect("Failed to clear context");
@@ -455,8 +455,8 @@ mod rls_isolation {
             .expect("Failed to create client B");
 
         // Query with Tenant A context - should only see Tenant A's data
-        let mut conn = ctx.pool.acquire().await.expect("Failed to acquire conn");
-        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+        let mut conn = ctx.rls_pool.acquire().await.expect("Failed to acquire conn");
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, false)")
             .bind(tenant_a.as_uuid().to_string())
             .execute(&mut *conn)
             .await
@@ -494,8 +494,8 @@ mod rls_isolation {
         let tenant_b = ctx.create_tenant("Tenant B", &slug_b).await;
 
         // Set context to Tenant A
-        let mut conn = ctx.pool.acquire().await.expect("Failed to acquire conn");
-        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+        let mut conn = ctx.rls_pool.acquire().await.expect("Failed to acquire conn");
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, false)")
             .bind(tenant_a.as_uuid().to_string())
             .execute(&mut *conn)
             .await
@@ -579,22 +579,24 @@ mod token_isolation {
 
         sqlx::query(
             r#"INSERT INTO oauth_refresh_tokens
-               (id, tenant_id, client_id, user_id, token_hash, scopes, expires_at, revoked)
-               VALUES ($1, $2, $3, $4, $5, ARRAY['openid'], $6, false)"#,
+               (id, tenant_id, client_id, user_id, token_hash, scope, family_id, expires_at, revoked)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false)"#,
         )
         .bind(Uuid::new_v4())
         .bind(tenant_a.as_uuid())
         .bind(client_a.id)
         .bind(user_a)
         .bind(&token_hash)
+        .bind("openid")
+        .bind(Uuid::new_v4())
         .bind(expires_at)
         .execute(&ctx.admin_pool)
         .await
         .expect("Failed to insert refresh token");
 
         // Query with Tenant A context - should find the token
-        let mut conn = ctx.pool.acquire().await.expect("Failed to acquire conn");
-        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+        let mut conn = ctx.rls_pool.acquire().await.expect("Failed to acquire conn");
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, false)")
             .bind(tenant_a.as_uuid().to_string())
             .execute(&mut *conn)
             .await
@@ -610,7 +612,7 @@ mod token_isolation {
         assert_eq!(row.0, 1, "Tenant A should see its own refresh token");
 
         // Query with Tenant B context - should NOT find the token
-        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, false)")
             .bind(tenant_b.as_uuid().to_string())
             .execute(&mut *conn)
             .await
@@ -667,8 +669,8 @@ mod token_isolation {
 
         sqlx::query(
             r#"INSERT INTO authorization_codes
-               (id, tenant_id, client_id, user_id, code_hash, redirect_uri, scopes, expires_at, used)
-               VALUES ($1, $2, $3, $4, $5, 'https://example.com/cb', ARRAY['openid'], $6, false)"#,
+               (id, tenant_id, client_id, user_id, code_hash, redirect_uri, scope, code_challenge, expires_at, used)
+               VALUES ($1, $2, $3, $4, $5, 'https://example.com/cb', 'openid', 'test-challenge', $6, false)"#,
         )
         .bind(Uuid::new_v4())
         .bind(tenant_a.as_uuid())
@@ -681,8 +683,8 @@ mod token_isolation {
         .expect("Failed to insert authorization code");
 
         // Query with Tenant A context - should find the code
-        let mut conn = ctx.pool.acquire().await.expect("Failed to acquire conn");
-        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+        let mut conn = ctx.rls_pool.acquire().await.expect("Failed to acquire conn");
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, false)")
             .bind(tenant_a.as_uuid().to_string())
             .execute(&mut *conn)
             .await
@@ -698,7 +700,7 @@ mod token_isolation {
         assert_eq!(row.0, 1, "Tenant A should see its own authorization code");
 
         // Query with Tenant B context - should NOT find the code
-        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, false)")
             .bind(tenant_b.as_uuid().to_string())
             .execute(&mut *conn)
             .await
@@ -771,8 +773,8 @@ mod bulk_isolation {
             .expect("Failed to create client B");
 
         // Set context to Tenant A and try a bulk UPDATE
-        let mut conn = ctx.pool.acquire().await.expect("Failed to acquire conn");
-        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+        let mut conn = ctx.rls_pool.acquire().await.expect("Failed to acquire conn");
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, false)")
             .bind(tenant_a.as_uuid().to_string())
             .execute(&mut *conn)
             .await
@@ -848,8 +850,8 @@ mod bulk_isolation {
             .expect("Failed to create client B");
 
         // Set context to Tenant A and try a bulk DELETE
-        let mut conn = ctx.pool.acquire().await.expect("Failed to acquire conn");
-        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+        let mut conn = ctx.rls_pool.acquire().await.expect("Failed to acquire conn");
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, false)")
             .bind(tenant_a.as_uuid().to_string())
             .execute(&mut *conn)
             .await

@@ -7,6 +7,10 @@
 //! - Format validators
 //! - Docker infrastructure utilities (feature: docker-tests)
 
+#![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+
 pub mod certificates;
 pub mod mock_syslog;
 pub mod test_events;

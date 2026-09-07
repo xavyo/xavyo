@@ -236,7 +236,7 @@ async fn test_multiple_risk_history_entries() {
 #[tokio::test]
 async fn test_ra_004_custom_threshold_application() {
     let ctx = TestContext::new();
-    let user_id = Uuid::new_v4();
+    let _user_id = Uuid::new_v4();
 
     // Set custom thresholds
     let custom_thresholds = RiskThresholds {

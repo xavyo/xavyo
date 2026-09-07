@@ -1,6 +1,8 @@
 //! Integration tests for delta sync token management.
 
 #![cfg(feature = "integration")]
+#![allow(dead_code)]
+#![allow(unused_imports)]
 
 mod common;
 
