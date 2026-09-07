@@ -532,29 +532,18 @@ pub async fn login_handler(
         }
     }
 
-    // MFA not enabled - issue full tokens
-    let (access_token, refresh_token, expires_in) = token_service
-        .create_tokens(
-            user_id,
-            tenant_id_val,
-            roles,
-            Some(request.email.clone()),
-            // This path issues a full token only when MFA is not required, i.e.
-            // single-factor password authentication (acr "1").
-            Some(AuthContext::password()),
-            user_agent.clone(),
-            ip_address,
-        )
-        .await?;
-
-    // Create session entry for tracking. Errors must refuse login so the
-    // issued tokens are not advertised without a tracked session.
-    login_session_recorded(
+    // MFA not enabled - issue full tokens.
+    //
+    // Create the session FIRST so the access token's `jti` can be pinned to the
+    // session id. This links the session <-> access token (so `is_current` works)
+    // and lets session revocation invalidate the associated tokens. Errors must
+    // refuse login so tokens are not advertised without a tracked session.
+    let session = login_session_recorded(
         session_service
             .create_session(
                 *user_id.as_uuid(),
                 *tenant_id_val.as_uuid(),
-                None, // No refresh_token_id linking for now
+                None,
                 user_agent.as_deref(),
                 ip_address.map(|ip| ip.to_string()).as_deref(),
             )
@@ -572,6 +561,33 @@ pub async fn login_handler(
         );
         e
     })?;
+
+    let (access_token, refresh_token, expires_in) = token_service
+        .create_session_tokens(
+            session.id,
+            user_id,
+            tenant_id_val,
+            roles,
+            Some(request.email.clone()),
+            // This path issues a full token only when MFA is not required, i.e.
+            // single-factor password authentication (acr "1").
+            Some(AuthContext::password()),
+            user_agent.clone(),
+            ip_address,
+        )
+        .await?;
+
+    // Link the refresh token to the session so revoking the session revokes it.
+    // Best-effort: a link failure must not fail the login (the session and tokens
+    // are already valid), but it is logged for observability.
+    if let Ok(rt) = token_service.validate_refresh_token(&refresh_token).await {
+        let link_result = session_service
+            .link_refresh_token(session.id, *tenant_id_val.as_uuid(), rt.id)
+            .await;
+        if let Err(e) = link_result {
+            tracing::warn!(error = %e, "Failed to link session to refresh token");
+        }
+    }
 
     let response = TokenResponse::new(access_token, refresh_token, expires_in);
 

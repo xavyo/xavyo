@@ -196,6 +196,58 @@ impl TokenService {
         user_agent: Option<String>,
         ip_address: Option<IpAddr>,
     ) -> Result<(String, String, i64), ApiAuthError> {
+        self.create_tokens_inner(
+            None,
+            user_id,
+            tenant_id,
+            roles,
+            email,
+            auth_context,
+            user_agent,
+            ip_address,
+        )
+        .await
+    }
+
+    /// Like [`create_tokens`], but pins the access token's `jti` to `session_id`
+    /// so the session row and the access token are linked (`is_current` detection
+    /// and session-scoped revocation depend on this). Used by the login path.
+    pub async fn create_session_tokens(
+        &self,
+        session_id: uuid::Uuid,
+        user_id: UserId,
+        tenant_id: TenantId,
+        roles: Vec<String>,
+        email: Option<String>,
+        auth_context: Option<AuthContext>,
+        user_agent: Option<String>,
+        ip_address: Option<IpAddr>,
+    ) -> Result<(String, String, i64), ApiAuthError> {
+        self.create_tokens_inner(
+            Some(session_id),
+            user_id,
+            tenant_id,
+            roles,
+            email,
+            auth_context,
+            user_agent,
+            ip_address,
+        )
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn create_tokens_inner(
+        &self,
+        jti: Option<uuid::Uuid>,
+        user_id: UserId,
+        tenant_id: TenantId,
+        roles: Vec<String>,
+        email: Option<String>,
+        auth_context: Option<AuthContext>,
+        user_agent: Option<String>,
+        ip_address: Option<IpAddr>,
+    ) -> Result<(String, String, i64), ApiAuthError> {
         // Advertised tenant IP restrictions must apply at token issue.
         let ip_str = ip_address.map(|ip| ip.to_string());
         super::IpRestrictionService::new(self.pool.clone())
@@ -220,6 +272,7 @@ impl TokenService {
 
         // Generate access token
         let access_token = self.create_access_token(
+            jti,
             user_id,
             tenant_id,
             roles,
@@ -246,8 +299,12 @@ impl TokenService {
     }
 
     /// Create a JWT access token.
+    ///
+    /// When `jti` is `Some`, the token's `jti` is pinned to that value (the owning
+    /// session id) instead of a random one, linking the access token to its session.
     fn create_access_token(
         &self,
+        jti: Option<uuid::Uuid>,
         user_id: UserId,
         tenant_id: TenantId,
         roles: Vec<String>,
@@ -262,6 +319,10 @@ impl TokenService {
             .audience(vec![&self.config.audience])
             .roles(roles)
             .expires_in_secs(self.access_token_validity.num_seconds());
+
+        if let Some(jti) = jti {
+            builder = builder.jwt_id(jti.to_string());
+        }
 
         if let Some(email) = email {
             builder = builder.email(email);
@@ -504,16 +565,47 @@ impl TokenService {
             _ => None,
         };
 
-        self.create_tokens(
-            user_id,
-            tenant_id,
-            roles,
-            Some(email),
-            forwarded_context,
-            user_agent,
-            ip_address,
+        // Preserve the session linkage across rotation: if this refresh token
+        // belongs to a tracked session, keep the new access token's jti pinned to
+        // that session id and re-point the session at the new refresh token. This
+        // keeps `is_current` stable and keeps session revocation able to kill the
+        // (rotated) refresh token.
+        let session_id: Option<uuid::Uuid> = sqlx::query_scalar(
+            "SELECT id FROM sessions WHERE refresh_token_id = $1 AND tenant_id = $2 AND revoked_at IS NULL",
         )
+        .bind(token.id)
+        .bind(token.tenant_id)
+        .fetch_optional(&self.pool)
         .await
+        .unwrap_or(None);
+
+        let issued = self
+            .create_tokens_inner(
+                session_id,
+                user_id,
+                tenant_id,
+                roles,
+                Some(email),
+                forwarded_context,
+                user_agent,
+                ip_address,
+            )
+            .await?;
+
+        if let Some(sid) = session_id {
+            if let Ok(new_rt) = self.validate_refresh_token(&issued.1).await {
+                let _ = sqlx::query(
+                    "UPDATE sessions SET refresh_token_id = $1 WHERE id = $2 AND tenant_id = $3",
+                )
+                .bind(new_rt.id)
+                .bind(sid)
+                .bind(token.tenant_id)
+                .execute(&self.pool)
+                .await;
+            }
+        }
+
+        Ok(issued)
     }
 
     /// Revoke a refresh token by its opaque value.
@@ -917,6 +1009,30 @@ mod tests {
         assert!(
             production.contains("builder = builder.name(name)"),
             "create_access_token must set JwtClaims.name"
+        );
+    }
+
+    #[test]
+    fn session_tokens_pin_jti_and_refresh_preserves_linkage() {
+        let src = include_str!("token_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        // Login issues session-pinned tokens so session.id == access token jti.
+        assert!(
+            production.contains("pub async fn create_session_tokens"),
+            "must expose create_session_tokens for the login path"
+        );
+        assert!(
+            production.contains("builder = builder.jwt_id(jti.to_string())"),
+            "create_access_token must pin jti when provided"
+        );
+        // Refresh rotation must keep the session pinned + re-point it to the new token.
+        assert!(
+            production.contains("SELECT id FROM sessions WHERE refresh_token_id = $1"),
+            "refresh must resolve the owning session for jti continuity"
+        );
+        assert!(
+            production.contains("UPDATE sessions SET refresh_token_id = $1"),
+            "refresh must re-point the session at the rotated refresh token"
         );
     }
 

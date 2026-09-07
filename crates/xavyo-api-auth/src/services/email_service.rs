@@ -173,7 +173,11 @@ If you didn't request this, you can safely ignore this email.
     /// magic link would fail with a 401 off the original device.
     #[must_use]
     pub fn magic_link_body(&self, token: &str, tenant_id: TenantId) -> String {
-        let url = format!("{}&tenant={}", self.magic_link_url(token), tenant_id.as_uuid());
+        let url = format!(
+            "{}&tenant={}",
+            self.magic_link_url(token),
+            tenant_id.as_uuid()
+        );
         format!(
             r"Hi,
 
