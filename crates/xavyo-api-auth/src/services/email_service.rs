@@ -166,9 +166,14 @@ If you didn't request this, you can safely ignore this email.
     }
 
     /// Build the magic link email body.
+    ///
+    /// The tenant is included in the link so that clicking it on a device without
+    /// the tenant cookie (e.g. a phone or a fresh browser) still resolves the tenant
+    /// — the passwordless verify endpoint requires tenant context, so without this the
+    /// magic link would fail with a 401 off the original device.
     #[must_use]
-    pub fn magic_link_body(&self, token: &str) -> String {
-        let url = self.magic_link_url(token);
+    pub fn magic_link_body(&self, token: &str, tenant_id: TenantId) -> String {
+        let url = format!("{}&tenant={}", self.magic_link_url(token), tenant_id.as_uuid());
         format!(
             r"Hi,
 
@@ -437,7 +442,7 @@ impl EmailSender for SmtpEmailSender {
             .parse()
             .map_err(|e| EmailError::InvalidAddress(format!("Invalid recipient: {e}")))?;
 
-        let body = self.config.magic_link_body(token);
+        let body = self.config.magic_link_body(token, tenant_id);
 
         let email = Message::builder()
             .from(from)
@@ -829,6 +834,34 @@ mod tests {
                 tenant_id.as_uuid()
             )),
             "reset email link must include the tenant; body was:\n{body}"
+        );
+    }
+
+    #[test]
+    fn magic_link_body_includes_tenant_for_cross_device_signin() {
+        let config = EmailConfig {
+            smtp_host: "smtp.example.com".to_string(),
+            smtp_port: 587,
+            smtp_username: "u".to_string(),
+            smtp_password: "p".to_string(),
+            smtp_tls: true,
+            from_address: "noreply@example.com".to_string(),
+            from_name: "Test".to_string(),
+            frontend_base_url: "https://app.xavyo.com".to_string(),
+            password_reset_path: "/reset-password".to_string(),
+            email_verify_path: "/verify-email".to_string(),
+            magic_link_path: "/passwordless/magic-link/verify".to_string(),
+        };
+        let tenant_id = TenantId::new();
+        let body = config.magic_link_body("mltoken", tenant_id);
+        // The magic link must carry the tenant so it works when opened on a device
+        // without the tenant cookie (the verify endpoint requires tenant context).
+        assert!(
+            body.contains(&format!(
+                "https://app.xavyo.com/passwordless/magic-link/verify?token=mltoken&tenant={}",
+                tenant_id.as_uuid()
+            )),
+            "magic link email must include the tenant; body was:\n{body}"
         );
     }
 
