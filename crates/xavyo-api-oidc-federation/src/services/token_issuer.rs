@@ -59,6 +59,50 @@ pub struct IssuedTokens {
     pub token_type: String,
 }
 
+/// Issues xavyo session tokens for a federated user.
+///
+/// Abstracted as a trait so `idp-api` can inject an implementation backed by the
+/// shared `TokenService` (which persists an opaque, refreshable/revocable refresh
+/// token) instead of the standalone JWT issuer, giving federation logins the same
+/// refresh/logout semantics as password and social login.
+#[async_trait::async_trait]
+pub trait FederationTokenIssuer: Send + Sync {
+    /// Issue an access + refresh token pair for the given user/tenant.
+    async fn issue_tokens(
+        &self,
+        user_id: Uuid,
+        tenant_id: Uuid,
+        roles: Vec<String>,
+        email: Option<String>,
+        name: Option<String>,
+        federation_claims: Option<FederationClaims>,
+    ) -> FederationResult<IssuedTokens>;
+}
+
+#[async_trait::async_trait]
+impl FederationTokenIssuer for TokenIssuerService {
+    async fn issue_tokens(
+        &self,
+        user_id: Uuid,
+        tenant_id: Uuid,
+        roles: Vec<String>,
+        email: Option<String>,
+        name: Option<String>,
+        federation_claims: Option<FederationClaims>,
+    ) -> FederationResult<IssuedTokens> {
+        TokenIssuerService::issue_tokens(
+            self,
+            user_id,
+            tenant_id,
+            roles,
+            email,
+            name,
+            federation_claims,
+        )
+        .await
+    }
+}
+
 impl TokenIssuerService {
     /// Create a new token issuer service with configuration.
     #[must_use]

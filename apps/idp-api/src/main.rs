@@ -1003,7 +1003,14 @@ async fn main() {
         frontend_url: config.frontend_url.clone(),
         jwt_private_key_pem: config.jwt_private_key.expose_secret().as_bytes().to_vec(),
     };
-    let federation_state = FederationState::new(&federation_config);
+    let mut federation_state = FederationState::new(&federation_config);
+    // Issue federation session tokens through the shared TokenService so the
+    // refresh token is persisted (refreshable + revocable), matching password
+    // and social login. The default standalone JWT issuer is not refreshable.
+    federation_state.token_issuer = std::sync::Arc::new(FederationTokenAdapter {
+        pool: pool.clone(),
+        jwt_private_key: SecretString::from(config.jwt_private_key.expose_secret().to_string()),
+    });
 
     // F-1: CRITICAL - Split federation routes based on tenant requirements
     // Routes that need tenant context (discover, authorize, logout) - require X-Tenant-ID
@@ -2019,6 +2026,58 @@ fn build_cors_layer(origins: &[String]) -> CorsLayer {
     }
 
     layer
+}
+
+/// Adapter so OIDC federation issues session tokens via the shared `TokenService`
+/// (persisted, refreshable, revocable refresh tokens) instead of the standalone
+/// non-persisted JWT issuer.
+struct FederationTokenAdapter {
+    pool: sqlx::PgPool,
+    jwt_private_key: SecretString,
+}
+
+#[async_trait::async_trait]
+impl xavyo_api_oidc_federation::FederationTokenIssuer for FederationTokenAdapter {
+    async fn issue_tokens(
+        &self,
+        user_id: uuid::Uuid,
+        tenant_id: uuid::Uuid,
+        roles: Vec<String>,
+        email: Option<String>,
+        _name: Option<String>,
+        _federation_claims: Option<xavyo_api_oidc_federation::models::FederationClaims>,
+    ) -> Result<xavyo_api_oidc_federation::IssuedTokens, xavyo_api_oidc_federation::FederationError>
+    {
+        let token_config = TokenConfig::new(
+            self.jwt_private_key.expose_secret().as_bytes().to_vec(),
+            "xavyo".to_string(),
+            "xavyo".to_string(),
+        );
+        let token_service = TokenService::new(token_config, self.pool.clone());
+
+        // External IdP established the assurance, so no acr/amr/auth_time is asserted.
+        let (access_token, refresh_token, expires_in) = token_service
+            .create_tokens(
+                xavyo_core::UserId::from_uuid(user_id),
+                xavyo_core::TenantId::from_uuid(tenant_id),
+                roles,
+                email,
+                None,
+                None,
+                None,
+            )
+            .await
+            .map_err(|e| {
+                xavyo_api_oidc_federation::FederationError::TokenIssueFailed(e.to_string())
+            })?;
+
+        Ok(xavyo_api_oidc_federation::IssuedTokens {
+            access_token,
+            expires_in,
+            refresh_token: Some(refresh_token),
+            token_type: "Bearer".to_string(),
+        })
+    }
 }
 
 /// Adapter to connect xavyo-api-social to xavyo-auth.

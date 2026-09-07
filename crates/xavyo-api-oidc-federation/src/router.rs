@@ -7,9 +7,11 @@ use axum::{
 use sqlx::PgPool;
 
 use crate::handlers::{admin, federation};
+use std::sync::Arc;
+
 use crate::services::{
-    AuthFlowService, EncryptionService, HrdService, IdpConfigService, ProvisioningService,
-    TokenIssuerService, ValidationService,
+    AuthFlowService, EncryptionService, FederationTokenIssuer, HrdService, IdpConfigService,
+    ProvisioningService, TokenIssuerService, ValidationService,
 };
 
 /// Shared state for federation handlers.
@@ -30,8 +32,10 @@ pub struct FederationState {
     pub auth_flow: AuthFlowService,
     /// Provisioning service.
     pub provisioning: ProvisioningService,
-    /// Token issuer service.
-    pub token_issuer: TokenIssuerService,
+    /// Token issuer. Defaults to the standalone JWT issuer; `idp-api` injects a
+    /// `TokenService`-backed implementation so federation refresh tokens are
+    /// persisted (refreshable + revocable like password/social login).
+    pub token_issuer: Arc<dyn FederationTokenIssuer>,
 }
 
 /// Configuration for federation router.
@@ -68,10 +72,12 @@ impl FederationState {
             config.frontend_url.clone(),
         );
         let provisioning = ProvisioningService::new(config.pool.clone());
-        let token_issuer = TokenIssuerService::new(crate::services::TokenIssuerConfig {
-            private_key_pem: config.jwt_private_key_pem.clone(),
-            ..Default::default()
-        });
+        let token_issuer: Arc<dyn FederationTokenIssuer> = Arc::new(TokenIssuerService::new(
+            crate::services::TokenIssuerConfig {
+                private_key_pem: config.jwt_private_key_pem.clone(),
+                ..Default::default()
+            },
+        ));
 
         Self {
             pool: config.pool.clone(),
