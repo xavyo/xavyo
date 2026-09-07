@@ -55,9 +55,9 @@ pub struct EmailConfig {
     pub smtp_tls: bool,
     /// Base URL for frontend links (e.g., `https://app.xavyo.com`).
     pub frontend_base_url: String,
-    /// Path for password reset page (e.g., "/auth/reset-password").
+    /// Path for password reset page (e.g., "/reset-password").
     pub password_reset_path: String,
-    /// Path for email verification page (e.g., "/auth/verify-email").
+    /// Path for email verification page (e.g., "/verify-email").
     pub email_verify_path: String,
     /// Path for magic link verification page (e.g., "/passwordless/magic-link/verify").
     pub magic_link_path: String,
@@ -77,8 +77,8 @@ impl EmailConfig {
     ///
     /// Optional environment variables (with defaults):
     /// - `EMAIL_SMTP_TLS` (default: "true") — set to "false" for local dev (e.g., Mailpit)
-    /// - `PASSWORD_RESET_PATH` (default: "/auth/reset-password")
-    /// - `EMAIL_VERIFY_PATH` (default: "/auth/verify-email")
+    /// - `PASSWORD_RESET_PATH` (default: "/reset-password")
+    /// - `EMAIL_VERIFY_PATH` (default: "/verify-email")
     pub fn from_env() -> Result<Self, EmailError> {
         Ok(Self {
             smtp_host: std::env::var("EMAIL_SMTP_HOST")
@@ -101,9 +101,9 @@ impl EmailConfig {
             frontend_base_url: std::env::var("FRONTEND_BASE_URL")
                 .map_err(|_| EmailError::ConfigError("FRONTEND_BASE_URL not set".to_string()))?,
             password_reset_path: std::env::var("PASSWORD_RESET_PATH")
-                .unwrap_or_else(|_| "/auth/reset-password".to_string()),
+                .unwrap_or_else(|_| "/reset-password".to_string()),
             email_verify_path: std::env::var("EMAIL_VERIFY_PATH")
-                .unwrap_or_else(|_| "/auth/verify-email".to_string()),
+                .unwrap_or_else(|_| "/verify-email".to_string()),
             magic_link_path: std::env::var("MAGIC_LINK_PATH")
                 .unwrap_or_else(|_| "/passwordless/magic-link/verify".to_string()),
         })
