@@ -21,7 +21,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use validator::Validate;
 use xavyo_core::TenantId;
-use xavyo_db::{AuthMethod, FailureReason, UserRole};
+use xavyo_db::{AuthMethod, FailureReason, Tenant, UserRole};
 use xavyo_webhooks::{EventPublisher, WebhookEvent};
 
 /// Login response that can be either full tokens or MFA required.
@@ -95,6 +95,19 @@ pub async fn login_handler(
             .collect();
         ApiAuthError::Validation(errors.join(", "))
     })?;
+
+    // Fail closed on an unknown tenant. The client-supplied X-Tenant-ID is only
+    // format-validated by the tenant layer, never checked against the DB. Without
+    // this guard, a login for a non-existent tenant reaches the failed-attempt /
+    // audit writes, whose tenant_id foreign keys reject the row and surface a 500.
+    // Return the same generic error as bad credentials so an unknown tenant and an
+    // unknown user are indistinguishable (no tenant-enumeration oracle).
+    if Tenant::find_by_id(&pool, *tenant_id.as_uuid())
+        .await?
+        .is_none()
+    {
+        return Err(ApiAuthError::InvalidCredentials);
+    }
 
     // Extract client info early for audit logging and IP restriction.
     // Forwarded headers are used only when TrustXff is present.
@@ -740,6 +753,26 @@ mod tests {
         assert!(
             !production.contains("EnforcementDecision::skip()"),
             "must not treat risk-eval errors as a skipped decision"
+        );
+    }
+
+    #[test]
+    fn login_handler_rejects_unknown_tenant_before_recording_attempts() {
+        // A login for a non-existent tenant must fail closed as InvalidCredentials
+        // *before* any tenant-scoped write, otherwise the failed-attempt/audit
+        // foreign keys reject the row and the handler 500s (and leaks tenant
+        // existence). Guard both the check and its ordering.
+        let src = include_str!("login.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let guard = production
+            .find("Tenant::find_by_id(&pool")
+            .expect("login must verify the tenant exists");
+        let authenticate = production
+            .find(".login(tenant_id")
+            .expect("login must call auth_service.login");
+        assert!(
+            guard < authenticate,
+            "tenant existence must be checked before authentication/attempt recording"
         );
     }
 
