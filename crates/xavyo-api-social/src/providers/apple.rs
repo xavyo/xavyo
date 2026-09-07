@@ -117,6 +117,7 @@ pub struct AppleProvider {
     key_id: String,
     private_key: EncodingKey,
     http_client: Client,
+    configured_scopes: Option<Vec<String>>,
 }
 
 impl AppleProvider {
@@ -149,7 +150,21 @@ impl AppleProvider {
                 .timeout(Duration::from_secs(10))
                 .build()
                 .unwrap_or_else(|_| Client::new()),
+            configured_scopes: None,
         })
+    }
+
+    /// Override the requested scopes with the tenant-configured set (empty → defaults).
+    #[must_use]
+    pub fn with_scopes(mut self, scopes: Option<Vec<String>>) -> Self {
+        self.configured_scopes = scopes.filter(|s| !s.is_empty());
+        self
+    }
+
+    fn effective_scopes(&self) -> Vec<String> {
+        self.configured_scopes
+            .clone()
+            .unwrap_or_else(|| self.default_scopes())
     }
 
     /// Generate a client secret JWT for Apple.
@@ -335,7 +350,7 @@ impl SocialProvider for AppleProvider {
         redirect_uri: &str,
         nonce: Option<&str>,
     ) -> String {
-        let scopes = self.default_scopes().join(" ");
+        let scopes = self.effective_scopes().join(" ");
 
         // Apple uses form_post response mode
         let mut url = format!(

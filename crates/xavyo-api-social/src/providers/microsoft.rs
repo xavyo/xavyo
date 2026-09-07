@@ -40,6 +40,7 @@ pub struct MicrosoftProvider {
     client_secret: String,
     tenant: String,
     http_client: Client,
+    configured_scopes: Option<Vec<String>>,
 }
 
 impl MicrosoftProvider {
@@ -80,7 +81,21 @@ impl MicrosoftProvider {
                 .timeout(std::time::Duration::from_secs(10))
                 .build()
                 .unwrap_or_else(|_| Client::new()),
+            configured_scopes: None,
         })
+    }
+
+    /// Override the requested scopes with the tenant-configured set (empty → defaults).
+    #[must_use]
+    pub fn with_scopes(mut self, scopes: Option<Vec<String>>) -> Self {
+        self.configured_scopes = scopes.filter(|s| !s.is_empty());
+        self
+    }
+
+    fn effective_scopes(&self) -> Vec<String> {
+        self.configured_scopes
+            .clone()
+            .unwrap_or_else(|| self.default_scopes())
     }
 
     /// Get the authorization endpoint URL.
@@ -118,7 +133,7 @@ impl SocialProvider for MicrosoftProvider {
         redirect_uri: &str,
         nonce: Option<&str>,
     ) -> String {
-        let scopes = self.default_scopes().join(" ");
+        let scopes = self.effective_scopes().join(" ");
 
         let mut url = format!(
             "{}?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}&code_challenge={}&code_challenge_method=S256&response_mode=query",
@@ -143,7 +158,7 @@ impl SocialProvider for MicrosoftProvider {
         pkce_verifier: &str,
         redirect_uri: &str,
     ) -> SocialResult<TokenResponse> {
-        let scopes = self.default_scopes().join(" ");
+        let scopes = self.effective_scopes().join(" ");
 
         let params = [
             ("client_id", self.client_id.as_str()),

@@ -54,6 +54,9 @@ pub async fn authorize(
             provider: provider_type,
         })?;
 
+    // Tenant-configured scopes (if any) override each provider's defaults.
+    let cfg_scopes = config.scopes.clone();
+
     // Generate PKCE challenge
     let pkce = OAuthService::generate_pkce();
 
@@ -77,7 +80,8 @@ pub async fn authorize(
     let nonce_ref = oidc_nonce.as_deref();
     let auth_url = match provider_type {
         ProviderType::Google => {
-            let p = ProviderFactory::google(config.client_id, config.client_secret);
+            let p = ProviderFactory::google(config.client_id, config.client_secret)
+                .with_scopes(cfg_scopes.clone());
             p.authorization_url(&state_token, &pkce.challenge, &redirect_uri, nonce_ref)
         }
         ProviderType::Microsoft => {
@@ -88,7 +92,8 @@ pub async fn authorize(
                 .and_then(|v| v.as_str())
                 .map(String::from);
             let p =
-                ProviderFactory::microsoft(config.client_id, config.client_secret, azure_tenant)?;
+                ProviderFactory::microsoft(config.client_id, config.client_secret, azure_tenant)?
+                    .with_scopes(cfg_scopes.clone());
             p.authorization_url(&state_token, &pkce.challenge, &redirect_uri, nonce_ref)
         }
         ProviderType::Apple => {
@@ -120,11 +125,13 @@ pub async fn authorize(
                 })?
                 .to_string();
 
-            let p = ProviderFactory::apple(config.client_id, team_id, key_id, private_key)?;
+            let p = ProviderFactory::apple(config.client_id, team_id, key_id, private_key)?
+                .with_scopes(cfg_scopes.clone());
             p.authorization_url(&state_token, &pkce.challenge, &redirect_uri, nonce_ref)
         }
         ProviderType::Github => {
-            let p = ProviderFactory::github(config.client_id, config.client_secret);
+            let p = ProviderFactory::github(config.client_id, config.client_secret)
+                .with_scopes(cfg_scopes.clone());
             p.authorization_url(&state_token, &pkce.challenge, &redirect_uri, nonce_ref)
         }
     };
