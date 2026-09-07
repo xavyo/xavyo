@@ -1000,6 +1000,7 @@ async fn main() {
         pool: pool.clone(),
         master_key: config.federation_encryption_key,
         callback_base_url: config.issuer_url.clone(),
+        frontend_url: config.frontend_url.clone(),
         jwt_private_key_pem: config.jwt_private_key.expose_secret().as_bytes().to_vec(),
     };
     let federation_state = FederationState::new(&federation_config);

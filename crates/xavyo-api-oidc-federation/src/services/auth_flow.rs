@@ -21,6 +21,8 @@ pub struct AuthFlowService {
     token_verifier: TokenVerifierService,
     /// Base URL for callbacks.
     callback_base_url: String,
+    /// Frontend base URL; also an allowed post-login redirect origin.
+    frontend_url: String,
 }
 
 /// Authorization URL result.
@@ -102,13 +104,19 @@ pub struct IdTokenClaims {
 impl AuthFlowService {
     /// Create a new authorization flow service.
     #[must_use]
-    pub fn new(pool: PgPool, encryption: EncryptionService, callback_base_url: String) -> Self {
+    pub fn new(
+        pool: PgPool,
+        encryption: EncryptionService,
+        callback_base_url: String,
+        frontend_url: String,
+    ) -> Self {
         Self {
             pool,
             discovery: DiscoveryService::new(),
             encryption,
             token_verifier: TokenVerifierService::default(),
             callback_base_url,
+            frontend_url,
         }
     }
 
@@ -144,7 +152,7 @@ impl AuthFlowService {
 
         // Validate redirect URI to prevent open redirects (H2)
         if let Some(ref uri) = input.redirect_uri {
-            Self::validate_redirect_uri(uri, &self.callback_base_url)?;
+            self.validate_redirect_uri(uri)?;
         }
 
         // Determine final redirect URI
@@ -450,8 +458,16 @@ impl AuthFlowService {
         Ok(())
     }
 
-    /// Validate redirect URI to prevent open redirects.
-    fn validate_redirect_uri(redirect_uri: &str, callback_base_url: &str) -> FederationResult<()> {
+    /// Frontend base URL (an allowed post-login redirect origin).
+    #[must_use]
+    pub fn frontend_url(&self) -> &str {
+        &self.frontend_url
+    }
+
+    /// Whether a post-login `redirect_uri` is allowed: a safe relative path, or
+    /// an absolute URL whose origin matches the callback base or the frontend.
+    #[must_use]
+    pub fn redirect_uri_allowed(&self, redirect_uri: &str) -> bool {
         let trimmed = redirect_uri.trim();
         // Allow relative paths starting with / (but not // or /\)
         if trimmed.starts_with('/')
@@ -459,35 +475,41 @@ impl AuthFlowService {
             && !trimmed.starts_with("/\\")
             && !trimmed.contains("://")
         {
-            // SECURITY: Block encoded path traversal patterns that could bypass the above checks
-            // after browser URL normalization (e.g., %2f → /, %5c → \, %0a → newline).
+            // Block encoded traversal that could bypass the checks after browser
+            // URL normalization (e.g., %2f → /, %5c → \, %0a → newline).
             let lower = trimmed.to_lowercase();
-            if lower.contains("%2f")
+            return !(lower.contains("%2f")
                 || lower.contains("%5c")
                 || lower.contains("%0a")
                 || lower.contains("%0d")
-                || lower.contains("\\")
-            {
-                return Err(FederationError::InvalidCallback(
-                    "redirect_uri contains invalid encoded characters".to_string(),
-                ));
-            }
-            return Ok(());
+                || lower.contains('\\'));
         }
-        // For absolute URLs: parse both and compare scheme + host + port
-        if let (Ok(redirect), Ok(base)) =
-            (url::Url::parse(trimmed), url::Url::parse(callback_base_url))
-        {
-            if redirect.scheme() == base.scheme()
-                && redirect.host_str() == base.host_str()
-                && redirect.port() == base.port()
-            {
-                return Ok(());
-            }
+        // Absolute URLs: allow when the origin matches the callback base or frontend.
+        Self::origin_matches(trimmed, &self.callback_base_url)
+            || Self::origin_matches(trimmed, &self.frontend_url)
+    }
+
+    /// Compare the scheme+host+port of two URLs.
+    fn origin_matches(url: &str, base: &str) -> bool {
+        matches!(
+            (url::Url::parse(url), url::Url::parse(base)),
+            (Ok(u), Ok(b))
+                if u.scheme() == b.scheme()
+                    && u.host_str() == b.host_str()
+                    && u.port() == b.port()
+        )
+    }
+
+    /// Validate redirect URI to prevent open redirects.
+    fn validate_redirect_uri(&self, redirect_uri: &str) -> FederationResult<()> {
+        if self.redirect_uri_allowed(redirect_uri) {
+            Ok(())
+        } else {
+            Err(FederationError::InvalidCallback(
+                "redirect_uri must be a relative path or under the configured base/frontend URL"
+                    .to_string(),
+            ))
         }
-        Err(FederationError::InvalidCallback(
-            "redirect_uri must be a relative path or under the configured base URL".to_string(),
-        ))
     }
 
     /// Get session by ID with tenant isolation.

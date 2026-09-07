@@ -264,19 +264,10 @@ pub async fn callback(
     // If the redirect_uri contains a path (e.g., callback page), redirect with token
     // Otherwise return JSON response
     if redirect_uri.starts_with("http") {
-        // H2: Validate redirect URI (defense in depth against open redirects)
-        // Use proper URL parsing to prevent prefix bypass (e.g., example.com.evil.com)
-        let redirect_safe = if let (Ok(redirect_url), Ok(base_url)) = (
-            url::Url::parse(&redirect_uri),
-            url::Url::parse(state.auth_flow.callback_base_url()),
-        ) {
-            redirect_url.scheme() == base_url.scheme()
-                && redirect_url.host_str() == base_url.host_str()
-                && redirect_url.port() == base_url.port()
-        } else {
-            false
-        };
-        if !redirect_safe {
+        // H2: Validate redirect URI (defense in depth against open redirects).
+        // Allowed origins are the callback base and the configured frontend, so a
+        // split frontend/backend deployment can finish login in the SPA.
+        if !state.auth_flow.redirect_uri_allowed(&redirect_uri) {
             tracing::warn!(
                 redirect_uri = %redirect_uri,
                 "Blocked potential open redirect in federation callback"
@@ -288,14 +279,20 @@ pub async fn callback(
                 refresh_token: xavyo_tokens.refresh_token,
             })));
         }
-        // Redirect with token as fragment (safer than query params)
-        // R9: URL-encode the access token per RFC 6749 Section 4.2.2
+        // Redirect with tokens as fragment (safer than query params).
+        // R9: URL-encode per RFC 6749 Section 4.2.2. Include the refresh token so
+        // the SPA can establish a full session (parity with social login).
         let encoded_token: String =
             url::form_urlencoded::byte_serialize(xavyo_tokens.access_token.as_bytes()).collect();
-        let redirect_url = format!(
+        let mut redirect_url = format!(
             "{}#access_token={encoded_token}&token_type=Bearer&expires_in={}",
             redirect_uri, xavyo_tokens.expires_in
         );
+        if let Some(ref refresh) = xavyo_tokens.refresh_token {
+            let encoded_refresh: String =
+                url::form_urlencoded::byte_serialize(refresh.as_bytes()).collect();
+            redirect_url.push_str(&format!("&refresh_token={encoded_refresh}"));
+        }
         Ok(CallbackResponse::Redirect(Redirect::temporary(
             &redirect_url,
         )))
