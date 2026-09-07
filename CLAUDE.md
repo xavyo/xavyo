@@ -4,6 +4,10 @@
 
 For maps, not territory: `llms.txt`, `llms-full.txt`, `docs/crates/index.md`, each crate's `CRATE.md`.
 
+GraphPact development lifecycle (structured/critical agent changes):
+
+@AGENTS.md
+
 ---
 
 ## How we work

@@ -1,0 +1,49 @@
+{
+  "id": "replace-cache",
+  "state": "draft",
+  "objective": "Replace the shared cache without changing public behavior.",
+  "non_goals": ["No unrelated dependency upgrades"],
+  "project": {
+    "field": "brownfield",
+    "baseline_revision": "abc1234",
+    "invariants": [
+      "The cache public interface and return values stay compatible",
+      "Existing eviction and expiry semantics remain observable"
+    ],
+    "rollback": "Restore the previous cache implementation behind the unchanged interface."
+  },
+  "grill": {
+    "mode": "interactive",
+    "notes": [
+      "Asked the owner whether eviction order is part of the public contract; confirmed yes, so it becomes an invariant.",
+      "Pre-mortem: the most plausible failure is the eviction order changing; the continuity test pins the observable eviction sequence so a regression fails the suite."
+    ]
+  },
+  "risk": {
+    "tier": "structured",
+    "signals": ["cross-component"],
+    "rationale": "The cache is shared by more than one component."
+  },
+  "acceptance": [
+    {
+      "id": "behavior-preserved",
+      "criterion": "Existing cache behavior remains compatible.",
+      "verification": "python3 -m unittest discover -s tests -v",
+      "continuity": true
+    }
+  ],
+  "execution": {
+    "mode": "sequential",
+    "rationale": "The implementation and its directly related tests share one local write path."
+  },
+  "tasks": [
+    {
+      "id": "replace-cache",
+      "outcome": "Replace the implementation and its directly related tests."
+    }
+  ],
+  "approvals": {
+    "contract": false,
+    "critical_actions": false
+  }
+}
