@@ -776,9 +776,8 @@ mod tests {
 
         // List must include deactivated (non-deleted) users.
         assert!(
-            production.contains(
-                "SELECT * FROM users WHERE tenant_id = $1 AND scim_deleted_at IS NULL"
-            ),
+            production
+                .contains("SELECT * FROM users WHERE tenant_id = $1 AND scim_deleted_at IS NULL"),
             "list must return active + deactivated (non-deleted) users"
         );
 
