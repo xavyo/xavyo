@@ -832,12 +832,15 @@ mod tests {
         let body = config.password_reset_body("abc123", tenant_id);
         // The reset link must carry the tenant so the post-reset login preserves
         // tenant context (otherwise a new-device reset lands on the system tenant).
+        // NB: do not interpolate `body` into the assert message — it contains the
+        // reset link/token and CodeQL flags that as clear-text logging of secrets.
+        let expected = format!(
+            "https://app.xavyo.com/reset-password?token=abc123&tenant={}",
+            tenant_id.as_uuid()
+        );
         assert!(
-            body.contains(&format!(
-                "https://app.xavyo.com/reset-password?token=abc123&tenant={}",
-                tenant_id.as_uuid()
-            )),
-            "reset email link must include the tenant; body was:\n{body}"
+            body.contains(&expected),
+            "reset email link must include the tenant"
         );
     }
 
@@ -860,12 +863,15 @@ mod tests {
         let body = config.magic_link_body("mltoken", tenant_id);
         // The magic link must carry the tenant so it works when opened on a device
         // without the tenant cookie (the verify endpoint requires tenant context).
+        // NB: do not interpolate `body` into the assert message — it contains the
+        // magic-link token and CodeQL flags that as clear-text logging of secrets.
+        let expected = format!(
+            "https://app.xavyo.com/passwordless/magic-link/verify?token=mltoken&tenant={}",
+            tenant_id.as_uuid()
+        );
         assert!(
-            body.contains(&format!(
-                "https://app.xavyo.com/passwordless/magic-link/verify?token=mltoken&tenant={}",
-                tenant_id.as_uuid()
-            )),
-            "magic link email must include the tenant; body was:\n{body}"
+            body.contains(&expected),
+            "magic link email must include the tenant"
         );
     }
 
