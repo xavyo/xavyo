@@ -262,9 +262,31 @@ impl TenantProviderService {
             });
         }
         if enabled && client_secret.is_none() {
-            return Err(crate::error::SocialError::ConfigurationError {
-                message: "client_secret cannot be empty".to_string(),
-            });
+            // Enabling without a secret in the request is valid when the provider
+            // is already configured with one (e.g. an admin toggles an
+            // already-saved provider on). The UPDATE branch below preserves the
+            // stored secret. Reject only when no secret exists anywhere — otherwise
+            // toggling a configured provider on 500'd with "client_secret cannot be
+            // empty".
+            let mut check_conn = self.pool.acquire().await?;
+            sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+                .bind(tenant_id.to_string())
+                .execute(&mut *check_conn)
+                .await?;
+            let has_stored_secret: bool = sqlx::query_scalar(
+                "SELECT client_secret_encrypted IS NOT NULL \
+                 FROM tenant_social_providers WHERE tenant_id = $1 AND provider = $2",
+            )
+            .bind(tenant_id)
+            .bind(provider.to_string())
+            .fetch_optional(&mut *check_conn)
+            .await?
+            .unwrap_or(false);
+            if !has_stored_secret {
+                return Err(crate::error::SocialError::ConfigurationError {
+                    message: "client_secret cannot be empty".to_string(),
+                });
+            }
         }
 
         // R9: Validate additional_config size to prevent storage abuse
@@ -434,4 +456,31 @@ struct AdminProviderRow {
     scopes: Option<Vec<String>>,
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[cfg(test)]
+mod tests {
+    /// Regression: toggling an already-configured social provider to `enabled`
+    /// sends `{ enabled: true }` with no `client_secret`. The upfront validation
+    /// must NOT hard-reject that — it should allow it when a secret is already
+    /// stored (the UPDATE branch preserves it). Previously this 500'd with
+    /// "client_secret cannot be empty", so admins could not enable a saved
+    /// provider from the UI.
+    #[test]
+    fn enable_without_secret_allowed_when_secret_already_stored() {
+        let src = include_str!("tenant_provider_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let update = production
+            .split("pub async fn update_provider")
+            .nth(1)
+            .expect("update_provider");
+        assert!(
+            update.contains("has_stored_secret"),
+            "update_provider must check for an already-stored secret before rejecting enable"
+        );
+        assert!(
+            update.contains("client_secret_encrypted IS NOT NULL"),
+            "the stored-secret check must query client_secret_encrypted"
+        );
+    }
 }
