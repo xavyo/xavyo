@@ -227,15 +227,17 @@ impl UserService {
         Ok(mapper.to_scim_user(&user, groups, &self.base_url))
     }
 
-    /// Find an active user by ID, returning error if not found or deactivated.
+    /// Find a non-deleted user by ID, returning error if not found or SCIM-deleted.
     ///
-    /// SCIM DELETE deactivates users (sets is_active=false). Per RFC 7644 Section 3.6,
-    /// subsequent GET on a deleted resource should return 404.
+    /// A *deactivated* user (`is_active = false`) still exists and must be readable,
+    /// reactivatable, and deletable via SCIM — only a SCIM *delete* (which sets
+    /// `scim_deleted_at`) hides the resource so a subsequent GET returns 404 per
+    /// RFC 7644 Section 3.6.
     async fn find_user(&self, tenant_id: Uuid, user_id: Uuid) -> ScimResult<User> {
         let user: Option<User> = sqlx::query_as(
             r"
             SELECT * FROM users
-            WHERE id = $1 AND tenant_id = $2 AND is_active = true
+            WHERE id = $1 AND tenant_id = $2 AND scim_deleted_at IS NULL
             ",
         )
         .bind(user_id)
@@ -256,11 +258,14 @@ impl UserService {
         let mapper = self.get_mapper(tenant_id).await?;
         let filter_mapper = AttributeMapper::for_users();
 
-        // Build query — only return active users (SCIM DELETE deactivates, per RFC 7644 Section 3.6)
+        // Return all non-deleted users (active *and* deactivated); SCIM DELETE sets
+        // scim_deleted_at to hide the resource. Callers filter by `active` via the
+        // SCIM `filter` parameter, matching Okta/Azure list semantics.
         let mut base_query =
-            String::from("SELECT * FROM users WHERE tenant_id = $1 AND is_active = true");
-        let mut count_query =
-            String::from("SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND is_active = true");
+            String::from("SELECT * FROM users WHERE tenant_id = $1 AND scim_deleted_at IS NULL");
+        let mut count_query = String::from(
+            "SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND scim_deleted_at IS NULL",
+        );
         let mut params: Vec<String> = vec![];
 
         // Apply filter
@@ -673,9 +678,10 @@ impl UserService {
             r"
             UPDATE users SET
                 is_active = false,
+                scim_deleted_at = NOW(),
                 scim_last_sync = NOW(),
                 updated_at = NOW()
-            WHERE id = $1 AND tenant_id = $2 AND is_active = true
+            WHERE id = $1 AND tenant_id = $2 AND scim_deleted_at IS NULL
             ",
         )
         .bind(user_id)
@@ -743,6 +749,52 @@ fn patch_optional_string(value: &serde_json::Value, field: &str) -> ScimResult<O
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deactivated_users_remain_manageable_only_scim_delete_hides_them() {
+        // Regression: SCIM overloaded `is_active` for both "deactivated" and
+        // "deleted", so once an IdP deactivated a user (PATCH active=false) that
+        // user became invisible — it could not be fetched, reactivated, or deleted
+        // through SCIM. Reads/lists must key off `scim_deleted_at`, and only DELETE
+        // may set it (so deactivated users stay readable/reactivatable, per Okta/Azure).
+        let src = include_str!("user_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+
+        // find_user (get/patch/replace lookup) must hide only SCIM-deleted rows.
+        let find = production
+            .split("async fn find_user")
+            .nth(1)
+            .expect("find_user");
+        assert!(
+            find.contains("scim_deleted_at IS NULL"),
+            "find_user must key off scim_deleted_at, not is_active"
+        );
+        assert!(
+            !find.contains("is_active = true"),
+            "find_user must not filter deactivated users out"
+        );
+
+        // List must include deactivated (non-deleted) users.
+        assert!(
+            production
+                .contains("SELECT * FROM users WHERE tenant_id = $1 AND scim_deleted_at IS NULL"),
+            "list must return active + deactivated (non-deleted) users"
+        );
+
+        // DELETE is the only path that sets the soft-delete marker.
+        let delete = production
+            .split("pub async fn delete_user")
+            .nth(1)
+            .expect("delete_user");
+        assert!(
+            delete.contains("scim_deleted_at = NOW()"),
+            "delete_user must set the scim_deleted_at soft-delete marker"
+        );
+        assert!(
+            delete.contains("scim_deleted_at IS NULL"),
+            "delete_user must target non-deleted rows (idempotent on active or deactivated)"
+        );
+    }
 
     #[test]
     fn test_patch_op_replace_active() {

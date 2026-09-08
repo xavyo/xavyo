@@ -32,3 +32,4 @@ pub use error::{FederationError, FederationResult};
 pub use router::{
     admin_routes, auth_routes, create_federation_router, FederationConfig, FederationState,
 };
+pub use services::{FederationTokenIssuer, IssuedTokens};

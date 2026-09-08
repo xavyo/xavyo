@@ -4,12 +4,13 @@
 //! Delegates to the shared `do_password_change` logic.
 
 use crate::error::ApiAuthError;
-use crate::handlers::password_change::do_password_change;
+use crate::handlers::password_change::{current_session_id, do_password_change};
 use crate::models::{PasswordChangeRequest, PasswordChangeResponse};
 use crate::services::{AlertService, PasswordPolicyService, SessionService};
 use axum::{extract::ConnectInfo, Extension, Json};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use xavyo_auth::JwtClaims;
 use xavyo_core::{TenantId, UserId};
 
 /// Handle PUT /me/password request.
@@ -30,6 +31,7 @@ use xavyo_core::{TenantId, UserId};
 pub async fn me_password_change(
     Extension(tenant_id): Extension<TenantId>,
     Extension(user_id): Extension<UserId>,
+    Extension(claims): Extension<JwtClaims>,
     Extension(password_policy_service): Extension<Arc<PasswordPolicyService>>,
     Extension(alert_service): Extension<Arc<AlertService>>,
     Extension(session_service): Extension<Arc<SessionService>>,
@@ -37,6 +39,7 @@ pub async fn me_password_change(
     Json(request): Json<PasswordChangeRequest>,
 ) -> Result<Json<PasswordChangeResponse>, ApiAuthError> {
     let revoke = request.revoke_other_sessions;
+    let current = current_session_id(&claims);
     do_password_change(
         &tenant_id,
         &user_id,
@@ -46,6 +49,7 @@ pub async fn me_password_change(
         addr,
         request,
         revoke,
+        current,
     )
     .await
 }

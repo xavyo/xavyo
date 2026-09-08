@@ -787,10 +787,17 @@ pub async fn get_user_lifecycle_status(
         .ok_or_else(|| crate::error::ApiGovernanceError::Unauthorized)?;
 
     // Get user information
+    // The user's lifecycle is tracked via `users.lifecycle_state_id` (FK to
+    // gov_lifecycle_states). Derive the owning config id and the state name from
+    // that state row; `users` has no `lifecycle_config_id`/`lifecycle_state`
+    // columns (querying them 500s the whole user detail page).
     let user: Option<(Option<Uuid>, Option<Uuid>, Option<String>)> = sqlx::query_as(
         r"
-        SELECT lifecycle_config_id, archetype_id, lifecycle_state FROM users
-        WHERE id = $1 AND tenant_id = $2
+        SELECT ls.config_id, u.archetype_id, ls.name
+        FROM users u
+        LEFT JOIN gov_lifecycle_states ls
+          ON ls.id = u.lifecycle_state_id AND ls.tenant_id = u.tenant_id
+        WHERE u.id = $1 AND u.tenant_id = $2
         ",
     )
     .bind(user_id)

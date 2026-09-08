@@ -98,6 +98,9 @@ pub async fn create_identity_provider(
     );
 
     let idp = state.idp_config.create(tenant_id, req).await?;
+    // Bust HRD cache so a newly-configured domain is discovered immediately
+    // (clears any stale negative "standard" entry for that domain).
+    state.hrd.clear_tenant_cache(tenant_id).await;
     let domains = state.idp_config.get_domains(tenant_id, idp.id).await?;
     let response = IdentityProviderResponse::from_model(idp, domains, 0)?;
 
@@ -176,6 +179,8 @@ pub async fn update_identity_provider(
     );
 
     let idp = state.idp_config.update(tenant_id, idp_id, req).await?;
+    // Config may have changed the enabled state, issuer, or scopes — bust HRD cache.
+    state.hrd.clear_tenant_cache(tenant_id).await;
     let domains = state.idp_config.get_domains(tenant_id, idp_id).await?;
     let linked_users_count = state
         .idp_config
@@ -221,6 +226,8 @@ pub async fn delete_identity_provider(
     );
 
     state.idp_config.delete(tenant_id, idp_id).await?;
+    // Stop routing the deleted IdP's domains immediately.
+    state.hrd.clear_tenant_cache(tenant_id).await;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -299,6 +306,8 @@ pub async fn toggle_identity_provider(
         .idp_config
         .set_enabled(tenant_id, idp_id, req.is_enabled)
         .await?;
+    // Enabling/disabling must take effect immediately for Home Realm Discovery.
+    state.hrd.clear_tenant_cache(tenant_id).await;
     let domains = state.idp_config.get_domains(tenant_id, idp_id).await?;
     let linked_users_count = state
         .idp_config
@@ -385,6 +394,8 @@ pub async fn add_domain(
         .idp_config
         .add_domain(tenant_id, idp_id, req.domain, req.priority)
         .await?;
+    // A newly-added domain must be discoverable immediately (clear stale negative entry).
+    state.hrd.clear_tenant_cache(tenant_id).await;
 
     Ok((StatusCode::CREATED, Json(DomainResponse::from(domain))))
 }
@@ -426,6 +437,8 @@ pub async fn remove_domain(
         .idp_config
         .remove_domain(tenant_id, idp_id, domain_id)
         .await?;
+    // Stop routing the removed domain immediately.
+    state.hrd.clear_tenant_cache(tenant_id).await;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -445,5 +458,32 @@ mod tests {
             list.contains("params.is_enabled") && list.contains(".list("),
             "GET /admin/federation/identity-providers must honor advertised is_enabled"
         );
+    }
+
+    #[test]
+    fn mutating_handlers_invalidate_hrd_cache() {
+        // Every IdP/domain mutation must bust the Home Realm Discovery cache so a
+        // disable/delete/domain change takes effect immediately instead of being
+        // served stale from the cache for up to the cache TTL.
+        let src = include_str!("admin.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for handler in [
+            "pub async fn create_identity_provider",
+            "pub async fn update_identity_provider",
+            "pub async fn delete_identity_provider",
+            "pub async fn toggle_identity_provider",
+            "pub async fn add_domain",
+            "pub async fn remove_domain",
+        ] {
+            let body = production
+                .split(handler)
+                .nth(1)
+                .and_then(|s| s.split("\npub async fn ").next())
+                .unwrap_or_else(|| panic!("handler not found: {handler}"));
+            assert!(
+                body.contains("hrd.clear_tenant_cache(tenant_id)"),
+                "{handler} must invalidate the HRD cache after mutating IdP config"
+            );
+        }
     }
 }

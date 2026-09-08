@@ -90,15 +90,55 @@ pub struct VerifyEmailResponse {
 
     /// True if email was already verified (idempotent).
     pub already_verified: bool,
+
+    /// Access token issued for automatic sign-in immediately after a fresh
+    /// verification, so the user is not forced to log in again. Absent on the
+    /// idempotent already-verified path.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub access_token: Option<String>,
+
+    /// Refresh token paired with `access_token` (see above).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refresh_token: Option<String>,
+
+    /// Token type for the issued session (always `Bearer` when present).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token_type: Option<String>,
+
+    /// Access-token lifetime in seconds (present with `access_token`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_in: Option<i64>,
 }
 
 impl VerifyEmailResponse {
-    /// Create a new response for a newly verified email.
+    /// Create a new response for a newly verified email (no auto-login session).
     #[must_use]
     pub fn verified() -> Self {
         Self {
             message: "Email verified successfully.".to_string(),
             already_verified: false,
+            access_token: None,
+            refresh_token: None,
+            token_type: None,
+            expires_in: None,
+        }
+    }
+
+    /// Create a response for a freshly verified email that also carries a session
+    /// so the frontend can sign the user in automatically.
+    #[must_use]
+    pub fn verified_with_session(
+        access_token: String,
+        refresh_token: String,
+        expires_in: i64,
+    ) -> Self {
+        Self {
+            message: "Email verified successfully.".to_string(),
+            already_verified: false,
+            access_token: Some(access_token),
+            refresh_token: Some(refresh_token),
+            token_type: Some("Bearer".to_string()),
+            expires_in: Some(expires_in),
         }
     }
 
@@ -108,6 +148,10 @@ impl VerifyEmailResponse {
         Self {
             message: "Email verified successfully.".to_string(),
             already_verified: true,
+            access_token: None,
+            refresh_token: None,
+            token_type: None,
+            expires_in: None,
         }
     }
 }

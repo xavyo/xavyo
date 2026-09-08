@@ -4,13 +4,14 @@
 
 use crate::error::ApiAuthError;
 use crate::models::{VerifyEmailRequest, VerifyEmailResponse};
-use crate::services::{hash_token, verify_token_hash_constant_time};
+use crate::services::{hash_token, verify_token_hash_constant_time, TokenService};
 use axum::{Extension, Json};
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
+use std::sync::Arc;
 use validator::Validate;
-use xavyo_core::TenantId;
-use xavyo_db::set_tenant_context;
+use xavyo_core::{TenantId, UserId};
+use xavyo_db::{set_tenant_context, UserRole};
 
 /// Email verification token row from database query.
 type EmailVerificationTokenRow = (
@@ -39,6 +40,7 @@ type EmailVerificationTokenRow = (
 )]
 pub async fn verify_email_handler(
     Extension(pool): Extension<PgPool>,
+    Extension(token_service): Extension<Arc<TokenService>>,
     Json(request): Json<VerifyEmailRequest>,
 ) -> Result<Json<VerifyEmailResponse>, ApiAuthError> {
     // Validate request format
@@ -84,8 +86,8 @@ pub async fn verify_email_handler(
     let tenant_id = TenantId::from_uuid(token_tenant_id);
 
     // Check if user is already verified (include tenant_id for defense-in-depth)
-    let (is_active, email_verified): (bool, bool) = sqlx::query_as(
-        "SELECT is_active, email_verified FROM users WHERE id = $1 AND tenant_id = $2",
+    let (is_active, email_verified, email): (bool, bool, String) = sqlx::query_as(
+        "SELECT is_active, email_verified, email FROM users WHERE id = $1 AND tenant_id = $2",
     )
     .bind(user_id)
     .bind(*tenant_id.as_uuid())
@@ -160,7 +162,40 @@ pub async fn verify_email_handler(
         "Email verification completed successfully"
     );
 
-    Ok(Json(VerifyEmailResponse::verified()))
+    // Issue a session so the just-verified user is signed in automatically,
+    // instead of being bounced back to the login screen. This mirrors the
+    // passwordless email-OTP verify flow, which also proves control of the
+    // mailbox and returns tokens. Role/token issuance failures fall back to a
+    // successful (but session-less) verification so the account is still usable.
+    let roles = UserRole::get_user_roles(&pool, user_id, *tenant_id.as_uuid())
+        .await
+        .unwrap_or_default();
+
+    match token_service
+        .create_tokens(
+            UserId::from_uuid(user_id),
+            tenant_id,
+            roles,
+            Some(email),
+            None,
+            None,
+            None,
+        )
+        .await
+    {
+        Ok((access_token, refresh_token, expires_in)) => Ok(Json(
+            VerifyEmailResponse::verified_with_session(access_token, refresh_token, expires_in),
+        )),
+        Err(e) => {
+            tracing::warn!(
+                user_id = %user_id,
+                tenant_id = %tenant_id,
+                error = %e,
+                "Email verified but auto-login session issuance failed; user can still log in"
+            );
+            Ok(Json(VerifyEmailResponse::verified()))
+        }
+    }
 }
 
 #[cfg(test)]

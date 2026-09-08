@@ -8825,6 +8825,7 @@ name = "xavyo-api-oidc-federation"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",
+ "async-trait",
  "axum",
  "base64 0.22.1",
  "chrono",

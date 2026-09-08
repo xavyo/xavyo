@@ -54,6 +54,9 @@ pub async fn authorize(
             provider: provider_type,
         })?;
 
+    // Tenant-configured scopes (if any) override each provider's defaults.
+    let cfg_scopes = config.scopes.clone();
+
     // Generate PKCE challenge
     let pkce = OAuthService::generate_pkce();
 
@@ -70,17 +73,15 @@ pub async fn authorize(
         oidc_nonce.clone(),
     )?;
 
-    // Build redirect URI
-    let redirect_uri = format!(
-        "{}/api/v1/auth/social/{}/callback",
-        state.base_url, provider_type
-    );
+    // Build redirect URI (must match the mounted callback route, `/auth/social/{provider}/callback`)
+    let redirect_uri = format!("{}/auth/social/{}/callback", state.base_url, provider_type);
 
     // Create provider instance and get authorization URL
     let nonce_ref = oidc_nonce.as_deref();
     let auth_url = match provider_type {
         ProviderType::Google => {
-            let p = ProviderFactory::google(config.client_id, config.client_secret);
+            let p = ProviderFactory::google(config.client_id, config.client_secret)
+                .with_scopes(cfg_scopes.clone());
             p.authorization_url(&state_token, &pkce.challenge, &redirect_uri, nonce_ref)
         }
         ProviderType::Microsoft => {
@@ -91,7 +92,8 @@ pub async fn authorize(
                 .and_then(|v| v.as_str())
                 .map(String::from);
             let p =
-                ProviderFactory::microsoft(config.client_id, config.client_secret, azure_tenant)?;
+                ProviderFactory::microsoft(config.client_id, config.client_secret, azure_tenant)?
+                    .with_scopes(cfg_scopes.clone());
             p.authorization_url(&state_token, &pkce.challenge, &redirect_uri, nonce_ref)
         }
         ProviderType::Apple => {
@@ -123,11 +125,13 @@ pub async fn authorize(
                 })?
                 .to_string();
 
-            let p = ProviderFactory::apple(config.client_id, team_id, key_id, private_key)?;
+            let p = ProviderFactory::apple(config.client_id, team_id, key_id, private_key)?
+                .with_scopes(cfg_scopes.clone());
             p.authorization_url(&state_token, &pkce.challenge, &redirect_uri, nonce_ref)
         }
         ProviderType::Github => {
-            let p = ProviderFactory::github(config.client_id, config.client_secret);
+            let p = ProviderFactory::github(config.client_id, config.client_secret)
+                .with_scopes(cfg_scopes.clone());
             p.authorization_url(&state_token, &pkce.challenge, &redirect_uri, nonce_ref)
         }
     };
@@ -159,4 +163,23 @@ pub async fn available_providers(
         .collect();
 
     Ok(Json(AvailableProvidersResponse { providers }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn authorize_redirect_uri_matches_mounted_route() {
+        // The redirect_uri sent to the provider must match the callback route
+        // mounted at `/auth/social/{provider}/callback` (see idp-api main.rs).
+        let src = include_str!("authorize.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("/api/v1/auth/social/"),
+            "authorize redirect_uri must not use the unmounted /api/v1 prefix"
+        );
+        assert!(
+            production.contains("{}/auth/social/{}/callback"),
+            "authorize redirect_uri must target the mounted /auth/social route"
+        );
+    }
 }

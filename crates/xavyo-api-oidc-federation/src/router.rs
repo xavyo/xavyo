@@ -7,9 +7,11 @@ use axum::{
 use sqlx::PgPool;
 
 use crate::handlers::{admin, federation};
+use std::sync::Arc;
+
 use crate::services::{
-    AuthFlowService, EncryptionService, HrdService, IdpConfigService, ProvisioningService,
-    TokenIssuerService, ValidationService,
+    AuthFlowService, EncryptionService, FederationTokenIssuer, HrdService, IdpConfigService,
+    ProvisioningService, TokenIssuerService, ValidationService,
 };
 
 /// Shared state for federation handlers.
@@ -30,8 +32,10 @@ pub struct FederationState {
     pub auth_flow: AuthFlowService,
     /// Provisioning service.
     pub provisioning: ProvisioningService,
-    /// Token issuer service.
-    pub token_issuer: TokenIssuerService,
+    /// Token issuer. Defaults to the standalone JWT issuer; `idp-api` injects a
+    /// `TokenService`-backed implementation so federation refresh tokens are
+    /// persisted (refreshable + revocable like password/social login).
+    pub token_issuer: Arc<dyn FederationTokenIssuer>,
 }
 
 /// Configuration for federation router.
@@ -43,6 +47,11 @@ pub struct FederationConfig {
     pub master_key: [u8; 32],
     /// Base URL for callbacks (e.g., "<https://idp.example.com>").
     pub callback_base_url: String,
+    /// Frontend base URL (e.g. "<http://localhost:3000>"). Post-login browser
+    /// redirects to the SPA are allowed to target this origin in addition to
+    /// `callback_base_url`, so a split frontend/backend deployment can complete
+    /// the login in the app.
+    pub frontend_url: String,
     /// PEM-encoded RSA private key for signing federation JWTs.
     /// Must be provided — federation login will fail without a valid signing key.
     pub jwt_private_key_pem: Vec<u8>,
@@ -60,12 +69,15 @@ impl FederationState {
             config.pool.clone(),
             encryption,
             config.callback_base_url.clone(),
+            config.frontend_url.clone(),
         );
         let provisioning = ProvisioningService::new(config.pool.clone());
-        let token_issuer = TokenIssuerService::new(crate::services::TokenIssuerConfig {
-            private_key_pem: config.jwt_private_key_pem.clone(),
-            ..Default::default()
-        });
+        let token_issuer: Arc<dyn FederationTokenIssuer> = Arc::new(TokenIssuerService::new(
+            crate::services::TokenIssuerConfig {
+                private_key_pem: config.jwt_private_key_pem.clone(),
+                ..Default::default()
+            },
+        ));
 
         Self {
             pool: config.pool.clone(),

@@ -21,7 +21,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use validator::Validate;
 use xavyo_core::TenantId;
-use xavyo_db::{AuthMethod, FailureReason, UserRole};
+use xavyo_db::{AuthMethod, FailureReason, Tenant, UserRole};
 use xavyo_webhooks::{EventPublisher, WebhookEvent};
 
 /// Login response that can be either full tokens or MFA required.
@@ -95,6 +95,19 @@ pub async fn login_handler(
             .collect();
         ApiAuthError::Validation(errors.join(", "))
     })?;
+
+    // Fail closed on an unknown tenant. The client-supplied X-Tenant-ID is only
+    // format-validated by the tenant layer, never checked against the DB. Without
+    // this guard, a login for a non-existent tenant reaches the failed-attempt /
+    // audit writes, whose tenant_id foreign keys reject the row and surface a 500.
+    // Return the same generic error as bad credentials so an unknown tenant and an
+    // unknown user are indistinguishable (no tenant-enumeration oracle).
+    if Tenant::find_by_id(&pool, *tenant_id.as_uuid())
+        .await?
+        .is_none()
+    {
+        return Err(ApiAuthError::InvalidCredentials);
+    }
 
     // Extract client info early for audit logging and IP restriction.
     // Forwarded headers are used only when TrustXff is present.
@@ -519,29 +532,18 @@ pub async fn login_handler(
         }
     }
 
-    // MFA not enabled - issue full tokens
-    let (access_token, refresh_token, expires_in) = token_service
-        .create_tokens(
-            user_id,
-            tenant_id_val,
-            roles,
-            Some(request.email.clone()),
-            // This path issues a full token only when MFA is not required, i.e.
-            // single-factor password authentication (acr "1").
-            Some(AuthContext::password()),
-            user_agent.clone(),
-            ip_address,
-        )
-        .await?;
-
-    // Create session entry for tracking. Errors must refuse login so the
-    // issued tokens are not advertised without a tracked session.
-    login_session_recorded(
+    // MFA not enabled - issue full tokens.
+    //
+    // Create the session FIRST so the access token's `jti` can be pinned to the
+    // session id. This links the session <-> access token (so `is_current` works)
+    // and lets session revocation invalidate the associated tokens. Errors must
+    // refuse login so tokens are not advertised without a tracked session.
+    let session = login_session_recorded(
         session_service
             .create_session(
                 *user_id.as_uuid(),
                 *tenant_id_val.as_uuid(),
-                None, // No refresh_token_id linking for now
+                None,
                 user_agent.as_deref(),
                 ip_address.map(|ip| ip.to_string()).as_deref(),
             )
@@ -559,6 +561,33 @@ pub async fn login_handler(
         );
         e
     })?;
+
+    let (access_token, refresh_token, expires_in) = token_service
+        .create_session_tokens(
+            session.id,
+            user_id,
+            tenant_id_val,
+            roles,
+            Some(request.email.clone()),
+            // This path issues a full token only when MFA is not required, i.e.
+            // single-factor password authentication (acr "1").
+            Some(AuthContext::password()),
+            user_agent.clone(),
+            ip_address,
+        )
+        .await?;
+
+    // Link the refresh token to the session so revoking the session revokes it.
+    // Best-effort: a link failure must not fail the login (the session and tokens
+    // are already valid), but it is logged for observability.
+    if let Ok(rt) = token_service.validate_refresh_token(&refresh_token).await {
+        let link_result = session_service
+            .link_refresh_token(session.id, *tenant_id_val.as_uuid(), rt.id)
+            .await;
+        if let Err(e) = link_result {
+            tracing::warn!(error = %e, "Failed to link session to refresh token");
+        }
+    }
 
     let response = TokenResponse::new(access_token, refresh_token, expires_in);
 
@@ -740,6 +769,26 @@ mod tests {
         assert!(
             !production.contains("EnforcementDecision::skip()"),
             "must not treat risk-eval errors as a skipped decision"
+        );
+    }
+
+    #[test]
+    fn login_handler_rejects_unknown_tenant_before_recording_attempts() {
+        // A login for a non-existent tenant must fail closed as InvalidCredentials
+        // *before* any tenant-scoped write, otherwise the failed-attempt/audit
+        // foreign keys reject the row and the handler 500s (and leaks tenant
+        // existence). Guard both the check and its ordering.
+        let src = include_str!("login.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let guard = production
+            .find("Tenant::find_by_id(&pool")
+            .expect("login must verify the tenant exists");
+        let authenticate = production
+            .find(".login(tenant_id")
+            .expect("login must call auth_service.login");
+        assert!(
+            guard < authenticate,
+            "tenant existence must be checked before authentication/attempt recording"
         );
     }
 

@@ -461,6 +461,12 @@ pub fn device_router(state: OAuthState) -> Router {
             "/resend-confirmation",
             post(device_resend_confirmation_handler),
         )
+        // RFC 8628: resolve the tenant from the globally-unique user_code so the
+        // browser-facing device pages work without an X-Tenant-ID header.
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::handlers::device::resolve_device_tenant,
+        ))
         .with_state(state)
 }
 

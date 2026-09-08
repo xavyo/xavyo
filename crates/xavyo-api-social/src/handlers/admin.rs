@@ -142,14 +142,13 @@ pub async fn disable_provider(
 }
 
 /// Secret is required when enabling. Disabling without a secret must keep the stored secret.
-fn social_update_secret(enabled: bool, secret: Option<&str>) -> SocialResult<Option<&str>> {
-    let secret = secret.map(str::trim).filter(|s| !s.is_empty());
-    if enabled && secret.is_none() {
-        return Err(SocialError::ConfigurationError {
-            message: "client_secret is required when enabling a provider".to_string(),
-        });
-    }
-    Ok(secret)
+fn social_update_secret(_enabled: bool, secret: Option<&str>) -> SocialResult<Option<&str>> {
+    // Normalize only: empty/whitespace -> None. Whether a secret is REQUIRED
+    // (enabling a provider that has none stored yet) is enforced in the service
+    // layer, which can see the persisted secret; the handler cannot. Previously
+    // this rejected enable-without-secret outright, so an admin toggling an
+    // already-configured provider on got a 500 ("client_secret is required").
+    Ok(secret.map(str::trim).filter(|s| !s.is_empty()))
 }
 
 #[cfg(test)]
@@ -158,7 +157,10 @@ mod tests {
 
     #[test]
     fn disable_without_secret_does_not_send_empty() {
-        assert!(social_update_secret(true, None).is_err());
+        // Enabling without a secret in the request is NOT rejected here — the
+        // service enforces it against the stored secret (so an admin can toggle an
+        // already-configured provider on). The handler only normalizes.
+        assert_eq!(social_update_secret(true, None).unwrap(), None);
         assert_eq!(
             social_update_secret(true, Some("s3cret")).unwrap(),
             Some("s3cret")

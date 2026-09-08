@@ -91,14 +91,20 @@ pub async fn link_account(
             provider: provider_type,
         })?;
 
-    // Build redirect URI
-    let redirect_uri = format!(
-        "{}/api/v1/auth/social/{}/callback",
-        state.base_url, provider_type
-    );
+    // Build redirect URI (must match the mounted callback route, `/auth/social/{provider}/callback`)
+    let redirect_uri = format!("{}/auth/social/{}/callback", state.base_url, provider_type);
+
+    // Capture ID-token verification inputs before `config` is consumed below.
+    let client_id_for_verify = config.client_id.clone();
+    let azure_tenant_for_verify = config
+        .additional_config
+        .as_ref()
+        .and_then(|c| c.get("azure_tenant"))
+        .and_then(|v| v.as_str())
+        .map(String::from);
 
     // Exchange code for tokens (similar to callback)
-    let (tokens, user_info) = match provider_type {
+    let (tokens, mut user_info) = match provider_type {
         ProviderType::Google => {
             let p =
                 crate::providers::ProviderFactory::google(config.client_id, config.client_secret);
@@ -184,6 +190,20 @@ pub async fn link_account(
             (tokens, user_info)
         }
     };
+
+    // Defense-in-depth: verify the OIDC ID token (signature/issuer/audience,
+    // subject cross-check, nonce) — parity with the login callback so linking
+    // trusts the same verified identity, not just the userinfo response.
+    super::callback::verify_provider_id_token(
+        &state,
+        provider_type,
+        tokens.id_token.as_deref(),
+        &mut user_info,
+        claims.oidc_nonce.as_deref(),
+        azure_tenant_for_verify.as_deref(),
+        &client_id_for_verify,
+    )
+    .await?;
 
     // Link the account
     let connection_id = state
@@ -282,11 +302,8 @@ pub async fn initiate_link(
         oidc_nonce.clone(),
     )?;
 
-    // Build redirect URI
-    let redirect_uri = format!(
-        "{}/api/v1/auth/social/{}/callback",
-        state.base_url, provider_type
-    );
+    // Build redirect URI (must match the mounted callback route, `/auth/social/{provider}/callback`)
+    let redirect_uri = format!("{}/auth/social/{}/callback", state.base_url, provider_type);
 
     // Get authorization URL
     let nonce_ref = oidc_nonce.as_deref();
@@ -394,4 +411,25 @@ pub async fn list_connections(
     Ok(Json(ConnectionsListResponse {
         connections: responses,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    /// Account linking must verify the OIDC ID token before trusting the
+    /// identity — parity with the login callback (defense-in-depth against
+    /// token substitution / unsigned userinfo).
+    #[test]
+    fn link_account_verifies_id_token() {
+        let src = include_str!("link.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let link = production
+            .split("pub async fn link_account")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn initiate_link").next())
+            .expect("link_account handler");
+        assert!(
+            link.contains("verify_provider_id_token("),
+            "link_account must verify the provider ID token before linking"
+        );
+    }
 }

@@ -47,6 +47,7 @@ pub struct GithubProvider {
     client_id: String,
     client_secret: String,
     http_client: Client,
+    configured_scopes: Option<Vec<String>>,
 }
 
 impl GithubProvider {
@@ -60,7 +61,21 @@ impl GithubProvider {
                 .timeout(std::time::Duration::from_secs(10))
                 .build()
                 .unwrap_or_else(|_| Client::new()),
+            configured_scopes: None,
         }
+    }
+
+    /// Override the requested scopes with the tenant-configured set (empty → defaults).
+    #[must_use]
+    pub fn with_scopes(mut self, scopes: Option<Vec<String>>) -> Self {
+        self.configured_scopes = scopes.filter(|s| !s.is_empty());
+        self
+    }
+
+    fn effective_scopes(&self) -> Vec<String> {
+        self.configured_scopes
+            .clone()
+            .unwrap_or_else(|| self.default_scopes())
     }
 
     /// Fetch the primary verified email from GitHub.
@@ -135,7 +150,7 @@ impl SocialProvider for GithubProvider {
         redirect_uri: &str,
         _nonce: Option<&str>,
     ) -> String {
-        let scopes = self.default_scopes().join(" ");
+        let scopes = self.effective_scopes().join(" ");
 
         // SECURITY: GitHub doesn't support PKCE (code_challenge/code_verifier).
         // Mitigations: signed single-use CSRF state token + server-side client_secret

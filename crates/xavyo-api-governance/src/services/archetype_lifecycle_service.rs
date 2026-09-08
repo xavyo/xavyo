@@ -111,11 +111,16 @@ impl ArchetypeLifecycleService {
         tenant_id: Uuid,
         user_id: Uuid,
     ) -> Result<Option<EffectiveLifecycleModel>, GovernanceError> {
-        // Get the user to find their archetype
+        // Get the user's archetype and their effective lifecycle config. The
+        // config is derived from `users.lifecycle_state_id` (FK to
+        // gov_lifecycle_states); there is no `lifecycle_config_id` column.
         let user: Option<(Option<Uuid>, Option<Uuid>)> = sqlx::query_as(
             r"
-            SELECT archetype_id, lifecycle_config_id FROM users
-            WHERE id = $1 AND tenant_id = $2
+            SELECT u.archetype_id, ls.config_id
+            FROM users u
+            LEFT JOIN gov_lifecycle_states ls
+              ON ls.id = u.lifecycle_state_id AND ls.tenant_id = u.tenant_id
+            WHERE u.id = $1 AND u.tenant_id = $2
             ",
         )
         .bind(user_id)

@@ -61,6 +61,20 @@ fn detect_device_type(ua: &str) -> String {
         return "mobile".to_string();
     }
 
+    // Recognized desktop platforms (after mobile/tablet so e.g. Android's
+    // "Linux" token doesn't win). Without this, ordinary desktop logins (Chrome
+    // on Windows, Firefox on macOS) were classified "unknown" in the sessions/
+    // devices UI instead of "desktop".
+    if ua.contains("windows")
+        || ua.contains("macintosh")
+        || ua.contains("mac os x")
+        || ua.contains("cros")
+        || ua.contains("x11")
+        || (ua.contains("linux") && !ua.contains("android"))
+    {
+        return "desktop".to_string();
+    }
+
     // Unrecognized UA is not a desktop — device-type policies must not skip.
     "unknown".to_string()
 }

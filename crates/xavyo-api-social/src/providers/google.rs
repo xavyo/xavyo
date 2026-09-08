@@ -41,6 +41,7 @@ pub struct GoogleProvider {
     client_id: String,
     client_secret: String,
     http_client: Client,
+    configured_scopes: Option<Vec<String>>,
 }
 
 impl GoogleProvider {
@@ -54,7 +55,21 @@ impl GoogleProvider {
                 .timeout(std::time::Duration::from_secs(10))
                 .build()
                 .unwrap_or_else(|_| Client::new()),
+            configured_scopes: None,
         }
+    }
+
+    /// Override the requested scopes with the tenant-configured set (empty → defaults).
+    #[must_use]
+    pub fn with_scopes(mut self, scopes: Option<Vec<String>>) -> Self {
+        self.configured_scopes = scopes.filter(|s| !s.is_empty());
+        self
+    }
+
+    fn effective_scopes(&self) -> Vec<String> {
+        self.configured_scopes
+            .clone()
+            .unwrap_or_else(|| self.default_scopes())
     }
 }
 
@@ -71,7 +86,7 @@ impl SocialProvider for GoogleProvider {
         redirect_uri: &str,
         nonce: Option<&str>,
     ) -> String {
-        let scopes = self.default_scopes().join(" ");
+        let scopes = self.effective_scopes().join(" ");
 
         let mut url = format!(
             "{}?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}&code_challenge={}&code_challenge_method=S256&access_type=offline&prompt=consent",
@@ -196,6 +211,31 @@ mod tests {
         assert!(url.contains("scope=openid"));
         assert!(url.contains("access_type=offline"));
         assert!(!url.contains("nonce="));
+    }
+
+    #[test]
+    fn authorization_url_uses_configured_scopes() {
+        // Tenant-configured scopes must override the provider defaults in the
+        // authorize URL (previously configured scopes were silently ignored).
+        let provider = GoogleProvider::new("client-id".to_string(), "client-secret".to_string())
+            .with_scopes(Some(vec![
+                "openid".to_string(),
+                "email".to_string(),
+                "https://www.googleapis.com/auth/drive.readonly".to_string(),
+            ]));
+        let url = provider.authorization_url("s0123456789abcdef", "chal", "https://x/cb", None);
+        assert!(
+            url.contains("drive.readonly"),
+            "configured custom scope must appear in the authorize URL; got {url}"
+        );
+    }
+
+    #[test]
+    fn authorization_url_falls_back_to_defaults_when_no_scopes_configured() {
+        let provider = GoogleProvider::new("client-id".to_string(), "client-secret".to_string())
+            .with_scopes(Some(vec![])); // empty → defaults
+        let url = provider.authorization_url("s0123456789abcdef", "chal", "https://x/cb", None);
+        assert!(url.contains("scope=openid"));
     }
 
     #[test]

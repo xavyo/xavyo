@@ -72,7 +72,12 @@ impl DiscoveryService {
                 .to_string(),
             userinfo_endpoint: metadata.userinfo_endpoint().map(|e| e.url().to_string()),
             jwks_uri: metadata.jwks_uri().url().to_string(),
-            issuer: metadata.issuer().url().to_string(),
+            // Use the issuer identifier verbatim. `Url::to_string()` normalizes a
+            // host-only issuer by appending a trailing slash (e.g.
+            // `https://accounts.google.com` -> `.../`), but OIDC requires the ID
+            // token `iss` to match the issuer identifier by exact string. Using the
+            // normalized form rejects spec-compliant tokens from such providers.
+            issuer: metadata.issuer().as_str().to_string(),
         };
 
         tracing::info!(

@@ -141,7 +141,7 @@ impl EmailSender for SesEmailSender {
         token: &str,
         tenant_id: TenantId,
     ) -> Result<(), EmailError> {
-        let body = self.config.base.password_reset_body(token);
+        let body = self.config.base.password_reset_body(token, tenant_id);
         self.send_ses_email(to, "Reset your Xavyo password", &body)
             .await?;
 
@@ -179,7 +179,7 @@ impl EmailSender for SesEmailSender {
         token: &str,
         tenant_id: TenantId,
     ) -> Result<(), EmailError> {
-        let body = self.config.base.magic_link_body(token);
+        let body = self.config.base.magic_link_body(token, tenant_id);
         self.send_ses_email(to, "Sign in to Xavyo", &body).await?;
 
         tracing::info!(

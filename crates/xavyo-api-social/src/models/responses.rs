@@ -88,6 +88,9 @@ pub struct TenantProvidersListResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UpdateProviderRequest {
     pub enabled: bool,
+    /// Required when first configuring a provider. Omitted for a plain
+    /// enable/disable toggle, in which case the stored value is preserved.
+    #[serde(default)]
     pub client_id: String,
     /// Only required when enabling or changing.
     pub client_secret: Option<String>,
@@ -152,4 +155,23 @@ pub struct SocialLoginSuccessResponse {
     pub refresh_token: String,
     pub token_type: String,
     pub expires_in: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::UpdateProviderRequest;
+
+    /// Regression: the admin UI's enable/disable toggle sends only
+    /// `{ "enabled": <bool> }`. `client_id` must be `#[serde(default)]` so this
+    /// deserializes (previously it 422'd as a missing required field). The empty
+    /// client_id is then treated as "preserve stored value" by the service.
+    #[test]
+    fn update_provider_request_deserializes_from_enabled_only() {
+        let req: UpdateProviderRequest =
+            serde_json::from_str(r#"{"enabled":true}"#).expect("enabled-only toggle must parse");
+        assert!(req.enabled);
+        assert_eq!(req.client_id, "");
+        assert!(req.client_secret.is_none());
+        assert!(req.scopes.is_none());
+    }
 }

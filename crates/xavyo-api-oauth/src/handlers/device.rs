@@ -15,8 +15,10 @@ use crate::router::OAuthState;
 use crate::services::{DeviceAuthorizationStatus, DeviceCodeService, RiskAction, RiskContext};
 use crate::utils::{extract_country_code, extract_origin_ip};
 use axum::{
-    extract::{ConnectInfo, Query, State},
+    body::{to_bytes, Body},
+    extract::{ConnectInfo, Query, Request, State},
     http::{header::SET_COOKIE, HeaderMap, HeaderValue},
+    middleware::Next,
     response::{Html, IntoResponse, Response},
     Extension, Form,
 };
@@ -323,6 +325,93 @@ pub async fn device_authorization_handler(
     }))
 }
 
+/// Max device-flow form body we will buffer to resolve the tenant (device forms
+/// are tiny: a user_code plus a CSRF token).
+const DEVICE_FORM_BUFFER_LIMIT: usize = 16 * 1024;
+
+/// Resolve the tenant for browser-facing device-verification requests.
+///
+/// RFC 8628 has the user open `verification_uri` in a plain browser, which cannot
+/// send the `X-Tenant-ID` header this app uses for tenant resolution — so without
+/// this the entire `/device` flow returned 401. `user_code` is globally unique, so
+/// we derive the tenant from it (query `code`/`user_code`, or the form body) and
+/// inject the header before the tenant middleware/handlers run. Requests that
+/// already carry the header (or carry no resolvable code, e.g. the bare entry
+/// page) pass through unchanged.
+pub async fn resolve_device_tenant(
+    State(state): State<OAuthState>,
+    req: Request,
+    next: Next,
+) -> Response {
+    if req.headers().contains_key("x-tenant-id") {
+        return next.run(req).await;
+    }
+
+    // 1. Try query params (GET /device?code=..., and GET login/mfa pages).
+    let user_code = req.uri().query().and_then(|q| {
+        url::form_urlencoded::parse(q.as_bytes())
+            .find(|(k, _)| k == "code" || k == "user_code")
+            .map(|(_, v)| v.into_owned())
+    });
+
+    if let Some(code) = user_code {
+        return inject_tenant_and_run(state, req, next, &code).await;
+    }
+
+    // 2. For POSTs with a form body, buffer it, read user_code, then rebuild.
+    let is_form = req
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.starts_with("application/x-www-form-urlencoded"));
+
+    if req.method() == axum::http::Method::POST && is_form {
+        let (parts, body) = req.into_parts();
+        let bytes = match to_bytes(body, DEVICE_FORM_BUFFER_LIMIT).await {
+            Ok(b) => b,
+            Err(_) => {
+                // Body too large / unreadable: rebuild empty and let the handler 400.
+                let req = Request::from_parts(parts, Body::empty());
+                return next.run(req).await;
+            }
+        };
+        let code = url::form_urlencoded::parse(&bytes)
+            .find(|(k, _)| k == "user_code" || k == "code")
+            .map(|(_, v)| v.into_owned());
+        let mut req = Request::from_parts(parts, Body::from(bytes));
+        if let Some(code) = code {
+            if let Ok(Some(tenant_id)) = DeviceCodeService::new(state.pool.clone())
+                .resolve_tenant_by_user_code(&code)
+                .await
+            {
+                if let Ok(hv) = HeaderValue::from_str(&tenant_id.to_string()) {
+                    req.headers_mut().insert("x-tenant-id", hv);
+                }
+            }
+        }
+        return next.run(req).await;
+    }
+
+    next.run(req).await
+}
+
+async fn inject_tenant_and_run(
+    state: OAuthState,
+    mut req: Request,
+    next: Next,
+    user_code: &str,
+) -> Response {
+    if let Ok(Some(tenant_id)) = DeviceCodeService::new(state.pool.clone())
+        .resolve_tenant_by_user_code(user_code)
+        .await
+    {
+        if let Ok(hv) = HeaderValue::from_str(&tenant_id.to_string()) {
+            req.headers_mut().insert("x-tenant-id", hv);
+        }
+    }
+    next.run(req).await
+}
+
 /// Device verification page (HTML).
 ///
 /// GET /device
@@ -390,10 +479,14 @@ pub async fn device_verify_code_handler(
     // Determine secure flag based on environment
     let is_secure = state.is_production();
 
-    // Helper to build response with new CSRF token
-    let with_csrf_cookie = |html: String| -> Response {
-        let csrf_token = generate_csrf_token();
-        let csrf_cookie = create_csrf_cookie(&csrf_token, is_secure);
+    // Helper to attach the CSRF cookie. The cookie MUST carry the *same* token
+    // that was embedded in the page's hidden form field, otherwise the next POST
+    // fails CSRF validation ("Session expired"). Previously this closure minted a
+    // fresh token for the cookie while the HTML kept a different one, so the
+    // approval page always mismatched and device authorization could never be
+    // completed in a browser.
+    let with_csrf_cookie = |html: String, csrf_token: &str| -> Response {
+        let csrf_cookie = create_csrf_cookie(csrf_token, is_secure);
         let mut response = Html(html).into_response();
         if let Ok(cookie_value) = HeaderValue::from_str(&csrf_cookie) {
             response.headers_mut().insert(SET_COOKIE, cookie_value);
@@ -422,11 +515,14 @@ pub async fn device_verify_code_handler(
                 "Device verify: CSRF validation failed"
             );
             let csrf_token = generate_csrf_token();
-            return with_csrf_cookie(render_verification_page(
-                &request.user_code,
-                "Session expired. Please try again.",
+            return with_csrf_cookie(
+                render_verification_page(
+                    &request.user_code,
+                    "Session expired. Please try again.",
+                    &csrf_token,
+                ),
                 &csrf_token,
-            ));
+            );
         }
     }
 
@@ -440,11 +536,14 @@ pub async fn device_verify_code_handler(
                 "Device verify: missing or invalid tenant ID"
             );
             let csrf_token = generate_csrf_token();
-            return with_csrf_cookie(render_verification_page(
-                &request.user_code,
-                "Invalid request. Please try again.",
+            return with_csrf_cookie(
+                render_verification_page(
+                    &request.user_code,
+                    "Invalid request. Please try again.",
+                    &csrf_token,
+                ),
                 &csrf_token,
-            ));
+            );
         }
     };
 
@@ -489,33 +588,43 @@ pub async fn device_verify_code_handler(
                 };
 
                 // User is logged in - show enhanced approval page with context
-                with_csrf_cookie(render_approval_page_with_context(&context))
+                let approval_csrf = context.csrf_token.clone();
+                with_csrf_cookie(render_approval_page_with_context(&context), &approval_csrf)
             } else {
                 // User not logged in - show login form with device code context
-                with_csrf_cookie(render_login_page(
-                    &request.user_code,
-                    &device_code.client_id,
-                    &device_code.scopes,
-                    None, // No error initially
+                with_csrf_cookie(
+                    render_login_page(
+                        &request.user_code,
+                        &device_code.client_id,
+                        &device_code.scopes,
+                        None, // No error initially
+                        &csrf_token,
+                    ),
                     &csrf_token,
-                ))
+                )
             }
         }
         Ok(None) => {
             let csrf_token = generate_csrf_token();
-            with_csrf_cookie(render_verification_page(
-                &request.user_code,
-                "Invalid or expired code. Please check the code and try again.",
+            with_csrf_cookie(
+                render_verification_page(
+                    &request.user_code,
+                    "Invalid or expired code. Please check the code and try again.",
+                    &csrf_token,
+                ),
                 &csrf_token,
-            ))
+            )
         }
         Err(_) => {
             let csrf_token = generate_csrf_token();
-            with_csrf_cookie(render_verification_page(
-                &request.user_code,
-                "An error occurred. Please try again.",
+            with_csrf_cookie(
+                render_verification_page(
+                    &request.user_code,
+                    "An error occurred. Please try again.",
+                    &csrf_token,
+                ),
                 &csrf_token,
-            ))
+            )
         }
     }
 }
@@ -1834,6 +1943,62 @@ fn render_confirmation_result_page(success: bool, message: &str) -> String {
 mod tests {
     use super::*;
     use chrono::{Duration, Utc};
+
+    #[test]
+    fn device_csrf_cookie_matches_embedded_form_token() {
+        // Regression: with_csrf_cookie used to mint a NEW token for the cookie
+        // while the rendered HTML embedded a different one, so every device POST
+        // page shipped a form token that never matched its cookie — the approval
+        // step always failed CSRF ("Session expired") and device authorization
+        // could not be completed in a browser. The cookie must use the same token
+        // that was embedded in the page.
+        let src = include_str!("device.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let closure = production
+            .split("let with_csrf_cookie =")
+            .nth(1)
+            .and_then(|s| s.split("};").next())
+            .expect("with_csrf_cookie closure");
+        assert!(
+            closure.contains("csrf_token: &str")
+                && closure.contains("create_csrf_cookie(csrf_token"),
+            "with_csrf_cookie must set the cookie to the embedded form token, not a fresh one"
+        );
+        assert!(
+            !closure.contains("generate_csrf_token()"),
+            "with_csrf_cookie must NOT mint its own token (would mismatch the form)"
+        );
+    }
+
+    #[test]
+    fn device_flow_resolves_tenant_from_user_code_without_header() {
+        // Regression (RFC 8628): the browser-facing /device pages must work
+        // without an X-Tenant-ID header (a user opens verification_uri in a plain
+        // browser). The middleware derives the tenant from the globally-unique
+        // user_code (query or form) and injects the header; it must NOT hard-fail
+        // when the header is absent.
+        let src = include_str!("device.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("pub async fn resolve_device_tenant"),
+            "device routes must have a tenant-from-user_code resolver middleware"
+        );
+        assert!(
+            production.contains("resolve_tenant_by_user_code"),
+            "middleware must resolve the tenant from the user_code"
+        );
+        // It resolves from both the query string and the buffered form body.
+        assert!(
+            production.contains("req.uri().query()") && production.contains("to_bytes(body"),
+            "middleware must read user_code from query and form body"
+        );
+        // And it injects the header the handlers read, only when absent.
+        assert!(
+            production.contains("req.headers().contains_key(\"x-tenant-id\")")
+                && production.contains("insert(\"x-tenant-id\""),
+            "middleware must inject X-Tenant-ID (and skip when already present)"
+        );
+    }
 
     #[test]
     fn test_html_escape() {

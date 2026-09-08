@@ -249,6 +249,17 @@ impl SpService {
             )));
         }
 
+        // Normalize the NameID format (UI sends short labels; the assertion
+        // builder needs canonical URNs). Reject unsupported values up front
+        // rather than fail with a 500 during assertion generation.
+        let name_id_format = crate::saml::attributes::normalize_nameid_format(&req.name_id_format)
+            .ok_or_else(|| {
+                SamlError::InvalidAuthnRequest(format!(
+                    "Unsupported name_id_format: {}",
+                    req.name_id_format
+                ))
+            })?;
+
         let group_cfg = req
             .resolved_group_config()
             .map_err(|e| SamlError::InvalidAuthnRequest(format!("invalid group config: {e}")))?;
@@ -287,7 +298,7 @@ impl SpService {
         .bind(&req.acs_urls)
         .bind(&req.certificate)
         .bind(&attribute_mapping)
-        .bind(&req.name_id_format)
+        .bind(&name_id_format)
         .bind(req.sign_assertions)
         .bind(req.validate_signatures)
         .bind(req.assertion_validity_seconds)
@@ -350,7 +361,14 @@ impl SpService {
         }
         let certificate = req.certificate.or(existing.certificate);
         let attribute_mapping = req.attribute_mapping.unwrap_or(existing.attribute_mapping);
-        let name_id_format = req.name_id_format.unwrap_or(existing.name_id_format);
+        let name_id_format = match req.name_id_format {
+            Some(fmt) => {
+                crate::saml::attributes::normalize_nameid_format(&fmt).ok_or_else(|| {
+                    SamlError::InvalidAuthnRequest(format!("Unsupported name_id_format: {fmt}"))
+                })?
+            }
+            None => existing.name_id_format,
+        };
         let sign_assertions = req.sign_assertions.unwrap_or(existing.sign_assertions);
         let validate_signatures = req
             .validate_signatures

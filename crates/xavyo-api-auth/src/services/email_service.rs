@@ -55,9 +55,9 @@ pub struct EmailConfig {
     pub smtp_tls: bool,
     /// Base URL for frontend links (e.g., `https://app.xavyo.com`).
     pub frontend_base_url: String,
-    /// Path for password reset page (e.g., "/auth/reset-password").
+    /// Path for password reset page (e.g., "/reset-password").
     pub password_reset_path: String,
-    /// Path for email verification page (e.g., "/auth/verify-email").
+    /// Path for email verification page (e.g., "/verify-email").
     pub email_verify_path: String,
     /// Path for magic link verification page (e.g., "/passwordless/magic-link/verify").
     pub magic_link_path: String,
@@ -77,8 +77,8 @@ impl EmailConfig {
     ///
     /// Optional environment variables (with defaults):
     /// - `EMAIL_SMTP_TLS` (default: "true") — set to "false" for local dev (e.g., Mailpit)
-    /// - `PASSWORD_RESET_PATH` (default: "/auth/reset-password")
-    /// - `EMAIL_VERIFY_PATH` (default: "/auth/verify-email")
+    /// - `PASSWORD_RESET_PATH` (default: "/reset-password")
+    /// - `EMAIL_VERIFY_PATH` (default: "/verify-email")
     pub fn from_env() -> Result<Self, EmailError> {
         Ok(Self {
             smtp_host: std::env::var("EMAIL_SMTP_HOST")
@@ -101,9 +101,9 @@ impl EmailConfig {
             frontend_base_url: std::env::var("FRONTEND_BASE_URL")
                 .map_err(|_| EmailError::ConfigError("FRONTEND_BASE_URL not set".to_string()))?,
             password_reset_path: std::env::var("PASSWORD_RESET_PATH")
-                .unwrap_or_else(|_| "/auth/reset-password".to_string()),
+                .unwrap_or_else(|_| "/reset-password".to_string()),
             email_verify_path: std::env::var("EMAIL_VERIFY_PATH")
-                .unwrap_or_else(|_| "/auth/verify-email".to_string()),
+                .unwrap_or_else(|_| "/verify-email".to_string()),
             magic_link_path: std::env::var("MAGIC_LINK_PATH")
                 .unwrap_or_else(|_| "/passwordless/magic-link/verify".to_string()),
         })
@@ -137,9 +137,18 @@ impl EmailConfig {
     }
 
     /// Build the password reset email body.
+    ///
+    /// The tenant is included in the link so that, after resetting, the "log in"
+    /// handoff preserves tenant context — otherwise a user resetting from a device
+    /// without the tenant cookie (e.g. a new device) would land on the system-tenant
+    /// login and fail to authenticate.
     #[must_use]
-    pub fn password_reset_body(&self, token: &str) -> String {
-        let url = self.password_reset_url(token);
+    pub fn password_reset_body(&self, token: &str, tenant_id: TenantId) -> String {
+        let url = format!(
+            "{}&tenant={}",
+            self.password_reset_url(token),
+            tenant_id.as_uuid()
+        );
         format!(
             r"Hi,
 
@@ -157,9 +166,18 @@ If you didn't request this, you can safely ignore this email.
     }
 
     /// Build the magic link email body.
+    ///
+    /// The tenant is included in the link so that clicking it on a device without
+    /// the tenant cookie (e.g. a phone or a fresh browser) still resolves the tenant
+    /// — the passwordless verify endpoint requires tenant context, so without this the
+    /// magic link would fail with a 401 off the original device.
     #[must_use]
-    pub fn magic_link_body(&self, token: &str) -> String {
-        let url = self.magic_link_url(token);
+    pub fn magic_link_body(&self, token: &str, tenant_id: TenantId) -> String {
+        let url = format!(
+            "{}&tenant={}",
+            self.magic_link_url(token),
+            tenant_id.as_uuid()
+        );
         format!(
             r"Hi,
 
@@ -354,7 +372,7 @@ impl EmailSender for SmtpEmailSender {
             .parse()
             .map_err(|e| EmailError::InvalidAddress(format!("Invalid recipient: {e}")))?;
 
-        let body = self.config.password_reset_body(token);
+        let body = self.config.password_reset_body(token, tenant_id);
 
         let email = Message::builder()
             .from(from)
@@ -428,7 +446,7 @@ impl EmailSender for SmtpEmailSender {
             .parse()
             .map_err(|e| EmailError::InvalidAddress(format!("Invalid recipient: {e}")))?;
 
-        let body = self.config.magic_link_body(token);
+        let body = self.config.magic_link_body(token, tenant_id);
 
         let email = Message::builder()
             .from(from)
@@ -792,6 +810,68 @@ mod tests {
         assert_eq!(
             magic_url,
             "https://app.xavyo.com/passwordless/magic-link/verify?token=ml_token"
+        );
+    }
+
+    #[test]
+    fn password_reset_body_includes_tenant_for_login_handoff() {
+        let config = EmailConfig {
+            smtp_host: "smtp.example.com".to_string(),
+            smtp_port: 587,
+            smtp_username: "u".to_string(),
+            smtp_password: "p".to_string(),
+            smtp_tls: true,
+            from_address: "noreply@example.com".to_string(),
+            from_name: "Test".to_string(),
+            frontend_base_url: "https://app.xavyo.com".to_string(),
+            password_reset_path: "/reset-password".to_string(),
+            email_verify_path: "/verify-email".to_string(),
+            magic_link_path: "/passwordless/magic-link/verify".to_string(),
+        };
+        let tenant_id = TenantId::new();
+        let body = config.password_reset_body("abc123", tenant_id);
+        // The reset link must carry the tenant so the post-reset login preserves
+        // tenant context (otherwise a new-device reset lands on the system tenant).
+        // NB: do not interpolate `body` into the assert message — it contains the
+        // reset link/token and CodeQL flags that as clear-text logging of secrets.
+        let expected = format!(
+            "https://app.xavyo.com/reset-password?token=abc123&tenant={}",
+            tenant_id.as_uuid()
+        );
+        assert!(
+            body.contains(&expected),
+            "reset email link must include the tenant"
+        );
+    }
+
+    #[test]
+    fn magic_link_body_includes_tenant_for_cross_device_signin() {
+        let config = EmailConfig {
+            smtp_host: "smtp.example.com".to_string(),
+            smtp_port: 587,
+            smtp_username: "u".to_string(),
+            smtp_password: "p".to_string(),
+            smtp_tls: true,
+            from_address: "noreply@example.com".to_string(),
+            from_name: "Test".to_string(),
+            frontend_base_url: "https://app.xavyo.com".to_string(),
+            password_reset_path: "/reset-password".to_string(),
+            email_verify_path: "/verify-email".to_string(),
+            magic_link_path: "/passwordless/magic-link/verify".to_string(),
+        };
+        let tenant_id = TenantId::new();
+        let body = config.magic_link_body("mltoken", tenant_id);
+        // The magic link must carry the tenant so it works when opened on a device
+        // without the tenant cookie (the verify endpoint requires tenant context).
+        // NB: do not interpolate `body` into the assert message — it contains the
+        // magic-link token and CodeQL flags that as clear-text logging of secrets.
+        let expected = format!(
+            "https://app.xavyo.com/passwordless/magic-link/verify?token=mltoken&tenant={}",
+            tenant_id.as_uuid()
+        );
+        assert!(
+            body.contains(&expected),
+            "magic link email must include the tenant"
         );
     }
 

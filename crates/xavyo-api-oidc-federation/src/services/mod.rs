@@ -20,6 +20,8 @@ pub use hrd::{HrdResult, HrdService};
 pub use idp_config::IdpConfigService;
 pub use jwks_cache::{JwksCache, JwksCacheStats, DEFAULT_JWKS_CACHE_TTL};
 pub use provisioning::ProvisioningService;
-pub use token_issuer::{IssuedTokens, TokenIssuerConfig, TokenIssuerService};
+pub use token_issuer::{
+    FederationTokenIssuer, IssuedTokens, TokenIssuerConfig, TokenIssuerService,
+};
 pub use token_verifier::{TokenVerifierService, VerificationConfig, VerifiedToken};
 pub use validation::ValidationService;

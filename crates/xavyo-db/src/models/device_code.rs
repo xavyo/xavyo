@@ -243,6 +243,33 @@ impl DeviceCode {
         .await
     }
 
+    /// Resolve the owning tenant of a pending device code from its `user_code`
+    /// alone (no tenant context).
+    ///
+    /// RFC 8628 has the user open `verification_uri` in a plain browser, which
+    /// cannot send the `X-Tenant-ID` header this app normally uses for tenant
+    /// resolution. Because `user_code` is globally unique
+    /// (`device_codes_user_code_unique`), it unambiguously identifies the tenant.
+    /// This mirrors the header-less authorization-code lookup in the token
+    /// endpoint (`lookup_authorization_code`), which likewise resolves the tenant
+    /// from a globally-unique code before any tenant context exists.
+    pub async fn resolve_tenant_by_user_code(
+        pool: &PgPool,
+        user_code: &str,
+    ) -> Result<Option<Uuid>, sqlx::Error> {
+        sqlx::query_scalar::<_, Uuid>(
+            r"
+            SELECT tenant_id FROM device_codes
+            WHERE user_code = $1
+              AND status = 'pending'
+              AND expires_at > NOW()
+            ",
+        )
+        .bind(user_code)
+        .fetch_optional(pool)
+        .await
+    }
+
     /// Update the status of a device code.
     pub async fn update_status(
         pool: &PgPool,

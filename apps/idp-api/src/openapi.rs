@@ -1439,7 +1439,6 @@ impl Modify for SecurityAddon {
         xavyo_api_auth::handlers::mfa::webauthn::register::RegistrationResponse,
         xavyo_api_auth::handlers::mfa::webauthn::authenticate::AuthenticationOptionsResponse,
         xavyo_api_auth::handlers::mfa::webauthn::authenticate::FinishAuthenticationRequest,
-        xavyo_api_auth::handlers::mfa::webauthn::authenticate::AuthenticationSuccessResponse,
         xavyo_api_auth::handlers::mfa::webauthn::credentials::CredentialListResponse,
         xavyo_api_auth::handlers::mfa::webauthn::credentials::UpdateCredentialRequest,
         xavyo_api_auth::handlers::mfa::webauthn::credentials::UpdateCredentialResponse,

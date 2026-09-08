@@ -477,6 +477,7 @@ impl PasswordPolicyService {
         current_password: &str,
         new_password: &str,
         revoke_sessions: bool,
+        current_session_id: Option<Uuid>,
         session_service: &SessionService,
     ) -> Result<PasswordChangeResult, ApiAuthError> {
         // Acquire a connection with tenant context for RLS on the users table
@@ -571,17 +572,31 @@ impl PasswordPolicyService {
         self.update_password_timestamps(user_id, tenant_id, policy.expiration_days)
             .await?;
 
-        // 12. Revoke sessions and refresh tokens concurrently if requested
+        // 12. Revoke OTHER sessions + refresh tokens if requested. The current
+        // session (identified by the access token jti == session id) is preserved
+        // so a self-service password change does not log the user out — matching
+        // Auth0/Okta. When the caller has no identifiable session (e.g. an API-key
+        // token), fall back to revoking everything.
         let (sessions_revoked, refresh_tokens_revoked) = if revoke_sessions {
-            let (s, r) = tokio::try_join!(
-                session_service.revoke_all_user_sessions(
-                    user_id,
-                    tenant_id,
-                    RevokeReason::PasswordChange
-                ),
-                session_service.revoke_all_user_refresh_tokens(user_id, tenant_id),
-            )?;
-            (s as i64, r as i64)
+            match current_session_id {
+                Some(current) => {
+                    let s = session_service
+                        .revoke_all_except_current(user_id, tenant_id, current)
+                        .await?;
+                    (s as i64, s as i64)
+                }
+                None => {
+                    let (s, r) = tokio::try_join!(
+                        session_service.revoke_all_user_sessions(
+                            user_id,
+                            tenant_id,
+                            RevokeReason::PasswordChange
+                        ),
+                        session_service.revoke_all_user_refresh_tokens(user_id, tenant_id),
+                    )?;
+                    (s as i64, r as i64)
+                }
+            }
         } else {
             (0, 0)
         };

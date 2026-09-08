@@ -69,26 +69,37 @@ pub async fn forgot_password_handler(
         return Err(ApiAuthError::RateLimitExceeded);
     }
 
-    // Process the reset request
-    // Always return success to prevent email enumeration
-    if let Err(e) = process_forgot_password(
-        &pool,
-        email_sender.as_ref(),
-        tenant_id,
-        &email,
-        ip,
-        &headers,
-    )
-    .await
-    {
-        // Log the error but don't return it to prevent enumeration
-        tracing::warn!(
-            email = %email,
-            tenant_id = %tenant_id,
-            error = %e,
-            "Failed to process password reset (not returned to user)"
-        );
-    }
+    // Extract user agent for audit before moving into the background task.
+    let user_agent = headers
+        .get(axum::http::header::USER_AGENT)
+        .and_then(|v| v.to_str().ok())
+        .map(String::from);
+
+    // Process the reset in the background and return immediately. All the
+    // per-account work (user lookup, token creation, and — most importantly —
+    // the SMTP send) is done off the request path so the response time does not
+    // depend on whether the account exists. Otherwise the ~45ms email-send cost
+    // for existing accounts is a timing side-channel that enumerates valid emails
+    // despite the identical response body. Always returns the generic message.
+    let bg_email_sender = email_sender.clone();
+    tokio::spawn(async move {
+        if let Err(e) = process_forgot_password(
+            &pool,
+            bg_email_sender.as_ref(),
+            tenant_id,
+            &email,
+            ip,
+            user_agent,
+        )
+        .await
+        {
+            tracing::warn!(
+                tenant_id = %tenant_id,
+                error = %e,
+                "Failed to process password reset (not returned to user)"
+            );
+        }
+    });
 
     Ok(Json(ForgotPasswordResponse::default()))
 }
@@ -100,7 +111,7 @@ async fn process_forgot_password(
     tenant_id: TenantId,
     email: &str,
     ip: IpAddr,
-    headers: &HeaderMap,
+    user_agent: Option<String>,
 ) -> Result<(), ApiAuthError> {
     // Look up user by email and tenant
     let user_row: Option<(uuid::Uuid, bool)> = sqlx::query_as(
@@ -135,12 +146,6 @@ async fn process_forgot_password(
     // Generate new token
     let (token, token_hash) = generate_password_reset_token();
     let expires_at = Utc::now() + Duration::hours(PASSWORD_RESET_TOKEN_VALIDITY_HOURS);
-
-    // Extract user agent for audit
-    let user_agent = headers
-        .get(axum::http::header::USER_AGENT)
-        .and_then(|v| v.to_str().ok())
-        .map(String::from);
 
     // Use a transaction with tenant context for RLS compliance
     let mut tx = pool.begin().await?;
@@ -226,6 +231,24 @@ mod tests {
         assert!(
             !production.contains("WHERE user_id = $1 AND used_at IS NULL"),
             "must not invalidate reset tokens by user_id alone"
+        );
+    }
+
+    #[test]
+    fn forgot_password_processes_reset_off_the_request_path() {
+        // The per-account work (user lookup, token creation, and the SMTP send)
+        // must run in a background task so response time does not depend on whether
+        // the account exists — otherwise the email-send latency is a timing oracle
+        // that enumerates valid emails despite the identical response body.
+        let src = include_str!("forgot_password.rs");
+        let handler = src
+            .split("pub async fn forgot_password_handler")
+            .nth(1)
+            .and_then(|s| s.split("async fn process_forgot_password").next())
+            .expect("forgot_password_handler");
+        assert!(
+            handler.contains("tokio::spawn") && handler.contains("process_forgot_password("),
+            "forgot-password must process the reset in a spawned task (constant-time response)"
         );
     }
 }

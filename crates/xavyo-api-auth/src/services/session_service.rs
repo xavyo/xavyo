@@ -199,7 +199,34 @@ impl SessionService {
             .map_err(ApiAuthError::Database)
     }
 
+    /// Link a session to the refresh token issued alongside it, so revoking the
+    /// session can invalidate that refresh token.
+    pub async fn link_refresh_token(
+        &self,
+        session_id: Uuid,
+        tenant_id: Uuid,
+        refresh_token_id: Uuid,
+    ) -> Result<(), ApiAuthError> {
+        let mut conn = self.pool.acquire().await.map_err(ApiAuthError::Database)?;
+        set_tenant_context(&mut *conn, xavyo_core::TenantId::from_uuid(tenant_id))
+            .await
+            .map_err(ApiAuthError::DatabaseInternal)?;
+        sqlx::query("UPDATE sessions SET refresh_token_id = $1 WHERE id = $2 AND tenant_id = $3")
+            .bind(refresh_token_id)
+            .bind(session_id)
+            .bind(tenant_id)
+            .execute(&mut *conn)
+            .await
+            .map_err(ApiAuthError::Database)?;
+        Ok(())
+    }
+
     /// Revoke a specific session.
+    ///
+    /// Also revokes the refresh token linked to the session so the device cannot
+    /// mint new access tokens after being signed out (the security control that
+    /// "revoke this device" implies). The short-lived access token expires on its
+    /// own TTL.
     pub async fn revoke_session(
         &self,
         session_id: Uuid,
@@ -211,11 +238,31 @@ impl SessionService {
             .await
             .map_err(ApiAuthError::DatabaseInternal)?;
 
+        // Capture the linked refresh token before revoking the session.
+        let refresh_token_id: Option<Uuid> = sqlx::query_scalar::<_, Option<Uuid>>(
+            "SELECT refresh_token_id FROM sessions WHERE id = $1 AND tenant_id = $2",
+        )
+        .bind(session_id)
+        .bind(tenant_id)
+        .fetch_optional(&mut *conn)
+        .await
+        .map_err(ApiAuthError::Database)?
+        .flatten();
+
         let result = Session::revoke(&mut *conn, tenant_id, session_id, reason)
             .await
             .map_err(ApiAuthError::Database)?;
 
         if result {
+            if let Some(rt_id) = refresh_token_id {
+                let _ = sqlx::query(
+                    "UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1 AND tenant_id = $2 AND revoked_at IS NULL",
+                )
+                .bind(rt_id)
+                .bind(tenant_id)
+                .execute(&mut *conn)
+                .await;
+            }
             info!(session_id = %session_id, reason = %reason, "Session revoked");
         }
 
@@ -234,6 +281,20 @@ impl SessionService {
             .await
             .map_err(ApiAuthError::DatabaseInternal)?;
 
+        // Capture the refresh tokens of the sessions about to be revoked so they
+        // can be invalidated too (otherwise those devices could keep refreshing).
+        let refresh_token_ids: Vec<Uuid> = sqlx::query_scalar::<_, Uuid>(
+            "SELECT refresh_token_id FROM sessions \
+             WHERE user_id = $1 AND tenant_id = $2 AND id <> $3 \
+               AND revoked_at IS NULL AND refresh_token_id IS NOT NULL",
+        )
+        .bind(user_id)
+        .bind(tenant_id)
+        .bind(current_session_id)
+        .fetch_all(&mut *conn)
+        .await
+        .map_err(ApiAuthError::Database)?;
+
         let count = Session::revoke_all_except(
             &mut *conn,
             tenant_id,
@@ -243,6 +304,17 @@ impl SessionService {
         )
         .await
         .map_err(ApiAuthError::Database)?;
+
+        if !refresh_token_ids.is_empty() {
+            let _ = sqlx::query(
+                "UPDATE refresh_tokens SET revoked_at = NOW() \
+                 WHERE id = ANY($1) AND tenant_id = $2 AND revoked_at IS NULL",
+            )
+            .bind(&refresh_token_ids)
+            .bind(tenant_id)
+            .execute(&mut *conn)
+            .await;
+        }
 
         info!(
             user_id = %user_id,
@@ -547,6 +619,32 @@ mod tests {
         assert!(
             production.contains("UPDATE oauth_refresh_tokens"),
             "refresh-token revoke must also revoke OAuth refresh tokens"
+        );
+    }
+
+    #[test]
+    fn revoking_a_session_revokes_its_refresh_token() {
+        let src = include_str!("session_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        // Single revoke must invalidate the linked refresh token so the device
+        // cannot mint new access tokens ("sign out this device" must actually work).
+        assert!(
+            production.contains("pub async fn link_refresh_token"),
+            "login must be able to link a session to its refresh token"
+        );
+        assert!(
+            production.contains("SELECT refresh_token_id FROM sessions WHERE id = $1"),
+            "revoke_session must resolve the linked refresh token"
+        );
+        assert!(
+            production.contains("UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1"),
+            "revoke_session must revoke the linked refresh token"
+        );
+        // Revoke-all-others must invalidate the other sessions' refresh tokens too.
+        assert!(
+            production.contains("UPDATE refresh_tokens SET revoked_at = NOW() \n                 WHERE id = ANY($1)")
+                || production.contains("WHERE id = ANY($1) AND tenant_id = $2 AND revoked_at IS NULL"),
+            "revoke_all_except_current must revoke the other sessions' refresh tokens"
         );
     }
 
