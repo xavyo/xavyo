@@ -178,6 +178,24 @@ impl DeviceCodeService {
         })
     }
 
+    /// Resolve the owning tenant of a pending device code from its `user_code`.
+    ///
+    /// Used by the browser-facing device verification routes to derive tenant
+    /// context without an `X-Tenant-ID` header (RFC 8628 has the user open the
+    /// verification URL in a plain browser). `user_code` is globally unique.
+    pub async fn resolve_tenant_by_user_code(
+        &self,
+        user_code: &str,
+    ) -> Result<Option<Uuid>, OAuthError> {
+        let normalized = Self::normalize_user_code(user_code);
+        DeviceCode::resolve_tenant_by_user_code(&self.pool, &normalized)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to resolve tenant from user_code: {}", e);
+                OAuthError::Internal("Database error".to_string())
+            })
+    }
+
     /// Find a pending device code by user code (for verification page).
     pub async fn find_pending_by_user_code(
         &self,

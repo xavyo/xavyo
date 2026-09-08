@@ -15,8 +15,10 @@ use crate::router::OAuthState;
 use crate::services::{DeviceAuthorizationStatus, DeviceCodeService, RiskAction, RiskContext};
 use crate::utils::{extract_country_code, extract_origin_ip};
 use axum::{
-    extract::{ConnectInfo, Query, State},
+    body::{to_bytes, Body},
+    extract::{ConnectInfo, Query, Request, State},
     http::{header::SET_COOKIE, HeaderMap, HeaderValue},
+    middleware::Next,
     response::{Html, IntoResponse, Response},
     Extension, Form,
 };
@@ -321,6 +323,93 @@ pub async fn device_authorization_handler(
         expires_in: response.expires_in,
         interval: response.interval,
     }))
+}
+
+/// Max device-flow form body we will buffer to resolve the tenant (device forms
+/// are tiny: a user_code plus a CSRF token).
+const DEVICE_FORM_BUFFER_LIMIT: usize = 16 * 1024;
+
+/// Resolve the tenant for browser-facing device-verification requests.
+///
+/// RFC 8628 has the user open `verification_uri` in a plain browser, which cannot
+/// send the `X-Tenant-ID` header this app uses for tenant resolution — so without
+/// this the entire `/device` flow returned 401. `user_code` is globally unique, so
+/// we derive the tenant from it (query `code`/`user_code`, or the form body) and
+/// inject the header before the tenant middleware/handlers run. Requests that
+/// already carry the header (or carry no resolvable code, e.g. the bare entry
+/// page) pass through unchanged.
+pub async fn resolve_device_tenant(
+    State(state): State<OAuthState>,
+    req: Request,
+    next: Next,
+) -> Response {
+    if req.headers().contains_key("x-tenant-id") {
+        return next.run(req).await;
+    }
+
+    // 1. Try query params (GET /device?code=..., and GET login/mfa pages).
+    let user_code = req.uri().query().and_then(|q| {
+        url::form_urlencoded::parse(q.as_bytes())
+            .find(|(k, _)| k == "code" || k == "user_code")
+            .map(|(_, v)| v.into_owned())
+    });
+
+    if let Some(code) = user_code {
+        return inject_tenant_and_run(state, req, next, &code).await;
+    }
+
+    // 2. For POSTs with a form body, buffer it, read user_code, then rebuild.
+    let is_form = req
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.starts_with("application/x-www-form-urlencoded"));
+
+    if req.method() == axum::http::Method::POST && is_form {
+        let (parts, body) = req.into_parts();
+        let bytes = match to_bytes(body, DEVICE_FORM_BUFFER_LIMIT).await {
+            Ok(b) => b,
+            Err(_) => {
+                // Body too large / unreadable: rebuild empty and let the handler 400.
+                let req = Request::from_parts(parts, Body::empty());
+                return next.run(req).await;
+            }
+        };
+        let code = url::form_urlencoded::parse(&bytes)
+            .find(|(k, _)| k == "user_code" || k == "code")
+            .map(|(_, v)| v.into_owned());
+        let mut req = Request::from_parts(parts, Body::from(bytes));
+        if let Some(code) = code {
+            if let Ok(Some(tenant_id)) = DeviceCodeService::new(state.pool.clone())
+                .resolve_tenant_by_user_code(&code)
+                .await
+            {
+                if let Ok(hv) = HeaderValue::from_str(&tenant_id.to_string()) {
+                    req.headers_mut().insert("x-tenant-id", hv);
+                }
+            }
+        }
+        return next.run(req).await;
+    }
+
+    next.run(req).await
+}
+
+async fn inject_tenant_and_run(
+    state: OAuthState,
+    mut req: Request,
+    next: Next,
+    user_code: &str,
+) -> Response {
+    if let Ok(Some(tenant_id)) = DeviceCodeService::new(state.pool.clone())
+        .resolve_tenant_by_user_code(user_code)
+        .await
+    {
+        if let Ok(hv) = HeaderValue::from_str(&tenant_id.to_string()) {
+            req.headers_mut().insert("x-tenant-id", hv);
+        }
+    }
+    next.run(req).await
 }
 
 /// Device verification page (HTML).
@@ -1834,6 +1923,36 @@ fn render_confirmation_result_page(success: bool, message: &str) -> String {
 mod tests {
     use super::*;
     use chrono::{Duration, Utc};
+
+    #[test]
+    fn device_flow_resolves_tenant_from_user_code_without_header() {
+        // Regression (RFC 8628): the browser-facing /device pages must work
+        // without an X-Tenant-ID header (a user opens verification_uri in a plain
+        // browser). The middleware derives the tenant from the globally-unique
+        // user_code (query or form) and injects the header; it must NOT hard-fail
+        // when the header is absent.
+        let src = include_str!("device.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("pub async fn resolve_device_tenant"),
+            "device routes must have a tenant-from-user_code resolver middleware"
+        );
+        assert!(
+            production.contains("resolve_tenant_by_user_code"),
+            "middleware must resolve the tenant from the user_code"
+        );
+        // It resolves from both the query string and the buffered form body.
+        assert!(
+            production.contains("req.uri().query()") && production.contains("to_bytes(body"),
+            "middleware must read user_code from query and form body"
+        );
+        // And it injects the header the handlers read, only when absent.
+        assert!(
+            production.contains("req.headers().contains_key(\"x-tenant-id\")")
+                && production.contains("insert(\"x-tenant-id\""),
+            "middleware must inject X-Tenant-ID (and skip when already present)"
+        );
+    }
 
     #[test]
     fn test_html_escape() {

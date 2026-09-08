@@ -851,9 +851,14 @@ async fn main() {
         .layer(axum::Extension(lockout_service_for_device.clone()))
         .layer(axum::Extension(mfa_service_for_device.clone()))
         .layer(axum::Extension(audit_service_for_device.clone()))
+        // RFC 8628: the browser-facing device pages must load without an
+        // X-Tenant-ID header — the tenant is resolved from the globally-unique
+        // user_code by the `resolve_device_tenant` middleware inside
+        // `device_router` (which injects the header the handlers read). So this
+        // layer must NOT hard-require the header, or the entry page 401s.
         .layer(TenantLayer::with_config(
             xavyo_tenant::TenantConfig::builder()
-                .require_tenant(true)
+                .require_tenant(false)
                 .build(),
         ));
 
