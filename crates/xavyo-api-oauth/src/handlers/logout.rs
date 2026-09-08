@@ -18,9 +18,11 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
     Form, Json,
 };
+use chrono::Utc;
 use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use xavyo_db::models::{CreateRevokedToken, RevokedToken};
 
 /// Parameters for the OIDC RP-Initiated Logout endpoint.
 ///
@@ -399,22 +401,68 @@ async fn revoke_user_sessions(
             OAuthError::Internal("Failed to set tenant context".to_string())
         })?;
 
-    let result = sqlx::query("DELETE FROM user_sessions WHERE tenant_id = $1 AND user_id = $2")
-        .bind(tenant_id)
-        .bind(user_id)
-        .execute(&mut *conn)
-        .await
-        .map_err(|e| {
-            tracing::error!(
-                user_id = %user_id,
-                tenant_id = %tenant_id,
-                error = %e,
-                "Failed to delete user sessions"
-            );
-            OAuthError::Internal("Failed to revoke user sessions".to_string())
-        })?;
+    // Soft-revoke every active session for the user in the `sessions` table
+    // (the app's session store — there is no `user_sessions` table; querying it
+    // 500'd the entire logout). Sessions are revoked via `revoked_at`, matching
+    // SessionService and the JWT/session checks that key off it.
+    let result = sqlx::query(
+        "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'oidc_logout' \
+         WHERE tenant_id = $1 AND user_id = $2 AND revoked_at IS NULL",
+    )
+    .bind(tenant_id)
+    .bind(user_id)
+    .execute(&mut *conn)
+    .await
+    .map_err(|e| {
+        tracing::error!(
+            user_id = %user_id,
+            tenant_id = %tenant_id,
+            error = %e,
+            "Failed to revoke user sessions"
+        );
+        OAuthError::Internal("Failed to revoke user sessions".to_string())
+    })?;
 
     let rows_deleted = result.rows_affected();
+
+    // Also revoke the session-issued refresh tokens so the device cannot mint new
+    // access tokens after logout (the OAuth client refresh tokens are revoked
+    // separately by TokenService::revoke_user_tokens).
+    let _ = sqlx::query(
+        "UPDATE refresh_tokens SET revoked_at = NOW() \
+         WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL",
+    )
+    .bind(user_id)
+    .bind(tenant_id)
+    .execute(&mut *conn)
+    .await;
+
+    // Blacklist all currently-valid access tokens via a revoke-all sentinel so
+    // logout takes effect immediately rather than after the (short) access-token
+    // TTL — matching Auth0/Okta, where RP-initiated logout ends the session now.
+    // The JWT auth middleware rejects any of the user's tokens issued before this.
+    let sentinel = CreateRevokedToken {
+        jti: format!("revoke-all:{user_id}:{}", Utc::now().timestamp()),
+        user_id,
+        tenant_id,
+        reason: Some("oidc_logout".to_string()),
+        // Cover the access-token max lifetime with a comfortable buffer.
+        expires_at: Utc::now() + chrono::Duration::hours(1),
+        revoked_by: None,
+    };
+    if let Err(e) = RevokedToken::insert(&mut *conn, sentinel).await {
+        // A failed sentinel would let access tokens live out their TTL — surface it.
+        tracing::error!(
+            user_id = %user_id,
+            tenant_id = %tenant_id,
+            error = %e,
+            "Failed to write revoke-all sentinel during OIDC logout"
+        );
+        return Err(OAuthError::Internal(
+            "Failed to fully revoke user tokens".to_string(),
+        ));
+    }
+
     tracing::info!(
         user_id = %user_id,
         tenant_id = %tenant_id,
@@ -428,6 +476,35 @@ async fn revoke_user_sessions(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn logout_revokes_sessions_in_the_real_sessions_table() {
+        // Regression: RP-initiated logout deleted from a non-existent
+        // `user_sessions` table, so any logout with an id_token_hint that
+        // identified a user returned 500 (session revocation crashed the whole
+        // request). Must target the real `sessions` table and soft-revoke via
+        // revoked_at, consistent with SessionService.
+        let src = include_str!("logout.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("FROM user_sessions"),
+            "logout must not reference the non-existent user_sessions table"
+        );
+        assert!(
+            production.contains("UPDATE sessions SET revoked_at = NOW()"),
+            "logout must soft-revoke sessions in the real sessions table"
+        );
+        // It must also revoke the session refresh tokens so the device cannot
+        // continue the session, and write a revoke-all sentinel.
+        assert!(
+            production.contains("UPDATE refresh_tokens SET revoked_at = NOW()"),
+            "logout must revoke the session refresh tokens"
+        );
+        assert!(
+            production.contains("revoke-all:{user_id}") && production.contains("\"oidc_logout\""),
+            "logout must write a revoke-all sentinel to end the session immediately"
+        );
+    }
 
     #[test]
     fn test_end_session_params_deserialize_empty() {
