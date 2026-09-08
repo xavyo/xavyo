@@ -1608,6 +1608,13 @@ async fn main() {
         .layer(axum::Extension(api_key_rate_limiter.clone()))
         // F082-US4: Revocation cache for fast JTI lookups
         .layer(axum::Extension(revocation_cache))
+        // The JWT auth middleware's revoke-all *sentinel* check (cascade
+        // revocation from logout / admin revoke / auth-code reuse / password
+        // change) requires a PgPool in the request extensions. Most authenticated
+        // route groups did not layer one, so the sentinel check silently
+        // fail-opened there and revoked access tokens kept working until TTL.
+        // Provide the pool globally so cascade revocation is enforced everywhere.
+        .layer(axum::Extension(pool.clone()))
         // F085: Webhook event publisher for identity lifecycle events
         .layer(axum::Extension(event_publisher))
         // Trusted proxy config for X-Forwarded-For validation
