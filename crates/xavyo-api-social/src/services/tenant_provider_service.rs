@@ -255,38 +255,41 @@ impl TenantProviderService {
         additional_config: Option<serde_json::Value>,
         scopes: Option<Vec<String>>,
     ) -> SocialResult<TenantProviderResponse> {
-        // L7: Validate required fields are non-empty
-        if client_id.trim().is_empty() {
+        // Look up the existing row once: whether it exists at all and whether it
+        // already has a stored secret. This lets a plain enable/disable toggle
+        // ({ enabled }) succeed without re-sending client_id / secret / scopes
+        // (the UPDATE branch below preserves the stored values), while still
+        // requiring them the first time a provider is configured.
+        let mut check_conn = self.pool.acquire().await?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *check_conn)
+            .await?;
+        let existing: Option<(bool,)> = sqlx::query_as(
+            "SELECT client_secret_encrypted IS NOT NULL \
+             FROM tenant_social_providers WHERE tenant_id = $1 AND provider = $2",
+        )
+        .bind(tenant_id)
+        .bind(provider.to_string())
+        .fetch_optional(&mut *check_conn)
+        .await?;
+        drop(check_conn);
+        let provider_exists = existing.is_some();
+        let has_stored_secret = existing.map(|r| r.0).unwrap_or(false);
+
+        // client_id is required to CREATE a provider; an existing provider keeps
+        // its stored client_id when the request omits it (e.g. a toggle).
+        if client_id.trim().is_empty() && !provider_exists {
             return Err(crate::error::SocialError::ConfigurationError {
                 message: "client_id cannot be empty".to_string(),
             });
         }
-        if enabled && client_secret.is_none() {
-            // Enabling without a secret in the request is valid when the provider
-            // is already configured with one (e.g. an admin toggles an
-            // already-saved provider on). The UPDATE branch below preserves the
-            // stored secret. Reject only when no secret exists anywhere — otherwise
-            // toggling a configured provider on 500'd with "client_secret cannot be
-            // empty".
-            let mut check_conn = self.pool.acquire().await?;
-            sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
-                .bind(tenant_id.to_string())
-                .execute(&mut *check_conn)
-                .await?;
-            let has_stored_secret: bool = sqlx::query_scalar(
-                "SELECT client_secret_encrypted IS NOT NULL \
-                 FROM tenant_social_providers WHERE tenant_id = $1 AND provider = $2",
-            )
-            .bind(tenant_id)
-            .bind(provider.to_string())
-            .fetch_optional(&mut *check_conn)
-            .await?
-            .unwrap_or(false);
-            if !has_stored_secret {
-                return Err(crate::error::SocialError::ConfigurationError {
-                    message: "client_secret cannot be empty".to_string(),
-                });
-            }
+        // A secret is required to ENABLE a provider that has none stored yet.
+        // Toggling an already-configured provider on does not need to re-send it.
+        if enabled && client_secret.is_none() && !has_stored_secret {
+            return Err(crate::error::SocialError::ConfigurationError {
+                message: "client_secret cannot be empty".to_string(),
+            });
         }
 
         // R9: Validate additional_config size to prevent storage abuse
@@ -328,10 +331,10 @@ impl TenantProviderService {
                 ON CONFLICT (tenant_id, provider)
                 DO UPDATE SET
                     enabled = EXCLUDED.enabled,
-                    client_id = EXCLUDED.client_id,
+                    client_id = COALESCE(NULLIF(EXCLUDED.client_id, ''), tenant_social_providers.client_id),
                     client_secret_encrypted = EXCLUDED.client_secret_encrypted,
-                    additional_config = EXCLUDED.additional_config,
-                    scopes = EXCLUDED.scopes,
+                    additional_config = COALESCE(EXCLUDED.additional_config, tenant_social_providers.additional_config),
+                    scopes = COALESCE(EXCLUDED.scopes, tenant_social_providers.scopes),
                     updated_at = NOW()
                 RETURNING provider, enabled, client_id, scopes, created_at, updated_at
                 ",
@@ -350,9 +353,9 @@ impl TenantProviderService {
                 r"
                 UPDATE tenant_social_providers
                 SET enabled = $3,
-                    client_id = $4,
-                    additional_config = $5,
-                    scopes = $6,
+                    client_id = COALESCE(NULLIF($4, ''), client_id),
+                    additional_config = COALESCE($5, additional_config),
+                    scopes = COALESCE($6, scopes),
                     updated_at = NOW()
                 WHERE tenant_id = $1 AND provider = $2
                 RETURNING provider, enabled, client_id, scopes, created_at, updated_at
@@ -460,27 +463,41 @@ struct AdminProviderRow {
 
 #[cfg(test)]
 mod tests {
-    /// Regression: toggling an already-configured social provider to `enabled`
-    /// sends `{ enabled: true }` with no `client_secret`. The upfront validation
-    /// must NOT hard-reject that — it should allow it when a secret is already
-    /// stored (the UPDATE branch preserves it). Previously this 500'd with
-    /// "client_secret cannot be empty", so admins could not enable a saved
-    /// provider from the UI.
+    /// Regression: a plain enable/disable toggle from the admin UI sends only
+    /// `{ enabled }` — no client_id, secret, or scopes. update_provider must
+    /// treat that as a partial update against an existing provider: keep the
+    /// stored client_id/secret/scopes and only flip `enabled`. Previously it
+    /// rejected the empty client_id ("client_id cannot be empty") and the missing
+    /// secret ("client_secret cannot be empty") with a 500, so an admin could not
+    /// enable a provider they had already configured. First-time configuration
+    /// still requires client_id + secret.
     #[test]
-    fn enable_without_secret_allowed_when_secret_already_stored() {
+    fn enable_toggle_preserves_stored_config_for_existing_provider() {
         let src = include_str!("tenant_provider_service.rs");
         let production = src.split("mod tests").next().expect("production source");
         let update = production
             .split("pub async fn update_provider")
             .nth(1)
             .expect("update_provider");
+        // Existence is checked so create-vs-update can be distinguished.
         assert!(
-            update.contains("has_stored_secret"),
-            "update_provider must check for an already-stored secret before rejecting enable"
+            update.contains("provider_exists") && update.contains("has_stored_secret"),
+            "update_provider must distinguish an existing provider from a new one"
+        );
+        // client_id / secret only required when the provider does NOT yet exist.
+        assert!(
+            update.contains("client_id.trim().is_empty() && !provider_exists"),
+            "client_id must be required only when creating a provider"
         );
         assert!(
-            update.contains("client_secret_encrypted IS NOT NULL"),
-            "the stored-secret check must query client_secret_encrypted"
+            update.contains("enabled && client_secret.is_none() && !has_stored_secret"),
+            "a secret must be required only when enabling an unconfigured provider"
+        );
+        // The UPDATE branch must preserve stored values on a toggle.
+        assert!(
+            update.contains("client_id = COALESCE(NULLIF($4, ''), client_id)")
+                && update.contains("scopes = COALESCE($6, scopes)"),
+            "toggling must preserve the stored client_id and scopes"
         );
     }
 }
