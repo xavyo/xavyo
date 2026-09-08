@@ -479,10 +479,14 @@ pub async fn device_verify_code_handler(
     // Determine secure flag based on environment
     let is_secure = state.is_production();
 
-    // Helper to build response with new CSRF token
-    let with_csrf_cookie = |html: String| -> Response {
-        let csrf_token = generate_csrf_token();
-        let csrf_cookie = create_csrf_cookie(&csrf_token, is_secure);
+    // Helper to attach the CSRF cookie. The cookie MUST carry the *same* token
+    // that was embedded in the page's hidden form field, otherwise the next POST
+    // fails CSRF validation ("Session expired"). Previously this closure minted a
+    // fresh token for the cookie while the HTML kept a different one, so the
+    // approval page always mismatched and device authorization could never be
+    // completed in a browser.
+    let with_csrf_cookie = |html: String, csrf_token: &str| -> Response {
+        let csrf_cookie = create_csrf_cookie(csrf_token, is_secure);
         let mut response = Html(html).into_response();
         if let Ok(cookie_value) = HeaderValue::from_str(&csrf_cookie) {
             response.headers_mut().insert(SET_COOKIE, cookie_value);
@@ -511,11 +515,14 @@ pub async fn device_verify_code_handler(
                 "Device verify: CSRF validation failed"
             );
             let csrf_token = generate_csrf_token();
-            return with_csrf_cookie(render_verification_page(
-                &request.user_code,
-                "Session expired. Please try again.",
+            return with_csrf_cookie(
+                render_verification_page(
+                    &request.user_code,
+                    "Session expired. Please try again.",
+                    &csrf_token,
+                ),
                 &csrf_token,
-            ));
+            );
         }
     }
 
@@ -529,11 +536,14 @@ pub async fn device_verify_code_handler(
                 "Device verify: missing or invalid tenant ID"
             );
             let csrf_token = generate_csrf_token();
-            return with_csrf_cookie(render_verification_page(
-                &request.user_code,
-                "Invalid request. Please try again.",
+            return with_csrf_cookie(
+                render_verification_page(
+                    &request.user_code,
+                    "Invalid request. Please try again.",
+                    &csrf_token,
+                ),
                 &csrf_token,
-            ));
+            );
         }
     };
 
@@ -578,33 +588,43 @@ pub async fn device_verify_code_handler(
                 };
 
                 // User is logged in - show enhanced approval page with context
-                with_csrf_cookie(render_approval_page_with_context(&context))
+                let approval_csrf = context.csrf_token.clone();
+                with_csrf_cookie(render_approval_page_with_context(&context), &approval_csrf)
             } else {
                 // User not logged in - show login form with device code context
-                with_csrf_cookie(render_login_page(
-                    &request.user_code,
-                    &device_code.client_id,
-                    &device_code.scopes,
-                    None, // No error initially
+                with_csrf_cookie(
+                    render_login_page(
+                        &request.user_code,
+                        &device_code.client_id,
+                        &device_code.scopes,
+                        None, // No error initially
+                        &csrf_token,
+                    ),
                     &csrf_token,
-                ))
+                )
             }
         }
         Ok(None) => {
             let csrf_token = generate_csrf_token();
-            with_csrf_cookie(render_verification_page(
-                &request.user_code,
-                "Invalid or expired code. Please check the code and try again.",
+            with_csrf_cookie(
+                render_verification_page(
+                    &request.user_code,
+                    "Invalid or expired code. Please check the code and try again.",
+                    &csrf_token,
+                ),
                 &csrf_token,
-            ))
+            )
         }
         Err(_) => {
             let csrf_token = generate_csrf_token();
-            with_csrf_cookie(render_verification_page(
-                &request.user_code,
-                "An error occurred. Please try again.",
+            with_csrf_cookie(
+                render_verification_page(
+                    &request.user_code,
+                    "An error occurred. Please try again.",
+                    &csrf_token,
+                ),
                 &csrf_token,
-            ))
+            )
         }
     }
 }
@@ -1923,6 +1943,32 @@ fn render_confirmation_result_page(success: bool, message: &str) -> String {
 mod tests {
     use super::*;
     use chrono::{Duration, Utc};
+
+    #[test]
+    fn device_csrf_cookie_matches_embedded_form_token() {
+        // Regression: with_csrf_cookie used to mint a NEW token for the cookie
+        // while the rendered HTML embedded a different one, so every device POST
+        // page shipped a form token that never matched its cookie — the approval
+        // step always failed CSRF ("Session expired") and device authorization
+        // could not be completed in a browser. The cookie must use the same token
+        // that was embedded in the page.
+        let src = include_str!("device.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let closure = production
+            .split("let with_csrf_cookie =")
+            .nth(1)
+            .and_then(|s| s.split("};").next())
+            .expect("with_csrf_cookie closure");
+        assert!(
+            closure.contains("csrf_token: &str")
+                && closure.contains("create_csrf_cookie(csrf_token"),
+            "with_csrf_cookie must set the cookie to the embedded form token, not a fresh one"
+        );
+        assert!(
+            !closure.contains("generate_csrf_token()"),
+            "with_csrf_cookie must NOT mint its own token (would mismatch the form)"
+        );
+    }
 
     #[test]
     fn device_flow_resolves_tenant_from_user_code_without_header() {
