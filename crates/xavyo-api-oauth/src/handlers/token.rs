@@ -1113,8 +1113,7 @@ mod tests {
         let sql = lookup
             .split("r\"")
             .nth(1)
-            .and_then(|s| s.split("\"")
-                .next())
+            .and_then(|s| s.split("\"").next())
             .expect("lookup SQL literal");
         assert!(
             !sql.contains("AND used = FALSE"),

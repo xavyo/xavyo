@@ -100,6 +100,7 @@ impl OpenIdConfiguration {
                 "iat".to_string(),
                 "auth_time".to_string(),
                 "nonce".to_string(),
+                "at_hash".to_string(),
                 "email".to_string(),
                 "email_verified".to_string(),
                 "name".to_string(),

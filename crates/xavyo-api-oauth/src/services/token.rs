@@ -314,6 +314,15 @@ impl TokenService {
         hex::encode(hash)
     }
 
+    /// Compute the OIDC `at_hash` for an access token: base64url (no padding) of
+    /// the left-most 128 bits of its SHA-256 digest (RS256 ⇒ SHA-256).
+    fn access_token_hash(access_token: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(access_token.as_bytes());
+        let digest = hasher.finalize();
+        URL_SAFE_NO_PAD.encode(&digest[..16])
+    }
+
     /// Look up user email and name fields from the database.
     /// Failures are logged and ignored so token issuance is never blocked by a
     /// profile lookup failure.
@@ -536,6 +545,7 @@ impl TokenService {
         auth_time: i64,
         scope: &str,
         profile: Option<&TokenUserProfile>,
+        access_token: Option<&str>,
     ) -> Result<String, OAuthError> {
         // For OIDC ID tokens, we need additional claims beyond standard JWT
         // We'll use a specialized ID token claims structure
@@ -547,6 +557,13 @@ impl TokenService {
             .auth_time(auth_time)
             .nonce(nonce)
             .expires_in_secs(ID_TOKEN_EXPIRY_SECS);
+        // OIDC Core §3.1.3.6 `at_hash`: base64url(left-most 128 bits of
+        // SHA-256(access_token)) — SHA-256 because the ID token is signed with
+        // RS256. Lets the client bind the ID token to the access token (token
+        // substitution defense), matching Auth0/Okta/Google on the code flow.
+        if let Some(at) = access_token {
+            builder = builder.at_hash(Self::access_token_hash(at));
+        }
         if let Some(profile) = profile {
             if scope_includes(scope, "email") {
                 builder = builder.email(profile.email.as_deref(), profile.email_verified);
@@ -938,6 +955,7 @@ impl TokenService {
                 auth_time,
                 scope,
                 Some(&profile),
+                Some(&access_token),
             )?)
         } else {
             None
@@ -1311,6 +1329,7 @@ impl TokenService {
                 auth_time,
                 scope,
                 Some(&profile),
+                Some(&access_token),
             )?)
         } else {
             None
@@ -1555,6 +1574,20 @@ xxU7T7aU32bKZLygCDtwsN8=
         let token1 = TokenService::generate_refresh_token_value();
         let token2 = TokenService::generate_refresh_token_value();
         assert_ne!(token1, token2);
+    }
+
+    #[test]
+    fn access_token_hash_matches_oidc_at_hash_formula() {
+        // OIDC Core §3.1.3.6: at_hash = base64url(left-most 128 bits of
+        // SHA-256(access_token)) for an RS256-signed ID token. Verify against an
+        // independent computation so the code flow's at_hash is spec-correct.
+        use sha2::{Digest, Sha256};
+        let at = "example-access-token-value";
+        let digest = Sha256::new().chain_update(at.as_bytes()).finalize();
+        let expected = URL_SAFE_NO_PAD.encode(&digest[..16]);
+        assert_eq!(TokenService::access_token_hash(at), expected);
+        // 128 bits → 16 bytes → 22 base64url chars (no padding).
+        assert_eq!(TokenService::access_token_hash(at).len(), 22);
     }
 
     #[test]
