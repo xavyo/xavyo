@@ -160,6 +160,105 @@ pub async fn callback_apple_post(
     process_callback(state, ProviderType::Apple, &code, &form.state, apple_user).await
 }
 
+/// Verify an OIDC provider's ID token and reconcile it with the userinfo result.
+///
+/// Shared by the login callback and the account-link flow so both enforce the
+/// same checks: JWKS-backed signature/issuer/audience verification, subject
+/// cross-check against userinfo (blocks token substitution), and OIDC nonce
+/// replay protection. On success, `email_verified` is upgraded from the signed
+/// ID token (never downgraded). A JWKS-fetch infrastructure failure is
+/// non-fatal (the token still came from the provider's token endpoint), but
+/// signature/claim failures fail closed. No-op for non-OIDC providers (GitHub)
+/// or when no ID token is present.
+pub(crate) async fn verify_provider_id_token(
+    state: &SocialState,
+    provider_type: ProviderType,
+    id_token: Option<&str>,
+    user_info: &mut SocialUserInfo,
+    expected_nonce: Option<&str>,
+    azure_tenant: Option<&str>,
+    client_id: &str,
+) -> Result<(), SocialError> {
+    let Some(id_token) = id_token else {
+        return Ok(());
+    };
+
+    let verify_params: Option<(String, String)> = match provider_type {
+        ProviderType::Google => Some((
+            "https://www.googleapis.com/oauth2/v3/certs".to_string(),
+            "https://accounts.google.com".to_string(),
+        )),
+        ProviderType::Microsoft => {
+            let t = azure_tenant.unwrap_or("common");
+            Some((
+                format!("https://login.microsoftonline.com/{t}/discovery/v2.0/keys"),
+                format!("https://login.microsoftonline.com/{t}/v2.0"),
+            ))
+        }
+        ProviderType::Apple => Some((
+            "https://appleid.apple.com/auth/keys".to_string(),
+            "https://appleid.apple.com".to_string(),
+        )),
+        ProviderType::Github => None,
+    };
+
+    let Some((jwks_uri, issuer)) = verify_params else {
+        return Ok(());
+    };
+
+    match state
+        .id_token_verifier
+        .verify(id_token, &jwks_uri, &issuer, client_id)
+        .await
+    {
+        Ok(verified_claims) => {
+            // Cross-check: verified sub must match userinfo sub
+            if verified_claims.sub != user_info.provider_user_id {
+                warn!(
+                    provider = %provider_type,
+                    id_token_sub = %verified_claims.sub,
+                    userinfo_sub = %user_info.provider_user_id,
+                    "ID token sub mismatch — possible token substitution"
+                );
+                return Err(SocialError::IdTokenVerificationFailed {
+                    provider: provider_type,
+                    reason: "Subject mismatch between ID token and userinfo".to_string(),
+                });
+            }
+
+            // OIDC nonce validation: the ID token nonce must match what we sent
+            if let Some(expected_nonce) = expected_nonce {
+                if verified_claims.nonce.as_deref() != Some(expected_nonce) {
+                    warn!(
+                        provider = %provider_type,
+                        "OIDC nonce mismatch — possible replay attack"
+                    );
+                    return Err(SocialError::NonceMismatch {
+                        provider: provider_type,
+                    });
+                }
+            }
+
+            // Propagate email_verified from the JWKS-verified ID token (upgrade only).
+            if verified_claims.email_verified == Some(true) {
+                user_info.email_verified = Some(true);
+            }
+
+            info!(provider = %provider_type, "ID token verified successfully");
+        }
+        Err(SocialError::JwksFetchFailed { provider, reason }) => {
+            warn!(
+                provider = %provider,
+                reason = %reason,
+                "JWKS fetch failed, continuing without ID token verification"
+            );
+        }
+        Err(e) => return Err(e),
+    }
+
+    Ok(())
+}
+
 /// Process the OAuth callback and handle user creation/login.
 async fn process_callback(
     state: SocialState,
@@ -307,82 +406,16 @@ async fn process_callback(
 
     // Defense-in-depth: Verify ID token signature for OIDC providers.
     // GitHub has no ID token. All OIDC providers (Google, Microsoft, Apple) are verified.
-    if let Some(ref id_token) = tokens.id_token {
-        let verify_params: Option<(String, String)> = match provider_type {
-            ProviderType::Google => Some((
-                "https://www.googleapis.com/oauth2/v3/certs".to_string(),
-                "https://accounts.google.com".to_string(),
-            )),
-            ProviderType::Microsoft => {
-                let t = azure_tenant_for_verify.as_deref().unwrap_or("common");
-                Some((
-                    format!("https://login.microsoftonline.com/{t}/discovery/v2.0/keys"),
-                    format!("https://login.microsoftonline.com/{t}/v2.0"),
-                ))
-            }
-            ProviderType::Apple => Some((
-                "https://appleid.apple.com/auth/keys".to_string(),
-                "https://appleid.apple.com".to_string(),
-            )),
-            _ => None,
-        };
-
-        if let Some((jwks_uri, issuer)) = verify_params {
-            match state
-                .id_token_verifier
-                .verify(id_token, &jwks_uri, &issuer, &client_id_for_verify)
-                .await
-            {
-                Ok(verified_claims) => {
-                    // Cross-check: verified sub must match userinfo sub
-                    if verified_claims.sub != user_info.provider_user_id {
-                        warn!(
-                            provider = %provider_type,
-                            id_token_sub = %verified_claims.sub,
-                            userinfo_sub = %user_info.provider_user_id,
-                            "ID token sub mismatch — possible token substitution"
-                        );
-                        return Err(SocialError::IdTokenVerificationFailed {
-                            provider: provider_type,
-                            reason: "Subject mismatch between ID token and userinfo".to_string(),
-                        });
-                    }
-
-                    // OIDC nonce validation: verify the nonce in the ID token matches what we sent
-                    if let Some(ref expected_nonce) = claims.oidc_nonce {
-                        if verified_claims.nonce.as_deref() != Some(expected_nonce.as_str()) {
-                            warn!(
-                                provider = %provider_type,
-                                "OIDC nonce mismatch — possible replay attack"
-                            );
-                            return Err(SocialError::NonceMismatch {
-                                provider: provider_type,
-                            });
-                        }
-                    }
-
-                    // Propagate email_verified from JWKS-verified ID token.
-                    // The ID token is signed by the provider's private key, making
-                    // it more authoritative than the userinfo endpoint's default.
-                    // Only upgrade false→true (never downgrade true→false).
-                    if verified_claims.email_verified == Some(true) {
-                        user_info.email_verified = Some(true);
-                    }
-
-                    info!(provider = %provider_type, "ID token verified successfully");
-                }
-                Err(SocialError::JwksFetchFailed { provider, reason }) => {
-                    warn!(
-                        provider = %provider,
-                        reason = %reason,
-                        "JWKS fetch failed, continuing without ID token verification"
-                    );
-                    // Defense-in-depth: don't block login for infrastructure issues
-                }
-                Err(e) => return Err(e),
-            }
-        }
-    }
+    verify_provider_id_token(
+        &state,
+        provider_type,
+        tokens.id_token.as_deref(),
+        &mut user_info,
+        claims.oidc_nonce.as_deref(),
+        azure_tenant_for_verify.as_deref(),
+        &client_id_for_verify,
+    )
+    .await?;
 
     info!(
         provider = %provider_type,
