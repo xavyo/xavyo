@@ -357,14 +357,21 @@ async fn lookup_authorization_code(
     hasher.update(code.as_bytes());
     let code_hash = hex::encode(hasher.finalize());
 
-    // Query WITHOUT setting RLS context - we need to find the tenant_id
+    // Query WITHOUT setting RLS context - we need to find the tenant_id.
+    //
+    // Intentionally resolve on `code_hash` alone: do NOT filter on `used` or
+    // `expires_at` here. All of those checks — and, critically, the RFC 6749
+    // §10.5 reuse detection that revokes the previously-issued token family —
+    // live in `validate_and_consume_code`. Filtering `used = FALSE` here would
+    // short-circuit a replayed code with a plain "not found" before reuse
+    // detection could fire, leaving any tokens minted from the intercepted code
+    // valid. This lookup only resolves the tenant/client context; the atomic
+    // transaction downstream enforces expiry, single-use, and reuse revocation.
     let result: Option<(Uuid, Uuid)> = sqlx::query_as(
         r"
         SELECT client_id, tenant_id
         FROM authorization_codes
         WHERE code_hash = $1
-          AND used = FALSE
-          AND expires_at > NOW()
         ",
     )
     .bind(&code_hash)
@@ -1085,6 +1092,39 @@ async fn handle_token_exchange_grant(
 mod tests {
     use super::*;
     use axum::http::HeaderValue;
+
+    #[test]
+    fn lookup_does_not_filter_used_so_reuse_detection_can_fire() {
+        // Regression: lookup_authorization_code filtered `used = FALSE`, so a
+        // replayed authorization code was rejected here with a plain "not found"
+        // BEFORE reaching validate_and_consume_code — making the RFC 6749 §10.5
+        // reuse-detection branch (which writes the revoke-all token-family
+        // sentinel) dead code. The lookup must resolve on code_hash alone and let
+        // the downstream atomic transaction enforce expiry / single-use / reuse.
+        let src = include_str!("token.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let lookup = production
+            .split("async fn lookup_authorization_code")
+            .nth(1)
+            .expect("lookup_authorization_code");
+        // Inspect only the SQL string of the lookup (between the raw-string
+        // delimiters), so explanatory comments mentioning these clauses don't
+        // trip the assertions.
+        let sql = lookup
+            .split("r\"")
+            .nth(1)
+            .and_then(|s| s.split("\"")
+                .next())
+            .expect("lookup SQL literal");
+        assert!(
+            !sql.contains("AND used = FALSE"),
+            "lookup SQL must not filter used=FALSE (short-circuits reuse detection)"
+        );
+        assert!(
+            !sql.contains("AND expires_at > NOW()"),
+            "lookup SQL must not filter expiry (validate_and_consume_code is authoritative)"
+        );
+    }
 
     #[test]
     fn test_extract_client_credentials_from_basic_auth() {
