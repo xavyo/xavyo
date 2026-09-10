@@ -8,7 +8,7 @@ use sqlx::PgPool;
 use tracing::{info, warn};
 use uuid::Uuid;
 
-use xavyo_db::models::{GovPersona, GovPersonaArchetype};
+use xavyo_db::models::{GovPersona, GovPersonaArchetype, UserRole};
 use xavyo_governance::error::{GovernanceError, Result};
 
 /// Permission types for persona operations.
@@ -274,27 +274,26 @@ impl PersonaAuthorizationService {
     /// integrate with the full RBAC/entitlement system.
     async fn check_permission(
         &self,
-        _tenant_id: Uuid,
-        _user_id: Uuid,
+        tenant_id: Uuid,
+        user_id: Uuid,
         permission: PersonaPermission,
     ) -> Result<bool> {
-        // For now, we grant basic permissions to all authenticated users
-        // In production, this would check:
-        // 1. User's roles/entitlements
-        // 2. Delegated admin permissions
-        // 3. Archetype-specific grants
-
         match permission {
             // Self-management of own personas is allowed by default
             PersonaPermission::ManageOwnPersonas => Ok(true),
             // Creating personas requires explicit grant (would check entitlements)
             // For now, allow authenticated users to create their own personas
             PersonaPermission::CreatePersona => Ok(true),
-            // Admin permissions would require role check
+            // Managing personas for OTHER users is an admin capability. The persona
+            // routes are already admin-gated, so mirror that by granting tenant
+            // admins / super admins. Previously this was hard-coded to false, so no
+            // one — not even an admin — could create a persona for another user, and
+            // the resulting denial surfaced as a 500.
             PersonaPermission::ManageAllPersonas => {
-                // TODO: Check if user has admin role
-                // For now, return false (requires explicit admin grant)
-                Ok(false)
+                let roles = UserRole::get_user_roles(&self.pool, user_id, tenant_id)
+                    .await
+                    .map_err(GovernanceError::Database)?;
+                Ok(roles.iter().any(|r| r == "admin" || r == "super_admin"))
             }
             PersonaPermission::DeletePersona => {
                 // TODO: Check if user has delete permission

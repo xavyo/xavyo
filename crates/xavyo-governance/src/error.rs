@@ -2655,6 +2655,9 @@ impl GovernanceError {
                 // Power of Attorney (F-PoA)
                 | Self::PoaScopeViolation(_)
                 | Self::PersonaExtensionRequiresApproval
+                // Persona authorization denials (must be 403, not 500)
+                | Self::PersonaCreationNotAuthorized
+                | Self::PersonaArchetypeNotAuthorized(_)
         )
     }
 
@@ -3148,3 +3151,17 @@ impl GovernanceError {
 
 /// Result type alias for governance operations.
 pub type Result<T> = std::result::Result<T, GovernanceError>;
+
+#[cfg(test)]
+mod forbidden_mapping_tests {
+    use super::GovernanceError;
+
+    /// Regression: persona authorization denials must be classified as forbidden
+    /// so the API maps them to 403. Previously PersonaCreationNotAuthorized fell
+    /// through to the generic 500 "internal error" arm.
+    #[test]
+    fn persona_authorization_denials_are_forbidden() {
+        assert!(GovernanceError::PersonaCreationNotAuthorized.is_forbidden());
+        assert!(GovernanceError::PersonaArchetypeNotAuthorized(uuid::Uuid::nil()).is_forbidden());
+    }
+}

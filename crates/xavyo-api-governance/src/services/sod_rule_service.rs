@@ -4,7 +4,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use xavyo_db::models::{
-    CreateGovSodRule, GovSodRule, GovSodRuleStatus, GovSodSeverity, SodRuleFilter, UpdateGovSodRule,
+    CreateGovSodRule, GovEntitlement, GovSodRule, GovSodRuleStatus, GovSodSeverity, SodRuleFilter,
+    UpdateGovSodRule,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -82,6 +83,26 @@ impl SodRuleService {
         // Validate entitlement IDs are different
         if input.first_entitlement_id == input.second_entitlement_id {
             return Err(GovernanceError::SodSameEntitlement);
+        }
+
+        // Validate both entitlements actually exist for this tenant. Without this, a
+        // bad/stale entitlement id hit the FK constraint and surfaced to the user as a
+        // raw 500 "Database error"; now it returns a clear 400.
+        if GovEntitlement::find_by_id(&self.pool, tenant_id, input.first_entitlement_id)
+            .await?
+            .is_none()
+        {
+            return Err(GovernanceError::Validation(
+                "First entitlement not found".to_string(),
+            ));
+        }
+        if GovEntitlement::find_by_id(&self.pool, tenant_id, input.second_entitlement_id)
+            .await?
+            .is_none()
+        {
+            return Err(GovernanceError::Validation(
+                "Second entitlement not found".to_string(),
+            ));
         }
 
         // Check for duplicate name
@@ -274,5 +295,28 @@ mod tests {
         let ent_a = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
         let ent_b = ent_a;
         assert_eq!(ent_a, ent_b, "Same entitlement IDs should be detected");
+    }
+
+    /// Regression: creating an SoD rule with a non-existent entitlement id used to
+    /// hit the FK constraint and surface as a raw 500 "Database error". create_rule
+    /// must first verify both entitlements exist and return a Validation (400) error
+    /// instead.
+    #[test]
+    fn create_rule_validates_entitlement_existence() {
+        let src = include_str!("sod_rule_service.rs");
+        let create = src
+            .split("pub async fn create_rule")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn update_rule").next())
+            .expect("create_rule body");
+        assert!(
+            create.matches("GovEntitlement::find_by_id").count() >= 2,
+            "create_rule must look up both entitlements before inserting"
+        );
+        assert!(
+            create.contains("First entitlement not found")
+                && create.contains("Second entitlement not found"),
+            "create_rule must return a clear validation error for missing entitlements"
+        );
     }
 }

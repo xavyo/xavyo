@@ -101,6 +101,37 @@ impl IntoResponse for NhiApiError {
                 )
             }
             Self::Database(ref e) => {
+                // Constraint violations are caused by bad client input (e.g. a
+                // referenced entity id that doesn't exist, or a duplicate). Surfacing
+                // them as a raw 500 "database error" is misleading — map them to a
+                // clear 4xx instead.
+                if let Some(db_err) = e.as_database_error() {
+                    match db_err.code().as_deref() {
+                        // foreign_key_violation
+                        Some("23503") => {
+                            return (
+                                StatusCode::BAD_REQUEST,
+                                Json(ErrorResponse {
+                                    error: "invalid_reference".to_string(),
+                                    message: "A referenced entity does not exist".to_string(),
+                                }),
+                            )
+                                .into_response();
+                        }
+                        // unique_violation
+                        Some("23505") => {
+                            return (
+                                StatusCode::CONFLICT,
+                                Json(ErrorResponse {
+                                    error: "conflict".to_string(),
+                                    message: "A conflicting record already exists".to_string(),
+                                }),
+                            )
+                                .into_response();
+                        }
+                        _ => {}
+                    }
+                }
                 tracing::error!("Database error: {:?}", e);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -133,6 +164,28 @@ mod tests {
     use super::*;
     use axum::body::to_bytes;
     use axum::response::IntoResponse;
+
+    /// Regression: DB constraint violations from bad client input (e.g. a
+    /// non-existent referenced id) must map to a clear 4xx, not a raw 500
+    /// "database error". Previously creating a delegation with a non-existent
+    /// actor_nhi_id 500'd.
+    #[test]
+    fn database_error_maps_constraint_violations_to_4xx() {
+        let src = include_str!("error.rs");
+        let arm = src
+            .split("Self::Database(ref e) =>")
+            .nth(1)
+            .and_then(|s| s.split("let body = Json").next())
+            .expect("Database arm");
+        assert!(
+            arm.contains("23503") && arm.contains("StatusCode::BAD_REQUEST"),
+            "foreign_key_violation (23503) must map to 400"
+        );
+        assert!(
+            arm.contains("23505") && arm.contains("StatusCode::CONFLICT"),
+            "unique_violation (23505) must map to 409"
+        );
+    }
 
     #[tokio::test]
     async fn not_implemented_into_response_is_501() {

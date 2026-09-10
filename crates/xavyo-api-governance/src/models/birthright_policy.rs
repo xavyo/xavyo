@@ -91,7 +91,10 @@ pub struct CreateBirthrightPolicyRequest {
     pub priority: i32,
 
     /// Conditions that must ALL match for policy to apply (AND logic).
-    #[validate(length(min = 1, message = "At least one condition is required"))]
+    #[validate(
+        length(min = 1, message = "At least one condition is required"),
+        nested
+    )]
     pub conditions: Vec<PolicyConditionRequest>,
 
     /// Entitlement IDs to grant when conditions match.
@@ -135,6 +138,7 @@ pub struct UpdateBirthrightPolicyRequest {
 
     /// Conditions that must ALL match.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[validate(nested)]
     pub conditions: Option<Vec<PolicyConditionRequest>>,
 
     /// Entitlement IDs to grant.
@@ -521,6 +525,25 @@ pub enum UserImpactType {
 
 #[cfg(test)]
 mod tests {
+    /// Regression: a condition with an empty attribute used to 500 because the
+    /// nested per-condition validation (attribute length 1..=100) never ran — the
+    /// `conditions` field lacked `#[validate(nested)]`. It must now be present so a
+    /// bad condition returns a 400 validation error.
+    #[test]
+    fn condition_fields_are_nested_validated() {
+        let src = include_str!("birthright_policy.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let create = production
+            .split("struct CreateBirthrightPolicyRequest")
+            .nth(1)
+            .and_then(|s| s.split("pub entitlement_ids").next())
+            .unwrap_or("");
+        assert!(
+            create.contains("pub conditions") && create.contains("nested"),
+            "CreateBirthrightPolicyRequest.conditions must be #[validate(nested)]"
+        );
+    }
+
     #[test]
     fn birthright_response_does_not_default_on_invalid_json() {
         let src = include_str!("birthright_policy.rs");
