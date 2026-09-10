@@ -293,9 +293,7 @@ impl PersonaAuthorizationService {
                 let roles = UserRole::get_user_roles(&self.pool, user_id, tenant_id)
                     .await
                     .map_err(GovernanceError::Database)?;
-                Ok(roles
-                    .iter()
-                    .any(|r| r == "admin" || r == "super_admin"))
+                Ok(roles.iter().any(|r| r == "admin" || r == "super_admin"))
             }
             PersonaPermission::DeletePersona => {
                 // TODO: Check if user has delete permission
