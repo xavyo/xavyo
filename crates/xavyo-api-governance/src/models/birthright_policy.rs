@@ -536,11 +536,10 @@ mod tests {
         let create = production
             .split("struct CreateBirthrightPolicyRequest")
             .nth(1)
-            .and_then(|s| s.split("pub conditions").nth(1))
             .and_then(|s| s.split("pub entitlement_ids").next())
             .unwrap_or("");
         assert!(
-            create.contains("nested"),
+            create.contains("pub conditions") && create.contains("nested"),
             "CreateBirthrightPolicyRequest.conditions must be #[validate(nested)]"
         );
     }
